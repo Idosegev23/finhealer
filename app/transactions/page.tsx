@@ -26,7 +26,8 @@ export default async function TransactionsPage() {
   }
 
   // אם אין מנוי פעיל - הפנה לתשלום
-  if (userData.subscription_status !== 'active') {
+  const userInfo = userData as any
+  if (userInfo.subscription_status !== 'active') {
     redirect('/payment');
   }
 

@@ -36,8 +36,10 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
+  const userDataInfo = userData as any
+
   // אם אין מנוי פעיל - הפנה לתשלום
-  if (userData.subscription_status !== 'active') {
+  if (userDataInfo.subscription_status !== 'active') {
     redirect('/payment')
   }
 
@@ -51,7 +53,7 @@ export default async function DashboardPage() {
   // קבלת ציון בריאות פיננסית
   const { data: healthScore } = await supabase.rpc('calculate_financial_health', {
     p_user_id: user.id,
-  })
+  } as any)
 
   // קבלת סטטיסטיקות חודשיות
   const { data: monthlyStats } = await supabase
@@ -91,7 +93,7 @@ export default async function DashboardPage() {
 
   // חישוב ימים מההתחלה
   const daysSinceStart = Math.floor(
-    (Date.now() - new Date(userData.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    (Date.now() - new Date(userDataInfo.created_at).getTime()) / (1000 * 60 * 60 * 24)
   )
 
   const score = healthScore || 0
@@ -104,15 +106,16 @@ export default async function DashboardPage() {
   }
 
   // Check if user has completed profile (Empty State)
+  const profileData = userProfile as any
   const hasCompletedProfile = !!(
-    userProfile?.total_monthly_income || 
-    userProfile?.marital_status || 
-    userProfile?.num_children !== undefined
+    profileData?.total_monthly_income || 
+    profileData?.marital_status || 
+    profileData?.num_children !== undefined
   )
 
   // Show Empty State if no profile
   if (!hasCompletedProfile) {
-    return <EmptyDashboard userName={userData.name} hasProfile={false} />
+    return <EmptyDashboard userName={userDataInfo.name} hasProfile={false} />
   }
 
   return (
@@ -127,17 +130,17 @@ export default async function DashboardPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                  שלום, {userData.name}!
+                  שלום, {userDataInfo.name}!
                   <span className="text-2xl">👋</span>
                 </h1>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-sm text-emerald-400 font-medium flex items-center gap-1">
                     <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                    {userData.subscription_status === 'active' ? 'משתמש פעיל' : 'ממתין להפעלה'}
+                    {userDataInfo.subscription_status === 'active' ? 'משתמש פעיל' : 'ממתין להפעלה'}
                   </span>
                   <span className="text-sm text-gray-400">•</span>
                   <span className="text-sm text-gray-300">
-                    Phase {userData.phase === 'reflection' ? '1' : userData.phase === 'behavior' ? '2' : userData.phase === 'budget' ? '3' : userData.phase === 'goals' ? '4' : '5'}
+                    Phase {userDataInfo.phase === 'reflection' ? '1' : userDataInfo.phase === 'behavior' ? '2' : userDataInfo.phase === 'budget' ? '3' : userDataInfo.phase === 'goals' ? '4' : '5'}
                   </span>
                 </div>
               </div>
@@ -168,7 +171,7 @@ export default async function DashboardPage() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Progressive Banners */}
-        {!userProfile?.completed && transactionCount && transactionCount >= 5 && (
+        {!profileData?.completed && transactionCount && transactionCount >= 5 && (
           <ProgressiveBanner type="complete_profile" />
         )}
         {transactionCount && transactionCount >= 5 && transactionCount < 15 && (
@@ -177,7 +180,7 @@ export default async function DashboardPage() {
         {daysSinceStart >= 14 && (!activeGoals || activeGoals.length === 0) && (
           <ProgressiveBanner type="set_goals" daysSinceStart={daysSinceStart} />
         )}
-        {transactionCount && transactionCount >= 30 && userData.phase === 'behavior' && (
+        {transactionCount && transactionCount >= 30 && userDataInfo.phase === 'behavior' && (
           <ProgressiveBanner type="budget_ready" />
         )}
 
@@ -300,7 +303,7 @@ export default async function DashboardPage() {
 
           {/* Right Column - 1/3 */}
           <div className="space-y-6">
-            <PhaseProgress currentPhase={userData.phase || 'reflection'} />
+            <PhaseProgress currentPhase={userDataInfo.phase || 'reflection'} />
             
             <DebtVsAssets profile={userProfile} />
             

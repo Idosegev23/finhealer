@@ -48,7 +48,8 @@ export default function PaymentPage() {
         .eq('id', user.id)
         .single()
 
-      if (userData?.subscription_status === 'active') {
+      const userInfo = userData as any
+      if (userInfo?.subscription_status === 'active') {
         console.log('✅ משתמש כבר שילם, מפנה ל-dashboard')
         router.push('/dashboard')
       }

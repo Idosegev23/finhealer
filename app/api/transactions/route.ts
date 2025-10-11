@@ -108,7 +108,7 @@ export async function POST(request: Request) {
     // Update או Insert
     if (id) {
       // Update
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('transactions')
         .update({
           type,
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ transaction: data });
     } else {
       // Insert
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('transactions')
         .insert({
           user_id: user.id,

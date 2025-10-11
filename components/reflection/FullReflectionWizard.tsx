@@ -103,19 +103,20 @@ export default function FullReflectionWizard({ categories, userId }: FullReflect
 
     try {
       // חישוב סכום הוצאות קבועות
-      const totalFixedExpenses =
-        (data.rent_mortgage || 0) + (data.building_maintenance || 0) + (data.property_tax || 0) +
-        (data.life_insurance || 0) + (data.health_insurance || 0) + (data.car_insurance || 0) + (data.home_insurance || 0) +
-        (data.cellular || 0) + (data.internet || 0) + (data.tv_cable || 0) +
-        (data.leasing || 0) + (data.fuel || 0) + (data.parking || 0) + (data.public_transport || 0) +
-        (data.daycare || 0) + (data.afterschool || 0) + (data.tuition || 0) + (data.extracurricular || 0) + (data.babysitter || 0) +
-        (data.gym || 0) + (data.therapy || 0) + (data.medication || 0) +
-        (data.pension_funds || 0) +
-        (data.streaming || 0) + (data.digital_services || 0) +
-        (data.electricity || 0) + (data.water || 0) + (data.gas || 0) +
-        (data.other_fixed || 0);
+      const dataFields = data as any
+      const totalFixedExpenses = 
+        (dataFields.rent_mortgage || 0) + (dataFields.building_maintenance || 0) + (dataFields.property_tax || 0) +
+        (dataFields.life_insurance || 0) + (dataFields.health_insurance || 0) + (dataFields.car_insurance || 0) + (dataFields.home_insurance || 0) +
+        (dataFields.cellular || 0) + (dataFields.internet || 0) + (dataFields.tv_cable || 0) +
+        (dataFields.leasing || 0) + (dataFields.fuel || 0) + (dataFields.parking || 0) + (dataFields.public_transport || 0) +
+        (dataFields.daycare || 0) + (dataFields.afterschool || 0) + (dataFields.tuition || 0) + (dataFields.extracurricular || 0) + (dataFields.babysitter || 0) +
+        (dataFields.gym || 0) + (dataFields.therapy || 0) + (dataFields.medication || 0) +
+        (dataFields.pension_funds || 0) +
+        (dataFields.streaming || 0) + (dataFields.digital_services || 0) +
+        (dataFields.electricity || 0) + (dataFields.water || 0) + (dataFields.gas || 0) +
+        (dataFields.other_fixed || 0);
 
-      const totalMonthlyIncome = (data.monthly_income || 0) + (data.additional_income || 0) + (data.spouse_income || 0);
+      const totalMonthlyIncome = (dataFields.monthly_income || 0) + (dataFields.additional_income || 0) + (dataFields.spouse_income || 0);
 
       // שמירת פרופיל פיננסי
       const profileResponse = await fetch('/api/reflection/profile', {
@@ -123,60 +124,60 @@ export default function FullReflectionWizard({ categories, userId }: FullReflect
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           // Personal
-          age: data.age,
-          marital_status: data.marital_status,
-          children_count: data.children_count,
-          children_ages: data.children_ages,
-          city: data.city,
+          age: dataFields.age,
+          marital_status: dataFields.marital_status,
+          children_count: dataFields.children_count,
+          children_ages: dataFields.children_ages,
+          city: dataFields.city,
           // Income
-          monthly_income: data.monthly_income,
-          additional_income: data.additional_income,
-          spouse_income: data.spouse_income,
+          monthly_income: dataFields.monthly_income,
+          additional_income: dataFields.additional_income,
+          spouse_income: dataFields.spouse_income,
           total_monthly_income: totalMonthlyIncome,
           // Fixed Expenses - כל 39 השדות
-          rent_mortgage: data.rent_mortgage,
-          building_maintenance: data.building_maintenance,
-          property_tax: data.property_tax,
-          life_insurance: data.life_insurance,
-          health_insurance: data.health_insurance,
-          car_insurance: data.car_insurance,
-          home_insurance: data.home_insurance,
-          cellular: data.cellular,
-          internet: data.internet,
-          tv_cable: data.tv_cable,
-          leasing: data.leasing,
-          fuel: data.fuel,
-          parking: data.parking,
-          public_transport: data.public_transport,
-          daycare: data.daycare,
-          afterschool: data.afterschool,
-          tuition: data.tuition,
-          extracurricular: data.extracurricular,
-          babysitter: data.babysitter,
-          gym: data.gym,
-          therapy: data.therapy,
-          medication: data.medication,
-          pension_funds: data.pension_funds,
-          streaming: data.streaming,
-          digital_services: data.digital_services,
-          electricity: data.electricity,
-          water: data.water,
-          gas: data.gas,
-          other_fixed: data.other_fixed,
+          rent_mortgage: dataFields.rent_mortgage,
+          building_maintenance: dataFields.building_maintenance,
+          property_tax: dataFields.property_tax,
+          life_insurance: dataFields.life_insurance,
+          health_insurance: dataFields.health_insurance,
+          car_insurance: dataFields.car_insurance,
+          home_insurance: dataFields.home_insurance,
+          cellular: dataFields.cellular,
+          internet: dataFields.internet,
+          tv_cable: dataFields.tv_cable,
+          leasing: dataFields.leasing,
+          fuel: dataFields.fuel,
+          parking: dataFields.parking,
+          public_transport: dataFields.public_transport,
+          daycare: dataFields.daycare,
+          afterschool: dataFields.afterschool,
+          tuition: dataFields.tuition,
+          extracurricular: dataFields.extracurricular,
+          babysitter: dataFields.babysitter,
+          gym: dataFields.gym,
+          therapy: dataFields.therapy,
+          medication: dataFields.medication,
+          pension_funds: dataFields.pension_funds,
+          streaming: dataFields.streaming,
+          digital_services: dataFields.digital_services,
+          electricity: dataFields.electricity,
+          water: dataFields.water,
+          gas: dataFields.gas,
+          other_fixed: dataFields.other_fixed,
           total_fixed_expenses: totalFixedExpenses,
           // Debts & Assets
-          credit_card_debt: data.credit_card_debt,
-          bank_loans: data.bank_loans,
-          other_debts: data.other_debts,
-          current_savings: data.current_savings,
-          investments: data.investments,
-          owns_home: data.owns_home,
-          owns_car: data.owns_car,
-          current_account_balance: data.current_account_balance || 0,
+          credit_card_debt: dataFields.credit_card_debt,
+          bank_loans: dataFields.bank_loans,
+          other_debts: dataFields.other_debts,
+          current_savings: dataFields.current_savings,
+          investments: dataFields.investments,
+          owns_home: dataFields.owns_home,
+          owns_car: dataFields.owns_car,
+          current_account_balance: dataFields.current_account_balance || 0,
           // Goals
-          why_here: data.why_here,
-          short_term_goal: data.short_term_goal,
-          long_term_dream: data.long_term_dream,
+          why_here: dataFields.why_here,
+          short_term_goal: dataFields.short_term_goal,
+          long_term_dream: dataFields.long_term_dream,
           completed: true
         })
       });

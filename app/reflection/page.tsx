@@ -19,7 +19,8 @@ export default async function ReflectionPage() {
     .single();
 
   // אם כבר עבר את שלב ה-reflection, הפנה ל-dashboard
-  if (userData?.phase !== 'reflection') {
+  const userInfo = userData as any
+  if (userInfo?.phase !== 'reflection') {
     redirect('/dashboard');
   }
 

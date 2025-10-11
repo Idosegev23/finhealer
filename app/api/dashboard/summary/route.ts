@@ -19,6 +19,8 @@ export async function GET() {
       .select('phase, name')
       .eq('id', user.id)
       .single();
+    
+    const userInfo = userData as any;
 
     // תאריך חודש נוכחי
     const now = new Date();
@@ -34,19 +36,22 @@ export async function GET() {
       .gte('tx_date', firstDayOfMonth)
       .lte('tx_date', today);
 
-    const totalExpenses = transactions
-      ?.filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+    const txData = (transactions || []) as any[];
+    const totalExpenses = txData
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
 
-    const totalIncome = transactions
-      ?.filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+    const totalIncome = txData
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
 
     // מעקב תקציב חודשי
     const { data: budgetTracking } = await supabase
       .from('monthly_budget_tracking')
       .select('*')
       .eq('user_id', user.id);
+    
+    const budgetData = (budgetTracking || []) as any[];
 
     // יעדים פעילים
     const { data: activeGoals } = await supabase
@@ -67,7 +72,7 @@ export async function GET() {
 
     // ציון בריאות פיננסית
     const { data: healthData } = await supabase
-      .rpc('calculate_financial_health', { user_id: user.id });
+      .rpc('calculate_financial_health', { user_id: user.id } as any);
 
     const financialHealth = healthData || 0;
 
@@ -87,8 +92,8 @@ export async function GET() {
 
     return NextResponse.json({
       user: {
-        name: userData?.name,
-        phase: userData?.phase
+        name: userInfo?.name,
+        phase: userInfo?.phase
       },
       financial_health: financialHealth,
       monthly: {
@@ -96,7 +101,7 @@ export async function GET() {
         income: totalIncome,
         balance: totalIncome - totalExpenses
       },
-      budget_tracking: budgetTracking || [],
+      budget_tracking: budgetData,
       active_goals: activeGoals || [],
       recent_alerts: recentAlerts || [],
       baselines: baselines || [],

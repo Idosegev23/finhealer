@@ -54,14 +54,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (!user.wa_opt_in) {
+    const userData = user as any;
+
+    if (!userData.wa_opt_in) {
       return NextResponse.json(
         { error: 'User has not opted in to WhatsApp' },
         { status: 403 }
       );
     }
 
-    if (!user.phone) {
+    if (!userData.phone) {
       return NextResponse.json(
         { error: 'User has no phone number' },
         { status: 400 }
@@ -74,22 +76,22 @@ export async function POST(request: NextRequest) {
 
     if (buttons && buttons.length > 0) {
       result = await greenAPI.sendButtons({
-        phoneNumber: user.phone,
+        phoneNumber: userData.phone,
         message,
         buttons,
       });
     } else {
       result = await greenAPI.sendMessage({
-        phoneNumber: user.phone,
+        phoneNumber: userData.phone,
         message,
       });
     }
 
     // שמירת ההודעה היוצאת
-    const { data: savedMessage, error: msgError } = await supabase
+    const { data: savedMessage, error: msgError } = await (supabase as any)
       .from('wa_messages')
       .insert({
-        user_id: user.id,
+        user_id: userData.id,
         direction: 'out',
         msg_type: buttons ? 'buttons' : 'text',
         payload: { message, buttons },

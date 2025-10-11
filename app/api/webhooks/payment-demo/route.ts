@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     if (status === 'paid') {
       // עדכן את סטטוס המנוי של המשתמש
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('users')
         .update({ subscription_status: 'active' })
         .eq('id', user_id)
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       }
 
       // צור או עדכן מנוי
-      const { error: subscriptionError } = await supabase
+      const { error: subscriptionError } = await (supabase as any)
         .from('subscriptions')
         .upsert({
           user_id,
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       }
 
       // שלח הודעת ברוכים הבאים (בעתיד - דרך WhatsApp)
-      await supabase.from('alerts').insert({
+      await (supabase as any).from('alerts').insert({
         user_id,
         type: 'welcome',
         status: 'sent',
@@ -73,12 +73,12 @@ export async function POST(request: NextRequest) {
 
     if (status === 'cancelled') {
       // עדכן סטטוס ל-cancelled
-      await supabase
+      await (supabase as any)
         .from('users')
         .update({ subscription_status: 'cancelled' })
         .eq('id', user_id)
 
-      await supabase
+      await (supabase as any)
         .from('subscriptions')
         .update({ status: 'cancelled' })
         .eq('user_id', user_id)

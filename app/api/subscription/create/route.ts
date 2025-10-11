@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     // יצור/עדכן משתמש ב-users table (נוצר רק אחרי תשלום מוצלח!)
-    const { error: upsertUserError } = await supabase
+    const { error: upsertUserError } = await (supabase as any)
       .from('users')
       .upsert({
         id: user.id,
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // צור/עדכן מנוי
     const amount = plan === 'basic' ? 49 : 119;
-    const { error: subscriptionError } = await supabase
+    const { error: subscriptionError } = await (supabase as any)
       .from('subscriptions')
       .upsert(
         {

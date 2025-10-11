@@ -31,8 +31,10 @@ export async function POST(request: Request) {
       .select('phase')
       .eq('id', user.id)
       .single();
+    
+    const userPhase = (userData as any)?.phase;
 
-    if (userData?.phase !== 'reflection') {
+    if (userPhase !== 'reflection') {
       return NextResponse.json(
         { error: 'User not in reflection phase' },
         { status: 403 }
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
     }
 
     // מחיקת baselines קודמים (אם יש)
-    await supabase
+    await (supabase as any)
       .from('user_baselines')
       .delete()
       .eq('user_id', user.id);
@@ -54,7 +56,7 @@ export async function POST(request: Request) {
     }));
 
     // שמירת baselines
-    const { error: insertError } = await supabase
+    const { error: insertError } = await (supabase as any)
       .from('user_baselines')
       .insert(baselinesData);
 
@@ -67,7 +69,7 @@ export async function POST(request: Request) {
     }
 
     // עדכון phase ל-behavior
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from('users')
       .update({ phase: 'behavior' })
       .eq('id', user.id);
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
     }
 
     // יצירת התראת מעבר שלבים
-    await supabase
+    await (supabase as any)
       .from('alerts')
       .insert({
         user_id: user.id,

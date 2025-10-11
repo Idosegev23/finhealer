@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     if (existing) {
       // עדכון
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_financial_profile')
         .update({
           ...profile,
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       result = data;
     } else {
       // יצירה חדשה
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_financial_profile')
         .insert({
           ...profile,

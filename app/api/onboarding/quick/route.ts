@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     } = body;
 
     // Update user's name and phase
-    const { error: updateUserError } = await supabase
+    const { error: updateUserError } = await (supabase as any)
       .from('users')
       .update({
         name: name || user.user_metadata?.name || user.email?.split('@')[0],
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     // Create or update user_financial_profile with quick data
-    const { error: profileError } = await supabase
+    const { error: profileError } = await (supabase as any)
       .from('user_financial_profile')
       .upsert(
         {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     // Store the start method in user_settings
-    const { error: settingsError } = await supabase
+    const { error: settingsError } = await (supabase as any)
       .from('user_settings')
       .upsert(
         {

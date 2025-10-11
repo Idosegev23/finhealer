@@ -50,7 +50,9 @@ export async function POST(request: Request) {
           .maybeSingle();
 
         if (budgetData && !budgetError) {
-          const usagePercent = Number(budgetData.usage_percentage) || 0;
+          // Type assertion needed because view columns aren't in generated types
+          const data = budgetData as any;
+          const usagePercent = Number(data.usage_percentage) || 0;
           simulationResult.would_trigger = usagePercent >= threshold;
           simulationResult.message = simulationResult.would_trigger
             ? `🚨 התראה! חרגת ${usagePercent.toFixed(0)}% מהתקציב ב${category}`
@@ -59,8 +61,8 @@ export async function POST(request: Request) {
             usage_percentage: usagePercent,
             threshold,
             category,
-            spent: Number(budgetData.current_spent) || 0,
-            cap: Number(budgetData.monthly_cap) || 0
+            spent: Number(data.current_spent) || 0,
+            cap: Number(data.monthly_cap) || 0
           };
         }
         break;
@@ -93,7 +95,9 @@ export async function POST(request: Request) {
           .select('*')
           .eq('user_id', user.id);
 
-        const surplus = budgetTracking?.filter(b => Number(b.remaining) > 0) || [];
+        // Type assertion needed because view columns aren't in generated types
+        const trackingData = (budgetTracking || []) as any[];
+        const surplus = trackingData.filter(b => Number(b.remaining) > 0);
         const totalSurplus = surplus.reduce((sum, b) => sum + (Number(b.remaining) || 0), 0);
 
         simulationResult.would_trigger = totalSurplus > 100; // סף מינימום 100 ₪

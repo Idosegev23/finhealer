@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     // Update או Insert
     if (id) {
       // Update
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('goals')
         .update({
           name,
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ goal: data });
     } else {
       // Insert
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('goals')
         .insert({
           user_id: user.id,
@@ -130,15 +130,17 @@ export async function POST(request: Request) {
         .select('phase')
         .eq('id', user.id)
         .single();
+      
+      const userPhase = (userData as any)?.phase;
 
-      if (userData?.phase === 'goals' && goalsCount && (goalsCount as any).count === 1) {
+      if (userPhase === 'goals' && goalsCount && (goalsCount as any).count === 1) {
         // יעד ראשון - מעבר ל-monitoring
-        await supabase
+        await (supabase as any)
           .from('users')
           .update({ phase: 'monitoring' })
           .eq('id', user.id);
 
-        await supabase
+        await (supabase as any)
           .from('alerts')
           .insert({
             user_id: user.id,

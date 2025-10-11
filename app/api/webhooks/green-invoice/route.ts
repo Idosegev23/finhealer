@@ -56,7 +56,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
-      const userId = userRecord.id;
+      const userRecordData = userRecord as any;
+      const userId = userRecordData.id;
 
       // קבע את התוכנית לפי plan_id או amount
       let plan: 'basic' | 'advanced' = 'basic';
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       // יצור/עדכן משתמש ב-users table
-      const { error: upsertUserError } = await supabase
+      const { error: upsertUserError } = await (supabase as any)
         .from('users')
         .upsert({
           id: userId,
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       }
 
       // יצור/עדכן מנוי
-      const { error: subscriptionError } = await supabase
+      const { error: subscriptionError } = await (supabase as any)
         .from('subscriptions')
         .upsert({
           user_id: userId,
@@ -143,19 +144,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
+      const cancelledUserData = userRecord as any;
+
       // עדכן סטטוס
-      await supabase
+      await (supabase as any)
         .from('users')
         .update({ subscription_status: 'inactive' })
-        .eq('id', userRecord.id);
+        .eq('id', cancelledUserData.id);
 
-      await supabase
+      await (supabase as any)
         .from('subscriptions')
         .update({
           status: 'cancelled',
           canceled_at: new Date().toISOString(),
         })
-        .eq('user_id', userRecord.id);
+        .eq('user_id', cancelledUserData.id);
 
       console.log(`🚫 Subscription cancelled for ${customer_email}`);
 
@@ -174,10 +177,11 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (userRecord) {
-        await supabase
+        const failedUserData = userRecord as any;
+        await (supabase as any)
           .from('subscriptions')
           .update({ status: 'past_due' })
-          .eq('user_id', userRecord.id);
+          .eq('user_id', failedUserData.id);
 
         console.log(`⚠️ Payment failed for ${customer_email}`);
       }

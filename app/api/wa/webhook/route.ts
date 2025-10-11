@@ -82,7 +82,9 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    if (!user.wa_opt_in) {
+    const userData = user as any;
+
+    if (!userData.wa_opt_in) {
       console.log('⚠️ User has not opted in to WhatsApp:', phoneNumber);
       return NextResponse.json({ 
         status: 'error', 
@@ -95,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     // שמירת ההודעה בטבלה
     const waMessageData = {
-      user_id: user.id,
+      user_id: userData.id,
       direction: 'in',
       msg_type: messageType === 'imageMessage' ? 'image' : 'text',
       payload: payload,
@@ -103,7 +105,7 @@ export async function POST(request: NextRequest) {
       status: 'delivered',
     };
 
-    const { data: savedMessage, error: msgError } = await supabase
+    const { data: savedMessage, error: msgError } = await (supabase as any)
       .from('wa_messages')
       .insert(waMessageData)
       .select()
@@ -127,16 +129,16 @@ export async function POST(request: NextRequest) {
       // טיפול לפי סוג הכפתור
       if (buttonId.startsWith('confirm_')) {
         const transactionId = buttonId.replace('confirm_', '');
-        await handleConfirmTransaction(supabase, user.id, transactionId, phoneNumber);
+        await handleConfirmTransaction(supabase, userData.id, transactionId, phoneNumber);
       } else if (buttonId.startsWith('edit_')) {
         const transactionId = buttonId.replace('edit_', '');
-        await handleEditTransaction(supabase, user.id, transactionId, phoneNumber);
+        await handleEditTransaction(supabase, userData.id, transactionId, phoneNumber);
       } else if (buttonId.startsWith('category_')) {
         const [_, transactionId, categoryId] = buttonId.split('_');
-        await handleCategorySelection(supabase, user.id, transactionId, categoryId, phoneNumber);
+        await handleCategorySelection(supabase, userData.id, transactionId, categoryId, phoneNumber);
       } else if (buttonId.startsWith('split_')) {
         const transactionId = buttonId.replace('split_', '');
-        await handleSplitTransaction(supabase, user.id, transactionId, phoneNumber);
+        await handleSplitTransaction(supabase, userData.id, transactionId, phoneNumber);
       }
     }
     // טיפול לפי סוג הודעה
@@ -149,10 +151,10 @@ export async function POST(request: NextRequest) {
       
       if (parsedTransaction) {
         // צור transaction מוצעת
-        const { data: transaction, error: txError } = await supabase
+        const { data: transaction, error: txError } = await (supabase as any)
           .from('transactions')
           .insert({
-            user_id: user.id,
+            user_id: userData.id,
             type: 'expense',
             amount: parsedTransaction.amount,
             vendor: parsedTransaction.vendor,
@@ -198,10 +200,10 @@ export async function POST(request: NextRequest) {
 
         try {
           // שמור receipt בסטטוס pending - יעובד מאוחר יותר
-          const { data: receipt, error: receiptError } = await supabase
+            const { data: receipt, error: receiptError } = await (supabase as any)
             .from('receipts')
             .insert({
-              user_id: user.id,
+              user_id: userData.id,
               storage_path: downloadUrl,
               ocr_text: null,
               total_amount: null,
