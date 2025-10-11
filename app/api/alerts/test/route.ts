@@ -42,15 +42,15 @@ export async function POST(request: Request) {
           );
         }
 
-        const { data: budgetData } = await supabase
+        const { data: budgetData, error: budgetError } = await supabase
           .from('monthly_budget_tracking')
           .select('*')
           .eq('user_id', user.id)
           .eq('category_name', category)
-          .single();
+          .maybeSingle();
 
-        if (budgetData) {
-          const usagePercent = budgetData.usage_percentage || 0;
+        if (budgetData && !budgetError) {
+          const usagePercent = (budgetData.usage_percentage as number) || 0;
           simulationResult.would_trigger = usagePercent >= threshold;
           simulationResult.message = simulationResult.would_trigger
             ? `🚨 התראה! חרגת ${usagePercent.toFixed(0)}% מהתקציב ב${category}`
@@ -59,8 +59,8 @@ export async function POST(request: Request) {
             usage_percentage: usagePercent,
             threshold,
             category,
-            spent: budgetData.current_spent,
-            cap: budgetData.monthly_cap
+            spent: (budgetData.current_spent as number) || 0,
+            cap: (budgetData.monthly_cap as number) || 0
           };
         }
         break;
@@ -93,8 +93,8 @@ export async function POST(request: Request) {
           .select('*')
           .eq('user_id', user.id);
 
-        const surplus = budgetTracking?.filter(b => b.remaining > 0) || [];
-        const totalSurplus = surplus.reduce((sum, b) => sum + b.remaining, 0);
+        const surplus = budgetTracking?.filter(b => (b.remaining as number) > 0) || [];
+        const totalSurplus = surplus.reduce((sum, b) => sum + ((b.remaining as number) || 0), 0);
 
         simulationResult.would_trigger = totalSurplus > 100; // סף מינימום 100 ₪
         simulationResult.message = simulationResult.would_trigger
@@ -104,8 +104,8 @@ export async function POST(request: Request) {
           total_surplus: totalSurplus,
           categories_with_surplus: surplus.length,
           surplus_details: surplus.map(s => ({
-            category: s.category_name,
-            remaining: s.remaining
+            category: (s.category_name as string) || '',
+            remaining: (s.remaining as number) || 0
           }))
         };
         break;
