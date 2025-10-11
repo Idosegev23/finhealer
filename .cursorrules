@@ -1,0 +1,215 @@
+# FinHealer - כללי פרויקט
+
+## שפה ותרבות
+- השפה העיקרית של הפרויקט היא **עברית**
+- כל הממשקים, הודעות, בוטים - בעברית
+- התיעוד הטכני באנגלית
+- קוד ותגובות בקוד באנגלית
+
+## סגנון קוד
+
+### TypeScript
+- שימוש קפדני ב-TypeScript
+- הימנעות מ-`any` - תמיד לציין טיפוסים
+- שימוש ב-Zod לולידציה
+- העדפת `interface` על `type` למבני נתונים
+
+### React/Next.js
+- שימוש ב-App Router (לא Pages Router)
+- Server Components כברירת מחדל
+- Client Components רק כשצריך interactivity
+- שימוש ב-Server Actions לפעולות
+- Custom hooks עם prefix `use`
+
+### Naming Conventions
+- Components: `PascalCase`
+- Files: `kebab-case` או `PascalCase` (components)
+- Functions: `camelCase`
+- Constants: `UPPER_SNAKE_CASE`
+- Database tables: `snake_case`
+
+### ארגון תיקיות
+```
+/app                 - pages & routes
+/components
+  /ui               - shadcn components
+  /dashboard        - dashboard-specific
+  /shared           - reusable components
+/lib
+  /supabase         - DB clients
+  /utils            - helper functions
+  /hooks            - custom hooks
+/types              - TypeScript types
+/public             - static assets
+```
+
+## Database (Supabase)
+
+### חוקים
+1. **תמיד** להשתמש ב-RLS - אף משתמש לא רואה נתונים של אחרים
+2. **אין** להשתמש ב-service_role_key בצד הלקוח
+3. כל query ב-server component או server action
+4. שימוש ב-prepared statements (Supabase מטפל אוטומטית)
+
+### טבלאות מרכזיות
+- `users` - משתמשים
+- `transactions` - תנועות כספיות
+- `budget_categories` - קטגוריות תקציב
+- `goals` - יעדים
+- `wa_messages` - הודעות WhatsApp
+- `alerts` - התראות
+- `subscriptions` - מנויים
+- `receipts` - קבלות OCR
+
+### Views
+- `monthly_budget_tracking` - מעקב תקציב בזמן אמת
+- `user_monthly_stats` - סטטיסטיקות חודשיות
+
+### פונקציות
+- `calculate_financial_health(user_id)` - ציון בריאות (0-100)
+- `get_daily_summary(user_id, date)` - סיכום יומי
+
+## עיצוב (UI/UX)
+
+### צבעים
+```css
+--color-primary: #3A7BD5;      /* כחול בינוני */
+--color-dark: #1E2A3B;         /* כחול כהה */
+--color-bg: #F5F6F8;           /* אפור בהיר */
+--color-success: #7ED957;      /* ירוק */
+--color-warning: #F6A623;      /* כתום */
+```
+
+### טיפוגרפיה
+- Font: Heebo
+- Weights: 400 (regular), 500 (medium), 700 (bold)
+
+### קומפוננטות
+- שימוש ב-shadcn/ui כבסיס
+- Lucide-react לאייקונים
+- Recharts לגרפים
+- Framer Motion לאנימציות
+
+### עקרונות
+1. **Mobile First** - עיצוב למובייל קודם
+2. **Accessibility** - WCAG 2.1 AA
+3. **RTL Support** - תמיכה מלאה בעברית
+4. **Loading States** - תמיד להציג feedback
+5. **Error Boundaries** - תפיסת שגיאות ברמת קומפוננטות
+
+## אבטחה
+
+### Authentication
+- Supabase Auth בלבד
+- אין JWT tokens ידניים
+- Protected routes עם middleware
+
+### Input Validation
+- Zod schemas לכל טופס
+- Server-side validation תמיד
+- Sanitization של input
+
+### Webhooks
+- תמיד לאמת signature
+- Rate limiting
+- Logging מלא
+
+## בוט WhatsApp
+
+### עקרונות תקשורת
+1. **שפה חמה ומעודדת** - לא פורמלית
+2. **קצר ותמציתי** - לא יותר מ-2-3 שורות
+3. **אימוג'ים במידה** - לא להפריז
+4. **תמיד חיובי** - גם בהתראות
+
+### דוגמאות
+✅ "היי! רשמתי לך הוצאה של 55 ₪ על קפה. עוד 150 ₪ נשארו לך בקטגוריה הזו החודש 😊"
+❌ "נרשמה הוצאה בסך 55 ש״ח בקטגוריית בילויים. סה״כ הוצאות: 1,234 ש״ח"
+
+### זיהוי הודעות
+- Regex לזיהוי סכומים: `\d+(\.\d{1,2})?\s*₪|ש״ח`
+- AI fallback אם regex נכשל
+- תמיד לבקש אישור לפני שמירה
+
+## AI Assistant
+
+### OpenAI Configuration
+- Model: GPT-4 (או GPT-3.5-turbo לחיסכון)
+- Temperature: 0.7
+- Max tokens: 500
+- Language: Hebrew
+
+### System Prompt
+```
+אתה מאמן פיננסי אישי ישראלי. אתה מלווה את המשתמש בשיפור המצב הכלכלי שלו.
+דבר בשפה חמה, פשוטה וידידותית. תן עצות מעשיות, לא תיאורטיות.
+אל תיתן ייעוץ פיננסי או משפטי פורמלי - אתה מלווה, לא יועץ.
+השתמש באימוג'ים במידה. תמיד עודד ותמוך.
+```
+
+### Context לכל query
+- סכום תקציב חודשי
+- יעדים פעילים
+- חריגות אחרונות
+- מגמות הוצאה
+
+## Testing
+
+### מה לבדוק
+1. RLS policies - שמשתמש לא רואה נתונים של אחרים
+2. Form validation - שלא עובר input לא תקין
+3. Error states - שמוצגות הודעות שגיאה ברורות
+4. Loading states - שיש feedback על פעולות ארוכות
+5. Mobile responsiveness - שהכל עובד גם במובייל
+
+### כלים
+- Vitest לunit tests
+- Playwright ל-E2E
+- React Testing Library לקומפוננטות
+
+## Performance
+
+### מטרות
+- First Contentful Paint < 1.5s
+- Time to Interactive < 3s
+- Lighthouse Score > 90
+
+### טכניקות
+1. Image optimization (Next.js Image)
+2. Code splitting (dynamic imports)
+3. Server Components לכל מה שאפשר
+4. Caching (SWR / React Query)
+5. Database indexes
+
+## Git Flow
+
+### Branches
+- `main` - production
+- `develop` - staging
+- `feature/*` - תכונות חדשות
+- `hotfix/*` - תיקונים דחופים
+
+### Commits
+- שפה: אנגלית
+- פורמט: `type(scope): message`
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+דוגמה: `feat(dashboard): add financial health indicator`
+
+## הערות חשובות
+
+### שימוש בזיכרון
+- קרא את Memory Bank לפני כל עבודה
+- עדכן activeContext.md כשמתחיל משימה חדשה
+- עדכן progress.md כשמסיים משימה
+
+### תקשורת עם משתמש
+- תמיד בעברית
+- הסבר מה עשית ולמה
+- הצע צעד הבא
+
+### בעיות
+- לתעד ב-progress.md
+- ליצור issue אם צריך מעקב
+- לא להשאיר TODO בקוד בלי ticket
+

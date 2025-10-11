@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(npx tsc:*)",
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Bash(npx next build:*)",
+      "Bash(pkill:*)",
+      "Bash(npx supabase db inspect:*)",
+      "Bash(npx:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

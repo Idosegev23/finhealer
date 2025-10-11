@@ -1,0 +1,197 @@
+.outer-container {
+  display: flex;
+  min-height: 100%;
+  flex: 1 1 0%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.step-circle-container {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 900px;
+  border-radius: 16px;
+  background-color: #FFFFFF;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.step-indicator-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 2rem 2rem 1.5rem 2rem;
+}
+
+@media (max-width: 640px) {
+  .step-indicator-row {
+    padding: 1.5rem 1rem 1rem 1rem;
+  }
+}
+
+.step-content-default {
+  position: relative;
+  overflow: hidden;
+}
+
+.step-default {
+  padding: 0 2rem 1rem 2rem;
+}
+
+@media (max-width: 640px) {
+  .step-default {
+    padding: 0 1rem 0.5rem 1rem;
+  }
+}
+
+.footer-container {
+  padding: 1.5rem 2rem 2rem 2rem;
+  border-top: 1px solid #E5E7EB;
+}
+
+@media (max-width: 640px) {
+  .footer-container {
+    padding: 1rem;
+  }
+}
+
+.footer-nav {
+  display: flex;
+}
+
+.footer-nav.spread {
+  justify-content: space-between;
+}
+
+.footer-nav.end {
+  justify-content: flex-end;
+}
+
+.back-button {
+  transition: all 350ms;
+  border-radius: 8px;
+  padding: 0.625rem 1.25rem;
+  color: #6B7280;
+  background-color: transparent;
+  border: 1px solid #E5E7EB;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.back-button:hover {
+  color: #374151;
+  background-color: #F9FAFB;
+  border-color: #D1D5DB;
+}
+
+.back-button.inactive {
+  pointer-events: none;
+  opacity: 0.5;
+  color: #9CA3AF;
+}
+
+.next-button {
+  transition: all 350ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background-color: #3A7BD5;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+  padding: 0.625rem 1.75rem;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.next-button:hover {
+  background-color: #2E5EA5;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.next-button:active {
+  background-color: #2E5EA5;
+  transform: scale(0.98);
+}
+
+.step-indicator {
+  position: relative;
+  cursor: pointer;
+  outline: none;
+}
+
+.step-indicator-inner {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 640px) {
+  .step-indicator-inner {
+    height: 2rem;
+    width: 2rem;
+  }
+}
+
+.active-dot {
+  height: 0.875rem;
+  width: 0.875rem;
+  border-radius: 9999px;
+  background-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+.step-number {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .step-number {
+    font-size: 0.8125rem;
+  }
+}
+
+.step-connector {
+  position: relative;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+  height: 0.1875rem;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: #E5E7EB;
+}
+
+.step-connector-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 9999px;
+}
+
+.check-icon {
+  height: 1.125rem;
+  width: 1.125rem;
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .check-icon {
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+}
+
