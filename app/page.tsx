@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle2, Smartphone, TrendingUp, Target, Users, Brain, Zap, Shield, HeartHandshake, Sparkles, Menu, X } from 'lucide-react'
-import { RetroGrid } from '@/components/ui/retro-grid'
+import DotGrid from '@/components/ui/DotGrid'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 
@@ -10,13 +10,13 @@ export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-white via-[#F5F6F8]/30 to-white">
+    <main className="min-h-screen bg-white">
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+      <header className="border-b border-[#BBE8F2]/30 bg-white sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <motion.div 
-              className="text-2xl font-bold text-[#3A7BD5] flex items-center gap-2"
+              className="text-2xl font-bold text-[#3E6E8C] flex items-center gap-2"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
@@ -26,23 +26,27 @@ export default function HomePage() {
             
             {/* Desktop Navigation */}
             <nav className="hidden md:flex gap-6 items-center">
-              <Link href="#how-it-works" className="text-[#1E2A3B] hover:text-[#3A7BD5] transition-colors font-medium">
+              <Link href="#how-it-works" className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium">
                 איך זה עובד
               </Link>
-              <Link href="#features" className="text-[#1E2A3B] hover:text-[#3A7BD5] transition-colors font-medium">
+              <Link href="#features" className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium">
                 תכונות
               </Link>
-              <Link href="#pricing" className="text-[#1E2A3B] hover:text-[#3A7BD5] transition-colors font-medium">
+              <Link href="#pricing" className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium">
                 מחירים
               </Link>
-              <Link href="/login" className="bg-gradient-to-r from-[#3A7BD5] to-[#2E5EA5] text-white px-6 py-2 rounded-lg hover:shadow-lg hover:scale-105 transition-all">
-                התחבר
+              <Link 
+                href="/login" 
+                className="relative group bg-gradient-to-br from-[#F2C185] to-[#D96666] text-white px-6 py-2.5 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 overflow-hidden"
+              >
+                <span className="relative z-10">התחבר</span>
+                <div className="absolute inset-0 bg-gradient-to-br from-[#D96666] to-[#F2C185] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </Link>
             </nav>
 
             {/* Mobile Menu Button */}
             <button
-              className="md:hidden text-[#3A7BD5] p-2"
+              className="md:hidden text-[#3E6E8C] p-2 hover:bg-[#BBE8F2]/20 rounded-lg transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label="תפריט"
             >
@@ -54,7 +58,7 @@ export default function HomePage() {
           <AnimatePresence>
             {mobileMenuOpen && (
               <motion.nav
-                className="md:hidden mt-4 pb-4 flex flex-col gap-4"
+                className="md:hidden mt-4 pb-4 flex flex-col gap-3"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
@@ -62,31 +66,32 @@ export default function HomePage() {
               >
                 <Link 
                   href="#how-it-works" 
-                  className="text-[#1E2A3B] hover:text-[#3A7BD5] transition-colors font-medium py-2"
+                  className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium py-2 px-3 hover:bg-[#BBE8F2]/10 rounded-lg"
                   onClick={() => setMobileMenuOpen(false)}
                 >
               איך זה עובד
             </Link>
                 <Link 
                   href="#features" 
-                  className="text-[#1E2A3B] hover:text-[#3A7BD5] transition-colors font-medium py-2"
+                  className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium py-2 px-3 hover:bg-[#BBE8F2]/10 rounded-lg"
                   onClick={() => setMobileMenuOpen(false)}
                 >
               תכונות
             </Link>
                 <Link 
                   href="#pricing" 
-                  className="text-[#1E2A3B] hover:text-[#3A7BD5] transition-colors font-medium py-2"
+                  className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium py-2 px-3 hover:bg-[#BBE8F2]/10 rounded-lg"
                   onClick={() => setMobileMenuOpen(false)}
                 >
               מחירים
             </Link>
                 <Link 
                   href="/login" 
-                  className="bg-gradient-to-r from-[#3A7BD5] to-[#2E5EA5] text-white px-6 py-3 rounded-lg text-center font-medium"
+                  className="relative group bg-gradient-to-br from-[#F2C185] to-[#D96666] text-white px-6 py-3 rounded-2xl text-center font-bold shadow-lg active:scale-95 transition-transform overflow-hidden"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-              התחבר
+                  <span className="relative z-10">התחבר</span>
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#D96666] to-[#F2C185] opacity-0 group-active:opacity-100 transition-opacity duration-200" />
             </Link>
               </motion.nav>
             )}
@@ -95,10 +100,20 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative container mx-auto px-4 py-24 text-center overflow-hidden">
-        {/* Background Grid */}
-        <div className="absolute inset-0 h-full w-full">
-          <RetroGrid />
+      <section className="relative container mx-auto px-4 py-16 md:py-24 text-center overflow-hidden">
+        {/* DotGrid Background */}
+        <div className="absolute inset-0 w-full h-full opacity-50">
+          <DotGrid
+            dotSize={8}
+            gap={20}
+            baseColor="#BBE8F2"
+            activeColor="#3E6E8C"
+            proximity={100}
+            shockRadius={200}
+            shockStrength={3}
+            resistance={800}
+            returnDuration={1.2}
+          />
         </div>
         
         <motion.div 
@@ -108,7 +123,7 @@ export default function HomePage() {
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
           <motion.div 
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#3A7BD5]/10 to-[#7ED957]/10 border border-[#3A7BD5]/20 text-[#3A7BD5] px-5 py-2.5 rounded-full text-sm font-semibold mb-8 shadow-sm"
+            className="inline-flex items-center gap-2 bg-[#BBE8F2]/30 border border-[#3E6E8C]/20 text-[#3E6E8C] px-4 md:px-5 py-2 md:py-2.5 rounded-full text-xs md:text-sm font-bold mb-6 md:mb-8"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 }}
@@ -118,7 +133,7 @@ export default function HomePage() {
           </motion.div>
           
           <motion.h1 
-            className="text-6xl md:text-7xl font-black text-[#1E2A3B] mb-6 leading-tight"
+            className="text-4xl md:text-6xl lg:text-7xl font-black text-[#3B3740] mb-6 leading-tight px-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
@@ -127,39 +142,40 @@ export default function HomePage() {
             <br />
             האישי שלך
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3A7BD5] via-[#2E5EA5] to-[#3A7BD5] animate-gradient">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3E6E8C] via-[#F2C185] to-[#D96666]">
               24/7 בווטסאפ
             </span>
           </motion.h1>
           
           <motion.p 
-            className="text-xl md:text-2xl text-[#555555] mb-10 max-w-3xl mx-auto leading-relaxed"
+            className="text-lg md:text-xl lg:text-2xl text-[#3B3740]/80 mb-8 md:mb-10 max-w-3xl mx-auto leading-relaxed px-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
             מעקב חכם, תובנות מותאמות אישית, והליווי של גדי - מאמן פיננסי מוסמך.
-            <br />
-            <strong className="text-[#1E2A3B]">לא עוד Excel.</strong> לא עוד דאגות. רק שליטה מלאה על הכסף שלך.
+            <br className="hidden md:block" />
+            <strong className="text-[#3B3740]">לא עוד Excel.</strong> לא עוד דאגות. רק שליטה מלאה על הכסף שלך.
           </motion.p>
           
           <motion.div 
-            className="flex gap-4 justify-center flex-wrap mb-12"
+            className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center px-4 mb-10 md:mb-12"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
             <Link
               href="/login"
-              className="group bg-gradient-to-r from-[#3A7BD5] to-[#2E5EA5] text-white px-10 py-5 rounded-xl text-lg font-bold hover:shadow-2xl hover:scale-105 transition-all inline-flex items-center gap-2 shadow-lg relative overflow-hidden"
+              className="group relative bg-gradient-to-br from-[#F2C185] via-[#D96666] to-[#F2C185] text-white px-8 md:px-10 py-4 md:py-5 rounded-2xl text-base md:text-lg font-black hover:shadow-2xl transition-all inline-flex items-center justify-center gap-2 shadow-xl overflow-hidden hover:-translate-y-1 active:scale-95"
             >
               <span className="relative z-10">התחל עכשיו - 7 ימים חינם</span>
               <ArrowLeft className="w-5 h-5 relative z-10 group-hover:translate-x-[-4px] transition-transform" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#2E5EA5] to-[#1E4A8A] opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-[#D96666] via-[#F2C185] to-[#D96666] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute -inset-1 bg-gradient-to-r from-[#F2C185] to-[#D96666] blur opacity-30 group-hover:opacity-50 transition-opacity" />
             </Link>
             <a
               href="#how-it-works"
-              className="border-2 border-[#3A7BD5] text-[#3A7BD5] px-10 py-5 rounded-xl text-lg font-bold hover:bg-[#3A7BD5]/5 hover:shadow-lg transition-all"
+              className="border-2 border-[#3E6E8C] text-[#3E6E8C] px-8 md:px-10 py-4 md:py-5 rounded-2xl text-base md:text-lg font-bold hover:bg-[#BBE8F2]/20 hover:shadow-lg transition-all"
             >
               איך זה עובד?
             </a>
@@ -167,24 +183,24 @@ export default function HomePage() {
 
           {/* Trust indicators */}
           <motion.div 
-            className="flex items-center justify-center gap-8 flex-wrap text-sm text-[#555555]"
+            className="flex items-center justify-center gap-4 md:gap-8 flex-wrap text-xs md:text-sm px-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
           >
             {[
-              { icon: Shield, text: "מאובטח 100%" },
-              { icon: Users, text: "ליווי אנושי של גדי" },
-              { icon: CheckCircle2, text: "ללא התחייבות" }
+              { icon: Shield, text: "מאובטח 100%", color: "#3E6E8C" },
+              { icon: Users, text: "ליווי אנושי של גדי", color: "#F2C185" },
+              { icon: CheckCircle2, text: "ללא התחייבות", color: "#D96666" }
             ].map((item, i) => (
               <motion.div 
                 key={i}
-                className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100"
+                className="flex items-center gap-2 bg-white px-3 md:px-4 py-2 rounded-full shadow-md border border-gray-100"
                 whileHover={{ scale: 1.05, y: -2 }}
                 transition={{ type: "spring", stiffness: 400 }}
               >
-                <item.icon className="w-5 h-5 text-[#7ED957]" />
-                <span className="font-medium">{item.text}</span>
+                <item.icon className="w-4 md:w-5 h-4 md:h-5" style={{ color: item.color }} />
+                <span className="font-bold text-[#3B3740]">{item.text}</span>
               </motion.div>
             ))}
           </motion.div>
@@ -192,7 +208,7 @@ export default function HomePage() {
 
         {/* Floating Elements */}
         <motion.div
-          className="absolute top-20 right-[10%] w-20 h-20 bg-gradient-to-br from-[#7ED957]/20 to-transparent rounded-full blur-xl"
+          className="absolute top-20 right-[10%] w-20 h-20 bg-gradient-to-br from-[#BBE8F2]/40 to-transparent rounded-full blur-xl"
           animate={{ 
             y: [0, -20, 0],
             scale: [1, 1.1, 1]
@@ -204,7 +220,7 @@ export default function HomePage() {
           }}
         />
         <motion.div
-          className="absolute bottom-20 left-[15%] w-32 h-32 bg-gradient-to-br from-[#3A7BD5]/20 to-transparent rounded-full blur-xl"
+          className="absolute bottom-20 left-[15%] w-32 h-32 bg-gradient-to-br from-[#F2C185]/40 to-transparent rounded-full blur-xl"
           animate={{ 
             y: [0, 20, 0],
             scale: [1, 1.2, 1]
