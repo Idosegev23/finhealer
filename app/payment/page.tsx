@@ -18,37 +18,54 @@ export default function PaymentPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      setUserId(user.id)
-
-      // טען בחירות מ-localStorage (אם יש)
-      if (typeof window !== 'undefined') {
-        const savedPlan = localStorage.getItem('finhealer_plan_type') as Plan | null
-        const savedOnboarding = localStorage.getItem('finhealer_onboarding_type') as 'quick' | 'full' | null
+      try {
+        const supabase = createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
         
-        if (savedPlan) setSelectedPlan(savedPlan)
-        if (savedOnboarding) setOnboardingType(savedOnboarding)
+        if (authError || !user) {
+          console.log('❌ לא מחובר, מפנה להתחברות')
+          router.push('/login')
+          return
+        }
         
-        // אם אין בחירות, נשתמש בברירות מחדל (basic, quick)
-        // לא מפנים לדף אחר - הכל בעמוד התשלום
-      }
+        setUserId(user.id)
+        console.log('✅ משתמש מחובר:', user.email)
 
-      // בדוק אם כבר שילם
-      const { data: userData } = await supabase
-        .from('users')
-        .select('subscription_status')
-        .eq('id', user.id)
-        .single()
+        // טען בחירות מ-localStorage (אם יש)
+        if (typeof window !== 'undefined') {
+          const savedPlan = localStorage.getItem('finhealer_plan_type') as Plan | null
+          const savedOnboarding = localStorage.getItem('finhealer_onboarding_type') as 'quick' | 'full' | null
+          
+          if (savedPlan) setSelectedPlan(savedPlan)
+          if (savedOnboarding) setOnboardingType(savedOnboarding)
+          
+          console.log('📋 הגדרות נבחרו:', { plan: savedPlan || 'basic', onboarding: savedOnboarding || 'quick' })
+        }
 
-      const userInfo = userData as any
-      if (userInfo?.subscription_status === 'active') {
-        console.log('✅ משתמש כבר שילם, מפנה ל-dashboard')
-        router.push('/dashboard')
+        // בדוק אם כבר שילם (רשומה ב-users table)
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('subscription_status, phase')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        // אם יש רשומה במסד נתונים
+        if (userData && !userError) {
+          const userInfo = userData as any
+          console.log('👤 סטטוס משתמש:', userInfo)
+          
+          if (userInfo.subscription_status === 'active') {
+            console.log('✅ משתמש כבר שילם, מפנה ל-dashboard')
+            router.push('/dashboard')
+            return
+          }
+        } else {
+          // אין רשומה - משתמש חדש שטרם שילם
+          console.log('🆕 משתמש חדש - טרם שילם')
+        }
+      } catch (err) {
+        console.error('❌ שגיאה בטעינת נתונים:', err)
+        setError('שגיאה בטעינת הנתונים. אנא נסה לרענן את הדף.')
       }
     }
 
