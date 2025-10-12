@@ -9,7 +9,11 @@
       "Bash(npx next build:*)",
       "Bash(pkill:*)",
       "Bash(npx supabase db inspect:*)",
-      "Bash(npx:*)"
+      "Bash(npx:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

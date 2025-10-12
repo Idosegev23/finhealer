@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import * as XLSX from 'xlsx';
-import pdfParse from 'pdf-parse';
 
-// Force Node.js runtime (required for pdf-parse)
-export const runtime = 'nodejs';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +42,7 @@ export async function POST(request: Request) {
 
     const isImage = fileType.startsWith('image/');
     const isPDF = fileType === 'application/pdf' || fileName.endsWith('.pdf');
-    const isExcel = fileType.includes('spreadsheet') || fileType.includes('excel') || 
+    const isExcel = fileType.includes('spreadsheet') || fileType.includes('excel') ||
                     fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv');
 
     if (!isImage && !isPDF && !isExcel) {
@@ -54,8 +51,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    let extractedText = '';
 
     // Excel/CSV
     if (isExcel) {
@@ -66,48 +61,20 @@ export async function POST(request: Request) {
       const worksheet = workbook.Sheets[sheetName];
       const csvText = XLSX.utils.sheet_to_csv(worksheet);
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      
-      extractedText = `Excel Data:\n${csvText}\n\nRows: ${jsonData.length}`;
+
+      const extractedText = `Excel Data:\n${csvText}\n\nRows: ${jsonData.length}`;
       console.log(`✅ Excel parsed: ${jsonData.length} rows`);
-      
+
       return await analyzeTextWithAI(extractedText, importType, 'excel');
     }
 
-    // PDF
-    if (isPDF) {
-      console.log('📄 Extracting text from PDF...');
-      const arrayBuffer = await file.arrayBuffer();
-      const pdfBuffer = Buffer.from(arrayBuffer);
-      
-      try {
-        const data = await pdfParse(pdfBuffer);
-        extractedText = data.text;
-        console.log(`✅ PDF parsed: ${data.numpages} pages, ${extractedText.length} chars`);
-        
-        if (!extractedText || extractedText.length < 50) {
-          return NextResponse.json(
-            { error: 'Could not extract text from PDF. Try uploading an image instead.' },
-            { status: 400 }
-          );
-        }
-        
-        return await analyzeTextWithAI(extractedText, importType, 'pdf');
-      } catch (error: any) {
-        console.error('❌ PDF error:', error);
-        return NextResponse.json(
-          { error: 'Failed to read PDF. Try uploading an image instead.' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Images - GPT-4o Vision
-    console.log('🤖 Analyzing image with GPT-4o Vision...');
+    // PDF & Images - Use GPT-4o Vision for both
+    console.log(`🤖 Analyzing ${isPDF ? 'PDF' : 'image'} with GPT-4o Vision...`);
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
     const dataUrl = `data:${fileType};base64,${base64}`;
 
-    return await analyzeImageWithAI(dataUrl, importType);
+    return await analyzeImageWithAI(dataUrl, importType, isPDF ? 'pdf' : 'image');
 
   } catch (error: any) {
     console.error('❌ Error:', error);
@@ -181,8 +148,8 @@ ${text.substring(0, 5000)}
   }
 }
 
-// ניתוח תמונה עם GPT-4o Vision
-async function analyzeImageWithAI(dataUrl: string, importType: string) {
+// ניתוח תמונה/PDF עם GPT-4o Vision
+async function analyzeImageWithAI(dataUrl: string, importType: string, source: 'image' | 'pdf' = 'image') {
   const systemPrompt = `אתה מומחה לניתוח דוחות פיננסיים ישראליים.
 החזר ONLY JSON תקני. confidence: 0.9 = בטוח, 0.7 = סביר, 0.5 = לא בטוח.`;
 
@@ -241,7 +208,7 @@ async function analyzeImageWithAI(dataUrl: string, importType: string) {
       confidence: calculateConfidence(detected),
       model: 'gpt-4o-vision',
       tokens: response.usage?.total_tokens || 0,
-      source: 'image'
+      source
     });
   } catch (error: any) {
     console.error('❌ Vision error:', error);

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Phone, MessageSquare, Bell, User, CreditCard, Lock } from 'lucide-react';
 
 type Tab = 'profile' | 'whatsapp' | 'notifications' | 'subscription' | 'privacy';
 
-export default function SettingsPage() {
+function SettingsContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>('profile');
 
@@ -336,6 +336,14 @@ function PrivacyTab() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F5F6F8] flex items-center justify-center">טוען...</div>}>
+      <SettingsContent />
+    </Suspense>
   );
 }
 
