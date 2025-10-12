@@ -71,15 +71,25 @@ export async function middleware(request: NextRequest) {
     const currentPath = request.nextUrl.pathname
 
     // בדוק אם המשתמש קיים ב-users table (נוצר רק אחרי תשלום)
-    const { data: userData } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('name, phone, subscription_status, created_at')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
-    const userExistsInDB = !!userData
+    const userExistsInDB = !!userData && !userError
     const hasActiveSubscription = userData?.subscription_status === 'active'
     const hasCompletedOnboarding = !!userData?.name || !!userData?.phone
+
+    // Debug logging
+    console.log('🔐 Middleware check:', {
+      path: currentPath,
+      userExistsInDB,
+      hasActiveSubscription,
+      hasCompletedOnboarding,
+      userName: userData?.name,
+      userPhone: userData?.phone
+    })
 
     // תהליך: login (auth) → payment (בחירת תוכנית בתוכו) → users table נוצר → onboarding → dashboard
 
@@ -96,6 +106,7 @@ export async function middleware(request: NextRequest) {
     // 2. משתמש קיים ב-DB אבל טרם השלים onboarding
     if (userExistsInDB && !hasCompletedOnboarding) {
       if (!currentPath.startsWith('/onboarding') && 
+          !currentPath.startsWith('/reflection') &&
           currentPath !== '/payment') {
         return NextResponse.redirect(new URL('/onboarding', request.url))
       }
