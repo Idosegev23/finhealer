@@ -38,16 +38,23 @@ export async function GET(request: Request) {
 
       console.log('🔍 בדיקת משתמש:', { userData, selectError })
 
-      // אם אין מספר טלפון - הפנה ל-onboarding
-      if (!userData?.phone) {
-        console.log('📱 אין מספר טלפון, מפנה ל-onboarding')
-        return NextResponse.redirect(`${origin}/onboarding`)
+      // אם אין רשומה ב-DB (טרם שילם) - הפנה לתשלום
+      if (!userData) {
+        console.log('💳 משתמש חדש, מפנה לתשלום')
+        return NextResponse.redirect(`${origin}/payment`)
       }
 
-      // אם יש מספר אבל אין מנוי פעיל - הפנה ל-payment
-      if (userData.subscription_status !== 'active') {
-        console.log('💳 יש מספר אבל אין מנוי פעיל, מפנה לתשלום')
+      // אם יש רשומה אבל אין מנוי פעיל - הפנה לתשלום
+      const userInfo = userData as any
+      if (userInfo.subscription_status !== 'active') {
+        console.log('💳 אין מנוי פעיל, מפנה לתשלום')
         return NextResponse.redirect(`${origin}/payment`)
+      }
+
+      // אם אין מספר טלפון (שילם אבל לא השלים onboarding) - הפנה ל-onboarding
+      if (!userInfo.phone) {
+        console.log('📱 אין מספר טלפון, מפנה ל-onboarding')
+        return NextResponse.redirect(`${origin}/onboarding`)
       }
 
       // אם יש הכל - הפנה ל-dashboard

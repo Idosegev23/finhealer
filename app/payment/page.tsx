@@ -26,7 +26,7 @@ export default function PaymentPage() {
       }
       setUserId(user.id)
 
-      // טען בחירות מ-localStorage
+      // טען בחירות מ-localStorage (אם יש)
       if (typeof window !== 'undefined') {
         const savedPlan = localStorage.getItem('finhealer_plan_type') as Plan | null
         const savedOnboarding = localStorage.getItem('finhealer_onboarding_type') as 'quick' | 'full' | null
@@ -34,11 +34,8 @@ export default function PaymentPage() {
         if (savedPlan) setSelectedPlan(savedPlan)
         if (savedOnboarding) setOnboardingType(savedOnboarding)
         
-        // אם אין בחירות - הפנה לבחירת תוכנית
-        if (!savedPlan || !savedOnboarding) {
-          router.push('/plan-selection')
-          return
-        }
+        // אם אין בחירות, נשתמש בברירות מחדל (basic, quick)
+        // לא מפנים לדף אחר - הכל בעמוד התשלום
       }
 
       // בדוק אם כבר שילם

@@ -81,16 +81,15 @@ export async function middleware(request: NextRequest) {
     const hasActiveSubscription = userData?.subscription_status === 'active'
     const hasCompletedOnboarding = !!userData?.name || !!userData?.phone
 
-    // תהליך: login (auth) → plan-selection → payment → users table נוצר → onboarding → dashboard
+    // תהליך: login (auth) → payment (בחירת תוכנית בתוכו) → users table נוצר → onboarding → dashboard
 
     // 1. משתמש מאומת אבל לא קיים ב-users (טרם שילם)
     if (!userExistsInDB) {
-      // הרשה גישה רק ל-plan-selection ו-payment
-      if (!currentPath.startsWith('/plan-selection') && 
-          currentPath !== '/payment' &&
+      // הרשה גישה רק ל-payment (בחירת תוכנית בתוך דף התשלום)
+      if (currentPath !== '/payment' &&
           currentPath !== '/login' &&
           currentPath !== '/signup') {
-        return NextResponse.redirect(new URL('/plan-selection', request.url))
+        return NextResponse.redirect(new URL('/payment', request.url))
       }
     }
 
@@ -109,11 +108,10 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // 4. משתמש עם הכל - אסור לחזור ל-login/signup/plan-selection/payment
+    // 4. משתמש עם הכל - אסור לחזור ל-login/signup/payment
     if (userExistsInDB && hasCompletedOnboarding && hasActiveSubscription) {
       if (currentPath === '/login' || 
-          currentPath === '/signup' ||
-          currentPath.startsWith('/plan-selection')) {
+          currentPath === '/signup') {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
 
