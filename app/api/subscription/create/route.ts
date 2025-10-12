@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -25,15 +26,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }
 
+    // צור admin client שעוקף RLS
+    const supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     // בדוק אם המשתמש כבר קיים ב-users table
-    const { data: existingUser } = await supabase
+    const { data: existingUser } = await supabaseAdmin
       .from('users')
       .select('id')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     // יצור/עדכן משתמש ב-users table (נוצר רק אחרי תשלום מוצלח!)
-    const { error: upsertUserError } = await (supabase as any)
+    const { error: upsertUserError } = await supabaseAdmin
       .from('users')
       .upsert({
         id: user.id,
@@ -57,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     // צור/עדכן מנוי
     const amount = plan === 'basic' ? 49 : 119;
-    const { error: subscriptionError } = await (supabase as any)
+    const { error: subscriptionError } = await supabaseAdmin
       .from('subscriptions')
       .upsert(
         {
