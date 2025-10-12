@@ -24,10 +24,10 @@ export function OnboardingSelector() {
         transition={{ duration: 0.5 }}
         className="text-center mb-16"
       >
-        <h1 className="text-4xl md:text-5xl font-bold text-secondary mb-4">
+        <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
           ברוכים הבאים ל-FinHealer! 🎉
         </h1>
-        <p className="text-xl text-textMuted">
+        <p className="text-xl text-gray-600">
           איך היית רוצה להתחיל את המסע הפיננסי שלך?
         </p>
       </motion.div>
@@ -43,52 +43,49 @@ export function OnboardingSelector() {
         >
           <button
             onClick={handleQuickStart}
-            className="w-full h-full text-right bg-card rounded-2xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary/30 relative overflow-hidden"
+            className="w-full h-full text-right bg-white rounded-2xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border-2 border-gray-200 hover:border-blue-400 relative"
           >
-            {/* Gradient overlay on hover */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            
-            <div className="relative z-10">
+            <div className="relative">
               {/* Icon */}
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-6 group-hover:bg-primary/20 transition-colors">
-                <Zap className="w-8 h-8 text-primary" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-6 group-hover:bg-blue-200 transition-colors">
+                <Zap className="w-8 h-8 text-blue-600" />
               </div>
 
               {/* Badge */}
               <div className="inline-block mb-4">
-                <span className="text-xs font-semibold bg-success/10 text-success px-3 py-1 rounded-full">
+                <span className="text-xs font-semibold bg-green-100 text-green-700 px-3 py-1 rounded-full">
                   מומלץ למתחילים
                 </span>
               </div>
 
               {/* Title */}
-              <h2 className="text-2xl font-bold text-secondary mb-3">
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
                 בוא נתחיל קטן ⚡
               </h2>
 
               {/* Description */}
-              <p className="text-textMuted leading-relaxed mb-6">
+              <p className="text-gray-600 leading-relaxed mb-6">
                 התחל תוך 2 דקות ותקבל ערך מיידי. תוכל להשלים פרטים נוספים מאוחר יותר, בקצב שלך.
               </p>
 
               {/* Features */}
-              <ul className="space-y-2 mb-6 text-sm text-textMuted">
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
                 <li className="flex items-start gap-2">
-                  <span className="text-success mt-0.5">✓</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>2-3 שאלות בסיסיות בלבד</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-success mt-0.5">✓</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>תתחיל לרשום הוצאות מיד</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-success mt-0.5">✓</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>תקבל תובנות כבר ביום הראשון</span>
                 </li>
               </ul>
 
               {/* CTA */}
-              <div className="flex items-center justify-end gap-2 text-primary font-semibold group-hover:gap-4 transition-all">
+              <div className="flex items-center justify-end gap-2 text-blue-600 font-semibold group-hover:gap-4 transition-all">
                 <span>בואו נתחיל</span>
                 <ArrowRight className="w-5 h-5" />
               </div>
@@ -105,61 +102,58 @@ export function OnboardingSelector() {
         >
           <button
             onClick={handleFullOnboarding}
-            className="w-full h-full text-right bg-card rounded-2xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary/30 relative overflow-hidden"
+            className="w-full h-full text-right bg-white rounded-2xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border-2 border-gray-200 hover:border-purple-400 relative"
           >
-            {/* Gradient overlay on hover */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primaryDark/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            
-            <div className="relative z-10">
+            <div className="relative">
               {/* Icon */}
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primaryDark/10 mb-6 group-hover:bg-primaryDark/20 transition-colors">
-                <Sparkles className="w-8 h-8 text-primaryDark" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-100 mb-6 group-hover:bg-purple-200 transition-colors">
+                <Sparkles className="w-8 h-8 text-purple-600" />
               </div>
 
               {/* Badge */}
               <div className="inline-block mb-4">
-                <span className="text-xs font-semibold bg-primaryDark/10 text-primaryDark px-3 py-1 rounded-full">
+                <span className="text-xs font-semibold bg-purple-100 text-purple-700 px-3 py-1 rounded-full">
                   לתוצאות מקסימליות
                 </span>
               </div>
 
               {/* Title */}
-              <h2 className="text-2xl font-bold text-secondary mb-3">
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
                 יש לי זמן - בוא נעשה את זה כמו שצריך ✨
               </h2>
 
               {/* Description */}
-              <p className="text-textMuted leading-relaxed mb-6">
+              <p className="text-gray-600 leading-relaxed mb-6">
                 תמונת מצב 360° מלאה. נאסוף את כל הנתונים החשובים כדי לבנות לך תוכנית פיננסית מותאמת אישית.
               </p>
 
               {/* Features */}
-              <ul className="space-y-2 mb-6 text-sm text-textMuted">
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
                 <li className="flex items-start gap-2">
-                  <span className="text-primaryDark mt-0.5">✓</span>
+                  <span className="text-purple-600 mt-0.5">✓</span>
                   <span>תמונה כלכלית מלאה (הכנסות, הוצאות, חובות, נכסים)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-primaryDark mt-0.5">✓</span>
+                  <span className="text-purple-600 mt-0.5">✓</span>
                   <span>ממוצעי הוצאות היסטוריים (3-6 חודשים)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-primaryDark mt-0.5">✓</span>
+                  <span className="text-purple-600 mt-0.5">✓</span>
                   <span>הגדרת מטרות פיננסיות וחלומות</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-primaryDark mt-0.5">✓</span>
+                  <span className="text-purple-600 mt-0.5">✓</span>
                   <span>המלצות מותאמות מהיום הראשון</span>
                 </li>
               </ul>
 
               {/* Time estimate */}
-              <div className="inline-flex items-center gap-2 bg-background px-3 py-2 rounded-lg mb-4">
-                <span className="text-xs text-textMuted">⏱️ זמן משוער: 8-12 דקות</span>
+              <div className="inline-flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg mb-4">
+                <span className="text-xs text-gray-600">⏱️ זמן משוער: 8-12 דקות</span>
               </div>
 
               {/* CTA */}
-              <div className="flex items-center justify-end gap-2 text-primaryDark font-semibold group-hover:gap-4 transition-all">
+              <div className="flex items-center justify-end gap-2 text-purple-600 font-semibold group-hover:gap-4 transition-all">
                 <span>אני מוכן</span>
                 <ArrowRight className="w-5 h-5" />
               </div>
@@ -175,7 +169,7 @@ export function OnboardingSelector() {
         transition={{ duration: 0.5, delay: 0.5 }}
         className="text-center"
       >
-        <p className="text-sm text-textMuted">
+        <p className="text-sm text-gray-600">
           💡 <span className="font-medium">טיפ:</span> אם אתה לא בטוח - תתחיל קטן. תמיד תוכל להוסיף פרטים נוספים מאוחר יותר.
         </p>
       </motion.div>
