@@ -63,12 +63,12 @@ export function QuickOnboardingWizard() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
+        className="text-center mb-8 bg-white rounded-xl shadow-sm p-6"
       >
-        <h1 className="text-3xl font-bold text-secondary mb-2">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
           התחלה מהירה ⚡
         </h1>
-        <p className="text-textMuted">
+        <p className="text-gray-600">
           רק 2-3 דקות ואתה בפנים!
         </p>
       </motion.div>

@@ -30,13 +30,13 @@ export function QuickStep2Financial({ data, updateData }: Props) {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="space-y-8"
+      className="space-y-8 bg-white rounded-xl shadow-sm p-6"
     >
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-secondary mb-2">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
           תמונה כלכלית בסיסית 💼
         </h2>
-        <p className="text-textMuted">
+        <p className="text-gray-600">
           נתונים משוערים לגמרי - רק כדי לקבל תמונה ראשונית
         </p>
       </div>
@@ -72,13 +72,13 @@ export function QuickStep2Financial({ data, updateData }: Props) {
               p-4 rounded-xl border-2 transition-all
               ${
                 data.hasDebts === false
-                  ? 'border-success bg-success/5'
-                  : 'border-gray-200 hover:border-success/50'
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
               }
             `}
           >
             <div className="text-2xl mb-1">✅</div>
-            <div className="text-sm font-medium">לא</div>
+            <div className="text-sm font-medium text-gray-900">לא</div>
           </button>
           <button
             onClick={() => handleDebtToggle(true)}
@@ -86,13 +86,13 @@ export function QuickStep2Financial({ data, updateData }: Props) {
               p-4 rounded-xl border-2 transition-all
               ${
                 data.hasDebts === true
-                  ? 'border-warning bg-warning/5'
-                  : 'border-gray-200 hover:border-warning/50'
+                  ? 'border-orange-500 bg-orange-50'
+                  : 'border-gray-200 hover:border-orange-300 hover:bg-gray-50'
               }
             `}
           >
             <div className="text-2xl mb-1">💳</div>
-            <div className="text-sm font-medium">כן</div>
+            <div className="text-sm font-medium text-gray-900">כן</div>
           </button>
         </div>
 
@@ -131,13 +131,13 @@ export function QuickStep2Financial({ data, updateData }: Props) {
               p-4 rounded-xl border-2 transition-all
               ${
                 data.hasSavings === false
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-primary/50'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
               }
             `}
           >
             <div className="text-2xl mb-1">💰</div>
-            <div className="text-sm font-medium">עדיין לא</div>
+            <div className="text-sm font-medium text-gray-900">עדיין לא</div>
           </button>
           <button
             onClick={() => handleSavingsToggle(true)}
@@ -145,13 +145,13 @@ export function QuickStep2Financial({ data, updateData }: Props) {
               p-4 rounded-xl border-2 transition-all
               ${
                 data.hasSavings === true
-                  ? 'border-success bg-success/5'
-                  : 'border-gray-200 hover:border-success/50'
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
               }
             `}
           >
             <div className="text-2xl mb-1">💎</div>
-            <div className="text-sm font-medium">כן</div>
+            <div className="text-sm font-medium text-gray-900">כן</div>
           </button>
         </div>
 
@@ -185,9 +185,9 @@ export function QuickStep2Financial({ data, updateData }: Props) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3 }}
-        className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center"
+        className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center"
       >
-        <p className="text-sm text-primary font-medium">
+        <p className="text-sm text-blue-700 font-medium">
           💪 כל דרך מתחילה במקום כלשהו - אתה כבר בדרך!
         </p>
       </motion.div>

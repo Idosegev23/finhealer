@@ -42,13 +42,13 @@ export function QuickStep3GetStarted({ data, updateData }: Props) {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="space-y-8"
+      className="space-y-8 bg-white rounded-xl shadow-sm p-6"
     >
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-secondary mb-2">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
           איך תרצה להתחיל? 🚀
         </h2>
-        <p className="text-textMuted">
+        <p className="text-gray-600">
           בחר את הדרך הכי נוחה לך - תמיד אפשר לשנות
         </p>
       </div>
@@ -67,8 +67,8 @@ export function QuickStep3GetStarted({ data, updateData }: Props) {
                 w-full text-right p-6 rounded-xl border-2 transition-all
                 ${
                   isSelected
-                    ? 'border-primary bg-primary/5 shadow-lg'
-                    : 'border-gray-200 hover:border-primary/50 hover:bg-primary/5'
+                    ? 'border-blue-500 bg-blue-50 shadow-lg'
+                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
                 }
               `}
             >
@@ -77,7 +77,7 @@ export function QuickStep3GetStarted({ data, updateData }: Props) {
                 <div
                   className={`
                   flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center
-                  ${isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}
+                  ${isSelected ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'}
                 `}
                 >
                   <Icon className="w-6 h-6" />
@@ -86,7 +86,7 @@ export function QuickStep3GetStarted({ data, updateData }: Props) {
                 {/* Content */}
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-bold text-secondary">
+                    <h3 className="text-lg font-bold text-gray-900">
                       {method.title}
                     </h3>
                     <span
@@ -94,9 +94,9 @@ export function QuickStep3GetStarted({ data, updateData }: Props) {
                       text-xs px-2 py-0.5 rounded-full
                       ${
                         method.badge === 'מומלץ'
-                          ? 'bg-success/10 text-success'
+                          ? 'bg-green-100 text-green-700'
                           : method.badge === 'פופולרי'
-                          ? 'bg-primary/10 text-primary'
+                          ? 'bg-blue-100 text-blue-700'
                           : 'bg-gray-100 text-gray-600'
                       }
                     `}
@@ -105,14 +105,14 @@ export function QuickStep3GetStarted({ data, updateData }: Props) {
                     </span>
                   </div>
 
-                  <p className="text-textMuted text-sm mb-3">
+                  <p className="text-gray-600 text-sm mb-3">
                     {method.description}
                   </p>
 
                   <ul className="space-y-1">
                     {method.benefits.map((benefit, idx) => (
-                      <li key={idx} className="flex items-center gap-2 text-xs text-textMuted">
-                        <span className="text-success">✓</span>
+                      <li key={idx} className="flex items-center gap-2 text-xs text-gray-600">
+                        <span className="text-green-600">✓</span>
                         <span>{benefit}</span>
                       </li>
                     ))}
@@ -126,7 +126,7 @@ export function QuickStep3GetStarted({ data, updateData }: Props) {
                     w-6 h-6 rounded-full border-2 flex items-center justify-center
                     ${
                       isSelected
-                        ? 'border-primary bg-primary'
+                        ? 'border-blue-500 bg-blue-500'
                         : 'border-gray-300 bg-white'
                     }
                   `}
@@ -147,34 +147,34 @@ export function QuickStep3GetStarted({ data, updateData }: Props) {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-primary/10 to-primaryDark/10 border border-primary/20 rounded-xl p-6 text-center"
+          className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center"
         >
           {data.startMethod === 'whatsapp' && (
             <>
-              <p className="text-lg font-semibold text-secondary mb-2">
+              <p className="text-lg font-semibold text-gray-900 mb-2">
                 נפלא! 💬
               </p>
-              <p className="text-sm text-textMuted">
+              <p className="text-sm text-gray-600">
                 בשלב הבא נחבר את WhatsApp שלך ותוכל להתחיל לשלוח הוצאות
               </p>
             </>
           )}
           {data.startMethod === 'receipts' && (
             <>
-              <p className="text-lg font-semibold text-secondary mb-2">
+              <p className="text-lg font-semibold text-gray-900 mb-2">
                 בחירה חכמה! 📸
               </p>
-              <p className="text-sm text-textMuted">
+              <p className="text-sm text-gray-600">
                 בשלב הבא תוכל להעלות קבלות ונעבד אותן אוטומטית
               </p>
             </>
           )}
           {data.startMethod === 'manual' && (
             <>
-              <p className="text-lg font-semibold text-secondary mb-2">
+              <p className="text-lg font-semibold text-gray-900 mb-2">
                 מעולה! ✍️
               </p>
-              <p className="text-sm text-textMuted">
+              <p className="text-sm text-gray-600">
                 בשלב הבא תגיע לדשבורד ותוכל להתחיל לרשום הוצאות
               </p>
             </>
@@ -189,7 +189,7 @@ export function QuickStep3GetStarted({ data, updateData }: Props) {
         transition={{ delay: 0.5 }}
         className="text-center"
       >
-        <p className="text-sm text-textMuted">
+        <p className="text-sm text-gray-600">
           🎉 <span className="font-semibold">זהו! אתה מוכן להתחיל</span>
         </p>
       </motion.div>

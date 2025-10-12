@@ -25,13 +25,13 @@ export function QuickStep1Basic({ data, updateData }: Props) {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="space-y-8"
+      className="space-y-8 bg-white rounded-xl shadow-sm p-6"
     >
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-secondary mb-2">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
           בוא נכיר! 👋
         </h2>
-        <p className="text-textMuted">
+        <p className="text-gray-600">
           רק כמה פרטים בסיסיים ואנחנו יוצאים לדרך
         </p>
       </div>
@@ -64,18 +64,18 @@ export function QuickStep1Basic({ data, updateData }: Props) {
                 relative p-4 rounded-xl border-2 transition-all text-right
                 ${
                   data.primaryGoal === goal.id
-                    ? 'border-primary bg-primary/5 shadow-md'
-                    : 'border-gray-200 hover:border-primary/50 hover:bg-primary/5'
+                    ? 'border-blue-500 bg-blue-50 shadow-md'
+                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
                 }
               `}
             >
               <div className="text-2xl mb-2">{goal.icon}</div>
-              <div className="text-sm font-medium text-secondary">
+              <div className="text-sm font-medium text-gray-900">
                 {goal.label}
               </div>
               {data.primaryGoal === goal.id && (
                 <div className="absolute top-2 left-2">
-                  <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                  <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
                     <span className="text-white text-xs">✓</span>
                   </div>
                 </div>
@@ -90,9 +90,9 @@ export function QuickStep1Basic({ data, updateData }: Props) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3 }}
-        className="bg-success/10 border border-success/20 rounded-lg p-4 text-center"
+        className="bg-green-50 border border-green-200 rounded-lg p-4 text-center"
       >
-        <p className="text-sm text-success font-medium">
+        <p className="text-sm text-green-700 font-medium">
           🎉 מעולה! זה הצעד הראשון לשליטה כלכלית
         </p>
       </motion.div>
