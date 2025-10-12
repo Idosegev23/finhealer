@@ -64,8 +64,8 @@ export async function POST(request: Request) {
       const pdfBuffer = Buffer.from(arrayBuffer);
 
       try {
-        // Dynamic import to avoid build issues
-        const pdfParse = (await import('pdf-parse')).default;
+        // Use require for CommonJS module
+        const pdfParse = require('pdf-parse');
         const data = await pdfParse(pdfBuffer);
         const extractedText = data.text;
         console.log(`✅ PDF parsed: ${data.numpages} pages, ${extractedText.length} chars`);
