@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -206,7 +207,9 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
                       />
                       <div className="border-2 border-dashed border-[#3A7BD5] rounded-lg p-4 cursor-pointer hover:bg-white transition-colors text-center">
                         {idCardPreview ? (
-                          <img src={idCardPreview} alt="ID Card" className="max-h-32 mx-auto rounded" />
+                          <div className="relative w-full max-h-32 h-32">
+                            <Image src={idCardPreview} alt="ID Card" fill className="object-contain rounded" />
+                          </div>
                         ) : (
                           <div className="py-4">
                             <Upload className="w-8 h-8 text-[#3A7BD5] mx-auto mb-2" />
@@ -238,7 +241,9 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
                       />
                       <div className="border-2 border-dashed border-[#7ED957] rounded-lg p-4 cursor-pointer hover:bg-white transition-colors text-center">
                         {appendixPreview ? (
-                          <img src={appendixPreview} alt="Appendix" className="max-h-32 mx-auto rounded" />
+                          <div className="relative w-full max-h-32 h-32">
+                            <Image src={appendixPreview} alt="Appendix" fill className="object-contain rounded" />
+                          </div>
                         ) : (
                           <div className="py-4">
                             <Upload className="w-8 h-8 text-[#7ED957] mx-auto mb-2" />
@@ -358,7 +363,7 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
 
           {children.length === 0 && (
             <p className="text-sm text-[#888888] text-center py-4 bg-[#F5F6F8] rounded-lg">
-              אין ילדים רשומים. לחץ על "הוסף ילד/ה" כדי להוסיף
+              אין ילדים רשומים. לחץ על &quot;הוסף ילד/ה&quot; כדי להוסיף
             </p>
           )}
 
@@ -492,7 +497,7 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
 
             {grandchildren.length === 0 && (
               <p className="text-sm text-[#888888] text-center py-4 bg-[#F5F6F8] rounded-lg">
-                אין נכדים רשומים. לחץ על "הוסף נכד/ה" אם יש נכדים שאתה תומך בהם
+                אין נכדים רשומים. לחץ על &quot;הוסף נכד/ה&quot; אם יש נכדים שאתה תומך בהם
               </p>
             )}
 

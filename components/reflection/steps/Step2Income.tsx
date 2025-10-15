@@ -127,7 +127,7 @@ export default function Step2Income({ data, onChange }: Step2Props) {
           <div className="text-center py-8 bg-[#F5F6F8] rounded-lg border-2 border-dashed border-gray-300">
             <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-3" />
             <p className="text-sm text-[#888888]">עדיין לא הוספת מקורות הכנסה</p>
-            <p className="text-xs text-[#888888] mt-1">לחץ על "הוסף מקור הכנסה" כדי להתחיל</p>
+            <p className="text-xs text-[#888888] mt-1">לחץ על &quot;הוסף מקור הכנסה&quot; כדי להתחיל</p>
           </div>
         )}
 
@@ -254,7 +254,7 @@ export default function Step2Income({ data, onChange }: Step2Props) {
                         />
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555555]">₪</span>
                       </div>
-                      <p className="text-xs text-[#888888] mt-1">מה שרשום בתלוש שכר (שורת "נטו לתשלום")</p>
+                      <p className="text-xs text-[#888888] mt-1">מה שרשום בתלוש שכר (שורת &quot;נטו לתשלום&quot;)</p>
                     </div>
 
                     {/* קיזוזים נוספים */}

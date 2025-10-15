@@ -71,7 +71,7 @@ export function OnboardingSelector() {
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-[#7ED957] mt-0.5 text-lg">✓</span>
-                  <span><strong>אופציה לסריקת ת"ז:</strong> מילוי אוטומטי מהר וקל</span>
+                  <span><strong>אופציה לסריקת ת&quot;ז:</strong> מילוי אוטומטי מהר וקל</span>
                 </li>
               </ul>
 
