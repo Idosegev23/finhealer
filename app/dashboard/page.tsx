@@ -11,6 +11,7 @@ import MonthlyBreakdown from '@/components/dashboard/MonthlyBreakdown'
 import { QuickActions } from '@/components/dashboard/QuickActions'
 import { ProgressiveBanner } from '@/components/dashboard/ProgressiveBanner'
 import EmptyDashboard from '@/components/dashboard/EmptyDashboard'
+import DataCollectionDashboard from '@/components/dashboard/DataCollectionDashboard'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -105,17 +106,55 @@ export default async function DashboardPage() {
     income_count: 0,
   }
 
-  // Check if user has completed profile (Empty State)
+  // Check user phase
+  const currentPhase = userDataInfo.phase || 'reflection'
+
+  // Check if user has completed personal details (Step 1)
   const profileData = userProfile as any
-  const hasCompletedProfile = !!(
-    profileData?.total_monthly_income || 
+  const hasPersonalDetails = !!(
+    profileData?.age || 
     profileData?.marital_status || 
-    profileData?.num_children !== undefined
+    profileData?.city
   )
 
-  // Show Empty State if no profile
-  if (!hasCompletedProfile) {
+  // If user hasn't completed personal details, show empty state
+  if (!hasPersonalDetails) {
     return <EmptyDashboard userName={userDataInfo.name} hasProfile={false} />
+  }
+
+  // If user is in data_collection phase, show data collection dashboard
+  if (currentPhase === 'data_collection') {
+    // Get user data sections status
+    const { data: dataSections } = await supabase
+      .from('user_data_sections')
+      .select('*')
+      .eq('user_id', user.id)
+
+    // Create sections object
+    const sections = {
+      income: dataSections?.some((s: any) => s.subsection === 'income' && s.completed) ?? false,
+      expenses: dataSections?.some((s: any) => s.subsection === 'expenses' && s.completed) ?? false,
+      loans: dataSections?.some((s: any) => s.subsection === 'loans' && s.completed) ?? false,
+      savings: dataSections?.some((s: any) => s.subsection === 'savings' && s.completed) ?? false,
+      cash_flow: dataSections?.some((s: any) => s.subsection === 'cash_flow' && s.completed) ?? false,
+      investments: dataSections?.some((s: any) => s.subsection === 'investments' && s.completed) ?? false,
+      insurance: dataSections?.some((s: any) => s.subsection === 'insurance' && s.completed) ?? false,
+    }
+
+    // Check if all sections are completed
+    const allCompleted = Object.values(sections).every(Boolean)
+    
+    // If all sections completed, move to next phase
+    if (allCompleted) {
+      await (supabase as any)
+        .from('users')
+        .update({ phase: 'behavior' })
+        .eq('id', user.id)
+      // Continue to show full dashboard
+    } else {
+      // Show data collection dashboard
+      return <DataCollectionDashboard userName={userDataInfo.name} sections={sections} />
+    }
   }
 
   return (
