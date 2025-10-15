@@ -55,48 +55,44 @@ export default function DataCollectionDashboard({ userName, sections }: DataColl
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F5F6F8] via-white to-[#F5F6F8] px-4 py-8">
-      <div className="container mx-auto max-w-6xl">
-        {/* Header */}
+    <div>
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center mb-6"
+      >
+        <h2 className="text-3xl font-bold text-[#1E2A3B] mb-2">
+          השלם את תמונת המצב שלך 📊
+        </h2>
+        <p className="text-base text-[#555555] mb-1">
+          מלא את הרובריקות בקצב שלך - הן יעלמו אחרי שתשלים אותן
+        </p>
+      </motion.div>
+
+      {/* Progress Overview */}
+      <DataCollectionProgress 
+        sections={progressSections}
+      />
+
+      {/* Financial Information Category */}
+      <div className="mb-8">
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-4"
         >
-          <h1 className="text-4xl font-bold text-[#1E2A3B] mb-2">
-            {userName ? `שלום ${userName}! ` : 'שלום! '}👋
-          </h1>
-          <p className="text-lg text-[#555555] mb-1">
-            בואו נשלים את תמונת המצב הפיננסי שלך
-          </p>
-          <p className="text-sm text-[#888888]">
-            מלא את הרובריקות בקצב שלך - הן יעלמו אחרי שתשלים אותן
+          <h2 className="text-2xl font-bold text-[#1E2A3B] flex items-center gap-2">
+            <DollarSign className="w-7 h-7 text-[#3A7BD5]" />
+            מידע פיננסי
+          </h2>
+          <p className="text-sm text-[#888888] mt-1">
+            הכנסות, הוצאות, הלוואות וחסכונות
           </p>
         </motion.div>
 
-        {/* Progress Overview */}
-        <DataCollectionProgress 
-          sections={progressSections}
-        />
-
-        {/* Financial Information Category */}
-        <div className="mb-8">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mb-4"
-          >
-            <h2 className="text-2xl font-bold text-[#1E2A3B] flex items-center gap-2">
-              <DollarSign className="w-7 h-7 text-[#3A7BD5]" />
-              מידע פיננסי
-            </h2>
-            <p className="text-sm text-[#888888] mt-1">
-              הכנסות, הוצאות, הלוואות וחסכונות
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-2 gap-4">
             {/* Income */}
             {!sections.income && (
               <motion.div
@@ -252,39 +248,38 @@ export default function DataCollectionDashboard({ userName, sections }: DataColl
           </div>
         )}
 
-        {/* Info Box */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1 }}
-          className="bg-gradient-to-br from-[#E8F4FD] to-[#E8F5E9] p-6 rounded-2xl border-2 border-[#3A7BD5]/30"
-        >
-          <div className="flex items-start gap-3">
-            <div className="text-3xl">💡</div>
-            <div>
-              <h3 className="font-bold text-[#1E2A3B] mb-2">מדוע חשוב למלא את כל המידע?</h3>
-              <ul className="space-y-2 text-sm text-[#555555]">
-                <li className="flex items-start gap-2">
-                  <span className="text-[#7ED957] mt-0.5">✓</span>
-                  <span><strong>ניתוח מדויק יותר:</strong> ככל שיש לנו יותר מידע, כך התובנות מדויקות יותר</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#7ED957] mt-0.5">✓</span>
-                  <span><strong>המלצות מותאמות:</strong> נוכל להציע לך צעדים קונקרטיים לשיפור</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#7ED957] mt-0.5">✓</span>
-                  <span><strong>תקציב אוטומטי:</strong> נייצר לך תקציב מבוסס על ההתנהלות האמיתית שלך</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#7ED957] mt-0.5">✓</span>
-                  <span><strong>הכל באפס:</strong> אין חובה למלא הכל עכשיו - תוכל לחזור בכל עת</span>
-                </li>
-              </ul>
-            </div>
+      {/* Info Box */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.1 }}
+        className="bg-gradient-to-br from-[#E8F4FD] to-[#E8F5E9] p-6 rounded-2xl border-2 border-[#3A7BD5]/30 mt-8"
+      >
+        <div className="flex items-start gap-3">
+          <div className="text-3xl">💡</div>
+          <div>
+            <h3 className="font-bold text-[#1E2A3B] mb-2">מדוע חשוב למלא את כל המידע?</h3>
+            <ul className="space-y-2 text-sm text-[#555555]">
+              <li className="flex items-start gap-2">
+                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span><strong>ניתוח מדויק יותר:</strong> ככל שיש לנו יותר מידע, כך התובנות מדויקות יותר</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span><strong>המלצות מותאמות:</strong> נוכל להציע לך צעדים קונקרטיים לשיפור</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span><strong>תקציב אוטומטי:</strong> נייצר לך תקציב מבוסס על ההתנהלות האמיתית שלך</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span><strong>הכל בקצב שלך:</strong> אין חובה למלא הכל עכשיו - תוכל לחזור בכל עת</span>
+              </li>
+            </ul>
           </div>
-        </motion.div>
-      </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

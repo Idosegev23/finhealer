@@ -122,40 +122,36 @@ export default async function DashboardPage() {
     return <EmptyDashboard userName={userDataInfo.name} hasProfile={false} />
   }
 
-  // If user is in data_collection phase, show data collection dashboard
-  if (currentPhase === 'data_collection') {
-    // Get user data sections status
-    const { data: dataSections } = await supabase
-      .from('user_data_sections')
-      .select('*')
-      .eq('user_id', user.id)
+  // Get user data sections status (for data_collection phase)
+  const { data: dataSections } = await supabase
+    .from('user_data_sections')
+    .select('*')
+    .eq('user_id', user.id)
 
-    // Create sections object
-    const sections = {
-      income: dataSections?.some((s: any) => s.subsection === 'income' && s.completed) ?? false,
-      expenses: dataSections?.some((s: any) => s.subsection === 'expenses' && s.completed) ?? false,
-      loans: dataSections?.some((s: any) => s.subsection === 'loans' && s.completed) ?? false,
-      savings: dataSections?.some((s: any) => s.subsection === 'savings' && s.completed) ?? false,
-      cash_flow: dataSections?.some((s: any) => s.subsection === 'cash_flow' && s.completed) ?? false,
-      investments: dataSections?.some((s: any) => s.subsection === 'investments' && s.completed) ?? false,
-      insurance: dataSections?.some((s: any) => s.subsection === 'insurance' && s.completed) ?? false,
-    }
-
-    // Check if all sections are completed
-    const allCompleted = Object.values(sections).every(Boolean)
-    
-    // If all sections completed, move to next phase
-    if (allCompleted) {
-      await (supabase as any)
-        .from('users')
-        .update({ phase: 'behavior' })
-        .eq('id', user.id)
-      // Continue to show full dashboard
-    } else {
-      // Show data collection dashboard
-      return <DataCollectionDashboard userName={userDataInfo.name} sections={sections} />
-    }
+  // Create sections object
+  const sections = {
+    income: dataSections?.some((s: any) => s.subsection === 'income' && s.completed) ?? false,
+    expenses: dataSections?.some((s: any) => s.subsection === 'expenses' && s.completed) ?? false,
+    loans: dataSections?.some((s: any) => s.subsection === 'loans' && s.completed) ?? false,
+    savings: dataSections?.some((s: any) => s.subsection === 'savings' && s.completed) ?? false,
+    cash_flow: dataSections?.some((s: any) => s.subsection === 'cash_flow' && s.completed) ?? false,
+    investments: dataSections?.some((s: any) => s.subsection === 'investments' && s.completed) ?? false,
+    insurance: dataSections?.some((s: any) => s.subsection === 'insurance' && s.completed) ?? false,
   }
+
+  // Check if all sections are completed
+  const allCompleted = Object.values(sections).every(Boolean)
+  
+  // If all sections completed and still in data_collection phase, move to next phase
+  if (currentPhase === 'data_collection' && allCompleted) {
+    await (supabase as any)
+      .from('users')
+      .update({ phase: 'behavior' })
+      .eq('id', user.id)
+  }
+
+  // Calculate pending sections (for showing rubrics)
+  const hasPendingSections = currentPhase === 'data_collection' && !allCompleted
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5F6F8] via-white to-[#F5F6F8]">
@@ -221,6 +217,13 @@ export default async function DashboardPage() {
         )}
         {transactionCount && transactionCount >= 30 && userDataInfo.phase === 'behavior' && (
           <ProgressiveBanner type="budget_ready" />
+        )}
+
+        {/* Data Collection Rubrics - Show only if in data_collection phase */}
+        {hasPendingSections && (
+          <div className="mb-8">
+            <DataCollectionDashboard userName={userDataInfo.name} sections={sections} />
+          </div>
         )}
 
         {/* Financial Health Score */}
