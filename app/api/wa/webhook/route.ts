@@ -150,6 +150,37 @@ export async function POST(request: NextRequest) {
       const parsedTransaction = await parseExpenseFromText(text);
       
       if (parsedTransaction) {
+        // נסה לזהות קטגוריה אוטומטית
+        let category = null;
+        let expenseType = null;
+        let categoryGroup = null;
+        let autoCategorized = false;
+
+        try {
+          const categorizeResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/expenses/categorize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              description: text,
+              vendor: parsedTransaction.vendor,
+              amount: parsedTransaction.amount
+            })
+          });
+
+          if (categorizeResponse.ok) {
+            const categorizeData = await categorizeResponse.json();
+            if (categorizeData.matched && categorizeData.confidence > 0.5) {
+              category = categorizeData.suggested_category;
+              expenseType = categorizeData.expense_type;
+              categoryGroup = categorizeData.category_group;
+              autoCategorized = true;
+            }
+          }
+        } catch (catError) {
+          console.error('❌ Categorization error (non-critical):', catError);
+          // Continue without categorization
+        }
+
         // צור transaction מוצעת
         const { data: transaction, error: txError } = await (supabase as any)
           .from('transactions')
@@ -157,6 +188,10 @@ export async function POST(request: NextRequest) {
             user_id: userData.id,
             type: 'expense',
             amount: parsedTransaction.amount,
+            category: category,
+            expense_type: expenseType,
+            category_group: categoryGroup,
+            auto_categorized: autoCategorized,
             vendor: parsedTransaction.vendor,
             description: text,
             source: 'wa_text',
@@ -172,10 +207,15 @@ export async function POST(request: NextRequest) {
           console.log('✅ Transaction created:', transaction.id);
           
           // שלח הודעת אישור
-          await sendWhatsAppMessage(
-            phoneNumber,
-            `נרשמה הוצאה של ${parsedTransaction.amount} ₪${parsedTransaction.vendor ? ` ב${parsedTransaction.vendor}` : ''} ✅\n\nזה נכון? [כן] [לא]`
-          );
+          let confirmMessage = `נרשמה הוצאה של ${parsedTransaction.amount} ₪${parsedTransaction.vendor ? ` ב${parsedTransaction.vendor}` : ''} ✅`;
+          
+          if (autoCategorized && category) {
+            confirmMessage += `\nקטגוריה: ${category}`;
+          }
+          
+          confirmMessage += `\n\nזה נכון? [כן] [לא]`;
+          
+          await sendWhatsAppMessage(phoneNumber, confirmMessage);
         }
       } else {
         // לא הצלחנו לזהות - שאל

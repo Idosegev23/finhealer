@@ -17,7 +17,20 @@ export async function POST(request: Request) {
 
     // קבלת נתונים מהבקשה
     const body = await request.json();
-    const { dependents, incomeSources, ...profile } = body;
+    const { dependents, incomeSources, employment_status, ...profile } = body;
+
+    // עדכון employment_status בטבלת users אם סופק
+    if (employment_status) {
+      const { error: userUpdateError } = await (supabase as any)
+        .from('users')
+        .update({ employment_status })
+        .eq('id', user.id);
+      
+      if (userUpdateError) {
+        console.error('Error updating user employment_status:', userUpdateError);
+        // לא נכשיל את כל הבקשה
+      }
+    }
 
     // בדיקה אם כבר קיים פרופיל
     const { data: existing } = await supabase

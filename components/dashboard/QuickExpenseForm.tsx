@@ -6,14 +6,18 @@ import { X, DollarSign } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import ExpenseSelector, { ExpenseOption } from '@/components/shared/ExpenseSelector';
 
 interface Props {
   onClose: () => void;
+  employmentStatus?: 'employee' | 'self_employed' | 'both';
 }
 
-export function QuickExpenseForm({ onClose }: Props) {
+export function QuickExpenseForm({ onClose, employmentStatus }: Props) {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
+  const [expenseType, setExpenseType] = useState<'fixed' | 'variable' | 'special' | null>(null);
+  const [categoryGroup, setCategoryGroup] = useState<string | null>(null);
   const [vendor, setVendor] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -33,9 +37,12 @@ export function QuickExpenseForm({ onClose }: Props) {
           type: 'expense',
           amount: parseFloat(amount),
           category: category || 'כללי',
+          expense_type: expenseType,
+          category_group: categoryGroup,
           vendor: vendor || null,
           source: 'manual',
           status: 'confirmed',
+          auto_categorized: false,
           date: new Date().toISOString().split('T')[0],
         }),
       });
@@ -109,12 +116,14 @@ export function QuickExpenseForm({ onClose }: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="category">קטגוריה</Label>
-            <Input
-              id="category"
-              type="text"
-              placeholder="למשל: אוכל, תחבורה, בילויים..."
+            <ExpenseSelector
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(expense: ExpenseOption) => {
+                setCategory(expense.name);
+                setExpenseType(expense.expense_type);
+                setCategoryGroup(expense.category_group || null);
+              }}
+              employmentStatus={employmentStatus}
             />
           </div>
 

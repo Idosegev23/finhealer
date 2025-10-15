@@ -18,6 +18,7 @@ export default function FullReflectionWizard({ categories, userId }: FullReflect
     age: null,
     marital_status: '',
     city: '',
+    employment_status: '',
     dependents: [],  // Array of {id, name, birthDate, gender, relationshipType, isFinanciallySupported}
   });
 
@@ -37,6 +38,7 @@ export default function FullReflectionWizard({ categories, userId }: FullReflect
           age: data.age,
           marital_status: data.marital_status,
           city: data.city,
+          employment_status: data.employment_status,
           dependents: data.dependents,
           completed: true
         })

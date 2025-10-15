@@ -345,6 +345,22 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
           <p className="text-xs text-[#555555] mt-1">יעזור לנו להבין הוצאות מחיה אופייניות לאזור</p>
         </div>
 
+        {/* מעמד תעסוקתי */}
+        <div>
+          <Label htmlFor="employment" className="text-[#1E2A3B] font-medium">מעמד תעסוקתי</Label>
+          <Select value={data.employment_status || ''} onValueChange={(val) => onChange('employment_status', val)}>
+            <SelectTrigger className="mt-1">
+              <SelectValue placeholder="בחר..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="employee">שכיר</SelectItem>
+              <SelectItem value="self_employed">עצמאי</SelectItem>
+              <SelectItem value="both">שכיר + עצמאי</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-[#555555] mt-1">יעזור לנו להתאים את קטגוריות ההוצאות עבורך</p>
+        </div>
+
         {/* ילדים מתחת לגיל 18 */}
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
