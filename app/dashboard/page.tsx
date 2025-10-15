@@ -11,7 +11,7 @@ import MonthlyBreakdown from '@/components/dashboard/MonthlyBreakdown'
 import { QuickActions } from '@/components/dashboard/QuickActions'
 import { ProgressiveBanner } from '@/components/dashboard/ProgressiveBanner'
 import EmptyDashboard from '@/components/dashboard/EmptyDashboard'
-import DataCollectionDashboard from '@/components/dashboard/DataCollectionDashboard'
+import DataCollectionBanner from '@/components/dashboard/DataCollectionBanner'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -219,11 +219,9 @@ export default async function DashboardPage() {
           <ProgressiveBanner type="budget_ready" />
         )}
 
-        {/* Data Collection Rubrics - Show only if in data_collection phase */}
+        {/* Data Collection Banner - Show only if in data_collection phase */}
         {hasPendingSections && (
-          <div className="mb-8">
-            <DataCollectionDashboard userName={userDataInfo.name} sections={sections} />
-          </div>
+          <DataCollectionBanner userName={userDataInfo.name} sections={sections} />
         )}
 
         {/* Financial Health Score */}
