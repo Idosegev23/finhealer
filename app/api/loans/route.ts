@@ -66,13 +66,13 @@ export async function POST(request: Request) {
     }
 
     // First, mark all existing loans as inactive
-    await supabase
+    await (supabase as any)
       .from('loans')
       .update({ active: false })
       .eq('user_id', user.id);
 
     // Then insert new loans
-    const loansToInsert = loans.map(loan => ({
+    const loansToInsert = loans.map((loan: any) => ({
       user_id: user.id,
       lender_name: loan.lenderName,
       loan_number: loan.loanNumber,
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       active: true,
     }));
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('loans')
       .insert(loansToInsert)
       .select();
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     }
 
     // Update user_data_sections to mark loans as completed
-    await supabase
+    await (supabase as any)
       .from('user_data_sections')
       .update({ 
         completed: true,

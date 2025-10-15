@@ -92,7 +92,7 @@ export async function POST(request: Request) {
           is_financially_supported: dep.isFinanciallySupported || false
         }));
 
-        const { error: depsError } = await supabase
+        const { error: depsError } = await (supabase as any)
           .from('dependents')
           .insert(dependentsToInsert);
 
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
           active: true
         }));
 
-        const { error: incomeError } = await supabase
+        const { error: incomeError } = await (supabase as any)
           .from('income_sources')
           .insert(sourcesToInsert);
 

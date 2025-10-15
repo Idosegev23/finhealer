@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     // Update user phase
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('users')
       .update({ phase })
       .eq('id', user.id);
