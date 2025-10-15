@@ -26,8 +26,13 @@ export default function Step5History({ categories, data, onChange }: Step5Props)
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">ההיסטוריה שלך 📊</h2>
-        <p className="text-[#555555]">ממוצעי הוצאות מהחודשים האחרונים</p>
+        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">שלב 5: ההיסטוריה שלך 📊</h2>
+        <p className="text-[#555555] mb-2">ממוצעי הוצאות מהחודשים האחרונים לפי קטגוריות</p>
+        <div className="inline-block bg-[#E8F4FD] px-4 py-2 rounded-lg mt-2">
+          <p className="text-xs text-[#3A7BD5]">
+            <strong>מה נלקח:</strong> תקופת זמן (3-6 חודשים) • ממוצעי הוצאה בכל קטגוריה
+          </p>
+        </div>
       </div>
 
       {/* בחירת תקופה */}

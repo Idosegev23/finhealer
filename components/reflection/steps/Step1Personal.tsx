@@ -1,9 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Plus, Trash2, Scan, Upload, Loader2, CheckCircle, XCircle, Camera } from 'lucide-react';
+
+interface Dependent {
+  id: string;
+  name: string;
+  birthDate: string;
+  gender: 'male' | 'female' | 'other';
+  relationshipType: 'child' | 'grandchild';
+  isFinanciallySupported: boolean;
+}
 
 interface Step1Props {
   data: any;
@@ -11,12 +22,279 @@ interface Step1Props {
 }
 
 export default function Step1Personal({ data, onChange }: Step1Props) {
-  const [agesText, setAgesText] = useState<string>(data.children_ages?.join(', ') || '');
+  const [dependents, setDependents] = useState<Dependent[]>(data.dependents || []);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [idCardPreview, setIdCardPreview] = useState<string | null>(null);
+  const [appendixPreview, setAppendixPreview] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  
+  const userAge = data.age || 0;
+  const isOver60 = userAge >= 60;
+
+  const addDependent = (type: 'child' | 'grandchild') => {
+    const newDependent: Dependent = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: '',
+      birthDate: '',
+      gender: 'male',
+      relationshipType: type,
+      isFinanciallySupported: false
+    };
+    const updated = [...dependents, newDependent];
+    setDependents(updated);
+    onChange('dependents', updated);
+  };
+
+  const updateDependent = (id: string, field: keyof Dependent, value: any) => {
+    const updated = dependents.map(d => 
+      d.id === id ? { ...d, [field]: value } : d
+    );
+    setDependents(updated);
+    onChange('dependents', updated);
+  };
+
+  const removeDependent = (id: string) => {
+    const updated = dependents.filter(d => d.id !== id);
+    setDependents(updated);
+    onChange('dependents', updated);
+  };
+
+  const calculateAge = (birthDate: string): number => {
+    if (!birthDate) return 0;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const handleScanIdCard = async (idCardFile: File | null, appendixFile: File | null) => {
+    if (!idCardFile) return;
+
+    setIsScanning(true);
+    setScanError(null);
+    setScanSuccess(false);
+
+    try {
+      const formData = new FormData();
+      formData.append('idCard', idCardFile);
+      if (appendixFile) {
+        formData.append('appendix', appendixFile);
+      }
+
+      const response = await fetch('/api/ocr/id-card', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to scan ID card');
+      }
+
+      const result = await response.json();
+      const { idCard, children: scannedChildren } = result.data;
+
+      // Auto-fill personal data
+      if (idCard.fullName) {
+        // We don't have name field in current data, but we can add it
+      }
+      if (idCard.birthDate) {
+        const age = calculateAge(idCard.birthDate);
+        onChange('age', age);
+      }
+      if (idCard.gender) {
+        // Convert to marital status if needed - though gender !== marital status
+      }
+      if (idCard.address) {
+        onChange('city', idCard.address);
+      }
+
+      // Auto-fill children from appendix
+      if (scannedChildren && scannedChildren.length > 0) {
+        const newDependents = scannedChildren.map((child: any) => ({
+          id: Math.random().toString(36).substr(2, 9),
+          name: child.name || '',
+          birthDate: child.birthDate || '',
+          gender: child.gender || 'other',
+          relationshipType: 'child',
+          isFinanciallySupported: false
+        }));
+
+        const updatedDependents = [...dependents, ...newDependents];
+        setDependents(updatedDependents);
+        onChange('dependents', updatedDependents);
+      }
+
+      setScanSuccess(true);
+      setTimeout(() => {
+        setShowScanner(false);
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Scan error:', error);
+      setScanError(error.message || 'שגיאה בסריקה');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const children = dependents.filter(d => d.relationshipType === 'child');
+  const grandchildren = dependents.filter(d => d.relationshipType === 'grandchild');
+  const childrenUnder18 = children.filter(d => calculateAge(d.birthDate) < 18);
+  const childrenOver18 = children.filter(d => calculateAge(d.birthDate) >= 18);
+
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">בואו נכיר 👋</h2>
-        <p className="text-[#555555]">כמה פרטים בסיסיים כדי להתאים את הליווי בצורה הטובה ביותר</p>
+        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">שלב 1: בואו נכיר 👋</h2>
+        <p className="text-[#555555] mb-2">כמה פרטים אישיים שיעזרו לנו להתאים את הליווי בצורה הטובה ביותר</p>
+        <div className="inline-block bg-[#E8F4FD] px-4 py-2 rounded-lg mt-2">
+          <p className="text-xs text-[#3A7BD5]">
+            <strong>מה נלקח:</strong> גיל • מצב משפחתי • ילדים (שם, מין, ת. לידה) • כתובת מגורים
+          </p>
+        </div>
+      </div>
+
+      {/* ID Card Scanner */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => setShowScanner(!showScanner)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-l from-[#3A7BD5] to-[#7ED957] text-white rounded-lg hover:shadow-lg transition-all font-semibold"
+        >
+          <Camera className="w-5 h-5" />
+          {showScanner ? 'סגור סורק ת.ז' : 'סרוק ת.ז + ספח (מילוי אוטומטי מהיר!)'}
+        </button>
+
+        {showScanner && (
+          <div className="mt-4 p-6 bg-gradient-to-br from-[#E8F4FD] to-[#E8F5E9] border-2 border-[#3A7BD5] rounded-xl">
+            <div className="space-y-4">
+              <div className="text-center">
+                <Scan className="w-12 h-12 text-[#3A7BD5] mx-auto mb-3" />
+                <h3 className="font-semibold text-[#1E2A3B] mb-2">העלאת תעודת זהות + ספח</h3>
+                <p className="text-sm text-[#555555]">
+                  המערכת תמלא אוטומטית את כל הפרטים מהתמונות
+                </p>
+              </div>
+
+              {!isScanning && !scanSuccess && (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* ID Card Upload */}
+                  <div>
+                    <Label className="text-sm font-medium text-[#1E2A3B] mb-2 block">תעודת זהות</Label>
+                    <label className="block">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              setIdCardPreview(event.target?.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <div className="border-2 border-dashed border-[#3A7BD5] rounded-lg p-4 cursor-pointer hover:bg-white transition-colors text-center">
+                        {idCardPreview ? (
+                          <img src={idCardPreview} alt="ID Card" className="max-h-32 mx-auto rounded" />
+                        ) : (
+                          <div className="py-4">
+                            <Upload className="w-8 h-8 text-[#3A7BD5] mx-auto mb-2" />
+                            <p className="text-sm text-[#555555]">לחץ להעלאה</p>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Appendix Upload */}
+                  <div>
+                    <Label className="text-sm font-medium text-[#1E2A3B] mb-2 block">ספח (אופציונלי)</Label>
+                    <label className="block">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              setAppendixPreview(event.target?.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <div className="border-2 border-dashed border-[#7ED957] rounded-lg p-4 cursor-pointer hover:bg-white transition-colors text-center">
+                        {appendixPreview ? (
+                          <img src={appendixPreview} alt="Appendix" className="max-h-32 mx-auto rounded" />
+                        ) : (
+                          <div className="py-4">
+                            <Upload className="w-8 h-8 text-[#7ED957] mx-auto mb-2" />
+                            <p className="text-sm text-[#555555]">לחץ להעלאה</p>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {isScanning && (
+                <div className="text-center py-8">
+                  <Loader2 className="w-12 h-12 text-[#3A7BD5] mx-auto mb-3 animate-spin" />
+                  <p className="text-[#1E2A3B] font-semibold">סורק ומנתח...</p>
+                  <p className="text-sm text-[#555555] mt-1">זה יכול לקחת כמה שניות</p>
+                </div>
+              )}
+
+              {scanSuccess && (
+                <div className="text-center py-8 bg-[#E8F5E9] rounded-lg">
+                  <CheckCircle className="w-12 h-12 text-[#7ED957] mx-auto mb-3" />
+                  <p className="text-[#1E2A3B] font-semibold">סריקה הושלמה בהצלחה!</p>
+                  <p className="text-sm text-[#555555] mt-1">הפרטים מולאו אוטומטית</p>
+                </div>
+              )}
+
+              {scanError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-900">{scanError}</p>
+                    <p className="text-xs text-red-700 mt-1">נסה שוב או מלא ידנית</p>
+                  </div>
+                </div>
+              )}
+
+              {idCardPreview && !isScanning && !scanSuccess && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    // Get files from the inputs
+                    const idInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                    const appendixInput = document.querySelectorAll('input[type="file"]')[1] as HTMLInputElement;
+                    handleScanIdCard(idInput?.files?.[0] || null, appendixInput?.files?.[0] || null);
+                  }}
+                  className="w-full bg-[#3A7BD5] hover:bg-[#2E5EA5]"
+                >
+                  <Scan className="w-4 h-4 mr-2" />
+                  התחל סריקה
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4">
@@ -49,79 +327,294 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
           </Select>
         </div>
 
-        {/* ילדים */}
+        {/* כתובת מגורים */}
         <div>
-          <Label htmlFor="children" className="text-[#1E2A3B] font-medium">יש לך ילדים?</Label>
-          <Select 
-            value={data.children_count?.toString() || '0'} 
-            onValueChange={(val) => onChange('children_count', parseInt(val))}
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0">אין לי ילדים</SelectItem>
-              <SelectItem value="1">ילד אחד</SelectItem>
-              <SelectItem value="2">2 ילדים</SelectItem>
-              <SelectItem value="3">3 ילדים</SelectItem>
-              <SelectItem value="4">4 ילדים</SelectItem>
-              <SelectItem value="5">5+ ילדים</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* אם יש ילדים - גילאים */}
-        {data.children_count > 0 && (
-          <div>
-            <Label className="text-[#1E2A3B] font-medium">גילאי הילדים</Label>
-            <Input
-              type="text"
-              placeholder="לדוגמה: 5, 8, 12 או 5 8 12"
-              value={agesText}
-              onChange={(e) => {
-                // Allow free typing
-                setAgesText(e.target.value);
-              }}
-              onBlur={(e) => {
-                // Parse on blur - supports both comma and space
-                const text = e.target.value;
-                const ages = text
-                  .split(/[,\s]+/)  // Split by comma OR space
-                  .map(a => a.trim())
-                  .filter(a => a !== '')
-                  .map(a => parseInt(a))
-                  .filter(a => !isNaN(a) && a >= 0 && a <= 18);
-                onChange('children_ages', ages);
-              }}
-              className="mt-1"
-              dir="ltr"
-            />
-            <p className="text-xs text-[#555555] mt-1">
-              💡 ניתן להפריד בפסיק או רווח (לדוגמה: 5, 8, 12 או 5 8 12)
-              {data.children_ages && data.children_ages.length > 0 && (
-                <span className="block text-[#7ED957] font-medium mt-1">
-                  ✓ זיהיתי {data.children_ages.length} {data.children_ages.length === 1 ? 'גיל' : 'גילאים'}: {data.children_ages.join(', ')}
-                </span>
-              )}
-            </p>
-          </div>
-        )}
-
-        {/* עיר */}
-        <div>
-          <Label htmlFor="city" className="text-[#1E2A3B] font-medium">איפה אתה גר?</Label>
+          <Label htmlFor="city" className="text-[#1E2A3B] font-medium">כתובת מגורים</Label>
           <Input
             id="city"
             value={data.city || ''}
             onChange={(e) => onChange('city', e.target.value)}
-            placeholder="לדוגמה: תל אביב"
+            placeholder="לדוגמה: תל אביב, רחוב הרצל 10"
             className="mt-1"
           />
           <p className="text-xs text-[#555555] mt-1">יעזור לנו להבין הוצאות מחיה אופייניות לאזור</p>
         </div>
+
+        {/* ילדים מתחת לגיל 18 */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <Label className="text-[#1E2A3B] font-semibold">ילדים מתחת לגיל 18</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => addDependent('child')}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              הוסף ילד/ה
+            </Button>
+          </div>
+
+          {children.length === 0 && (
+            <p className="text-sm text-[#888888] text-center py-4 bg-[#F5F6F8] rounded-lg">
+              אין ילדים רשומים. לחץ על "הוסף ילד/ה" כדי להוסיף
+            </p>
+          )}
+
+          <div className="space-y-3">
+            {children.map((child) => {
+              const age = calculateAge(child.birthDate);
+              const isUnder18 = age < 18 || !child.birthDate;
+              
+              return (
+                <div key={child.id} className="p-4 bg-[#F5F6F8] rounded-lg border-2 border-gray-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#1E2A3B]">
+                        {child.name || 'ילד/ה חדש/ה'} 
+                        {child.birthDate && ` (גיל ${age})`}
+                      </p>
+                      {!isUnder18 && age >= 18 && (
+                        <p className="text-xs text-[#F6A623] mt-1">
+                          ⚠️ מעל גיל 18 - האם אתה תומך כלכלית?
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeDependent(child.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {/* שם */}
+                    <div>
+                      <Label className="text-xs text-[#555555]">שם מלא</Label>
+                      <Input
+                        value={child.name}
+                        onChange={(e) => updateDependent(child.id, 'name', e.target.value)}
+                        placeholder="לדוגמה: יוסי כהן"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* תאריך לידה */}
+                      <div>
+                        <Label className="text-xs text-[#555555]">תאריך לידה</Label>
+                        <Input
+                          type="date"
+                          value={child.birthDate}
+                          onChange={(e) => updateDependent(child.id, 'birthDate', e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+
+                      {/* מין */}
+                      <div>
+                        <Label className="text-xs text-[#555555]">מין</Label>
+                        <Select 
+                          value={child.gender} 
+                          onValueChange={(val) => updateDependent(child.id, 'gender', val)}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="male">זכר</SelectItem>
+                            <SelectItem value="female">נקבה</SelectItem>
+                            <SelectItem value="other">אחר</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* אם מעל 18 - שאלה על תמיכה */}
+                    {!isUnder18 && age >= 18 && (
+                      <div className="mt-2 p-3 bg-white rounded border border-[#F6A623]">
+                        <Label className="text-xs text-[#555555] mb-2 block">
+                          האם אתה תומך כלכלית ב{child.name || 'ילד/ה זה/זו'}?
+                        </Label>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              checked={child.isFinanciallySupported === true}
+                              onChange={() => updateDependent(child.id, 'isFinanciallySupported', true)}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">כן</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              checked={child.isFinanciallySupported === false}
+                              onChange={() => updateDependent(child.id, 'isFinanciallySupported', false)}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">לא</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* נכדים - רק אם מעל גיל 60 */}
+        {isOver60 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <Label className="text-[#1E2A3B] font-semibold">נכדים</Label>
+                <p className="text-xs text-[#888888] mt-1">האם יש לך נכדים שאתה תומך בהם כלכלית?</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => addDependent('grandchild')}
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                הוסף נכד/ה
+              </Button>
+            </div>
+
+            {grandchildren.length === 0 && (
+              <p className="text-sm text-[#888888] text-center py-4 bg-[#F5F6F8] rounded-lg">
+                אין נכדים רשומים. לחץ על "הוסף נכד/ה" אם יש נכדים שאתה תומך בהם
+              </p>
+            )}
+
+            <div className="space-y-3">
+              {grandchildren.map((grandchild) => {
+                const age = calculateAge(grandchild.birthDate);
+                
+                return (
+                  <div key={grandchild.id} className="p-4 bg-[#FFF9E6] rounded-lg border-2 border-[#FFD700]">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-[#1E2A3B]">
+                          {grandchild.name || 'נכד/ה חדש/ה'} 
+                          {grandchild.birthDate && ` (גיל ${age})`}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeDependent(grandchild.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-3">
+                      {/* שם */}
+                      <div>
+                        <Label className="text-xs text-[#555555]">שם מלא</Label>
+                        <Input
+                          value={grandchild.name}
+                          onChange={(e) => updateDependent(grandchild.id, 'name', e.target.value)}
+                          placeholder="לדוגמה: שרה לוי"
+                          className="mt-1"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* תאריך לידה */}
+                        <div>
+                          <Label className="text-xs text-[#555555]">תאריך לידה</Label>
+                          <Input
+                            type="date"
+                            value={grandchild.birthDate}
+                            onChange={(e) => updateDependent(grandchild.id, 'birthDate', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+
+                        {/* מין */}
+                        <div>
+                          <Label className="text-xs text-[#555555]">מין</Label>
+                          <Select 
+                            value={grandchild.gender} 
+                            onValueChange={(val) => updateDependent(grandchild.id, 'gender', val)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="male">זכר</SelectItem>
+                              <SelectItem value="female">נקבה</SelectItem>
+                              <SelectItem value="other">אחר</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* תמיכה כלכלית */}
+                      <div className="mt-2 p-3 bg-white rounded border border-[#FFD700]">
+                        <Label className="text-xs text-[#555555] mb-2 block">
+                          האם אתה תומך כלכלית ב{grandchild.name || 'נכד/ה זה/זו'}?
+                        </Label>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              checked={grandchild.isFinanciallySupported === true}
+                              onChange={() => updateDependent(grandchild.id, 'isFinanciallySupported', true)}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">כן</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              checked={grandchild.isFinanciallySupported === false}
+                              onChange={() => updateDependent(grandchild.id, 'isFinanciallySupported', false)}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">לא</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* סיכום */}
+      {(children.length > 0 || grandchildren.length > 0) && (
+        <div className="bg-[#E8F4FD] border-r-4 border-[#3A7BD5] rounded-lg p-4 mt-4">
+          <p className="text-sm font-medium text-[#1E2A3B] mb-2">📋 סיכום משפחה:</p>
+          <div className="space-y-1 text-sm text-[#555555]">
+            {childrenUnder18.length > 0 && (
+              <p>• {childrenUnder18.length} ילדים מתחת לגיל 18</p>
+            )}
+            {childrenOver18.filter(c => c.isFinanciallySupported).length > 0 && (
+              <p>• {childrenOver18.filter(c => c.isFinanciallySupported).length} ילדים מעל 18 שאתה תומך בהם</p>
+            )}
+            {grandchildren.filter(g => g.isFinanciallySupported).length > 0 && (
+              <p>• {grandchildren.filter(g => g.isFinanciallySupported).length} נכדים שאתה תומך בהם</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-

@@ -236,8 +236,13 @@ export default function Step3FixedExpenses({ data, onChange }: Step3Props) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">הוצאות קבועות 💰</h2>
+        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">שלב 3: הוצאות קבועות 💰</h2>
         <p className="text-[#555555] mb-2">כמה אתה משלם <strong>כל חודש</strong> באופן קבוע?</p>
+        <div className="inline-block bg-[#E8F4FD] px-4 py-2 rounded-lg mb-2">
+          <p className="text-xs text-[#3A7BD5]">
+            <strong>מה נלקח:</strong> דיור • ביטוחים • תקשורת • רכב • ילדים • בריאות • חיסכון • מנויים • חשמל ומים
+          </p>
+        </div>
         <p className="text-xs text-[#F6A623] bg-[#FFF3E0] inline-block px-4 py-2 rounded-lg">
           💡 לא כולל קניות וחשבונות משתנים - רק תשלומים קבועים שחוזרים כל חודש
         </p>

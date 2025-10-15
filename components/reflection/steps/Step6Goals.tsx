@@ -34,8 +34,13 @@ export default function Step6Goals({ data, onChange }: Step6Props) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">המטרות שלך 🎯</h2>
-        <p className="text-[#555555]">בואו נבין מה חשוב לך</p>
+        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">שלב 6: המטרות שלך 🎯</h2>
+        <p className="text-[#555555] mb-2">בואו נבין מה חשוב לך ולאן אתה רוצה להגיע</p>
+        <div className="inline-block bg-[#E8F4FD] px-4 py-2 rounded-lg mt-2">
+          <p className="text-xs text-[#3A7BD5]">
+            <strong>מה נלקח:</strong> סיבות להצטרפות • מטרה קצרת טווח • חלום ארוך טווח
+          </p>
+        </div>
       </div>
 
       {/* למה באת? */}

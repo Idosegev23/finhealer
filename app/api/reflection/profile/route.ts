@@ -16,7 +16,8 @@ export async function POST(request: Request) {
     }
 
     // קבלת נתונים מהבקשה
-    const profile = await request.json();
+    const body = await request.json();
+    const { dependents, incomeSources, ...profile } = body;
 
     // בדיקה אם כבר קיים פרופיל
     const { data: existing } = await supabase
@@ -70,6 +71,73 @@ export async function POST(request: Request) {
       }
 
       result = data;
+    }
+
+    // שמירת תלויים (dependents)
+    if (dependents && Array.isArray(dependents)) {
+      // מחיקת תלויים קיימים
+      await supabase
+        .from('dependents')
+        .delete()
+        .eq('user_id', user.id);
+
+      // הוספת תלויים חדשים
+      if (dependents.length > 0) {
+        const dependentsToInsert = dependents.map((dep: any) => ({
+          user_id: user.id,
+          name: dep.name,
+          birth_date: dep.birthDate,
+          gender: dep.gender,
+          relationship_type: dep.relationshipType,
+          is_financially_supported: dep.isFinanciallySupported || false
+        }));
+
+        const { error: depsError } = await supabase
+          .from('dependents')
+          .insert(dependentsToInsert);
+
+        if (depsError) {
+          console.error('Error saving dependents:', depsError);
+          // לא נכשיל את כל הבקשה בגלל זה
+        }
+      }
+    }
+
+    // שמירת מקורות הכנסה (incomeSources)
+    if (incomeSources && Array.isArray(incomeSources)) {
+      // מחיקת מקורות הכנסה קיימים
+      await supabase
+        .from('income_sources')
+        .delete()
+        .eq('user_id', user.id);
+
+      // הוספת מקורות הכנסה חדשים
+      if (incomeSources.length > 0) {
+        const sourcesToInsert = incomeSources.map((source: any) => ({
+          user_id: user.id,
+          source_name: source.sourceName,
+          employment_type: source.employmentType,
+          gross_amount: source.grossAmount || 0,
+          net_amount: source.netAmount || 0,
+          actual_bank_amount: source.actualBankAmount || source.netAmount || 0,
+          employer_name: source.employerName,
+          pension_contribution: source.pensionContribution || 0,
+          advanced_study_fund: source.advancedStudyFund || 0,
+          other_deductions: source.otherDeductions || 0,
+          is_primary: source.isPrimary || false,
+          payment_frequency: 'monthly',
+          active: true
+        }));
+
+        const { error: incomeError } = await supabase
+          .from('income_sources')
+          .insert(sourcesToInsert);
+
+        if (incomeError) {
+          console.error('Error saving income sources:', incomeError);
+          // לא נכשיל את כל הבקשה בגלל זה
+        }
+      }
     }
 
     return NextResponse.json({
