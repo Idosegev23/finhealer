@@ -23,7 +23,7 @@ export async function GET() {
     }
 
     // Transform to camelCase for frontend
-    const loans = data.map(loan => ({
+    const loans = (data || []).map((loan: any) => ({
       id: loan.id,
       lenderName: loan.lender_name,
       loanNumber: loan.loan_number,
