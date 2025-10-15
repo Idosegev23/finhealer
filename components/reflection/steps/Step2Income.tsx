@@ -214,46 +214,46 @@ export default function Step2Income({ data, onChange }: Step2Props) {
 
                   <div className="space-y-3">
                     {/* הכנסה ברוטו */}
-                    <div>
+        <div>
                       <Label className="text-xs text-[#555555]">
                         💼 הכנסה ברוטו (לפני כל הניכויים)
                       </Label>
-                      <div className="relative mt-1">
-                        <Input
-                          type="text"
-                          inputMode="numeric"
+          <div className="relative mt-1">
+            <Input
+              type="text"
+              inputMode="numeric"
                           value={source.grossAmount || ''}
                           onChange={(e) => {
                             const value = parseFloat(e.target.value.replace(/[^\d]/g, '')) || 0;
                             updateSource(source.id, 'grossAmount', value);
                           }}
-                          placeholder="0"
-                          className="text-left pr-10"
-                        />
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555555]">₪</span>
-                      </div>
+              placeholder="0"
+              className="text-left pr-10"
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555555]">₪</span>
+          </div>
                       <p className="text-xs text-[#888888] mt-1">מה שרשום בחוזה העבודה</p>
-                    </div>
+        </div>
 
                     {/* נטו משכורת */}
-                    <div>
+        <div>
                       <Label className="text-xs text-[#555555]">
                         📄 נטו משכורת (אחרי מס + ביטוח לאומי)
                       </Label>
-                      <div className="relative mt-1">
-                        <Input
-                          type="text"
-                          inputMode="numeric"
+          <div className="relative mt-1">
+            <Input
+              type="text"
+              inputMode="numeric"
                           value={source.netAmount || ''}
                           onChange={(e) => {
                             const value = parseFloat(e.target.value.replace(/[^\d]/g, '')) || 0;
                             updateSource(source.id, 'netAmount', value);
                           }}
-                          placeholder="0"
-                          className="text-left pr-10"
-                        />
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555555]">₪</span>
-                      </div>
+              placeholder="0"
+              className="text-left pr-10"
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555555]">₪</span>
+          </div>
                       <p className="text-xs text-[#888888] mt-1">מה שרשום בתלוש שכר (שורת &quot;נטו לתשלום&quot;)</p>
                     </div>
 
@@ -351,7 +351,7 @@ export default function Step2Income({ data, onChange }: Step2Props) {
                         ✓ מה שבאמת מגיע לחשבון הבנק שלך
                       </p>
                     </div>
-                  </div>
+        </div>
 
                   {/* חישוב הפרשים */}
                   {source.netAmount > 0 && source.actualBankAmount > 0 && source.netAmount !== source.actualBankAmount && (
@@ -399,27 +399,27 @@ export default function Step2Income({ data, onChange }: Step2Props) {
                   )}
 
                   {(source.employmentType === 'employee' || source.employmentType === 'self_employed') && (
-                    <div>
+          <div>
                       <Label className="text-xs text-[#555555]">ניכוי פנסיה חודשי (אופציונלי)</Label>
-                      <div className="relative mt-1">
-                        <Input
-                          type="text"
-                          inputMode="numeric"
+            <div className="relative mt-1">
+              <Input
+                type="text"
+                inputMode="numeric"
                           value={source.pensionContribution || ''}
                           onChange={(e) => {
                             const value = parseFloat(e.target.value.replace(/[^\d]/g, '')) || 0;
                             updateSource(source.id, 'pensionContribution', value);
                           }}
-                          placeholder="0"
-                          className="text-left pr-10"
-                        />
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555555]">₪</span>
-                      </div>
+                placeholder="0"
+                className="text-left pr-10"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555555]">₪</span>
+            </div>
                       <p className="text-xs text-[#888888] mt-1">
                         חשוב לחישוב זכויות פנסיוניות עתידיות
                       </p>
-                    </div>
-                  )}
+          </div>
+        )}
 
                   {/* סימון כעיקרי */}
                   {!source.isPrimary && incomeSources.length > 1 && (
@@ -498,7 +498,7 @@ export default function Step2Income({ data, onChange }: Step2Props) {
                     <span className="text-[#555555]">• {type.label}</span>
                     <span className="font-medium text-[#1E2A3B]">
                       {total.toLocaleString('he-IL')} ₪
-                    </span>
+          </span>
                   </div>
                 );
               })}
