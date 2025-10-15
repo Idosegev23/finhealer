@@ -163,7 +163,7 @@ export default function LoansSection({ onSave, initialLoans = [] }: LoansSection
         <div className="text-center py-12 bg-[#F5F6F8] rounded-lg border-2 border-dashed border-gray-300">
           <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <p className="text-sm text-[#888888]">עדיין לא הוספת הלוואות</p>
-          <p className="text-xs text-[#888888] mt-1">לחץ על "הוסף הלוואה" כדי להתחיל</p>
+          <p className="text-xs text-[#888888] mt-1">לחץ על &quot;הוסף הלוואה&quot; כדי להתחיל</p>
         </div>
       )}
 
