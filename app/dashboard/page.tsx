@@ -12,6 +12,10 @@ import { QuickActions } from '@/components/dashboard/QuickActions'
 import { ProgressiveBanner } from '@/components/dashboard/ProgressiveBanner'
 import EmptyDashboard from '@/components/dashboard/EmptyDashboard'
 import DataCollectionBanner from '@/components/dashboard/DataCollectionBanner'
+import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
+import { LoansStatusCard } from '@/components/dashboard/LoansStatusCard'
+import { InsurancePensionCard } from '@/components/dashboard/InsurancePensionCard'
+import { SavingsProgressCard } from '@/components/dashboard/SavingsProgressCard'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -345,7 +349,13 @@ export default async function DashboardPage() {
           <div className="space-y-6">
             <PhaseProgress currentPhase={userDataInfo.phase || 'reflection'} />
             
-            <DebtVsAssets profile={userProfile} />
+            <NetWorthCard />
+            
+            <LoansStatusCard />
+            
+            <InsurancePensionCard />
+            
+            <SavingsProgressCard />
             
             <GoalsQuickView 
               profile={userProfile}

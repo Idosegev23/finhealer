@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { FieldTooltip } from '@/components/ui/info-tooltip';
 import { Plus, Trash2, Scan, Upload, Loader2, CheckCircle, XCircle, Camera } from 'lucide-react';
 
 interface Dependent {
@@ -304,8 +305,10 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
 
       <div className="grid gap-4">
         {/* גיל */}
-        <div>
-          <Label htmlFor="age" className="text-[#1E2A3B] font-medium">מה הגיל שלך?</Label>
+        <FieldTooltip
+          label="מה הגיל שלך?"
+          tooltip="הגיל עוזר לנו להבין את האופק הזמני שלך ולתת המלצות מותאמות - מי שצעיר יותר יכול לקחת יותר סיכון בהשקעות"
+        >
           <Input
             id="age"
             type="number"
@@ -314,7 +317,7 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
             placeholder="לדוגמה: 32"
             className="mt-1"
           />
-        </div>
+        </FieldTooltip>
 
         {/* מצב משפחתי */}
         <div>

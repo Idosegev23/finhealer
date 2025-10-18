@@ -36,18 +36,23 @@
 
 ## 📊 מבנה מסד הנתונים
 
-### טבלאות מרכזיות (19 טבלאות)
+### טבלאות מרכזיות (29 טבלאות)
 - `users` - משתמשים (+ phase, ai_personality, locale)
 - `transactions` - תנועות כספיות (+ category_id FK, currency, tx_date)
 - `budget_categories` - קטגוריות תקציב (+ priority)
 - `goals` - יעדים פיננסיים (+ child_name, priority)
 - `wa_messages` - הודעות WhatsApp (+ buttons, provider_msg_id)
 - `alerts` - התראות למשתמש
-- `alerts_rules` - חוקי התראות ⭐ חדש
-- `alerts_events` - אירועי התראות ⭐ חדש
+- `alerts_rules` - חוקי התראות
+- `alerts_events` - אירועי התראות
 - `subscriptions` - מנויים (+ renewed_at, canceled_at)
 - `receipts` - קבלות OCR (+ tx_date)
-- `user_baselines` - ממוצעי הוצאות היסטוריים ⭐ חדש
+- `user_baselines` - ממוצעי הוצאות היסטוריים
+- `user_financial_profile` - פרופיל פיננסי 360°
+- `loans` - הלוואות והתחייבויות 🆕
+- `insurance` - ביטוחים (חיים, בריאות, מחלות קשות, סיעודי, תאונות) 🆕
+- `savings_accounts` - חשבונות חיסכון והשקעות 🆕
+- `pension_insurance` - קרנות פנסיה וקופות גמל 🆕
 - `behavior_insights` - דפוסי הוצאה מזוהים ⭐ חדש
 - `advisor_notes` - הערות ליווי אנושי ⭐ חדש
 - `user_financial_profile` - תמונת מצב 360° ⭐ חדש
@@ -57,18 +62,23 @@
 - `audit_logs` - לוגים
 - `default_categories` - קטגוריות ברירת מחדל
 
-### Views
+### Views (6 Views)
 - `monthly_budget_tracking` - מעקב תקציב בזמן אמת
 - `user_monthly_stats` - סטטיסטיקות חודשיות
 - `category_spending_report` - דוח הוצאות
 - `goals_progress_report` - דוח יעדים
+- `financial_summary` - סיכום פיננסי כולל (נכסים, חובות, שווי נטו) 🆕
+- `cash_flow_projection` - תחזית תזרים (6/12/24 חודשים) 🆕
+- `debt_analysis` - ניתוח חובות מפורט עם יחסים 🆕
 
-### פונקציות
+### פונקציות (8 Functions)
 - `calculate_financial_health(user_id)` - חישוב ציון בריאות (0-100)
 - `get_daily_summary(user_id, date)` - סיכום יומי
 - `create_default_user_categories(user_id)` - קטגוריות ברירת מחדל
 - `get_top_spenders(limit, month)` - דוח הוצאות גבוהות
 - `get_inactive_users(days)` - זיהוי משתמשים לא פעילים
+- `calculate_loan_details(loan_id)` - חישוב פרטי הלוואה (ריבית, תשלומים) 🆕
+- `calculate_net_worth(user_id)` - חישוב שווי נטו (נכסים - חובות) 🆕
 
 ## 🗂️ מבנה הפרויקט
 
@@ -124,6 +134,39 @@ finhealer/
     ├── activeContext.md
     └── progress.md
 ```
+
+## ✨ תכונות חדשות (18 באוקטובר 2025)
+
+### 💰 ניהול פיננסי מלא
+- **ניהול הלוואות** (`/dashboard/loans`) - מעקב אחרי כל ההלוואות והתחייבויות
+- **ניהול ביטוחים** (`/dashboard/insurance`) - 5 סוגי ביטוח עם זיהוי פערי כיסוי
+- **ניהול חיסכון** (`/dashboard/savings`) - חשבונות חיסכון עם יעדים ו-progress bars
+- **ניהול פנסיה** (`/dashboard/pensions`) - קרנות פנסיוניות וקופות גמל
+
+### 🎓 מערכת מדריך
+- **דף מדריך מקיף** (`/guide`) - 7 נושאים עם הסברים, דוגמאות וטיפים
+- **Tooltips System** - הסברים מהירים בכל שדה חשוב
+- **Info Sections** - טיפים מעשיים בכל דף
+
+### 🧮 סימולטור איחוד הלוואות (`/loans-simulator`)
+- הוספה/הסרה של עד 5 הלוואות
+- Sliders אינטראקטיביים לכל פרמטר
+- חישובים בזמן אמת
+- 2 גרפים: Bar Chart (לפני/אחרי) + Pie Chart (התפלגות)
+- תצוגת חיסכון פוטנציאלי
+
+### 📊 Dashboard משודרג
+- **4 Cards חדשים:** שווי נטו, סטטוס הלוואות, ביטוח/פנסיה, התקדמות חיסכון
+- **חישובים אוטומטיים** - נכסים, חובות, תזרים
+- **התראות חכמות** - אזהרה על ריבית גבוהה, פערי ביטוח
+
+### 🎨 UX Polish
+- **Empty states חמים** - אנימציות + micro-copy מעודד
+- **Animations חלקות** - fade-in, slide-up, bounce, scale
+- **שפה נעימה** - תומכת ומעודדת בכל מקום
+- **RTL מלא** - עברית מושלמת
+
+---
 
 ## 🛠️ התקנה ופיתוח
 
