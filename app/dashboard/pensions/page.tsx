@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Shield, TrendingUp, Briefcase } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { DashboardNav } from "@/components/shared/DashboardNav";
+import { AddPensionModal } from "@/components/pensions/AddPensionModal";
 
 interface PensionFund {
   id: string;
@@ -29,6 +31,7 @@ export default function PensionsPage() {
   const [pensions, setPensions] = useState<PensionFund[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<any>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     fetchPensions();
@@ -59,8 +62,10 @@ export default function PensionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4">
+    <>
+      <DashboardNav />
+      <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -77,7 +82,10 @@ export default function PensionsPage() {
                 ניהול מרכזי של כל החיסכון הפנסיוני שלך
               </p>
             </div>
-            <Button className="bg-[#7ED957] hover:bg-[#6BC949] text-white">
+            <Button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-[#7ED957] hover:bg-[#6BC949] text-white"
+            >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף קרן חדשה
             </Button>
@@ -146,7 +154,10 @@ export default function PensionsPage() {
               <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
                 הוסף את הקרנות הפנסיוניות שלך ובדוק שהן עובדות בשבילך נכון
               </p>
-              <Button className="bg-[#7ED957] hover:bg-[#6BC949] text-white shadow-lg hover:shadow-xl transition-all">
+              <Button 
+                onClick={() => setShowAddModal(true)}
+                className="bg-[#7ED957] hover:bg-[#6BC949] text-white shadow-lg hover:shadow-xl transition-all"
+              >
                 <PlusCircle className="w-4 h-4 ml-2" />
                 הוסף קרן פנסיונית ראשונה
               </Button>
@@ -276,8 +287,16 @@ export default function PensionsPage() {
             </li>
           </ul>
         </div>
+        </div>
       </div>
-    </div>
+
+      {/* Add Pension Modal */}
+      <AddPensionModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onSuccess={fetchPensions}
+      />
+    </>
   );
 }
 

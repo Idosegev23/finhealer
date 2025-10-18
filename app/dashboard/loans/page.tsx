@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, DollarSign, TrendingDown, AlertCircle, Calculator } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { DashboardNav } from "@/components/shared/DashboardNav";
+import { AddLoanModal } from "@/components/loans/AddLoanModal";
 import Link from "next/link";
 
 interface Loan {
@@ -31,6 +33,7 @@ const LOAN_TYPE_LABELS: Record<string, string> = {
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     fetchLoans();
@@ -78,8 +81,10 @@ export default function LoansPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4">
+    <>
+      <DashboardNav />
+      <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -101,7 +106,10 @@ export default function LoansPage() {
                   סימולטור איחוד
                 </Button>
               </Link>
-              <Button className="bg-[#3A7BD5] hover:bg-[#2A5BA5] text-white">
+              <Button 
+                onClick={() => setShowAddModal(true)}
+                className="bg-[#3A7BD5] hover:bg-[#2A5BA5] text-white"
+              >
                 <PlusCircle className="w-4 h-4 ml-2" />
                 הוסף הלוואה
               </Button>
@@ -191,7 +199,10 @@ export default function LoansPage() {
               <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
                 אם בכל זאת יש לך הלוואות, הוסף אותן כאן כדי לעקוב אחרי ההתקדמות ולראות כמה כסף תחסוך עם איחוד
               </p>
-              <Button className="bg-[#3A7BD5] hover:bg-[#2A5BA5] text-white shadow-lg hover:shadow-xl transition-all">
+              <Button 
+                onClick={() => setShowAddModal(true)}
+                className="bg-[#3A7BD5] hover:bg-[#2A5BA5] text-white shadow-lg hover:shadow-xl transition-all"
+              >
                 <PlusCircle className="w-4 h-4 ml-2" />
                 הוסף הלוואה
               </Button>
@@ -330,7 +341,15 @@ export default function LoansPage() {
             </li>
           </ul>
         </div>
+        </div>
       </div>
-    </div>
+
+      {/* Add Loan Modal */}
+      <AddLoanModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onSuccess={fetchLoans}
+      />
+    </>
   );
 }

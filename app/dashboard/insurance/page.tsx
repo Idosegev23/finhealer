@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Shield, Heart, AlertTriangle } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { DashboardNav } from "@/components/shared/DashboardNav";
+import { AddInsuranceModal } from "@/components/insurance/AddInsuranceModal";
 
 interface Insurance {
   id: string;
@@ -28,6 +30,7 @@ export default function InsurancePage() {
   const [insurances, setInsurances] = useState<Insurance[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<any>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     fetchInsurances();
@@ -62,8 +65,10 @@ export default function InsurancePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4">
+    <>
+      <DashboardNav />
+      <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -78,7 +83,10 @@ export default function InsurancePage() {
               </h1>
               <p className="text-gray-600 mt-2">ניהול מרכזי של כל הביטוחים שלך</p>
             </div>
-            <Button className="bg-[#7ED957] hover:bg-[#6BC949] text-white">
+            <Button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-[#7ED957] hover:bg-[#6BC949] text-white"
+            >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף ביטוח
             </Button>
@@ -164,7 +172,10 @@ export default function InsurancePage() {
             <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
               התחל לנהל את תיק הביטוח שלך בצורה מקצועית ובדוק שיש לך את הכיסויים החשובים
             </p>
-            <Button className="bg-[#7ED957] hover:bg-[#6BC949] text-white shadow-lg hover:shadow-xl transition-all">
+            <Button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-[#7ED957] hover:bg-[#6BC949] text-white shadow-lg hover:shadow-xl transition-all"
+            >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף ביטוח ראשון
             </Button>
@@ -283,7 +294,15 @@ export default function InsurancePage() {
             </li>
           </ul>
         </div>
+        </div>
       </div>
-    </div>
+
+      {/* Add Insurance Modal */}
+      <AddInsuranceModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onSuccess={fetchInsurances}
+      />
+    </>
   );
 }

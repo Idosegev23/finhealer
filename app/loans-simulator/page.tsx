@@ -5,6 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { DashboardNav } from "@/components/shared/DashboardNav";
 import { PlusCircle, MinusCircle, TrendingDown, TrendingUp, Calendar, DollarSign, Calculator } from "lucide-react";
 import { 
   BarChart, 
@@ -176,8 +177,10 @@ export default function LoansSimulatorPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4">
+    <>
+      <DashboardNav />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#1E2A3B] to-[#3A7BD5] text-white rounded-2xl p-8 mb-8 shadow-2xl animate-scale-in">
           <div className="flex items-center gap-4 mb-4">
@@ -470,28 +473,43 @@ export default function LoansSimulatorPage() {
               </div>
             )}
 
-            {/* Disclaimer */}
-            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-300 rounded-xl p-5 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0">
-                  <span className="text-lg">⚠️</span>
+            {/* Contact Gadi */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-6 shadow-md">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <span className="text-2xl">👨‍💼</span>
                 </div>
                 <div>
-                  <h4 className="font-bold text-yellow-900 mb-2">חשוב לדעת</h4>
-                  <p className="text-sm text-yellow-800 leading-relaxed">
-                    זהו סימולטור משוער המבוסס על נוסחאות מתמטיות. החישובים אינם לוקחים בחשבון עמלות פירעון מוקדם,
-                    עלויות נוספות או שינויי ריבית עתידיים.
+                  <h4 className="text-xl font-bold text-green-900 mb-2">רוצה עזרה מקצועית?</h4>
+                  <p className="text-sm text-green-800 leading-relaxed mb-4">
+                    הסימולטור נותן הערכה ראשונית, אבל <strong>גדי - המאמן הפיננסי שלך</strong> יכול לעזור לך למצוא את העסקה הכי טובה בשוק!
                   </p>
-                  <p className="text-sm text-yellow-800 leading-relaxed mt-2">
-                    <strong>לפני שמקבלים החלטה:</strong> התייעצו עם יועץ פיננסי או נציג הבנק לקבלת הצעה מדויקת.
-                  </p>
+                  <ul className="text-sm text-green-800 space-y-2 mb-4">
+                    <li className="flex gap-2">
+                      <span>✓</span>
+                      <span>ייעוץ אישי מותאם למצב שלך</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span>✓</span>
+                      <span>השוואת הצעות מכל הבנקים</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span>✓</span>
+                      <span>ליווי בתהליך כולו - ללא עמלה!</span>
+                    </li>
+                  </ul>
+                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
+                    <span className="ml-2">💬</span>
+                    דבר עם גדי עכשיו
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

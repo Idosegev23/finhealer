@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { DashboardNav } from "@/components/shared/DashboardNav";
 import { 
   Target, 
   TrendingUp, 
@@ -174,7 +175,9 @@ const guideSections: GuideSection[] = [
 
 export default function GuidePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" dir="rtl">
+    <>
+      <DashboardNav />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100" dir="rtl">
       {/* Header */}
       <div className="bg-gradient-to-r from-[#1E2A3B] to-[#3A7BD5] text-white py-16">
         <div className="max-w-5xl mx-auto px-4">
@@ -337,7 +340,8 @@ export default function GuidePage() {
           </a>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

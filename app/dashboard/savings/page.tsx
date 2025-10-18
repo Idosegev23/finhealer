@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, PiggyBank, Target, TrendingUp, Calendar } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { DashboardNav } from "@/components/shared/DashboardNav";
+import { AddSavingsModal } from "@/components/savings/AddSavingsModal";
 
 interface SavingsAccount {
   id: string;
@@ -31,6 +33,7 @@ export default function SavingsPage() {
   const [savings, setSavings] = useState<SavingsAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<any>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     fetchSavings();
@@ -61,8 +64,10 @@ export default function SavingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
-      <div className="max-w-7xl mx-auto px-4">
+    <>
+      <DashboardNav />
+      <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
+        <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -77,7 +82,10 @@ export default function SavingsPage() {
               </h1>
               <p className="text-gray-600 mt-2">ניהול מרכזי של כל החיסכונות שלך</p>
             </div>
-            <Button className="bg-[#7ED957] hover:bg-[#6BC949] text-white">
+            <Button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-[#7ED957] hover:bg-[#6BC949] text-white"
+            >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף חשבון חיסכון
             </Button>
@@ -145,7 +153,10 @@ export default function SavingsPage() {
             <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
               הגדר חשבונות חיסכון עם יעדים ברורים ותראה את הכסף גדל
             </p>
-            <Button className="bg-[#7ED957] hover:bg-[#6BC949] text-white shadow-lg hover:shadow-xl transition-all">
+            <Button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-[#7ED957] hover:bg-[#6BC949] text-white shadow-lg hover:shadow-xl transition-all"
+            >
               <PlusCircle className="w-4 h-4 ml-2" />
               פתח חשבון חיסכון ראשון
             </Button>
@@ -318,7 +329,15 @@ export default function SavingsPage() {
             </li>
           </ul>
         </div>
+        </div>
       </div>
-    </div>
+
+      {/* Add Savings Modal */}
+      <AddSavingsModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onSuccess={fetchSavings}
+      />
+    </>
   );
 }
