@@ -20,17 +20,20 @@ export async function GET(request: NextRequest) {
       savingsRes,
       pensionsRes,
       profileRes,
+      incomeSourcesRes,
     ] = await Promise.all([
       supabase.from("loans").select("*").eq("user_id", user.id).eq("active", true),
       supabase.from("savings_accounts").select("*").eq("user_id", user.id).eq("active", true),
       supabase.from("pension_insurance").select("*").eq("user_id", user.id).eq("active", true),
       supabase.from("user_financial_profile").select("*").eq("user_id", user.id).single(),
+      supabase.from("income_sources").select("*").eq("user_id", user.id).eq("active", true),
     ]);
 
     const loans = loansRes.data || [];
     const savings = savingsRes.data || [];
     const pensions = pensionsRes.data || [];
     const profile: any = profileRes.data || {};
+    const incomeSources = incomeSourcesRes.data || [];
 
     // Calculate totals
     const loansTotal = loans.reduce((sum: number, loan: any) => sum + (Number(loan.current_balance) || 0), 0);
@@ -48,9 +51,14 @@ export async function GET(request: NextRequest) {
     // Net worth
     const netWorth = totalAssets - totalLiabilities;
 
-    // Get current account balance and monthly income from profile
+    // Calculate monthly income from income sources
+    const incomeTotal = incomeSources.reduce((sum: number, source: any) => {
+      return sum + (Number(source.net_amount) || Number(source.actual_bank_amount) || 0);
+    }, 0);
+
+    // Get current account balance and monthly income
     const currentAccountBalance = Number(profile.current_account_balance) || 0;
-    const monthlyIncome = Number(profile.total_monthly_income) || Number(profile.monthly_income) || 0;
+    const monthlyIncome = incomeTotal || Number(profile.total_monthly_income) || Number(profile.monthly_income) || 0;
 
     return NextResponse.json({
       current_account_balance: currentAccountBalance,

@@ -126,14 +126,8 @@ export function DashboardNav() {
           </div>
         </div>
         
-        {/* Controls positioned absolutely */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
-          <button 
-            onClick={fetchFinancialData}
-            className="text-xs font-medium opacity-80 hover:opacity-100 transition-opacity px-3 py-1 rounded bg-white/10 hover:bg-white/20 backdrop-blur-sm"
-          >
-            ↻ רענן
-          </button>
+        {/* Theme Toggle positioned absolutely */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10">
           <ThemeToggle />
         </div>
       </div>
