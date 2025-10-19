@@ -101,26 +101,19 @@ export function DashboardNav() {
       {/* Spybar - נתונים פיננסיים עם Marquee */}
       <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white overflow-hidden relative">
         <div className="py-2">
-          <div className="flex animate-marquee hover:pause">
-            {/* First set of items */}
-            {financialItems.map((item, idx) => (
-              <div key={`first-${idx}`} className="flex items-center gap-2 whitespace-nowrap mx-8">
-                {item.icon}
-                <span className="text-xs font-medium opacity-80">{item.label}:</span>
-                <span className={`text-sm font-bold ${item.color}`}>
-                  {item.value}
-                </span>
-              </div>
-            ))}
-            
-            {/* Duplicate set for seamless loop */}
-            {financialItems.map((item, idx) => (
-              <div key={`second-${idx}`} className="flex items-center gap-2 whitespace-nowrap mx-8">
-                {item.icon}
-                <span className="text-xs font-medium opacity-80">{item.label}:</span>
-                <span className={`text-sm font-bold ${item.color}`}>
-                  {item.value}
-                </span>
+          <div className="flex animate-marquee-seamless">
+            {/* Multiple duplicates for truly seamless loop */}
+            {[...Array(4)].map((_, setIdx) => (
+              <div key={`set-${setIdx}`} className="flex flex-shrink-0">
+                {financialItems.map((item, idx) => (
+                  <div key={`${setIdx}-${idx}`} className="flex items-center gap-2 whitespace-nowrap mx-8">
+                    {item.icon}
+                    <span className="text-xs font-medium opacity-80">{item.label}:</span>
+                    <span className={`text-sm font-bold ${item.color}`}>
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
