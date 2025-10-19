@@ -4,31 +4,60 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Save, ArrowRight, Loader2 } from 'lucide-react';
+import { TrendingUp, Save, ArrowRight, Loader2, TrendingDown, DollarSign, Building, Bitcoin } from 'lucide-react';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 
 interface InvestmentsFormProps {
   initialData: any;
 }
 
+interface InvestmentAmounts {
+  stocks_israel: number;
+  stocks_foreign: number;
+  bonds: number;
+  mutual_funds: number;
+  crypto: number;
+  real_estate: number;
+  other: number;
+}
+
 export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
   const router = useRouter();
   const [hasInvestments, setHasInvestments] = useState<boolean | null>(null);
-  const [investmentsDetails, setInvestmentsDetails] = useState<string>(initialData.investments_details || '');
+  const [amounts, setAmounts] = useState<InvestmentAmounts>({
+    stocks_israel: 0,
+    stocks_foreign: 0,
+    bonds: 0,
+    mutual_funds: 0,
+    crypto: 0,
+    real_estate: 0,
+    other: 0,
+  });
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  const updateAmount = (field: keyof InvestmentAmounts, value: number) => {
+    setAmounts(prev => ({ ...prev, [field]: value }));
+  };
+
+  const calculateTotal = () => {
+    return Object.values(amounts).reduce((sum, val) => sum + val, 0);
+  };
 
   const handleSave = async () => {
     setLoading(true);
     setSuccessMessage('');
 
     try {
+      const totalInvestments = calculateTotal();
+      
       const response = await fetch('/api/reflection/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          has_investments: hasInvestments,
-          investments_details: investmentsDetails,
+          investments: totalInvestments,
         })
       });
 
@@ -36,12 +65,19 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
         throw new Error('Failed to save investments');
       }
 
+      // סימון הסקציה כ-completed
+      await fetch('/api/user/section/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subsection: 'investments' })
+      });
+
       setSuccessMessage('הנתונים נשמרו בהצלחה! ✓');
       
       setTimeout(() => {
         router.push('/dashboard');
         router.refresh();
-      }, 2000);
+      }, 1500);
 
     } catch (error) {
       console.error('Error saving investments:', error);
@@ -102,29 +138,164 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
         </div>
       </motion.div>
 
-      {/* Details (if has investments) */}
+      {/* Investment Details (if has investments) */}
       {hasInvestments === true && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200"
+          className="space-y-6"
         >
-          <h3 className="text-xl font-bold text-[#1E2A3B] mb-4">ספר לנו קצת יותר</h3>
+          {/* Total Summary */}
+          <div className="bg-gradient-to-l from-[#7ED957] to-[#6BBF4A] text-white rounded-2xl p-6 shadow-xl">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold mb-2">סך כל ההשקעות</h3>
+              <p className="text-5xl font-bold">
+                {calculateTotal().toLocaleString('he-IL')} ₪
+              </p>
+            </div>
+          </div>
 
+          {/* Investment Types */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200">
+            <h3 className="text-xl font-bold text-[#1E2A3B] mb-6 flex items-center gap-2">
+              פרט את ההשקעות שלך
+              <InfoTooltip content="הזן סכומים משוערים - לא צריך להיות מדויק לגמרי" type="info" />
+            </h3>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* מניות ישראל */}
+              <div>
+                <Label className="text-sm text-[#555555] flex items-center gap-1 mb-2">
+                  <TrendingUp className="w-4 h-4 text-blue-500" />
+                  מניות בישראל
+                  <InfoTooltip content="מניות בבורסה בת&quot;א" />
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={amounts.stocks_israel || ''}
+                    onChange={(e) => updateAmount('stocks_israel', parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="text-left pr-10"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]">₪</span>
+                </div>
+              </div>
+
+              {/* מניות חו"ל */}
+              <div>
+                <Label className="text-sm text-[#555555] flex items-center gap-1 mb-2">
+                  <TrendingUp className="w-4 h-4 text-green-500" />
+                  מניות בחו&quot;ל
+                  <InfoTooltip content="מניות בארה&quot;ב, אירופה וכו&apos;" />
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={amounts.stocks_foreign || ''}
+                    onChange={(e) => updateAmount('stocks_foreign', parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="text-left pr-10"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]">₪</span>
+                </div>
+              </div>
+
+              {/* אג"ח */}
+              <div>
+                <Label className="text-sm text-[#555555] flex items-center gap-1 mb-2">
+                  <TrendingDown className="w-4 h-4 text-indigo-500" />
+                  אגרות חוב (אג&quot;ח)
+                  <InfoTooltip content="אגרות חוב ממשלתיות או קונצרניות" />
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={amounts.bonds || ''}
+                    onChange={(e) => updateAmount('bonds', parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="text-left pr-10"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]">₪</span>
+                </div>
+              </div>
+
+              {/* קרנות נאמנות */}
+              <div>
+                <Label className="text-sm text-[#555555] flex items-center gap-1 mb-2">
+                  <DollarSign className="w-4 h-4 text-purple-500" />
+                  קרנות נאמנות
+                  <InfoTooltip content="קרנות נאמנות וקרנות מדד" />
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={amounts.mutual_funds || ''}
+                    onChange={(e) => updateAmount('mutual_funds', parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="text-left pr-10"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]">₪</span>
+                </div>
+              </div>
+
+              {/* קריפטו */}
+              <div>
+                <Label className="text-sm text-[#555555] flex items-center gap-1 mb-2">
+                  <Bitcoin className="w-4 h-4 text-orange-500" />
+                  מטבעות דיגיטליים
+                  <InfoTooltip content="ביטקוין, אתריום וכו&apos;" />
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={amounts.crypto || ''}
+                    onChange={(e) => updateAmount('crypto', parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="text-left pr-10"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]">₪</span>
+                </div>
+              </div>
+
+              {/* נדל"ן להשקעה */}
           <div>
-            <Label htmlFor="investmentsDetails" className="text-sm font-medium text-[#555555] mb-2 block">
-              פרט את ההשקעות שלך (סכומים משוערים)
+                <Label className="text-sm text-[#555555] flex items-center gap-1 mb-2">
+                  <Building className="w-4 h-4 text-cyan-500" />
+                  נדל&quot;ן להשקעה
+                  <InfoTooltip content="דירות להשכרה, חנויות, מגרשים" />
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={amounts.real_estate || ''}
+                    onChange={(e) => updateAmount('real_estate', parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="text-left pr-10"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]">₪</span>
+                </div>
+              </div>
+
+              {/* אחר */}
+              <div className="md:col-span-2">
+                <Label className="text-sm text-[#555555] flex items-center gap-1 mb-2">
+                  <DollarSign className="w-4 h-4 text-gray-500" />
+                  השקעות אחרות
+                  <InfoTooltip content="סחורות, אומנות, יין, וכו&apos;" />
             </Label>
-            <textarea
-              id="investmentsDetails"
-              value={investmentsDetails}
-              onChange={(e) => setInvestmentsDetails(e.target.value)}
-              placeholder="לדוגמה:&#10;• מניות בארה&quot;ב - ~200,000 ₪&#10;• מניות בישראל - ~100,000 ₪&#10;• קרנות נאמנות - ~150,000 ₪&#10;• ביטקוין - ~50,000 ₪"
-              className="w-full p-4 border border-gray-300 rounded-lg resize-none h-48 focus:outline-none focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent font-mono text-sm"
-            />
-            <p className="text-xs text-[#888888] mt-2">
-              💡 לא צריך לפרט כל מניה - מספיק פירוט כללי לפי סוג נכס
-            </p>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={amounts.other || ''}
+                    onChange={(e) => updateAmount('other', parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="text-left pr-10"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]">₪</span>
+                </div>
+              </div>
+            </div>
           </div>
         </motion.div>
       )}

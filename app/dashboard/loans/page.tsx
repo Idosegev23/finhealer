@@ -33,6 +33,7 @@ export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     fetchLoans();
@@ -49,6 +50,33 @@ export default function LoansPage() {
       console.error("Error fetching loans:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    setCompleting(true);
+    try {
+      const res = await fetch('/api/user/section/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subsection: 'loans' })
+      });
+
+      if (res.ok) {
+        alert("✓ מעולה! הסקציה סומנה כהושלמה");
+        window.location.href = '/dashboard';
+      }
+    } catch (error) {
+      console.error("Error completing section:", error);
+      alert("אירעה שגיאה");
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const handleSkipSection = async () => {
+    if (confirm("האם אתה בטוח שאין לך הלוואות? תוכל תמיד לחזור ולהוסיף מאוחר יותר.")) {
+      await handleComplete();
     }
   };
 
@@ -295,6 +323,50 @@ export default function LoansPage() {
             </div>
           )}
         </div>
+
+        {/* Action Buttons - Show when there are loans */}
+        {loans.length > 0 && (
+          <div className="mt-8 bg-white rounded-xl p-6 shadow-lg border-2 border-[#3A7BD5]">
+            <div className="text-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                סיימת להזין את ההלוואות שלך?
+              </h3>
+              <p className="text-gray-600">
+                אם הזנת את כל ההלוואות, לחץ על &quot;סיום&quot; כדי לעבור לשלב הבא
+              </p>
+            </div>
+            <div className="flex justify-center gap-4">
+              <Button
+                onClick={() => setShowAddModal(true)}
+                variant="outline"
+                className="border-[#3A7BD5] text-[#3A7BD5] hover:bg-[#3A7BD5] hover:text-white"
+              >
+                <PlusCircle className="w-4 h-4 ml-2" />
+                הוסף עוד הלוואה
+              </Button>
+              <Button
+                onClick={handleComplete}
+                disabled={completing}
+                className="bg-[#7ED957] hover:bg-[#6BC949] text-white shadow-lg"
+              >
+                {completing ? "שומר..." : "✓ סיום - עברתי על כל ההלוואות"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Skip Button - Show only when NO loans */}
+        {loans.length === 0 && (
+          <div className="mt-8 text-center">
+            <Button
+              onClick={handleSkipSection}
+              variant="outline"
+              className="border-gray-300 text-gray-600 hover:bg-gray-100"
+            >
+              אין לי הלוואות - דלג לשלב הבא →
+            </Button>
+          </div>
+        )}
 
         {/* Info Section */}
         <div className="mt-8 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 shadow-sm animate-slide-up">

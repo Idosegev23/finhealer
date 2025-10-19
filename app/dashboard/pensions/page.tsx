@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle, Shield, TrendingUp, Briefcase } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { AddPensionModal } from "@/components/pensions/AddPensionModal";
+import { RequestPensionReport } from "@/components/pension/RequestPensionReport";
 
 interface PensionFund {
   id: string;
@@ -133,6 +134,11 @@ export default function PensionsPage() {
             </div>
           </div>
         )}
+
+        {/* Request Pension Report from Gadi */}
+        <div className="mb-8">
+          <RequestPensionReport />
+        </div>
 
         {/* Pensions Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">

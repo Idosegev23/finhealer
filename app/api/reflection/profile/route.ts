@@ -87,6 +87,38 @@ export async function POST(request: Request) {
       result = data;
     }
 
+    // אם יש current_account_balance - סמן cash_flow כ-completed אוטומטית
+    if (profile.current_account_balance !== undefined && profile.current_account_balance !== null) {
+      const { data: cashFlowSection } = await supabase
+        .from('user_data_sections')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('subsection', 'cash_flow')
+        .single();
+
+      if (cashFlowSection) {
+        await (supabase as any)
+          .from('user_data_sections')
+          .update({
+            completed: true,
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id)
+          .eq('subsection', 'cash_flow');
+      } else {
+        await (supabase as any)
+          .from('user_data_sections')
+          .insert({
+            user_id: user.id,
+            section_type: 'financial_info',
+            subsection: 'cash_flow',
+            completed: true,
+            completed_at: new Date().toISOString()
+          });
+      }
+    }
+
     // שמירת תלויים (dependents)
     if (dependents && Array.isArray(dependents)) {
       // מחיקת תלויים קיימים
