@@ -128,59 +128,11 @@ export function DashboardNav() {
       </div>
 
       {/* Navigation */}
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between py-3">
-          {/* Desktop Navigation - Icons Only */}
-          <div className="hidden md:flex items-center gap-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  title={item.label}
-                  className={`group relative flex flex-col items-center gap-1 p-3 rounded-xl transition-all ${
-                    isActive
-                      ? "bg-[#3A7BD5] text-white shadow-lg"
-                      : isDark 
-                        ? "text-gray-400 hover:bg-gray-800 hover:text-white"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">{item.label}</span>
-                  
-                  {/* Tooltip */}
-                  <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50`}>
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            {mobileMenuOpen ? (
-              <X className="w-6 h-6 text-theme-primary" />
-            ) : (
-              <Menu className="w-6 h-6 text-theme-primary" />
-            )}
-          </button>
-
-          {/* Mobile placeholder for alignment */}
-          <div className="md:hidden w-10"></div>
-        </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-theme">
-            <div className="grid grid-cols-3 gap-3">
+      <div className="border-t border-theme">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between py-2">
+            {/* Desktop Navigation - Full Width Spread */}
+            <div className="hidden md:flex items-center justify-between w-full gap-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
@@ -189,8 +141,8 @@ export function DashboardNav() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all ${
+                    title={item.label}
+                    className={`group relative flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl transition-all flex-1 ${
                       isActive
                         ? "bg-[#3A7BD5] text-white shadow-lg"
                         : isDark 
@@ -199,10 +151,59 @@ export function DashboardNav() {
                     }`}
                   >
                     <Icon className="w-6 h-6" />
-                    <span className="text-xs font-medium text-center">{item.label}</span>
+                    <span className="text-xs font-medium text-center whitespace-nowrap">{item.label}</span>
+                    
+                    {/* Tooltip */}
+                    <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50`}>
+                      {item.label}
+                    </span>
                   </Link>
                 );
               })}
+            </div>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 w-full flex items-center justify-center"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6 text-theme-primary" />
+              ) : (
+                <Menu className="w-6 h-6 text-theme-primary" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-theme">
+            <div className="max-w-7xl mx-auto px-4 py-4">
+              <div className="grid grid-cols-3 gap-3">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all ${
+                        isActive
+                          ? "bg-[#3A7BD5] text-white shadow-lg"
+                          : isDark 
+                            ? "text-gray-400 hover:bg-gray-800 hover:text-white"
+                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      }`}
+                    >
+                      <Icon className="w-6 h-6" />
+                      <span className="text-xs font-medium text-center">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
