@@ -97,6 +97,84 @@ export default async function DashboardPage() {
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)
 
+  // ===== נתונים נוספים שחסרו =====
+  
+  // הלוואות
+  const { data: loans } = await supabase
+    .from('loans')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+
+  // חיסכון
+  const { data: savings } = await supabase
+    .from('savings_accounts')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+
+  // פנסיה וקופות גמל
+  const { data: pensions } = await supabase
+    .from('pension_insurance')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+
+  // ביטוחים
+  const { data: insurances } = await supabase
+    .from('insurance')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+
+  // מקורות הכנסה
+  const { data: incomeSources } = await supabase
+    .from('income_sources')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+
+  // תנועות אחרונות (לא רק ספירה)
+  const { data: recentTransactions } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('date', { ascending: false })
+    .limit(10)
+
+  // ===== חישובים =====
+  
+  // סכום כל ההלוואות
+  const totalLoans = (loans || []).reduce((sum: number, loan: any) => 
+    sum + (Number(loan.current_balance) || 0), 0)
+
+  // סכום כל החיסכון
+  const totalSavings = (savings || []).reduce((sum: number, acc: any) => 
+    sum + (Number(acc.current_balance) || 0), 0)
+
+  // סכום כל הפנסיה
+  const totalPension = (pensions || []).reduce((sum: number, pen: any) => 
+    sum + (Number(pen.current_balance) || 0), 0)
+
+  // סכום כל הביטוחים (פרמיות חודשיות)
+  const totalInsurancePremiums = (insurances || []).reduce((sum: number, ins: any) => 
+    sum + (Number(ins.monthly_premium) || 0), 0)
+
+  // סכום הכנסות חודשי
+  const totalMonthlyIncome = (incomeSources || []).reduce((sum: number, src: any) => 
+    sum + (Number(src.net_amount) || 0), 0)
+
+  // שווי נטו מלא
+  const profile: any = userProfile || {}
+  const totalAssets = totalSavings + totalPension + (Number(profile.investments) || 0) + (Number(profile.current_savings) || 0)
+  const totalLiabilities = totalLoans + (Number(profile.total_debt) || 0)
+  const netWorth = totalAssets - totalLiabilities
+
   // חישוב ימים מההתחלה
   const daysSinceStart = Math.floor(
     (Date.now() - new Date(userDataInfo.created_at).getTime()) / (1000 * 60 * 60 * 24)
@@ -306,6 +384,51 @@ export default async function DashboardPage() {
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
           {/* Left Column - 2/3 */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Dashboard Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {/* סך הכנסות */}
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-5 border-2 border-green-200 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-green-700">הכנסות חודשיות</span>
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                </div>
+                <p className="text-2xl font-bold text-green-900">
+                  ₪{(totalMonthlyIncome || 0).toLocaleString('he-IL')}
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  {(incomeSources || []).length} מקורות הכנסה
+                </p>
+              </div>
+
+              {/* סך חובות */}
+              <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-5 border-2 border-red-200 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-red-700">סך חובות</span>
+                  <TrendingDown className="w-5 h-5 text-red-600" />
+                </div>
+                <p className="text-2xl font-bold text-red-900">
+                  ₪{(totalLiabilities || 0).toLocaleString('he-IL')}
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  {(loans || []).length} הלוואות פעילות
+                </p>
+              </div>
+
+              {/* שווי נטו */}
+              <div className={`bg-gradient-to-br ${netWorth >= 0 ? 'from-blue-50 to-indigo-50 border-blue-200' : 'from-orange-50 to-amber-50 border-orange-200'} rounded-xl p-5 border-2 shadow-sm`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`text-sm font-medium ${netWorth >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>שווי נטו</span>
+                  <Target className={`w-5 h-5 ${netWorth >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
+                </div>
+                <p className={`text-2xl font-bold ${netWorth >= 0 ? 'text-blue-900' : 'text-orange-900'}`}>
+                  ₪{Math.abs(netWorth || 0).toLocaleString('he-IL')}
+                </p>
+                <p className={`text-xs ${netWorth >= 0 ? 'text-blue-600' : 'text-orange-600'} mt-1`}>
+                  {netWorth >= 0 ? 'מצב חיובי' : 'צריך שיפור'}
+                </p>
+              </div>
+            </div>
+
             <FinancialOverview
               profile={userProfile}
               monthlyExpenses={stats.total_expenses || 0}
