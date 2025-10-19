@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Heart, TrendingUp, TrendingDown, Target, Bell, Menu, Settings } from 'lucide-react'
+import { Heart, TrendingUp, TrendingDown, Target, Bell, Settings } from 'lucide-react'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import FinancialOverview from '@/components/dashboard/FinancialOverview'
 import DebtVsAssets from '@/components/dashboard/DebtVsAssets'
 import SmartInsights from '@/components/dashboard/SmartInsights'
@@ -265,6 +266,11 @@ export default async function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Theme Toggle */}
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
+
               {/* Notifications */}
               <button className="relative p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all group">
                 <Bell className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />

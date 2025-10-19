@@ -2,13 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark Dashboard Theme */
+/* Theme Variables */
+:root {
+  /* Light Mode */
+  --bg-dashboard: #f5f6f8;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f9fafb;
+  --text-primary: #1e2a3b;
+  --text-secondary: #555555;
+  --text-tertiary: #888888;
+  --border-color: #e5e7eb;
+  --border-color-strong: #d1d5db;
+}
+
+.dark {
+  /* Dark Mode */
+  --bg-dashboard: #1e1e1e;
+  --bg-card: #171717;
+  --bg-card-hover: #1f1f1f;
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --border-color: #1f2937;
+  --border-color-strong: #374151;
+}
+
+/* Apply Theme */
 .bg-dashboard {
-  background-color: #1e1e1e;
+  background-color: var(--bg-dashboard);
 }
 
 .bg-card-dark {
-  background-color: #171717;
+  background-color: var(--bg-card);
+}
+
+.bg-card-hover:hover {
+  background-color: var(--bg-card-hover);
+}
+
+.text-theme-primary {
+  color: var(--text-primary);
+}
+
+.text-theme-secondary {
+  color: var(--text-secondary);
+}
+
+.text-theme-tertiary {
+  color: var(--text-tertiary);
+}
+
+.border-theme {
+  border-color: var(--border-color);
+}
+
+.border-theme-strong {
+  border-color: var(--border-color-strong);
 }
 
 .bg-sidebar-card {

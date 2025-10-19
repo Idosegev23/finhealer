@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Home,
   TrendingUp,
@@ -32,8 +33,11 @@ const navItems = [
 
 export function DashboardNav() {
   const pathname = usePathname();
+  const { theme } = useTheme();
   const [financialData, setFinancialData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  const isDark = theme === 'dark';
 
   useEffect(() => {
     fetchFinancialData();
@@ -59,7 +63,7 @@ export function DashboardNav() {
   const netWorth = financialData?.net_worth || 0;
 
   return (
-    <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-md" dir="rtl">
+    <div className={`sticky top-0 z-50 ${isDark ? 'bg-card-dark border-gray-800' : 'bg-white border-gray-200'} border-b shadow-md transition-colors duration-200`} dir="rtl">
       {/* Spybar - נתונים פיננסיים */}
       <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white">
         <div className="max-w-7xl mx-auto px-4 py-2">
