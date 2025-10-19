@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
     // קבלת נתונים מהבקשה
     const body = await request.json();
-    const { dependents, incomeSources, employment_status, ...profile } = body;
+    const { dependents, incomeSources, employment_status, total_fixed_expenses, total_monthly_income, total_debt, ...profile } = body;
 
     // עדכון employment_status בטבלת users אם סופק
     if (employment_status) {
@@ -48,16 +48,17 @@ export async function POST(request: Request) {
         .update({
           ...profile,
           user_id: user.id,
-          completed_at: profile.completed ? new Date().toISOString() : null
+          completed_at: profile.completed ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id)
         .select()
         .single();
 
       if (error) {
-        console.error('Error updating profile:', error);
+        console.error('Error updating profile:', error, 'Data:', profile);
         return NextResponse.json(
-          { error: 'Failed to update profile' },
+          { error: 'Failed to update profile', details: error.message },
           { status: 500 }
         );
       }
@@ -76,9 +77,9 @@ export async function POST(request: Request) {
         .single();
 
       if (error) {
-        console.error('Error creating profile:', error);
+        console.error('Error creating profile:', error, 'Data:', profile);
         return NextResponse.json(
-          { error: 'Failed to create profile' },
+          { error: 'Failed to create profile', details: error.message },
           { status: 500 }
         );
       }
