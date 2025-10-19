@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, DollarSign, TrendingDown, AlertCircle, Calculator } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { DashboardNav } from "@/components/shared/DashboardNav";
 import { AddLoanModal } from "@/components/loans/AddLoanModal";
 import Link from "next/link";
 
@@ -81,9 +80,7 @@ export default function LoansPage() {
   }
 
   return (
-    <>
-      <DashboardNav />
-      <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
+    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
         <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -341,15 +338,14 @@ export default function LoansPage() {
             </li>
           </ul>
         </div>
-        </div>
       </div>
-
+      
       {/* Add Loan Modal */}
       <AddLoanModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
         onSuccess={fetchLoans}
       />
-    </>
+    </div>
   );
 }

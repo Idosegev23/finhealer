@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,10 +11,11 @@ import {
   Shield,
   Briefcase,
   Receipt,
-  Target,
   Calculator,
   BookOpen,
-  Settings,
+  Wallet,
+  TrendingDown,
+  Activity,
 } from "lucide-react";
 
 const navItems = [
@@ -30,9 +32,86 @@ const navItems = [
 
 export function DashboardNav() {
   const pathname = usePathname();
+  const [financialData, setFinancialData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFinancialData();
+  }, []);
+
+  const fetchFinancialData = async () => {
+    try {
+      const res = await fetch("/api/financial-summary");
+      if (res.ok) {
+        const data = await res.json();
+        setFinancialData(data);
+      }
+    } catch (error) {
+      console.error("Error fetching financial data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const accountBalance = financialData?.current_account_balance || 0;
+  const monthlyIncome = financialData?.monthly_income || 0;
+  const totalDebt = financialData?.total_debt || 0;
+  const netWorth = financialData?.net_worth || 0;
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-md sticky top-0 z-50" dir="rtl">
+    <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-md" dir="rtl">
+      {/* Spybar - נתונים פיננסיים */}
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-2">
+          <div className="flex items-center justify-between gap-6 overflow-x-auto scrollbar-hide">
+            {/* מצב חשבון */}
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <Wallet className="w-4 h-4" />
+              <span className="text-xs font-medium opacity-80">עו&quot;ש:</span>
+              <span className={`text-sm font-bold ${accountBalance >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                {loading ? '...' : `₪${Math.abs(accountBalance).toLocaleString('he-IL')}`}
+              </span>
+            </div>
+
+            {/* הכנסה חודשית */}
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <TrendingUp className="w-4 h-4" />
+              <span className="text-xs font-medium opacity-80">הכנסה:</span>
+              <span className="text-sm font-bold text-green-300">
+                {loading ? '...' : `₪${monthlyIncome.toLocaleString('he-IL')}`}
+              </span>
+            </div>
+
+            {/* חובות */}
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <TrendingDown className="w-4 h-4" />
+              <span className="text-xs font-medium opacity-80">חובות:</span>
+              <span className="text-sm font-bold text-orange-300">
+                {loading ? '...' : `₪${totalDebt.toLocaleString('he-IL')}`}
+              </span>
+            </div>
+
+            {/* שווי נטו */}
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <Activity className="w-4 h-4" />
+              <span className="text-xs font-medium opacity-80">שווי נטו:</span>
+              <span className={`text-sm font-bold ${netWorth >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                {loading ? '...' : `₪${Math.abs(netWorth).toLocaleString('he-IL')}`}
+              </span>
+            </div>
+
+            {/* רענון */}
+            <button 
+              onClick={fetchFinancialData}
+              className="text-xs font-medium opacity-80 hover:opacity-100 transition-opacity px-3 py-1 rounded bg-white/10 hover:bg-white/20"
+            >
+              ↻ רענן
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center gap-3 overflow-x-auto py-4 scrollbar-hide">
           {navItems.map((item) => {
@@ -56,7 +135,7 @@ export function DashboardNav() {
           })}
         </div>
       </div>
-    </nav>
+    </div>
   );
 }
 

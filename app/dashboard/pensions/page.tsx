@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Shield, TrendingUp, Briefcase } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { DashboardNav } from "@/components/shared/DashboardNav";
 import { AddPensionModal } from "@/components/pensions/AddPensionModal";
 
 interface PensionFund {
@@ -62,9 +61,7 @@ export default function PensionsPage() {
   }
 
   return (
-    <>
-      <DashboardNav />
-      <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
+    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
         <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -287,16 +284,15 @@ export default function PensionsPage() {
             </li>
           </ul>
         </div>
-        </div>
       </div>
-
+      
       {/* Add Pension Modal */}
       <AddPensionModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
         onSuccess={fetchPensions}
       />
-    </>
+    </div>
   );
 }
 

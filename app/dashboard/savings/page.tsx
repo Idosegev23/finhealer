@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, PiggyBank, Target, TrendingUp, Calendar } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { DashboardNav } from "@/components/shared/DashboardNav";
 import { AddSavingsModal } from "@/components/savings/AddSavingsModal";
 
 interface SavingsAccount {
@@ -64,9 +63,7 @@ export default function SavingsPage() {
   }
 
   return (
-    <>
-      <DashboardNav />
-      <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
+    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
         <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -329,15 +326,14 @@ export default function SavingsPage() {
             </li>
           </ul>
         </div>
-        </div>
       </div>
-
+      
       {/* Add Savings Modal */}
       <AddSavingsModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
         onSuccess={fetchSavings}
       />
-    </>
+    </div>
   );
 }

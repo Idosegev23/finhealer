@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Shield, Heart, AlertTriangle } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { DashboardNav } from "@/components/shared/DashboardNav";
 import { AddInsuranceModal } from "@/components/insurance/AddInsuranceModal";
 
 interface Insurance {
@@ -65,9 +64,7 @@ export default function InsurancePage() {
   }
 
   return (
-    <>
-      <DashboardNav />
-      <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
+    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
         <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -294,15 +291,14 @@ export default function InsurancePage() {
             </li>
           </ul>
         </div>
-        </div>
       </div>
-
+      
       {/* Add Insurance Modal */}
       <AddInsuranceModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
         onSuccess={fetchInsurances}
       />
-    </>
+    </div>
   );
 }
