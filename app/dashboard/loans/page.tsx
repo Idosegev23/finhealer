@@ -234,98 +234,186 @@ export default function LoansPage() {
               </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      מלווה
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      סוג
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      סכום מקורי
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      יתרה נוכחית
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      תשלום חודשי
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ריבית
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      תשלומים נותרים
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      התקדמות
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      פעולות
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {loans.map((loan) => {
-                    const paidPercentage =
-                      ((loan.original_amount - loan.current_balance) / loan.original_amount) * 100;
-                    return (
-                      <tr key={loan.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        מלווה
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        סוג
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        סכום מקורי
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        יתרה נוכחית
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        תשלום חודשי
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ריבית
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        תשלומים נותרים
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        התקדמות
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        פעולות
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {loans.map((loan) => {
+                      const paidPercentage =
+                        ((loan.original_amount - loan.current_balance) / loan.original_amount) * 100;
+                      return (
+                        <tr key={loan.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {loan.lender_name}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                              {LOAN_TYPE_LABELS[loan.loan_type] || loan.loan_type}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            ₪{loan.original_amount?.toLocaleString("he-IL") || 0}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">
+                            ₪{loan.current_balance?.toLocaleString("he-IL") || 0}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-orange-600">
+                            ₪{loan.monthly_payment?.toLocaleString("he-IL", { maximumFractionDigits: 0 }) || 0}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {loan.interest_rate}%
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {loan.remaining_payments || "N/A"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="w-32">
+                              <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+                                <div
+                                  className="bg-green-500 h-2 rounded-full"
+                                  style={{ width: `${paidPercentage}%` }}
+                                ></div>
+                              </div>
+                              <div className="text-xs text-gray-500 text-center">
+                                {paidPercentage.toFixed(0)}% שולם
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setEditingLoan(loan)}
+                            >
+                              ערוך
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards View */}
+              <div className="lg:hidden space-y-4 p-4">
+                {loans.map((loan) => {
+                  const paidPercentage =
+                    ((loan.original_amount - loan.current_balance) / loan.original_amount) * 100;
+                  return (
+                    <div
+                      key={loan.id}
+                      className="bg-white rounded-xl shadow-md p-5 border-2 border-gray-100 hover:border-[#3A7BD5] transition-all"
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">
                             {loan.lender_name}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                          </h3>
+                          <span className="inline-block mt-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
                             {LOAN_TYPE_LABELS[loan.loan_type] || loan.loan_type}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          ₪{loan.original_amount?.toLocaleString("he-IL") || 0}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">
-                          ₪{loan.current_balance?.toLocaleString("he-IL") || 0}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-orange-600">
-                          ₪{loan.monthly_payment?.toLocaleString("he-IL", { maximumFractionDigits: 0 }) || 0}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {loan.interest_rate}%
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {loan.remaining_payments || "N/A"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="w-32">
-                            <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
-                              <div
-                                className="bg-green-500 h-2 rounded-full"
-                                style={{ width: `${paidPercentage}%` }}
-                              ></div>
-                            </div>
-                            <div className="text-xs text-gray-500 text-center">
-                              {paidPercentage.toFixed(0)}% שולם
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setEditingLoan(loan)}
-                          >
-                            ערוך
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingLoan(loan)}
+                          className="text-[#3A7BD5]"
+                        >
+                          ערוך
+                        </Button>
+                      </div>
+
+                      {/* Main Info Grid */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">סכום מקורי</p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            ₪{loan.original_amount?.toLocaleString("he-IL") || 0}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">יתרה נוכחית</p>
+                          <p className="text-sm font-bold text-red-600">
+                            ₪{loan.current_balance?.toLocaleString("he-IL") || 0}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">תשלום חודשי</p>
+                          <p className="text-sm font-bold text-orange-600">
+                            ₪{loan.monthly_payment?.toLocaleString("he-IL", { maximumFractionDigits: 0 }) || 0}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">ריבית</p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {loan.interest_rate}%
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="mb-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-500">התקדמות</span>
+                          <span className="text-xs font-semibold text-green-600">
+                            {paidPercentage.toFixed(0)}% שולם
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                          <div
+                            className="bg-green-500 h-2.5 rounded-full transition-all"
+                            style={{ width: `${paidPercentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Additional Info */}
+                      {loan.remaining_payments && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          תשלומים נותרים: <span className="font-semibold">{loan.remaining_payments}</span>
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 

@@ -109,12 +109,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { id, ...updates } = body;
+    // Get ID from URL query parameter
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
 
     if (!id) {
       return NextResponse.json({ error: "Missing loan ID" }, { status: 400 });
     }
+
+    const updates = await request.json();
 
     const { data, error } = await (supabase as any)
       .from("loans")
