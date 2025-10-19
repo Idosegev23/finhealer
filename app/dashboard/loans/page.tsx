@@ -33,6 +33,7 @@ export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
   const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
@@ -311,7 +312,11 @@ export default function LoansPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setEditingLoan(loan)}
+                          >
                             ערוך
                           </Button>
                         </td>
@@ -418,6 +423,19 @@ export default function LoansPage() {
         onOpenChange={setShowAddModal}
         onSuccess={fetchLoans}
       />
+
+      {/* Edit Loan Modal */}
+      {editingLoan && (
+        <AddLoanModal
+          open={!!editingLoan}
+          onOpenChange={(open) => !open && setEditingLoan(null)}
+          onSuccess={() => {
+            fetchLoans();
+            setEditingLoan(null);
+          }}
+          editingLoan={editingLoan}
+        />
+      )}
     </div>
   );
 }

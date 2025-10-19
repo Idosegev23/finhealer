@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Sheet,
   SheetContent,
@@ -15,10 +15,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Loader2, DollarSign } from "lucide-react";
 
+interface Loan {
+  id: string;
+  lender_name: string;
+  loan_type: string;
+  original_amount: number;
+  current_balance: number;
+  monthly_payment: number;
+  interest_rate: number;
+  remaining_payments: number;
+  start_date?: string;
+  loan_number?: string;
+  notes?: string;
+}
+
 interface AddLoanModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  editingLoan?: Loan | null;
 }
 
 const LOAN_TYPES = [
@@ -31,7 +46,7 @@ const LOAN_TYPES = [
   { value: "other", label: "אחר" },
 ];
 
-export function AddLoanModal({ open, onOpenChange, onSuccess }: AddLoanModalProps) {
+export function AddLoanModal({ open, onOpenChange, onSuccess, editingLoan }: AddLoanModalProps) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
@@ -46,6 +61,39 @@ export function AddLoanModal({ open, onOpenChange, onSuccess }: AddLoanModalProp
     loan_number: "",
     notes: "",
   });
+
+  // Load editing data when modal opens
+  useEffect(() => {
+    if (editingLoan) {
+      setFormData({
+        lender_name: editingLoan.lender_name || "",
+        loan_type: editingLoan.loan_type || "",
+        original_amount: String(editingLoan.original_amount || ""),
+        current_balance: String(editingLoan.current_balance || ""),
+        monthly_payment: String(editingLoan.monthly_payment || ""),
+        interest_rate: String(editingLoan.interest_rate || ""),
+        remaining_payments: String(editingLoan.remaining_payments || ""),
+        start_date: editingLoan.start_date || "",
+        loan_number: editingLoan.loan_number || "",
+        notes: editingLoan.notes || "",
+      });
+    } else {
+      // Reset form when adding new
+      setFormData({
+        lender_name: "",
+        loan_type: "",
+        original_amount: "",
+        current_balance: "",
+        monthly_payment: "",
+        interest_rate: "",
+        remaining_payments: "",
+        start_date: "",
+        loan_number: "",
+        notes: "",
+      });
+    }
+    setErrors({});
+  }, [editingLoan, open]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -116,15 +164,19 @@ export function AddLoanModal({ open, onOpenChange, onSuccess }: AddLoanModalProp
         active: true,
       };
 
-      const res = await fetch("/api/loans", {
-        method: "POST",
+      // Use PATCH for editing, POST for adding new
+      const method = editingLoan ? "PATCH" : "POST";
+      const url = editingLoan ? `/api/loans?id=${editingLoan.id}` : "/api/loans";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || "Failed to add loan");
+        throw new Error(error.error || `Failed to ${editingLoan ? 'update' : 'add'} loan`);
       }
 
       // Reset form
@@ -144,7 +196,7 @@ export function AddLoanModal({ open, onOpenChange, onSuccess }: AddLoanModalProp
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      console.error("Error adding loan:", error);
+      console.error(`Error ${editingLoan ? 'updating' : 'adding'} loan:`, error);
       setErrors({ submit: error.message || "שגיאה בשמירת ההלוואה" });
     } finally {
       setLoading(false);
@@ -157,9 +209,11 @@ export function AddLoanModal({ open, onOpenChange, onSuccess }: AddLoanModalProp
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-2xl">
             <DollarSign className="w-6 h-6 text-[#3A7BD5]" />
-            הוסף הלוואה חדשה
+            {editingLoan ? "ערוך הלוואה" : "הוסף הלוואה חדשה"}
           </SheetTitle>
-          <SheetDescription>מלא את הפרטים כדי להתחיל לעקוב אחרי ההלוואה שלך</SheetDescription>
+          <SheetDescription>
+            {editingLoan ? "עדכן את הפרטים של ההלוואה" : "מלא את הפרטים כדי להתחיל לעקוב אחרי ההלוואה שלך"}
+          </SheetDescription>
         </SheetHeader>
 
         <div className="mt-8 space-y-6">
@@ -358,7 +412,7 @@ export function AddLoanModal({ open, onOpenChange, onSuccess }: AddLoanModalProp
                   שומר...
                 </>
               ) : (
-                "שמור הלוואה"
+                editingLoan ? "עדכן הלוואה" : "שמור הלוואה"
               )}
             </Button>
             <Button onClick={() => onOpenChange(false)} variant="outline" className="flex-1" disabled={loading}>
