@@ -148,6 +148,13 @@ export default function ExpensesForm({ initialData }: ExpensesFormProps) {
 
       setSuccessMessage('הנתונים נשמרו בהצלחה! ✓');
       
+      // Mark section as completed
+      await fetch('/api/user/section/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subsection: 'expenses' })
+      });
+      
       // Refresh the page to update the Spybar
       setTimeout(() => {
         window.location.reload();

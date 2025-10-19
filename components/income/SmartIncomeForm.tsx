@@ -105,6 +105,13 @@ export default function SmartIncomeForm({ initialIncomeSources }: SmartIncomeFor
         if (!res.ok) throw new Error("Failed to save");
       }
 
+      // Mark section as completed
+      await fetch('/api/user/section/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subsection: 'income' })
+      });
+
       alert("✓ נשמר בהצלחה!");
       router.push("/dashboard");
       router.refresh();
