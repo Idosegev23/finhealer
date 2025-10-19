@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import SmartIncomeForm from '@/components/income/SmartIncomeForm';
-import { DashboardNav } from '@/components/shared/DashboardNav';
 import { Sparkles, Zap, TrendingUp } from 'lucide-react';
 
 export default async function IncomePage() {
@@ -22,24 +21,22 @@ export default async function IncomePage() {
     .order('created_at', { ascending: false });
 
   return (
-    <>
-      <DashboardNav />
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4" dir="rtl">
+    <div className="min-h-screen bg-dashboard py-12 px-4" dir="rtl">
         <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#7ED957] to-[#6BC949] text-white rounded-2xl p-8 mb-8 shadow-xl animate-scale-in">
+        <div className="bg-card-dark border border-theme rounded-2xl p-8 mb-8 shadow-lg">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <TrendingUp className="w-8 h-8" />
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
+              <TrendingUp className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold mb-1">הכנסות 💰</h1>
-              <p className="text-sm text-green-100">ניהול חכם ומהיר של כל מקורות ההכנסה</p>
+              <h1 className="text-3xl font-bold mb-1 text-theme-primary">הכנסות 💰</h1>
+              <p className="text-sm text-theme-secondary">ניהול חכם ומהיר של כל מקורות ההכנסה</p>
             </div>
           </div>
-          <p className="text-white/90 leading-relaxed">
-            <strong>טופס חכם חדש!</strong> רק 3 שדות במצב מהיר, חישובים אוטומטיים, וסריקת תלוש אופציונלית.
-            <span className="inline-flex items-center gap-1 mr-2">
+          <p className="text-theme-secondary leading-relaxed">
+            <strong className="text-theme-primary">טופס חכם חדש!</strong> רק 3 שדות במצב מהיר, חישובים אוטומטיים, וסריקת תלוש אופציונלית.
+            <span className="inline-flex items-center gap-1 mr-2 text-green-600 dark:text-green-400">
               <Sparkles className="w-4 h-4" />
               <strong>חוסך 80% מהזמן!</strong>
             </span>
@@ -48,35 +45,34 @@ export default async function IncomePage() {
 
         {/* Info Cards */}
         <div className="grid md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-lg p-4 border-l-4 border-green-500">
+          <div className="bg-card-dark border border-theme rounded-lg p-4 border-r-4 border-r-green-500">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="w-5 h-5 text-green-500" />
-              <h3 className="font-bold text-gray-900">מצב מהיר</h3>
+              <h3 className="font-bold text-theme-primary">מצב מהיר</h3>
             </div>
-            <p className="text-sm text-gray-600">רק 3 שדות - 30 שניות ומסיימים</p>
+            <p className="text-sm text-theme-secondary">רק 3 שדות - 30 שניות ומסיימים</p>
           </div>
 
-          <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500">
+          <div className="bg-card-dark border border-theme rounded-lg p-4 border-r-4 border-r-blue-500">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-5 h-5 text-blue-500" />
-              <h3 className="font-bold text-gray-900">חישובים חכמים</h3>
+              <h3 className="font-bold text-theme-primary">חישובים חכמים</h3>
             </div>
-            <p className="text-sm text-gray-600">המערכת משלימה הכל אוטומטית</p>
+            <p className="text-sm text-theme-secondary">המערכת משלימה הכל אוטומטית</p>
           </div>
 
-          <div className="bg-white rounded-lg p-4 border-l-4 border-purple-500">
+          <div className="bg-card-dark border border-theme rounded-lg p-4 border-r-4 border-r-purple-500">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-5 h-5 text-purple-500" />
-              <h3 className="font-bold text-gray-900">סריקת תלוש</h3>
+              <h3 className="font-bold text-theme-primary">סריקת תלוש</h3>
             </div>
-            <p className="text-sm text-gray-600">צלם תלוש ונמלא הכל בשבילך</p>
+            <p className="text-sm text-theme-secondary">צלם תלוש ונמלא הכל בשבילך</p>
           </div>
         </div>
 
         <SmartIncomeForm initialIncomeSources={incomeSources || []} />
         </div>
       </div>
-    </>
   );
 }
 
