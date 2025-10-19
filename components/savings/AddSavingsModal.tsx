@@ -27,6 +27,7 @@ const ACCOUNT_TYPES = [
   { value: "investment", label: "קרן השתלמות" },
   { value: "pension_savings", label: "קרן פנסיה לתגמולים" },
   { value: "provident_fund", label: "קופת גמל" },
+  { value: "provident_investment", label: "קופת גמל להשקעה" },
   { value: "education_fund", label: "קרן השתלמות לילדים" },
   { value: "stocks", label: "מניות / תיק השקעות" },
   { value: "crypto", label: "קריפטו" },

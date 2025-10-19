@@ -43,6 +43,62 @@
     --radius: 0.5rem;
   }
 
+  /* הגדלת גופן בסיסית */
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  /* הגדלת טקסט בכרטיסים */
+  p {
+    font-size: 1.05rem;
+  }
+
+  /* שיפור קריאות בכותרות */
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  /* שיפור labels */
+  label {
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  /* שיפור inputs */
+  input, select, textarea {
+    font-size: 1.05rem;
+  }
+
+  /* שיפור buttons */
+  button {
+    font-size: 1.05rem;
+    font-weight: 500;
+  }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;

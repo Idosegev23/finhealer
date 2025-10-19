@@ -16,6 +16,7 @@ import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
 import { LoansStatusCard } from '@/components/dashboard/LoansStatusCard'
 import { InsurancePensionCard } from '@/components/dashboard/InsurancePensionCard'
 import { SavingsProgressCard } from '@/components/dashboard/SavingsProgressCard'
+import { CurrentAccountCard } from '@/components/dashboard/CurrentAccountCard'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -348,6 +349,8 @@ export default async function DashboardPage() {
           {/* Right Column - 1/3 */}
           <div className="space-y-6">
             <PhaseProgress currentPhase={userDataInfo.phase || 'reflection'} />
+            
+            <CurrentAccountCard />
             
             <NetWorthCard />
             

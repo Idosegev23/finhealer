@@ -93,7 +93,7 @@ const expenseCategories = [
   {
     category: 'חובה (חשמל, מים וגז)',
     icon: <Zap className="w-6 h-6" />,
-    color: 'from-[#FFEB3B] to-[#FBC02D]',
+    color: 'from-[#F97316] to-[#EA580C]',
     essential: true,
     fields: [
       { key: 'electricity', label: 'חשמל', placeholder: '0', tooltip: 'חשבון חשמל חודשי ממוצע' },
