@@ -2,6 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Dark Dashboard Theme */
+.bg-dashboard {
+  background-color: #1e1e1e;
+}
+
+.bg-card-dark {
+  background-color: #171717;
+}
+
+.bg-sidebar-card {
+  background-color: #353535;
+}
+
+.sidebar-separator-top {
+  border-bottom: 1px solid #2e2e2e;
+}
+
+.sidebar-separator-bottom {
+  border-top: 1px solid #2e2e2e;
+}
+
+.card-stack-border {
+  border-bottom: 2px solid #696969;
+}
+
+.icon-background {
+  background: #2d2d2d;
+}
+
+.tooltip-head {
+  background: #1d1d1d;
+}
+
+.tooltip-body {
+  background: #252525;
+}
+
+.dashboard-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
 @layer utilities {
   @keyframes gradient {
     0%, 100% {

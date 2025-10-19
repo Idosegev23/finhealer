@@ -237,9 +237,9 @@ export default async function DashboardPage() {
   const hasPendingSections = currentPhase === 'data_collection' && !allCompleted
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F5F6F8] via-white to-[#F5F6F8]">
+    <div className="min-h-screen bg-dashboard">
       {/* Header */}
-      <header className="bg-gradient-to-r from-[#1E2A3B] via-[#2E3A4B] to-[#1E2A3B] border-b border-gray-700/50 shadow-xl backdrop-blur-sm">
+      <header className="bg-card-dark border-b border-gray-800 shadow-2xl">
         <div className="container mx-auto px-4 py-5">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
@@ -307,69 +307,69 @@ export default async function DashboardPage() {
           <DataCollectionBanner userName={userDataInfo.name} sections={sections} />
         )}
 
-        {/* Financial Health Score */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#3A7BD5] via-[#2E5EA5] to-[#1E4A8A] text-white rounded-3xl p-8 mb-8 shadow-2xl border border-white/10">
+        {/* Financial Health Score - Dark Theme */}
+        <div className="relative overflow-hidden bg-card-dark border border-gray-800 rounded-2xl p-8 mb-8 shadow-2xl">
           {/* Animated Background Elements */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl" style={{animationDelay: '1s'}}></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-500/10 to-blue-500/5 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-br from-pink-500/10 to-purple-500/5 rounded-full blur-3xl"></div>
           
           <div className="relative z-10">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 bg-gradient-to-br from-white/20 to-white/5 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-white/20 shadow-lg">
+                <div className="w-20 h-20 rounded-2xl dashboard-gradient flex items-center justify-center shadow-xl">
                   <Heart className="w-10 h-10 text-white" fill="currentColor" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-black mb-1">ציון הבריאות הפיננסית</h2>
-                  <p className="text-white/80 text-sm">מבוסס על חיסכון, עמידה בתקציב והתקדמות יעדים</p>
+                  <h2 className="text-3xl font-black text-white mb-1">ציון הבריאות הפיננסית</h2>
+                  <p className="text-gray-400 text-sm">מבוסס על חיסכון, עמידה בתקציב והתקדמות יעדים</p>
                 </div>
               </div>
 
               <div className="flex items-baseline gap-2">
-                <span className="text-8xl font-black tracking-tight">{score}</span>
+                <span className="text-8xl font-black tracking-tight text-white">{score}</span>
                 <div className="flex flex-col">
-                  <span className="text-3xl font-bold text-white/80">/100</span>
-                  <span className="text-xs text-white/60">נקודות</span>
+                  <span className="text-3xl font-bold text-gray-400">/100</span>
+                  <span className="text-xs text-gray-500">נקודות</span>
                 </div>
               </div>
             </div>
 
             {/* Progress Bar */}
             <div className="relative mb-6">
-              <div className="h-6 bg-white/10 rounded-full overflow-hidden backdrop-blur-sm border border-white/20">
+              <div className="h-6 bg-gray-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-white via-white/90 to-white/80 rounded-full transition-all duration-1000 ease-out flex items-center justify-end px-3 shadow-lg"
+                  className="h-full dashboard-gradient rounded-full transition-all duration-1000 ease-out flex items-center justify-end px-3 shadow-lg"
                   style={{ width: `${score}%` }}
                 >
-                  <span className="text-xs font-bold text-[#3A7BD5]">{score}%</span>
+                  <span className="text-xs font-bold text-white">{score}%</span>
                 </div>
               </div>
               {/* Milestone Markers */}
               <div className="flex justify-between mt-2 px-1">
-                <span className="text-xs text-white/50">0</span>
-                <span className="text-xs text-white/50">25</span>
-                <span className="text-xs text-white/50">50</span>
-                <span className="text-xs text-white/50">75</span>
-                <span className="text-xs text-white/50">100</span>
+                <span className="text-xs text-gray-600">0</span>
+                <span className="text-xs text-gray-600">25</span>
+                <span className="text-xs text-gray-600">50</span>
+                <span className="text-xs text-gray-600">75</span>
+                <span className="text-xs text-gray-600">100</span>
               </div>
             </div>
 
             {/* Status Message */}
-            <div className="flex items-center gap-3 p-4 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <div className="text-3xl">
+            <div className="flex items-center gap-4 p-5 bg-gray-800/50 rounded-xl border border-gray-700">
+              <div className="text-4xl">
                 {score >= 80 && '🎉'}
                 {score >= 60 && score < 80 && '👍'}
                 {score >= 40 && score < 60 && '⚠️'}
                 {score < 40 && '💪'}
               </div>
               <div>
-                <p className="font-bold text-lg">
+                <p className="font-bold text-lg text-white">
                   {score >= 80 && 'מצוין! המצב הפיננסי שלך נהדר'}
                   {score >= 60 && score < 80 && 'טוב! אתה בכיוון הנכון'}
                   {score >= 40 && score < 60 && 'ניתן לשפר - יש לך פוטנציאל!'}
                   {score < 40 && 'בואו נעבוד על זה ביחד'}
                 </p>
-                <p className="text-sm text-white/70 mt-1">
+                <p className="text-sm text-gray-400 mt-1">
                   {score >= 80 && 'המשך כך! אתה מנהל את הכספים שלך בצורה מצוינת'}
                   {score >= 60 && score < 80 && 'עוד קצת מאמץ ותגיע למצוינות'}
                   {score >= 40 && score < 60 && 'בואו נזהה הזדמנויות לשיפור'}
@@ -384,48 +384,66 @@ export default async function DashboardPage() {
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
           {/* Left Column - 2/3 */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Dashboard Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* Dashboard Summary Cards - Dark Theme */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* סך הכנסות */}
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-5 border-2 border-green-200 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-green-700">הכנסות חודשיות</span>
-                  <TrendingUp className="w-5 h-5 text-green-600" />
+              <div className="bg-card-dark rounded-2xl p-6 border border-gray-800 shadow-xl card-hover relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-emerald-500/5 rounded-full blur-3xl"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                      <TrendingUp className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-2xl">💰</div>
+                  </div>
+                  <div className="text-sm font-medium text-gray-400 mb-1">הכנסות חודשיות</div>
+                  <div className="text-3xl font-bold text-white mb-2">
+                    ₪{(totalMonthlyIncome || 0).toLocaleString('he-IL')}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {(incomeSources || []).length} מקורות הכנסה
+                  </div>
                 </div>
-                <p className="text-2xl font-bold text-green-900">
-                  ₪{(totalMonthlyIncome || 0).toLocaleString('he-IL')}
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  {(incomeSources || []).length} מקורות הכנסה
-                </p>
               </div>
 
               {/* סך חובות */}
-              <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-5 border-2 border-red-200 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-red-700">סך חובות</span>
-                  <TrendingDown className="w-5 h-5 text-red-600" />
+              <div className="bg-card-dark rounded-2xl p-6 border border-gray-800 shadow-xl card-hover relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-500/10 to-rose-500/5 rounded-full blur-3xl"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg">
+                      <TrendingDown className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-2xl">📉</div>
+                  </div>
+                  <div className="text-sm font-medium text-gray-400 mb-1">סך חובות</div>
+                  <div className="text-3xl font-bold text-white mb-2">
+                    ₪{(totalLiabilities || 0).toLocaleString('he-IL')}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {(loans || []).length} הלוואות פעילות
+                  </div>
                 </div>
-                <p className="text-2xl font-bold text-red-900">
-                  ₪{(totalLiabilities || 0).toLocaleString('he-IL')}
-                </p>
-                <p className="text-xs text-red-600 mt-1">
-                  {(loans || []).length} הלוואות פעילות
-                </p>
               </div>
 
               {/* שווי נטו */}
-              <div className={`bg-gradient-to-br ${netWorth >= 0 ? 'from-blue-50 to-indigo-50 border-blue-200' : 'from-orange-50 to-amber-50 border-orange-200'} rounded-xl p-5 border-2 shadow-sm`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-sm font-medium ${netWorth >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>שווי נטו</span>
-                  <Target className={`w-5 h-5 ${netWorth >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
+              <div className="bg-card-dark rounded-2xl p-6 border border-gray-800 shadow-xl card-hover relative overflow-hidden">
+                <div className={`absolute top-0 right-0 w-32 h-32 ${netWorth >= 0 ? 'bg-gradient-to-br from-blue-500/10 to-indigo-500/5' : 'bg-gradient-to-br from-orange-500/10 to-amber-500/5'} rounded-full blur-3xl`}></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`w-12 h-12 rounded-xl ${netWorth >= 0 ? 'bg-gradient-to-br from-blue-500 to-indigo-600' : 'bg-gradient-to-br from-orange-500 to-amber-600'} flex items-center justify-center shadow-lg`}>
+                      <Target className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-2xl">{netWorth >= 0 ? '✅' : '⚠️'}</div>
+                  </div>
+                  <div className="text-sm font-medium text-gray-400 mb-1">שווי נטו</div>
+                  <div className="text-3xl font-bold text-white mb-2">
+                    ₪{Math.abs(netWorth || 0).toLocaleString('he-IL')}
+                  </div>
+                  <div className={`text-xs ${netWorth >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
+                    {netWorth >= 0 ? 'מצב חיובי 👍' : 'צריך שיפור 💪'}
+                  </div>
                 </div>
-                <p className={`text-2xl font-bold ${netWorth >= 0 ? 'text-blue-900' : 'text-orange-900'}`}>
-                  ₪{Math.abs(netWorth || 0).toLocaleString('he-IL')}
-                </p>
-                <p className={`text-xs ${netWorth >= 0 ? 'text-blue-600' : 'text-orange-600'} mt-1`}>
-                  {netWorth >= 0 ? 'מצב חיובי' : 'צריך שיפור'}
-                </p>
               </div>
             </div>
 
