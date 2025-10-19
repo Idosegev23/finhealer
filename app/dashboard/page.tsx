@@ -4,6 +4,7 @@ import { Wallet, TrendingUp, TrendingDown, Target, DollarSign, CreditCard } from
 import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
 import { CurrentAccountCard } from '@/components/dashboard/CurrentAccountCard'
 import { PhaseProgressCard } from '@/components/dashboard/PhaseProgressCard'
+import { PhaseProgressBar } from '@/components/dashboard/PhaseProgressBar'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -139,6 +140,12 @@ export default async function DashboardPage() {
         {/* Phase Progress - Only if in data_collection phase */}
         <PhaseProgressCard 
           userName={userDataInfo.name}
+          currentPhase={userDataInfo.phase}
+          sections={sections}
+        />
+
+        {/* Phase Progress Bar - All 5 Phases */}
+        <PhaseProgressBar 
           currentPhase={userDataInfo.phase}
           sections={sections}
         />

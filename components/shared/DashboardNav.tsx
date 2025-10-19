@@ -18,10 +18,13 @@ import {
   Wallet,
   TrendingDown,
   Activity,
+  BarChart3,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "דשבורד", icon: Home },
+  { href: "/dashboard/phases", label: "השלבים", icon: Activity },
+  { href: "/dashboard/overview", label: "תמונת מצב", icon: BarChart3 },
   { href: "/dashboard/income", label: "הכנסות", icon: TrendingUp },
   { href: "/dashboard/expenses", label: "הוצאות", icon: Receipt },
   { href: "/dashboard/loans", label: "הלוואות", icon: DollarSign },
