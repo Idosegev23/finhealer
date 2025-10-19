@@ -69,61 +69,72 @@ export function DashboardNav() {
   const totalDebt = financialData?.total_debt || 0;
   const netWorth = financialData?.net_worth || 0;
 
+  const financialItems = [
+    {
+      icon: <Wallet className="w-4 h-4" />,
+      label: 'עו"ש',
+      value: loading ? '...' : `₪${Math.abs(accountBalance).toLocaleString('he-IL')}`,
+      color: accountBalance >= 0 ? 'text-green-300' : 'text-red-300'
+    },
+    {
+      icon: <TrendingUp className="w-4 h-4" />,
+      label: 'הכנסה חודשית',
+      value: loading ? '...' : `₪${monthlyIncome.toLocaleString('he-IL')}`,
+      color: 'text-green-300'
+    },
+    {
+      icon: <TrendingDown className="w-4 h-4" />,
+      label: 'חובות',
+      value: loading ? '...' : `₪${totalDebt.toLocaleString('he-IL')}`,
+      color: 'text-orange-300'
+    },
+    {
+      icon: <Activity className="w-4 h-4" />,
+      label: 'שווי נטו',
+      value: loading ? '...' : `₪${Math.abs(netWorth).toLocaleString('he-IL')}`,
+      color: netWorth >= 0 ? 'text-green-300' : 'text-red-300'
+    }
+  ];
+
   return (
     <div className={`sticky top-0 z-50 ${isDark ? 'bg-card-dark border-gray-800' : 'bg-white border-gray-200'} border-b shadow-md transition-colors duration-200`} dir="rtl">
-      {/* Spybar - נתונים פיננסיים */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-2">
-          <div className="flex items-center justify-between gap-6 overflow-x-auto scrollbar-hide">
-            {/* מצב חשבון */}
-            <div className="flex items-center gap-2 whitespace-nowrap">
-              <Wallet className="w-4 h-4" />
-              <span className="text-xs font-medium opacity-80">עו&quot;ש:</span>
-              <span className={`text-sm font-bold ${accountBalance >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-                {loading ? '...' : `₪${Math.abs(accountBalance).toLocaleString('he-IL')}`}
-              </span>
-            </div>
-
-            {/* הכנסה חודשית */}
-            <div className="flex items-center gap-2 whitespace-nowrap">
-              <TrendingUp className="w-4 h-4" />
-              <span className="text-xs font-medium opacity-80">הכנסה:</span>
-              <span className="text-sm font-bold text-green-300">
-                {loading ? '...' : `₪${monthlyIncome.toLocaleString('he-IL')}`}
-              </span>
-            </div>
-
-            {/* חובות */}
-            <div className="flex items-center gap-2 whitespace-nowrap">
-              <TrendingDown className="w-4 h-4" />
-              <span className="text-xs font-medium opacity-80">חובות:</span>
-              <span className="text-sm font-bold text-orange-300">
-                {loading ? '...' : `₪${totalDebt.toLocaleString('he-IL')}`}
-              </span>
-            </div>
-
-            {/* שווי נטו */}
-            <div className="flex items-center gap-2 whitespace-nowrap">
-              <Activity className="w-4 h-4" />
-              <span className="text-xs font-medium opacity-80">שווי נטו:</span>
-              <span className={`text-sm font-bold ${netWorth >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-                {loading ? '...' : `₪${Math.abs(netWorth).toLocaleString('he-IL')}`}
-              </span>
-            </div>
-
-            {/* רענון */}
-            <button 
-              onClick={fetchFinancialData}
-              className="text-xs font-medium opacity-80 hover:opacity-100 transition-opacity px-3 py-1 rounded bg-white/10 hover:bg-white/20"
-            >
-              ↻ רענן
-            </button>
-
-            {/* Theme Toggle */}
-            <div className="mr-2">
-              <ThemeToggle />
-            </div>
+      {/* Spybar - נתונים פיננסיים עם Marquee */}
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white overflow-hidden relative">
+        <div className="py-2">
+          <div className="flex animate-marquee hover:pause">
+            {/* First set of items */}
+            {financialItems.map((item, idx) => (
+              <div key={`first-${idx}`} className="flex items-center gap-2 whitespace-nowrap mx-8">
+                {item.icon}
+                <span className="text-xs font-medium opacity-80">{item.label}:</span>
+                <span className={`text-sm font-bold ${item.color}`}>
+                  {item.value}
+                </span>
+              </div>
+            ))}
+            
+            {/* Duplicate set for seamless loop */}
+            {financialItems.map((item, idx) => (
+              <div key={`second-${idx}`} className="flex items-center gap-2 whitespace-nowrap mx-8">
+                {item.icon}
+                <span className="text-xs font-medium opacity-80">{item.label}:</span>
+                <span className={`text-sm font-bold ${item.color}`}>
+                  {item.value}
+                </span>
+              </div>
+            ))}
           </div>
+        </div>
+        
+        {/* Controls positioned absolutely */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
+          <button 
+            onClick={fetchFinancialData}
+            className="text-xs font-medium opacity-80 hover:opacity-100 transition-opacity px-3 py-1 rounded bg-white/10 hover:bg-white/20 backdrop-blur-sm"
+          >
+            ↻ רענן
+          </button>
+          <ThemeToggle />
         </div>
       </div>
 

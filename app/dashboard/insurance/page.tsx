@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle, Shield, Heart, AlertTriangle } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { AddInsuranceModal } from "@/components/insurance/AddInsuranceModal";
+import { RequestPensionReport } from "@/components/pension/RequestPensionReport";
 
 interface Insurance {
   id: string;
@@ -23,6 +24,11 @@ const INSURANCE_TYPE_LABELS: Record<string, { label: string; icon: string }> = {
   critical_illness: { label: "מחלות קשות", icon: "⚕️" },
   disability: { label: "ביטוח סיעודי", icon: "🦽" },
   accident: { label: "תאונות אישיות", icon: "🚑" },
+  home: { label: "ביטוח דירה", icon: "🏠" },
+  car: { label: "ביטוח רכב", icon: "🚗" },
+  travel: { label: "ביטוח נסיעות", icon: "✈️" },
+  pet: { label: "ביטוח חיות מחמד", icon: "🐾" },
+  other: { label: "אחר", icon: "📋" },
 };
 
 export default function InsurancePage() {
@@ -88,6 +94,11 @@ export default function InsurancePage() {
               הוסף ביטוח
             </Button>
           </div>
+        </div>
+
+        {/* Request Pension Report from Gadi */}
+        <div className="mb-8">
+          <RequestPensionReport />
         </div>
 
         {/* Missing Insurances Alert */}
