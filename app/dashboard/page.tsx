@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Wallet, TrendingUp, TrendingDown, Target, DollarSign, CreditCard } from 'lucide-react'
 import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
 import { CurrentAccountCard } from '@/components/dashboard/CurrentAccountCard'
+import { PhaseProgressCard } from '@/components/dashboard/PhaseProgressCard'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -106,6 +107,22 @@ export default async function DashboardPage() {
   const netWorth = totalAssets - totalLiabilities
   const currentAccount = Number(profile.current_account_balance) || 0
 
+  // קבלת סטטוס השלמת סקציות (לשלב data_collection)
+  const { data: dataSections } = await supabase
+    .from('user_data_sections')
+    .select('*')
+    .eq('user_id', user.id)
+
+  const sections = {
+    income: dataSections?.some((s: any) => s.subsection === 'income' && s.completed) ?? false,
+    expenses: dataSections?.some((s: any) => s.subsection === 'expenses' && s.completed) ?? false,
+    loans: dataSections?.some((s: any) => s.subsection === 'loans' && s.completed) ?? false,
+    savings: dataSections?.some((s: any) => s.subsection === 'savings' && s.completed) ?? false,
+    cash_flow: dataSections?.some((s: any) => s.subsection === 'cash_flow' && s.completed) ?? false,
+    investments: dataSections?.some((s: any) => s.subsection === 'investments' && s.completed) ?? false,
+    insurance: dataSections?.some((s: any) => s.subsection === 'insurance' && s.completed) ?? false,
+  }
+
   return (
     <div className="min-h-screen bg-dashboard">
       <div className="container mx-auto px-4 py-8">
@@ -118,6 +135,13 @@ export default async function DashboardPage() {
             סקירה כללית של המצב הפיננסי שלך
           </p>
             </div>
+
+        {/* Phase Progress - Only if in data_collection phase */}
+        <PhaseProgressCard 
+          userName={userDataInfo.name}
+          currentPhase={userDataInfo.phase}
+          sections={sections}
+        />
 
         {/* ציון בריאות פיננסית */}
         <div className="bg-card-dark border border-theme rounded-2xl p-6 mb-8 shadow-lg">
@@ -238,7 +262,7 @@ export default async function DashboardPage() {
                   <span className="text-theme-secondary">מספר חשבונות:</span>
                   <span className="font-bold text-theme-primary">{savings.length}</span>
                 </div>
-              </div>
+          </div>
             ) : (
               <p className="text-theme-tertiary text-sm">אין חשבונות חיסכון רשומים</p>
             )}

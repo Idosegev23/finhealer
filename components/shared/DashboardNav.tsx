@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   Home,
   TrendingUp,
@@ -111,6 +112,11 @@ export function DashboardNav() {
             >
               ↻ רענן
             </button>
+
+            {/* Theme Toggle */}
+            <div className="mr-2">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>
@@ -129,7 +135,9 @@ export function DashboardNav() {
                 className={`flex items-center gap-2 px-5 py-3 rounded-lg whitespace-nowrap transition-all font-semibold ${
                   isActive
                     ? "bg-[#3A7BD5] text-white shadow-lg scale-105"
-                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:scale-105"
+                    : isDark 
+                      ? "text-gray-300 hover:bg-gray-800 hover:text-white hover:scale-105"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:scale-105"
                 }`}
               >
                 <Icon className="w-5 h-5" />
