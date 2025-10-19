@@ -148,10 +148,10 @@ export default function ExpensesForm({ initialData }: ExpensesFormProps) {
 
       setSuccessMessage('הנתונים נשמרו בהצלחה! ✓');
       
+      // Refresh the page to update the Spybar
       setTimeout(() => {
-        router.push('/dashboard');
-        router.refresh();
-      }, 2000);
+        window.location.reload();
+      }, 1500);
 
     } catch (error) {
       console.error('Error saving expenses:', error);

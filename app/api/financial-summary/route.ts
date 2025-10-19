@@ -48,7 +48,15 @@ export async function GET(request: NextRequest) {
     // Net worth
     const netWorth = totalAssets - totalLiabilities;
 
+    // Get current account balance and monthly income from profile
+    const currentAccountBalance = Number(profile.current_account_balance) || 0;
+    const monthlyIncome = Number(profile.total_monthly_income) || Number(profile.monthly_income) || 0;
+
     return NextResponse.json({
+      current_account_balance: currentAccountBalance,
+      monthly_income: monthlyIncome,
+      total_debt: totalLiabilities,
+      net_worth: netWorth,
       savings_total: savingsTotal,
       pension_total: pensionTotal,
       investments_total: investmentsTotal,
@@ -56,7 +64,6 @@ export async function GET(request: NextRequest) {
       debt_total: profile.total_debt || 0,
       total_assets: totalAssets,
       total_liabilities: totalLiabilities,
-      net_worth: netWorth,
     });
   } catch (error: any) {
     console.error("Error in GET /api/financial-summary:", error);
