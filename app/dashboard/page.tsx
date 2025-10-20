@@ -5,6 +5,8 @@ import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
 import { CurrentAccountCard } from '@/components/dashboard/CurrentAccountCard'
 import { PhaseProgressCard } from '@/components/dashboard/PhaseProgressCard'
 import { PhaseProgressBar } from '@/components/dashboard/PhaseProgressBar'
+import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
+import { InfoTooltip } from '@/components/ui/info-tooltip'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -153,7 +155,13 @@ export default async function DashboardPage() {
         {/* ציון בריאות פיננסית */}
         <div className="bg-card-dark border border-theme rounded-2xl p-6 mb-8 shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-theme-primary">ציון בריאות פיננסית</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-theme-primary">ציון בריאות פיננסית</h2>
+              <InfoTooltip
+                content="הציון מחושב על בסיס הכנסות, הוצאות, חובות, חיסכון והתנהלות פיננסית כללית. ציון גבוה = מצב פיננסי טוב יותר"
+                type="info"
+              />
+            </div>
             <div className="text-5xl font-black text-blue-600">{score}<span className="text-2xl text-theme-tertiary">/100</span></div>
             </div>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
@@ -179,7 +187,13 @@ export default async function DashboardPage() {
                 <Wallet className="w-5 h-5 text-green-600 dark:text-green-400" />
               </div>
             </div>
-            <p className="text-theme-tertiary text-sm mb-1">מצב חשבון עו&quot;ש</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-theme-tertiary text-sm">מצב חשבון עו&quot;ש</p>
+              <InfoTooltip
+                content="היתרה הנוכחית בחשבון העו&quot;ש שלך - הכסף הזמין לשימוש מיידי"
+                type="info"
+              />
+            </div>
             <p className={`text-2xl font-bold ${currentAccount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
               {currentAccount >= 0 ? '+' : ''}₪{currentAccount.toLocaleString('he-IL')}
             </p>
@@ -192,7 +206,13 @@ export default async function DashboardPage() {
                 <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
-            <p className="text-theme-tertiary text-sm mb-1">הכנסה חודשית</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-theme-tertiary text-sm">הכנסה חודשית</p>
+              <InfoTooltip
+                content="סכום כל ההכנסות החודשיות הקבועות שלך מכל המקורות"
+                type="info"
+              />
+            </div>
             <p className="text-2xl font-bold text-theme-primary">
               ₪{monthlyIncome.toLocaleString('he-IL')}
             </p>
@@ -205,7 +225,13 @@ export default async function DashboardPage() {
                 <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
               </div>
             </div>
-            <p className="text-theme-tertiary text-sm mb-1">סך החובות</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-theme-tertiary text-sm">סך החובות</p>
+              <InfoTooltip
+                content="סך כל ההלוואות והחובות הפעילים שלך - מה שאתה צריך להחזיר"
+                type="info"
+              />
+            </div>
             <p className="text-2xl font-bold text-red-600 dark:text-red-400">
               ₪{totalLiabilities.toLocaleString('he-IL')}
             </p>
@@ -218,12 +244,21 @@ export default async function DashboardPage() {
                 <Target className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
-            <p className="text-theme-tertiary text-sm mb-1">שווי נטו</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-theme-tertiary text-sm">שווי נטו</p>
+              <InfoTooltip
+                content="נכסים פחות חובות - המצב הפיננסי הכולל שלך. ככל שהמספר גבוה יותר, המצב טוב יותר"
+                type="info"
+              />
+            </div>
             <p className={`text-2xl font-bold ${netWorth >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
               {netWorth >= 0 ? '+' : ''}₪{netWorth.toLocaleString('he-IL')}
             </p>
           </div>
         </div>
+
+        {/* גרפים ויזואליים */}
+        <DashboardCharts loans={loans || []} />
 
         {/* ניהול נכסים וחובות */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
