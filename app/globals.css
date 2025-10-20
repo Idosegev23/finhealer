@@ -345,22 +345,30 @@
 .stagger-item:nth-child(4) { animation-delay: 0.4s; }
 .stagger-item:nth-child(5) { animation-delay: 0.5s; }
 
-/* Marquee Animation for Spybar - Seamless Infinite Loop */
-@keyframes marquee-seamless {
-  0% {
-    transform: translateX(0%);
+/* Marquee Animation - True Seamless Loop */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
   }
-  100% {
-    transform: translateX(-25%);
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
   }
 }
 
-.animate-marquee-seamless {
-  animation: marquee-seamless 10s linear infinite;
-  will-change: transform;
+@keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
+  }
 }
 
-.animate-marquee-seamless:hover {
-  animation-play-state: paused;
+.animate-marquee {
+  animation: marquee var(--duration) linear infinite;
+}
+
+.animate-marquee-vertical {
+  animation: marquee-vertical var(--duration) linear infinite;
 }
 

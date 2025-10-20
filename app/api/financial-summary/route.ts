@@ -41,14 +41,20 @@ export async function GET(request: NextRequest) {
     const pensionTotal = pensions.reduce((sum: number, pen: any) => sum + (Number(pen.current_balance) || 0), 0);
     const investmentsTotal = Number(profile.investments) || 0;
     const currentSavings = Number(profile.current_savings) || 0;
+    const currentAccountBalance = Number(profile.current_account_balance) || 0;
 
-    // Total assets
-    const totalAssets = savingsTotal + pensionTotal + investmentsTotal + currentSavings;
+    // Total assets (כל מה שיש לך)
+    const totalAssets = 
+      currentAccountBalance +  // יתרת עו"ש
+      savingsTotal +           // חיסכונות
+      pensionTotal +           // פנסיה וקופות גמל
+      investmentsTotal +       // השקעות
+      currentSavings;          // חיסכון נוכחי
 
-    // Total liabilities
-    const totalLiabilities = loansTotal + (profile.total_debt || 0);
+    // Total liabilities (כל מה שאתה חייב)
+    const totalLiabilities = loansTotal;
 
-    // Net worth
+    // Net worth (שווי נטו = נכסים - התחייבויות)
     const netWorth = totalAssets - totalLiabilities;
 
     // Calculate monthly income from income sources
@@ -56,8 +62,7 @@ export async function GET(request: NextRequest) {
       return sum + (Number(source.net_amount) || Number(source.actual_bank_amount) || 0);
     }, 0);
 
-    // Get current account balance and monthly income
-    const currentAccountBalance = Number(profile.current_account_balance) || 0;
+    // Get monthly income
     const monthlyIncome = incomeTotal || Number(profile.total_monthly_income) || Number(profile.monthly_income) || 0;
 
     return NextResponse.json({

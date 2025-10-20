@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Marquee } from "@/components/ui/marquee";
 import {
   Home,
   TrendingUp,
@@ -100,27 +101,20 @@ export function DashboardNav() {
     <div className={`sticky top-0 z-50 ${isDark ? 'bg-card-dark border-gray-800' : 'bg-white border-gray-200'} border-b shadow-md transition-colors duration-200`} dir="rtl">
       {/* Spybar - נתונים פיננסיים עם Marquee */}
       <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white overflow-hidden relative">
-        <div className="py-2">
-          <div className="flex animate-marquee-seamless">
-            {/* Multiple duplicates for truly seamless loop */}
-            {[...Array(4)].map((_, setIdx) => (
-              <div key={`set-${setIdx}`} className="flex flex-shrink-0">
-                {financialItems.map((item, idx) => (
-                  <div key={`${setIdx}-${idx}`} className="flex items-center gap-2 whitespace-nowrap mx-8">
-                    {item.icon}
-                    <span className="text-xs font-medium opacity-80">{item.label}:</span>
-                    <span className={`text-sm font-bold ${item.color}`}>
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
+        <Marquee pauseOnHover className="[--duration:10s] [--gap:2rem] py-2">
+          {financialItems.map((item, idx) => (
+            <div key={idx} className="flex items-center gap-2 whitespace-nowrap">
+              {item.icon}
+              <span className="text-xs font-medium opacity-80">{item.label}:</span>
+              <span className={`text-sm font-bold ${item.color}`}>
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </Marquee>
         
         {/* Theme Toggle positioned absolutely */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-blue-700/50 backdrop-blur-sm rounded-full p-1">
           <ThemeToggle />
         </div>
       </div>
