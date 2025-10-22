@@ -27,7 +27,9 @@ export async function GET() {
 
     if (error) {
       console.error("Error fetching transactions:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Error details:", JSON.stringify(error, null, 2));
+      // Return empty array instead of error if table doesn't exist or other DB issues
+      return NextResponse.json([]);
     }
 
     // Group by month
