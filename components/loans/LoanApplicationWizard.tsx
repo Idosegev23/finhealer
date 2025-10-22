@@ -113,7 +113,7 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
             business_name: draft.business_name || "",
             business_number: draft.business_number || "",
             requested_amount: draft.requested_amount?.toString() || "",
-            additional_amount: "0",
+            additional_amount: draft.additional_amount?.toString() || "0",
             requested_term_months: draft.requested_term_months?.toString() || "",
             purpose: draft.purpose || "",
             property_address: draft.property_address || "",
@@ -159,6 +159,7 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
       const payload = {
         ...formData,
         requested_amount: formData.requested_amount ? parseFloat(formData.requested_amount) : null,
+        additional_amount: formData.additional_amount ? parseFloat(formData.additional_amount) : 0,
         requested_term_months: formData.requested_term_months ? parseInt(formData.requested_term_months) : null,
         property_value: formData.property_value ? parseFloat(formData.property_value) : null,
         status: "draft",
