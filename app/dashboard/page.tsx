@@ -1,12 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Wallet, TrendingUp, TrendingDown, Target, DollarSign, CreditCard } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, Target, DollarSign, CreditCard, PlusCircle } from 'lucide-react'
 import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
 import { CurrentAccountCard } from '@/components/dashboard/CurrentAccountCard'
 import { PhaseProgressCard } from '@/components/dashboard/PhaseProgressCard'
 import { PhaseProgressBar } from '@/components/dashboard/PhaseProgressBar'
 import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
+import { QuickActionsBar } from '@/components/dashboard/QuickActionsBar'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
+import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -131,13 +133,16 @@ export default async function DashboardPage() {
       <div className="container mx-auto px-4 py-8">
       {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-theme-primary mb-2">
+          <h1 className="text-4xl font-bold text-theme-primary mb-2">
             שלום, {userDataInfo.name}! 👋
                 </h1>
-          <p className="text-theme-secondary">
+          <p className="text-lg text-theme-secondary">
             סקירה כללית של המצב הפיננסי שלך
           </p>
             </div>
+
+        {/* Quick Actions Bar */}
+        <QuickActionsBar />
 
         {/* Phase Progress - Only if in data_collection phase */}
         <PhaseProgressCard 
@@ -153,107 +158,136 @@ export default async function DashboardPage() {
         />
 
         {/* ציון בריאות פיננסית */}
-        <div className="bg-card-dark border border-theme rounded-2xl p-6 mb-8 shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-theme-primary">ציון בריאות פיננסית</h2>
+        <div className="bg-card-dark border border-theme rounded-2xl p-8 mb-8 shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-theme-primary">ציון בריאות פיננסית</h2>
               <InfoTooltip
                 content="הציון מחושב על בסיס הכנסות, הוצאות, חובות, חיסכון והתנהלות פיננסית כללית. ציון גבוה = מצב פיננסי טוב יותר"
                 type="info"
               />
             </div>
-            <div className="text-5xl font-black text-blue-600">{score}<span className="text-2xl text-theme-tertiary">/100</span></div>
+            <div className="text-6xl font-black text-blue-600">{score}<span className="text-3xl text-theme-tertiary">/100</span></div>
             </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-4">
             <div 
-              className="bg-blue-600 h-3 rounded-full transition-all duration-500"
+              className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full transition-all duration-500 shadow-sm"
               style={{ width: `${score}%` }}
             ></div>
           </div>
-          <p className="text-theme-secondary text-sm mt-2">
-            {score >= 80 && '🎉 מצוין! המצב הפיננסי שלך נהדר'}
-            {score >= 60 && score < 80 && '👍 טוב! אתה בכיוון הנכון'}
-            {score >= 40 && score < 60 && '⚠️ ניתן לשפר - יש לך פוטנציאל'}
-            {score < 40 && '💪 בואו נעבוד על זה ביחד'}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-base text-theme-secondary">
+              {score >= 80 ? '🎉 מעולה! המצב הפיננסי שלך נהדר' : score >= 60 ? '👍 טוב! אתה בכיוון הנכון' : score >= 40 ? '⚠️ ניתן לשפר - יש לך פוטנציאל' : '💪 בואו נשפר את המצב ביחד'}
+            </p>
+            {score < 80 && (
+              <Link href="/dashboard/phases">
+                <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                  טיפים לשיפור
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* סיכום פיננסי - 4 כרטיסים */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* מצב חשבון */}
-          <div className="bg-card-dark border border-theme rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-green-600 dark:text-green-400" />
+          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Wallet className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
             </div>
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-theme-tertiary text-sm">מצב חשבון עו&quot;ש</p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-theme-tertiary text-sm font-medium">מצב חשבון עו&quot;ש</p>
               <InfoTooltip
                 content="היתרה הנוכחית בחשבון העו&quot;ש שלך - הכסף הזמין לשימוש מיידי"
                 type="info"
               />
             </div>
-            <p className={`text-2xl font-bold ${currentAccount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            <p className={`text-3xl font-bold mb-3 ${currentAccount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
               {currentAccount >= 0 ? '+' : ''}₪{currentAccount.toLocaleString('he-IL')}
             </p>
+            <Link href="/dashboard/cash-flow">
+              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <PlusCircle className="w-4 h-4 ml-2" />
+                עדכן יתרה
+              </Button>
+            </Link>
                 </div>
 
           {/* הכנסה חודשית */}
-          <div className="bg-card-dark border border-theme rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-theme-tertiary text-sm">הכנסה חודשית</p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-theme-tertiary text-sm font-medium">הכנסה חודשית</p>
               <InfoTooltip
                 content="סכום כל ההכנסות החודשיות הקבועות שלך מכל המקורות"
                 type="info"
               />
             </div>
-            <p className="text-2xl font-bold text-theme-primary">
+            <p className="text-3xl font-bold text-theme-primary mb-3">
               ₪{monthlyIncome.toLocaleString('he-IL')}
             </p>
+            <Link href="/dashboard/income">
+              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <PlusCircle className="w-4 h-4 ml-2" />
+                הוסף הכנסה
+              </Button>
+            </Link>
                 </div>
 
           {/* חובות */}
-          <div className="bg-card-dark border border-theme rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
-                <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
+          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
             </div>
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-theme-tertiary text-sm">סך החובות</p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-theme-tertiary text-sm font-medium">סך החובות</p>
               <InfoTooltip
                 content="סך כל ההלוואות והחובות הפעילים שלך - מה שאתה צריך להחזיר"
                 type="info"
               />
             </div>
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+            <p className="text-3xl font-bold text-red-600 dark:text-red-400 mb-3">
               ₪{totalLiabilities.toLocaleString('he-IL')}
             </p>
+            <Link href="/dashboard/loans">
+              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <PlusCircle className="w-4 h-4 ml-2" />
+                נהל הלוואות
+              </Button>
+            </Link>
               </div>
 
           {/* שווי נטו */}
-          <div className="bg-card-dark border border-theme rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
-                <Target className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Target className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-theme-tertiary text-sm">שווי נטו</p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-theme-tertiary text-sm font-medium">שווי נטו</p>
               <InfoTooltip
                 content="נכסים פחות חובות - המצב הפיננסי הכולל שלך. ככל שהמספר גבוה יותר, המצב טוב יותר"
                 type="info"
               />
             </div>
-            <p className={`text-2xl font-bold ${netWorth >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            <p className={`text-3xl font-bold mb-3 ${netWorth >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
               {netWorth >= 0 ? '+' : ''}₪{netWorth.toLocaleString('he-IL')}
             </p>
+            <Link href="/dashboard/overview">
+              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                צפה בסיכום מלא
+              </Button>
+            </Link>
           </div>
         </div>
 

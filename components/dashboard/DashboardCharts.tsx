@@ -56,12 +56,18 @@ export function DashboardCharts({ loans }: { loans: Loan[] }) {
 
       if (monthlyRes.ok) {
         const monthlyData = await monthlyRes.json();
-        setExpensesByMonth(monthlyData);
+        console.log("📊 Monthly expenses data:", monthlyData); // Debug
+        setExpensesByMonth(Array.isArray(monthlyData) ? monthlyData : []);
+      } else {
+        console.error("Failed to fetch monthly expenses:", monthlyRes.status);
       }
 
       if (categoryRes.ok) {
         const categoryData = await categoryRes.json();
-        setExpensesByCategory(categoryData);
+        console.log("📊 Category expenses data:", categoryData); // Debug
+        setExpensesByCategory(Array.isArray(categoryData) ? categoryData : []);
+      } else {
+        console.error("Failed to fetch category expenses:", categoryRes.status);
       }
     } catch (error) {
       console.error("Error fetching charts data:", error);
@@ -149,8 +155,14 @@ export function DashboardCharts({ loans }: { loans: Loan[] }) {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-theme-secondary">
-              אין עדיין נתוני הוצאות להצגה
+            <div className="h-[300px] flex flex-col items-center justify-center text-center p-8">
+              <TrendingUp className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
+              <h4 className="text-lg font-semibold text-theme-primary mb-2">
+                אין עדיין נתוני הוצאות
+              </h4>
+              <p className="text-sm text-theme-secondary mb-4">
+                התחל לעקוב אחרי ההוצאות שלך כדי לראות מגמות חודשיות
+              </p>
             </div>
           )}
         </div>
@@ -199,8 +211,14 @@ export function DashboardCharts({ loans }: { loans: Loan[] }) {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-theme-secondary">
-              אין עדיין נתוני הוצאות להצגה
+            <div className="h-[300px] flex flex-col items-center justify-center text-center p-8">
+              <PieIcon className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
+              <h4 className="text-lg font-semibold text-theme-primary mb-2">
+                אין עדיין נתוני הוצאות
+              </h4>
+              <p className="text-sm text-theme-secondary mb-4">
+                מלא את ההוצאות החודשיות שלך כדי לראות את החלוקה לפי קטגוריות
+              </p>
             </div>
           )}
         </div>
