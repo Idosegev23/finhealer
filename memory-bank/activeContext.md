@@ -2,7 +2,7 @@
 
 ## מיקום נוכחי בפרויקט
 
-### 🎉 **עדכון אחרון: 18 באוקטובר 2025 - UX Enhancement Edition!**
+### 🎉 **עדכון אחרון: 22 באוקטובר 2025 - Loan Application System!**
 
 ### מה עשינו עד כה? ✅
 1. **הקמת מסד נתונים מלא בסופאבייס**
@@ -111,6 +111,36 @@
   - תכנון OCR + AI parsing
   - יעד דיוק 90%+
   - תמיכה ב-PDF/Excel/Images
+
+### Priority 2.7: Loan Application System ✅ הושלם! (22 באוקטובר)
+- ✅ **Database Tables**
+  - `loan_applications` - בקשות לאיחוד הלוואות
+  - `loan_documents` - מסמכים מועלים עם מעקב אימות
+  - RLS policies מלאות למשתמשים
+  - Storage bucket `loan-documents` (נדרש setup ידני)
+- ✅ **Smart Document System** (`lib/loanDocuments.ts`)
+  - דינמי לפי סוג הלוואה (regular/mortgage)
+  - דינמי לפי סוג תעסוקה (employee/self_employed/business_owner/spouse_employee)
+  - קישורים חיצוניים (בנק ישראל, וכו')
+  - חישוב progress אוטומטי
+- ✅ **3-Step Wizard** (`components/loans/LoanApplicationWizard.tsx`)
+  - שלב 1: פרטים אישיים (conditional fields)
+  - שלב 2: פרטי הלוואה + סיכום הלוואות קיימות
+  - שלב 3: צ'קליסט מסמכים + העלאות
+  - שמירה אוטומטית (draft status)
+  - מעקב progress באחוזים
+- ✅ **Simulator Upgrade** (`/loans-simulator`)
+  - טעינה אוטומטית של הלוואות מה-DB
+  - אינדיקציה ויזואלית של טעינה
+  - כפתור "הגש בקשה לאיחוד"
+  - חיבור ל-Wizard
+- ✅ **API Routes**
+  - `POST/GET/PATCH /api/loan-applications`
+  - `POST/GET/DELETE /api/loan-applications/documents`
+- ✅ **Documentation**
+  - `STORAGE_SETUP.md` - הנחיות להגדרת Storage RLS
+  - `LOAN_APPLICATION_MIGRATION.sql` - SQL migration מלא
+  - עדכון README עם הפיצ'רים החדשים
 
 ### Priority 3: Phase 2 - Behavior Engine (שבוע הבא)
 - [ ] Cron יומי לניתוח דפוסים
