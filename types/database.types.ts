@@ -36,7 +36,43 @@ export type Database = {
           role?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "admin_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "admin_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "admin_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "admin_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "admin_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       advisor_notes: {
         Row: {
@@ -63,7 +99,78 @@ export type Database = {
           sent_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "advisor_notes_advisor_id_fkey"
+            columns: ["advisor_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "advisor_notes_advisor_id_fkey"
+            columns: ["advisor_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "advisor_notes_advisor_id_fkey"
+            columns: ["advisor_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "advisor_notes_advisor_id_fkey"
+            columns: ["advisor_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "advisor_notes_advisor_id_fkey"
+            columns: ["advisor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advisor_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "advisor_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "advisor_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "advisor_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "advisor_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       alerts: {
         Row: {
@@ -99,7 +206,43 @@ export type Database = {
           type?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "alerts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       alerts_events: {
         Row: {
@@ -126,7 +269,43 @@ export type Database = {
           type?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "alerts_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       alerts_rules: {
         Row: {
@@ -156,7 +335,43 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "alerts_rules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_rules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_rules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_rules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_rules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_logs: {
         Row: {
@@ -195,7 +410,43 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       behavior_insights: {
         Row: {
@@ -222,7 +473,43 @@ export type Database = {
           pattern?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "behavior_insights_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "behavior_insights_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "behavior_insights_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "behavior_insights_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "behavior_insights_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       budget_categories: {
         Row: {
@@ -261,7 +548,43 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       default_categories: {
         Row: {
@@ -414,7 +737,43 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       income_sources: {
         Row: {
@@ -547,6 +906,265 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      loan_applications: {
+        Row: {
+          applicant_email: string | null
+          applicant_id_number: string | null
+          applicant_name: string | null
+          applicant_phone: string | null
+          application_type: string
+          business_name: string | null
+          business_number: string | null
+          completed_steps: Json | null
+          created_at: string | null
+          employment_type: string
+          gadi_notes: string | null
+          id: string
+          property_address: string | null
+          property_value: number | null
+          purpose: string | null
+          requested_amount: number | null
+          requested_term_months: number | null
+          required_documents: Json | null
+          reviewed_at: string | null
+          spouse_employment_type: string | null
+          spouse_id_number: string | null
+          spouse_name: string | null
+          status: string
+          submitted_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          applicant_email?: string | null
+          applicant_id_number?: string | null
+          applicant_name?: string | null
+          applicant_phone?: string | null
+          application_type: string
+          business_name?: string | null
+          business_number?: string | null
+          completed_steps?: Json | null
+          created_at?: string | null
+          employment_type: string
+          gadi_notes?: string | null
+          id?: string
+          property_address?: string | null
+          property_value?: number | null
+          purpose?: string | null
+          requested_amount?: number | null
+          requested_term_months?: number | null
+          required_documents?: Json | null
+          reviewed_at?: string | null
+          spouse_employment_type?: string | null
+          spouse_id_number?: string | null
+          spouse_name?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          applicant_email?: string | null
+          applicant_id_number?: string | null
+          applicant_name?: string | null
+          applicant_phone?: string | null
+          application_type?: string
+          business_name?: string | null
+          business_number?: string | null
+          completed_steps?: Json | null
+          created_at?: string | null
+          employment_type?: string
+          gadi_notes?: string | null
+          id?: string
+          property_address?: string | null
+          property_value?: number | null
+          purpose?: string | null
+          requested_amount?: number | null
+          requested_term_months?: number | null
+          required_documents?: Json | null
+          reviewed_at?: string | null
+          spouse_employment_type?: string | null
+          spouse_id_number?: string | null
+          spouse_name?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loan_documents: {
+        Row: {
+          application_id: string
+          document_category: string
+          document_type: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          notes: string | null
+          uploaded_at: string | null
+          uploaded_by: string | null
+          verified: boolean | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          application_id: string
+          document_category: string
+          document_type: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+          verified?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          application_id?: string
+          document_category?: string
+          document_type?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+          verified?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_documents_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_documents_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "user_loan_applications_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_documents_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_documents_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_documents_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_documents_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_documents_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       loans: {
         Row: {
@@ -713,6 +1331,57 @@ export type Database = {
         }
         Relationships: []
       }
+      pension_report_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          gadi_notes: string | null
+          id: string
+          processed_at: string | null
+          report_file_url: string | null
+          requested_at: string
+          status: string
+          updated_at: string | null
+          user_email: string | null
+          user_id: string
+          user_name: string | null
+          user_phone: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          gadi_notes?: string | null
+          id?: string
+          processed_at?: string | null
+          report_file_url?: string | null
+          requested_at?: string
+          status?: string
+          updated_at?: string | null
+          user_email?: string | null
+          user_id: string
+          user_name?: string | null
+          user_phone?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          gadi_notes?: string | null
+          id?: string
+          processed_at?: string | null
+          report_file_url?: string | null
+          requested_at?: string
+          status?: string
+          updated_at?: string | null
+          user_email?: string | null
+          user_id?: string
+          user_name?: string | null
+          user_phone?: string | null
+        }
+        Relationships: []
+      }
       receipts: {
         Row: {
           amount: number | null
@@ -759,7 +1428,50 @@ export type Database = {
           user_id?: string
           vendor?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "receipts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       savings_accounts: {
         Row: {
@@ -870,7 +1582,43 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {
@@ -933,7 +1681,57 @@ export type Database = {
           user_id?: string
           vendor?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_budget_tracking"
+            referencedColumns: ["budget_category_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_baselines: {
         Row: {
@@ -960,7 +1758,43 @@ export type Database = {
           months_back?: number
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_baselines_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_baselines_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_baselines_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_baselines_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_baselines_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_custom_expenses: {
         Row: {
@@ -1215,7 +2049,43 @@ export type Database = {
           water?: number | null
           why_here?: string[] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_financial_profile_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_financial_profile_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_financial_profile_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_financial_profile_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_financial_profile_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_settings: {
         Row: {
@@ -1272,7 +2142,43 @@ export type Database = {
           wa_notifications?: boolean | null
           weekly_report?: boolean | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {
@@ -1353,7 +2259,50 @@ export type Database = {
           transaction_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "wa_messages_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "wa_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "wa_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "wa_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "wa_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1392,7 +2341,43 @@ export type Database = {
           user_id: string | null
           user_name: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       debt_analysis: {
         Row: {
@@ -1445,7 +2430,43 @@ export type Database = {
           user_id: string | null
           user_name: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       monthly_budget_tracking: {
         Row: {
@@ -1458,7 +2479,43 @@ export type Database = {
           usage_percentage: number | null
           user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "budget_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_data_collection_progress: {
         Row: {
@@ -1468,6 +2525,75 @@ export type Database = {
           user_id: string | null
         }
         Relationships: []
+      }
+      user_loan_applications_summary: {
+        Row: {
+          applicant_email: string | null
+          applicant_id_number: string | null
+          applicant_name: string | null
+          applicant_phone: string | null
+          application_type: string | null
+          business_name: string | null
+          business_number: string | null
+          completed_steps: Json | null
+          created_at: string | null
+          employment_type: string | null
+          gadi_notes: string | null
+          id: string | null
+          property_address: string | null
+          property_value: number | null
+          purpose: string | null
+          requested_amount: number | null
+          requested_term_months: number | null
+          required_documents: Json | null
+          reviewed_at: string | null
+          spouse_employment_type: string | null
+          spouse_id_number: string | null
+          spouse_name: string | null
+          status: string | null
+          submitted_at: string | null
+          total_documents: number | null
+          updated_at: string | null
+          user_id: string | null
+          verified_documents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "cash_flow_projection"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "debt_analysis"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "financial_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_monthly_stats"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "loan_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_loan_summary: {
         Row: {
@@ -1714,3 +2840,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

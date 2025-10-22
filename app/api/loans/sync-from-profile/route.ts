@@ -41,17 +41,17 @@ export async function POST(request: NextRequest) {
 
     // 3. Infer loans from profile
     const inferredLoans = inferLoansFromProfile({
-      rent_mortgage: profile.rent_mortgage,
-      bank_loans: profile.bank_loans,
-      other_debts: profile.other_debts,
-      leasing: profile.leasing,
+      rent_mortgage: (profile as any).rent_mortgage,
+      bank_loans: (profile as any).bank_loans,
+      other_debts: (profile as any).other_debts,
+      leasing: (profile as any).leasing,
     });
 
     // 4. Check which inferred loans don't exist yet
     const loansToCreate = inferredLoans.filter((inferred) => {
       // Check if we already have a loan of this type (inferred or manual)
       const exists = existingLoans?.some(
-        (existing) => existing.loan_type === inferred.loan_type
+        (existing: any) => existing.loan_type === inferred.loan_type
       );
       return !exists && inferred.monthly_payment > 0;
     });

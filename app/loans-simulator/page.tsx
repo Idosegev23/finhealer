@@ -258,7 +258,7 @@ export default function LoansSimulatorPage() {
         </div>
 
         {/* Info Banner for Inferred Loans */}
-        {!loadingLoans && dbLoans.some(loan => loan.notes?.includes('הוסק אוטומטית')) && (
+        {!loadingLoans && dbLoans.some((loan: any) => loan.notes?.includes('הוסק אוטומטית')) && (
           <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-6 animate-fade-in">
             <div className="flex items-start gap-3">
               <div className="text-blue-600 text-2xl">✨</div>
@@ -267,8 +267,8 @@ export default function LoansSimulatorPage() {
                   שאבנו אוטומטית את ההלוואות שמילאת בשלב הראשון!
                 </h4>
                 <p className="text-sm text-blue-800">
-                  ההלוואות בסימולטור מגיעות מהנתונים שמילאת (משכנתא, הלוואות בנק, אשראי וכו').
-                  עדכן את הנתונים כאן ללמידה מדויקת יותר, או לחץ על "ערוך" בעמוד ההלוואות לעדכון מלא.
+                  ההלוואות בסימולטור מגיעות מהנתונים שמילאת (משכנתא, הלוואות בנק, אשראי וכו&apos;).
+                  עדכן את הנתונים כאן ללמידה מדויקת יותר, או לחץ על &quot;ערוך&quot; בעמוד ההלוואות לעדכון מלא.
                 </p>
               </div>
             </div>

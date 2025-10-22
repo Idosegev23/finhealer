@@ -148,7 +148,7 @@ export default function LoansPage() {
         </div>
 
         {/* Info Banner for Inferred Loans */}
-        {loans.some(loan => loan.notes?.includes('הוסק אוטומטית')) && (
+        {loans.some((loan: any) => loan.notes?.includes('הוסק אוטומטית')) && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-4 mb-6 animate-fade-in">
             <div className="flex items-start gap-3">
               <div className="text-blue-600 dark:text-blue-400 text-2xl">💡</div>
@@ -157,7 +157,7 @@ export default function LoansPage() {
                   זיהינו הלוואות אוטומטית מהנתונים שמילאת
                 </h4>
                 <p className="text-sm text-blue-800 dark:text-blue-400">
-                  חלק מההלוואות הוסקו אוטומטית מהשדות שמילאת בשלב הראשון (דיור/משכנתא, הלוואות בנק, וכו').
+                  חלק מההלוואות הוסקו אוטומטית מהשדות שמילאת בשלב הראשון (דיור/משכנתא, הלוואות בנק, וכו&apos;).
                   <strong className="mr-1">מומלץ לעדכן אותן עם הנתונים המדויקים</strong> מלוח הסילוקין או מהבנק.
                 </p>
               </div>
