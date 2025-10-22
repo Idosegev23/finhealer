@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DashboardNav } from "@/components/shared/DashboardNav";
-import { PlusCircle, MinusCircle, TrendingDown, TrendingUp, Calendar, DollarSign, Calculator } from "lucide-react";
+import { PlusCircle, MinusCircle, TrendingDown, TrendingUp, Calendar, DollarSign, Calculator, FileText, Loader2 } from "lucide-react";
 import { 
   BarChart, 
   Bar, 
@@ -20,6 +20,7 @@ import {
   Pie,
   Cell
 } from "recharts";
+import { LoanApplicationWizard } from "@/components/loans/LoanApplicationWizard";
 
 interface Loan {
   id: number;
@@ -29,15 +30,58 @@ interface Loan {
   months: number;
 }
 
+interface DBLoan {
+  id: string;
+  lender_name: string;
+  current_balance: number;
+  interest_rate: number;
+  remaining_payments: number;
+}
+
 const COLORS = ["#3A7BD5", "#7ED957", "#F6A623", "#E74C3C", "#9B59B6"];
 
 export default function LoansSimulatorPage() {
   const [loans, setLoans] = useState<Loan[]>([
     { id: 1, name: "הלוואה 1", amount: 50000, interest: 8, months: 60 },
   ]);
+  const [dbLoans, setDbLoans] = useState<DBLoan[]>([]);
+  const [loadingLoans, setLoadingLoans] = useState(true);
+  const [showApplicationWizard, setShowApplicationWizard] = useState(false);
 
   const [consolidatedInterest, setConsolidatedInterest] = useState(5);
   const [consolidatedMonths, setConsolidatedMonths] = useState(60);
+
+  // Load user's existing loans from DB
+  useEffect(() => {
+    fetchUserLoans();
+  }, []);
+
+  const fetchUserLoans = async () => {
+    setLoadingLoans(true);
+    try {
+      const res = await fetch("/api/loans");
+      if (res.ok) {
+        const { data } = await res.json();
+        setDbLoans(data || []);
+        
+        // Populate simulator with actual loans
+        if (data && data.length > 0) {
+          const simulatorLoans = data.map((loan: DBLoan, idx: number) => ({
+            id: idx + 1,
+            name: loan.lender_name,
+            amount: loan.current_balance,
+            interest: loan.interest_rate || 8,
+            months: loan.remaining_payments || 60,
+          }));
+          setLoans(simulatorLoans);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching loans:", error);
+    } finally {
+      setLoadingLoans(false);
+    }
+  };
 
   // Add new loan
   const addLoan = () => {
@@ -187,10 +231,21 @@ export default function LoansSimulatorPage() {
             <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
               <Calculator className="w-8 h-8" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-bold mb-1">סימולטור איחוד הלוואות</h1>
               <p className="text-sm text-blue-200">כלי חכם לחישוב חיסכון אמיתי</p>
             </div>
+            {loadingLoans && (
+              <div className="flex items-center gap-2 bg-white/10 rounded-lg px-4 py-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">טוען הלוואות...</span>
+              </div>
+            )}
+            {!loadingLoans && dbLoans.length > 0 && (
+              <div className="flex items-center gap-2 bg-green-500/20 border border-green-400/40 rounded-lg px-4 py-2">
+                <span className="text-sm">✓ טעון {dbLoans.length} הלוואות מהמערכת</span>
+              </div>
+            )}
           </div>
           <p className="text-gray-200 leading-relaxed">
             גלה כמה כסף תחסוך על ידי איחוד ההלוואות שלך להלוואה אחת עם ריבית נמוכה יותר.
@@ -473,16 +528,16 @@ export default function LoansSimulatorPage() {
               </div>
             )}
 
-            {/* Contact Gadi */}
+            {/* Apply for Loan Consolidation */}
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-6 shadow-md">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                  <span className="text-2xl">👨‍💼</span>
+                  <FileText className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h4 className="text-xl font-bold text-green-900 mb-2">רוצה עזרה מקצועית?</h4>
+                <div className="flex-1">
+                  <h4 className="text-xl font-bold text-green-900 mb-2">מרוצה מהחיסכון? בואו נממש!</h4>
                   <p className="text-sm text-green-800 leading-relaxed mb-4">
-                    הסימולטור נותן הערכה ראשונית, אבל <strong>גדי - המאמן הפיננסי שלך</strong> יכול לעזור לך למצוא את העסקה הכי טובה בשוק!
+                    <strong>גדי - המאמן הפיננסי שלך</strong> יעזור לך למצוא את ההלוואה המאוחדת הכי טובה בשוק!
                   </p>
                   <ul className="text-sm text-green-800 space-y-2 mb-4">
                     <li className="flex gap-2">
@@ -495,13 +550,23 @@ export default function LoansSimulatorPage() {
                     </li>
                     <li className="flex gap-2">
                       <span>✓</span>
-                      <span>ליווי בתהליך כולו - ללא עמלה!</span>
+                      <span>ליווי מלא בתהליך - ללא עמלה!</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span>✓</span>
+                      <span>המסמכים שלך נשמרים ומסודרים</span>
                     </li>
                   </ul>
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
-                    <span className="ml-2">💬</span>
-                    דבר עם גדי עכשיו
+                  <Button
+                    onClick={() => setShowApplicationWizard(true)}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl transition-all"
+                  >
+                    <FileText className="w-5 h-5 ml-2" />
+                    הגש בקשה לאיחוד הלוואות
                   </Button>
+                  <p className="text-xs text-green-700 mt-2 text-center">
+                    💡 כל ההתקדמות נשמרת - אפשר להמשיך מחר
+                  </p>
                 </div>
               </div>
             </div>
@@ -509,6 +574,14 @@ export default function LoansSimulatorPage() {
         </div>
         </div>
       </div>
+
+      {/* Loan Application Wizard */}
+      <LoanApplicationWizard
+        open={showApplicationWizard}
+        onOpenChange={setShowApplicationWizard}
+        onSuccess={fetchUserLoans}
+        existingLoans={dbLoans}
+      />
     </>
   );
 }
