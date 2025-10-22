@@ -51,6 +51,7 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
     business_name: "",
     business_number: "",
     requested_amount: "",
+    additional_amount: "",
     requested_term_months: "",
     purpose: "",
     property_address: "",
@@ -64,6 +65,25 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
   const requiredDocs = getRequiredDocuments(formData.application_type, formData.employment_type);
   const completionPercentage = calculateCompletionPercentage(requiredDocs, uploadedDocuments);
   const missingDocs = getMissingDocuments(requiredDocs, uploadedDocuments);
+
+  // Calculate relevant loans and total amount based on application type
+  const relevantLoans = existingLoans.filter(loan => {
+    if (formData.application_type === "regular") {
+      // For regular loans, exclude mortgages
+      return loan.loan_type !== "mortgage";
+    }
+    // For mortgage consolidation, include all loans
+    return true;
+  });
+
+  const calculatedTotalAmount = relevantLoans.reduce((sum, loan) => sum + (loan.current_balance || 0), 0);
+
+  // Auto-calculate requested amount when application type changes
+  useEffect(() => {
+    if (calculatedTotalAmount > 0 && !formData.requested_amount) {
+      handleChange("requested_amount", calculatedTotalAmount.toString());
+    }
+  }, [formData.application_type, calculatedTotalAmount]);
 
   // Load draft application on mount
   useEffect(() => {
@@ -93,6 +113,7 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
             business_name: draft.business_name || "",
             business_number: draft.business_number || "",
             requested_amount: draft.requested_amount?.toString() || "",
+            additional_amount: "0",
             requested_term_months: draft.requested_term_months?.toString() || "",
             purpose: draft.purpose || "",
             property_address: draft.property_address || "",
@@ -354,33 +375,133 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
           <div className="space-y-6">
             <h3 className="text-lg font-bold">פרטי ההלוואה המבוקשת</h3>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>סכום מבוקש (₪)</Label>
-                <Input
-                  type="number"
-                  value={formData.requested_amount}
-                  onChange={(e) => handleChange("requested_amount", e.target.value)}
-                />
+            {/* Show existing loans breakdown */}
+            {existingLoans.length > 0 && (
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg">
+                <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  {formData.application_type === "regular" 
+                    ? "ההלוואות שיאוחדו (ללא משכנתאות):" 
+                    : "כל ההלוואות שיאוחדו:"}
+                </h4>
+                
+                <div className="space-y-2 mb-4">
+                  {existingLoans.map((loan, idx) => {
+                    const isRelevant = formData.application_type === "mortgage" || loan.loan_type !== "mortgage";
+                    const loanTypeLabel = loan.loan_type === "mortgage" ? "משכנתא" : "הלוואה";
+                    
+                    return (
+                      <div 
+                        key={idx} 
+                        className={`flex justify-between items-center p-2 rounded ${
+                          isRelevant 
+                            ? "bg-white text-gray-900 font-medium" 
+                            : "bg-gray-100 text-gray-400 line-through"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          {!isRelevant && <span className="text-xs bg-gray-300 text-gray-600 px-2 py-1 rounded">לא נכלל</span>}
+                          {loan.lender_name} ({loanTypeLabel})
+                        </span>
+                        <span className="font-mono">₪{loan.current_balance.toLocaleString('he-IL')}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="border-t-2 border-blue-300 pt-3 mt-3">
+                  <div className="flex justify-between items-center text-lg font-bold text-blue-900">
+                    <span>סה&quot;כ סכום לאיחוד:</span>
+                    <span className="text-2xl">₪{calculatedTotalAmount.toLocaleString('he-IL')}</span>
+                  </div>
+                  {formData.application_type === "regular" && existingLoans.some(l => l.loan_type === "mortgage") && (
+                    <p className="text-xs text-blue-700 mt-2">
+                      💡 משכנתאות לא נכללות באיחוד הלוואות רגילות
+                    </p>
+                  )}
+                </div>
               </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="flex items-center gap-2">
+                    סכום איחוד הלוואות (₪)
+                    <InfoTooltip 
+                      content="הסכום מחושב אוטומטית מסך ההלוואות הרלוונטיות." 
+                      type="info" 
+                    />
+                  </Label>
+                  <Input
+                    type="text"
+                    value={calculatedTotalAmount.toLocaleString('he-IL')}
+                    disabled
+                    className="bg-gray-100 font-bold text-lg"
+                  />
+                </div>
+                <div>
+                  <Label className="flex items-center gap-2">
+                    סכום נוסף מבוקש (₪)
+                    <InfoTooltip 
+                      content="האם תרצה לקבל סכום נוסף מעבר לאיחוד ההלוואות? (אופציונלי)" 
+                      type="help" 
+                    />
+                  </Label>
+                  <Input
+                    type="number"
+                    value={formData.additional_amount}
+                    onChange={(e) => {
+                      handleChange("additional_amount", e.target.value);
+                      const additional = parseFloat(e.target.value) || 0;
+                      handleChange("requested_amount", (calculatedTotalAmount + additional).toString());
+                    }}
+                    placeholder="0"
+                    className="font-bold text-lg"
+                  />
+                </div>
+              </div>
+
+              {/* Total Amount Display */}
+              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold text-green-900">סה&quot;כ סכום ההלוואה:</span>
+                  <div className="text-right">
+                    <div className="text-3xl font-bold text-green-700">
+                      ₪{(calculatedTotalAmount + (parseFloat(formData.additional_amount) || 0)).toLocaleString('he-IL')}
+                    </div>
+                    {parseFloat(formData.additional_amount) > 0 && (
+                      <div className="text-sm text-green-600 mt-1">
+                        (₪{calculatedTotalAmount.toLocaleString('he-IL')} איחוד + ₪{parseFloat(formData.additional_amount).toLocaleString('he-IL')} נוסף)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div>
-                <Label>תקופה (חודשים)</Label>
+                <Label>תקופה מבוקשת (חודשים)</Label>
                 <Input
                   type="number"
                   value={formData.requested_term_months}
                   onChange={(e) => handleChange("requested_term_months", e.target.value)}
+                  placeholder="לדוגמה: 60, 120, 240"
                 />
               </div>
             </div>
 
             <div>
               <Label>מטרת ההלוואה</Label>
-              <Input value={formData.purpose} onChange={(e) => handleChange("purpose", e.target.value)} />
+              <Input 
+                value={formData.purpose} 
+                onChange={(e) => handleChange("purpose", e.target.value)} 
+                placeholder="לדוגמה: איחוד הלוואות לשיפור תנאים"
+              />
             </div>
 
             {formData.application_type === "mortgage" && (
-              <div className="space-y-4 p-4 bg-green-50 rounded-lg">
-                <h4 className="font-semibold">פרטי הנכס</h4>
+              <div className="space-y-4 p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                <h4 className="font-semibold text-green-900">פרטי הנכס</h4>
                 <div>
                   <Label>כתובת הנכס</Label>
                   <Input value={formData.property_address} onChange={(e) => handleChange("property_address", e.target.value)} />
@@ -393,18 +514,6 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
                     onChange={(e) => handleChange("property_value", e.target.value)}
                   />
                 </div>
-              </div>
-            )}
-
-            {/* Show existing loans summary */}
-            {existingLoans.length > 0 && (
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-semibold mb-2">ההלוואות הקיימות שלך:</h4>
-                {existingLoans.map((loan, idx) => (
-                  <div key={idx} className="text-sm text-gray-700">
-                    • {loan.lender_name}: ₪{loan.current_balance.toLocaleString('he-IL')}
-                  </div>
-                ))}
               </div>
             )}
           </div>
