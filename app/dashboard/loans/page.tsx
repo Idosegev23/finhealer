@@ -42,6 +42,10 @@ export default function LoansPage() {
 
   const fetchLoans = async () => {
     try {
+      // First, sync loans from profile (creates inferred loans if needed)
+      await fetch("/api/loans/sync-from-profile", { method: "POST" });
+      
+      // Then fetch all loans (including newly created inferred ones)
       const res = await fetch("/api/loans");
       if (res.ok) {
         const data = await res.json();
@@ -142,6 +146,24 @@ export default function LoansPage() {
             </div>
           </div>
         </div>
+
+        {/* Info Banner for Inferred Loans */}
+        {loans.some(loan => loan.notes?.includes('הוסק אוטומטית')) && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-4 mb-6 animate-fade-in">
+            <div className="flex items-start gap-3">
+              <div className="text-blue-600 dark:text-blue-400 text-2xl">💡</div>
+              <div className="flex-1">
+                <h4 className="font-bold text-blue-900 dark:text-blue-300 mb-1">
+                  זיהינו הלוואות אוטומטית מהנתונים שמילאת
+                </h4>
+                <p className="text-sm text-blue-800 dark:text-blue-400">
+                  חלק מההלוואות הוסקו אוטומטית מהשדות שמילאת בשלב הראשון (דיור/משכנתא, הלוואות בנק, וכו').
+                  <strong className="mr-1">מומלץ לעדכן אותן עם הנתונים המדויקים</strong> מלוח הסילוקין או מהבנק.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

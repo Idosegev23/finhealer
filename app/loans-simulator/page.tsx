@@ -59,6 +59,10 @@ export default function LoansSimulatorPage() {
   const fetchUserLoans = async () => {
     setLoadingLoans(true);
     try {
+      // First, sync loans from profile (creates inferred loans if needed)
+      await fetch("/api/loans/sync-from-profile", { method: "POST" });
+      
+      // Then fetch all loans (including newly created inferred ones)
       const res = await fetch("/api/loans");
       if (res.ok) {
         const { data } = await res.json();
@@ -252,6 +256,24 @@ export default function LoansSimulatorPage() {
             <strong className="text-white"> החיסכון יכול להגיע לאלפי שקלים בשנה! </strong>
           </p>
         </div>
+
+        {/* Info Banner for Inferred Loans */}
+        {!loadingLoans && dbLoans.some(loan => loan.notes?.includes('הוסק אוטומטית')) && (
+          <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-6 animate-fade-in">
+            <div className="flex items-start gap-3">
+              <div className="text-blue-600 text-2xl">✨</div>
+              <div className="flex-1">
+                <h4 className="font-bold text-blue-900 mb-1">
+                  שאבנו אוטומטית את ההלוואות שמילאת בשלב הראשון!
+                </h4>
+                <p className="text-sm text-blue-800">
+                  ההלוואות בסימולטור מגיעות מהנתונים שמילאת (משכנתא, הלוואות בנק, אשראי וכו').
+                  עדכן את הנתונים כאן ללמידה מדויקת יותר, או לחץ על "ערוך" בעמוד ההלוואות לעדכון מלא.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Left Column - Input */}

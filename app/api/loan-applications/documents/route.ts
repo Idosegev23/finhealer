@@ -21,13 +21,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify user owns this application
-    const { data: application } = await supabase
+    const { data: application, error: appError } = await supabase
       .from("loan_applications")
       .select("user_id")
       .eq("id", applicationId)
       .single();
 
-    if (!application || application.user_id !== user.id) {
+    if (appError || !application || (application as any).user_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -69,13 +69,13 @@ export async function POST(request: NextRequest) {
     const { applicationId, documentType, documentCategory, fileName, fileUrl, fileSize, mimeType } = body;
 
     // Verify user owns this application
-    const { data: application } = await supabase
+    const { data: application, error: appError } = await supabase
       .from("loan_applications")
       .select("user_id")
       .eq("id", applicationId)
       .single();
 
-    if (!application || application.user_id !== user.id) {
+    if (appError || !application || (application as any).user_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
