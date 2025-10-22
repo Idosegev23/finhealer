@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DashboardNav } from "@/components/shared/DashboardNav";
 import { PlusCircle, MinusCircle, TrendingDown, TrendingUp, Calendar, DollarSign, Calculator, FileText, Loader2 } from "lucide-react";
+import { formatCurrency, formatNumber } from "@/lib/utils/formatNumber";
 import { 
   BarChart, 
   Bar, 
@@ -388,7 +389,7 @@ export default function LoansSimulatorPage() {
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">תשלום חודשי:</span>
                           <span className="font-bold text-[#3A7BD5]">
-                            ₪{currentLoans.find((l) => l.id === loan.id)?.monthlyPayment.toLocaleString("he-IL", { maximumFractionDigits: 0 })}
+                            {formatCurrency(currentLoans.find((l) => l.id === loan.id)?.monthlyPayment)}
                           </span>
                         </div>
                       </div>
@@ -405,19 +406,19 @@ export default function LoansSimulatorPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">סה&quot;כ קרן:</span>
                   <span className="font-bold">
-                    ₪{currentTotals.principal.toLocaleString("he-IL")}
+                    {formatCurrency(currentTotals.principal)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">תשלום חודשי כולל:</span>
                   <span className="font-bold text-[#3A7BD5]">
-                    ₪{currentTotals.monthlyPayment.toLocaleString("he-IL", { maximumFractionDigits: 0 })}
+                    {formatCurrency(currentTotals.monthlyPayment)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">סה&quot;כ ריבית:</span>
                   <span className="font-bold text-orange-600">
-                    ₪{currentTotals.totalInterest.toLocaleString("he-IL", { maximumFractionDigits: 0 })}
+                    {formatCurrency(currentTotals.totalInterest)}
                   </span>
                 </div>
               </div>
@@ -464,13 +465,13 @@ export default function LoansSimulatorPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-700">תשלום חודשי:</span>
                     <span className="font-bold text-[#3A7BD5]">
-                      ₪{consolidatedLoan.monthlyPayment.toLocaleString("he-IL", { maximumFractionDigits: 0 })}
+                      {formatCurrency(consolidatedLoan.monthlyPayment)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-700">סה&quot;כ ריבית:</span>
                     <span className="font-bold text-orange-600">
-                      ₪{consolidatedLoan.totalInterest.toLocaleString("he-IL", { maximumFractionDigits: 0 })}
+                      {formatCurrency(consolidatedLoan.totalInterest)}
                     </span>
                   </div>
                 </div>
@@ -494,7 +495,7 @@ export default function LoansSimulatorPage() {
                     <span className="text-sm">חיסכון חודשי</span>
                   </div>
                   <div className="text-3xl font-bold">
-                    ₪{savings.monthlyPayment.toLocaleString("he-IL", { maximumFractionDigits: 0 })}
+                    {formatCurrency(savings.monthlyPayment)}
                   </div>
                   {savings.monthlyPayment > 0 && (
                     <div className="text-sm mt-1">
@@ -509,7 +510,7 @@ export default function LoansSimulatorPage() {
                     <span className="text-sm">חיסכון כולל על ריבית</span>
                   </div>
                   <div className="text-3xl font-bold">
-                    ₪{savings.totalInterest.toLocaleString("he-IL", { maximumFractionDigits: 0 })}
+                    {formatCurrency(savings.totalInterest)}
                   </div>
                 </div>
 
@@ -539,7 +540,7 @@ export default function LoansSimulatorPage() {
                   <XAxis dataKey="name" />
                   <YAxis />
                   <RechartsTooltip
-                    formatter={(value: number) => `₪${value.toLocaleString("he-IL", { maximumFractionDigits: 0 })}`}
+                    formatter={(value: number) => formatCurrency(value)}
                   />
                   <Legend />
                   <Bar dataKey="לפני" fill="#F6A623" name="לפני איחוד" />
@@ -561,7 +562,7 @@ export default function LoansSimulatorPage() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(entry) => `${entry.name}: ₪${entry.value.toLocaleString("he-IL")}`}
+                      label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -571,7 +572,7 @@ export default function LoansSimulatorPage() {
                       ))}
                     </Pie>
                     <RechartsTooltip
-                      formatter={(value: number) => `₪${value.toLocaleString("he-IL")}`}
+                      formatter={(value: number) => formatCurrency(value)}
                     />
                   </PieChart>
                 </ResponsiveContainer>
