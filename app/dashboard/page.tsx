@@ -1,12 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Wallet, TrendingUp, TrendingDown, Target, DollarSign, CreditCard, PlusCircle } from 'lucide-react'
-import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
-import { CurrentAccountCard } from '@/components/dashboard/CurrentAccountCard'
-import { PhaseProgressCard } from '@/components/dashboard/PhaseProgressCard'
+import { Wallet, TrendingUp, TrendingDown, Target, PlusCircle, ArrowRight, Calculator } from 'lucide-react'
 import { PhaseProgressBar } from '@/components/dashboard/PhaseProgressBar'
 import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
-import { QuickActionsBar } from '@/components/dashboard/QuickActionsBar'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -128,28 +124,25 @@ export default async function DashboardPage() {
     insurance: dataSections?.some((s: any) => s.subsection === 'insurance' && s.completed) ?? false,
   }
 
+  // לוגיקה חכמה לכפתורים
+  const hasIncome = (incomeSources?.length || 0) > 0
+  const hasLoans = (loans?.length || 0) > 0
+  const hasSavings = (savings?.length || 0) > 0
+  const hasInsurance = (insurances?.length || 0) > 0
+  const hasPensions = (pensions?.length || 0) > 0
+
   return (
     <div className="min-h-screen bg-dashboard">
-      <div className="container mx-auto px-4 py-8">
-      {/* Header */}
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-theme-primary mb-2">
             שלום, {userDataInfo.name}! 👋
-                </h1>
+          </h1>
           <p className="text-lg text-theme-secondary">
             סקירה כללית של המצב הפיננסי שלך
           </p>
-            </div>
-
-        {/* Quick Actions Bar */}
-        <QuickActionsBar />
-
-        {/* Phase Progress - Only if in data_collection phase */}
-        <PhaseProgressCard 
-          userName={userDataInfo.name}
-          currentPhase={userDataInfo.phase}
-          sections={sections}
-        />
+        </div>
 
         {/* Phase Progress Bar - All 5 Phases */}
         <PhaseProgressBar 
@@ -167,8 +160,10 @@ export default async function DashboardPage() {
                 type="info"
               />
             </div>
-            <div className="text-6xl font-black text-blue-600">{score}<span className="text-3xl text-theme-tertiary">/100</span></div>
+            <div className="text-6xl font-black text-blue-600">
+              {score}<span className="text-3xl text-theme-tertiary">/100</span>
             </div>
+          </div>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-4">
             <div 
               className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full transition-all duration-500 shadow-sm"
@@ -177,7 +172,10 @@ export default async function DashboardPage() {
           </div>
           <div className="flex items-center justify-between">
             <p className="text-base text-theme-secondary">
-              {score >= 80 ? '🎉 מעולה! המצב הפיננסי שלך נהדר' : score >= 60 ? '👍 טוב! אתה בכיוון הנכון' : score >= 40 ? '⚠️ ניתן לשפר - יש לך פוטנציאל' : '💪 בואו נשפר את המצב ביחד'}
+              {score >= 80 ? '🎉 מעולה! המצב הפיננסי שלך נהדר' : 
+               score >= 60 ? '👍 טוב! אתה בכיוון הנכון' : 
+               score >= 40 ? '⚠️ ניתן לשפר - יש לך פוטנציאל' : 
+               '💪 בואו נשפר את המצב ביחד'}
             </p>
             {score < 80 && (
               <Link href="/dashboard/phases">
@@ -189,7 +187,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* סיכום פיננסי - 4 כרטיסים */}
+        {/* סיכום פיננסי - 4 כרטיסים עם כפתורים חכמים */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* מצב חשבון */}
           <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
@@ -199,22 +197,22 @@ export default async function DashboardPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-theme-tertiary text-sm font-medium">מצב חשבון עו&quot;ש</p>
+              <p className="text-theme-tertiary text-sm font-medium">חשבון עו&quot;ש</p>
               <InfoTooltip
-                content="היתרה הנוכחית בחשבון העו&quot;ש שלך - הכסף הזמין לשימוש מיידי"
+                content="היתרה הנוכחית בחשבון העו&quot;ש שלך"
                 type="info"
               />
             </div>
             <p className={`text-3xl font-bold mb-3 ${currentAccount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
               {currentAccount >= 0 ? '+' : ''}₪{currentAccount.toLocaleString('he-IL')}
             </p>
-            <Link href="/dashboard/cash-flow">
+            <Link href="/dashboard/cash-flow" className="block">
               <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
                 <PlusCircle className="w-4 h-4 ml-2" />
                 עדכן יתרה
               </Button>
             </Link>
-                </div>
+          </div>
 
           {/* הכנסה חודשית */}
           <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
@@ -226,20 +224,29 @@ export default async function DashboardPage() {
             <div className="flex items-center gap-2 mb-2">
               <p className="text-theme-tertiary text-sm font-medium">הכנסה חודשית</p>
               <InfoTooltip
-                content="סכום כל ההכנסות החודשיות הקבועות שלך מכל המקורות"
+                content="סכום כל ההכנסות החודשיות הקבועות שלך"
                 type="info"
               />
             </div>
             <p className="text-3xl font-bold text-theme-primary mb-3">
               ₪{monthlyIncome.toLocaleString('he-IL')}
             </p>
-            <Link href="/dashboard/income">
+            <Link href="/dashboard/income" className="block">
               <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                <PlusCircle className="w-4 h-4 ml-2" />
-                הוסף הכנסה
+                {hasIncome ? (
+                  <>
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                    נהל הכנסות
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="w-4 h-4 ml-2" />
+                    הוסף הכנסה ראשונה
+                  </>
+                )}
               </Button>
             </Link>
-                </div>
+          </div>
 
           {/* חובות */}
           <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
@@ -251,20 +258,29 @@ export default async function DashboardPage() {
             <div className="flex items-center gap-2 mb-2">
               <p className="text-theme-tertiary text-sm font-medium">סך החובות</p>
               <InfoTooltip
-                content="סך כל ההלוואות והחובות הפעילים שלך - מה שאתה צריך להחזיר"
+                content="סך כל ההלוואות והחובות הפעילים שלך"
                 type="info"
               />
             </div>
             <p className="text-3xl font-bold text-red-600 dark:text-red-400 mb-3">
               ₪{totalLiabilities.toLocaleString('he-IL')}
             </p>
-            <Link href="/dashboard/loans">
-              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                <PlusCircle className="w-4 h-4 ml-2" />
-                נהל הלוואות
-              </Button>
-            </Link>
-              </div>
+            {hasLoans ? (
+              <Link href="/loans-simulator" className="block">
+                <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                  <Calculator className="w-4 h-4 ml-2" />
+                  סימולטור איחוד
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/dashboard/loans" className="block">
+                <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                  <PlusCircle className="w-4 h-4 ml-2" />
+                  הוסף הלוואה
+                </Button>
+              </Link>
+            )}
+          </div>
 
           {/* שווי נטו */}
           <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
@@ -276,159 +292,100 @@ export default async function DashboardPage() {
             <div className="flex items-center gap-2 mb-2">
               <p className="text-theme-tertiary text-sm font-medium">שווי נטו</p>
               <InfoTooltip
-                content="נכסים פחות חובות - המצב הפיננסי הכולל שלך. ככל שהמספר גבוה יותר, המצב טוב יותר"
+                content="נכסים פחות חובות - המצב הפיננסי הכולל שלך"
                 type="info"
               />
             </div>
             <p className={`text-3xl font-bold mb-3 ${netWorth >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
               {netWorth >= 0 ? '+' : ''}₪{netWorth.toLocaleString('he-IL')}
             </p>
-            <Link href="/dashboard/overview">
+            <Link href="/dashboard/overview" className="block">
               <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                צפה בסיכום מלא
+                <ArrowRight className="w-4 h-4 ml-2" />
+                צפה בפירוט
               </Button>
             </Link>
           </div>
         </div>
 
-        {/* גרפים ויזואליים */}
-        <DashboardCharts loans={loans || []} />
+        {/* גרפים ויזואליים - רק אם יש נתונים */}
+        {hasLoans && loans && loans.length > 0 && (
+          <DashboardCharts loans={loans} />
+        )}
 
-        {/* ניהול נכסים וחובות */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* הלוואות */}
-          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-theme-primary">הלוואות</h3>
-              <Link href="/dashboard/loans" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                ניהול →
-              </Link>
-                  </div>
-            {loans && loans.length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-theme-secondary">סך יתרה:</span>
-                  <span className="font-bold text-red-600 dark:text-red-400">₪{totalLoans.toLocaleString('he-IL')}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-theme-secondary">מספר הלוואות:</span>
-                  <span className="font-bold text-theme-primary">{loans.length}</span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-theme-tertiary text-sm">אין הלוואות רשומות</p>
-            )}
-          </div>
-
-          {/* חיסכון */}
-          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-theme-primary">חיסכון</h3>
-              <Link href="/dashboard/savings" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                ניהול →
-              </Link>
-            </div>
-            {savings && savings.length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-theme-secondary">סך יתרה:</span>
-                  <span className="font-bold text-green-600 dark:text-green-400">₪{totalSavings.toLocaleString('he-IL')}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-theme-secondary">מספר חשבונות:</span>
-                  <span className="font-bold text-theme-primary">{savings.length}</span>
-                </div>
-          </div>
-            ) : (
-              <p className="text-theme-tertiary text-sm">אין חשבונות חיסכון רשומים</p>
-            )}
-        </div>
-
-          {/* ביטוח */}
-          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-theme-primary">ביטוחים</h3>
-              <Link href="/dashboard/insurance" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                ניהול →
-              </Link>
-            </div>
-            {insurances && insurances.length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-theme-secondary">פרמיה חודשית:</span>
-                  <span className="font-bold text-theme-primary">₪{totalInsurance.toLocaleString('he-IL')}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-theme-secondary">מספר פוליסות:</span>
-                  <span className="font-bold text-theme-primary">{insurances.length}</span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-theme-tertiary text-sm">אין ביטוחים רשומים</p>
-          )}
-      </div>
-
-          {/* פנסיה */}
-          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-theme-primary">פנסיה וקופות גמל</h3>
-              <Link href="/dashboard/pensions" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                ניהול →
-              </Link>
-            </div>
-            {pensions && pensions.length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-theme-secondary">סך יתרה:</span>
-                  <span className="font-bold text-green-600 dark:text-green-400">₪{totalPension.toLocaleString('he-IL')}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-theme-secondary">מספר קרנות:</span>
-                  <span className="font-bold text-theme-primary">{pensions.length}</span>
-    </div>
-      </div>
-            ) : (
-              <p className="text-theme-tertiary text-sm">אין קרנות פנסיה רשומות</p>
-            )}
-        </div>
-      </div>
-      
-        {/* פעולות מהירות */}
+        {/* פעולות מהירות חכמות - 4-6 כפתורים בלבד */}
         <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-theme-primary mb-4">פעולות מהירות</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Link 
-              href="/dashboard/income"
-              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              <DollarSign className="w-6 h-6 text-green-600 dark:text-green-400" />
-              <span className="text-sm text-theme-secondary">הכנסות</span>
-            </Link>
+          <h3 className="text-lg font-bold text-theme-primary mb-4">פעולות נוספות</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* הוצאות - תמיד מוצג */}
             <Link 
               href="/dashboard/expenses"
               className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
-              <CreditCard className="w-6 h-6 text-red-600 dark:text-red-400" />
-              <span className="text-sm text-theme-secondary">הוצאות</span>
+              <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
+              <span className="text-sm text-theme-secondary">רשום הוצאה</span>
             </Link>
+
+            {/* חיסכון - חכם */}
             <Link 
-              href="/dashboard/loans"
+              href="/dashboard/savings"
               className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
-              <TrendingDown className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-              <span className="text-sm text-theme-secondary">הלוואות</span>
+              <Wallet className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              <span className="text-sm text-theme-secondary">
+                {hasSavings ? 'חיסכון' : 'פתח חיסכון'}
+              </span>
             </Link>
-            <Link 
-              href="/loans-simulator"
-              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              <Target className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm text-theme-secondary">סימולטור</span>
-            </Link>
+
+            {/* ביטוח - חכם */}
+            {!hasInsurance && (
+              <Link 
+                href="/dashboard/insurance"
+                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <Target className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                <span className="text-sm text-theme-secondary">הוסף ביטוח</span>
+              </Link>
+            )}
+
+            {/* פנסיה - חכם */}
+            {!hasPensions && (
+              <Link 
+                href="/dashboard/pensions"
+                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <span className="text-sm text-theme-secondary">הוסף פנסיה</span>
+              </Link>
+            )}
+
+            {/* הלוואות - רק אם יש */}
+            {hasLoans && (
+              <Link 
+                href="/dashboard/loans"
+                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <ArrowRight className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <span className="text-sm text-theme-secondary">נהל הלוואות</span>
+              </Link>
+            )}
+
+            {/* מדריך - רק אם הציון נמוך */}
+            {score < 70 && (
+              <Link 
+                href="/guide"
+                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <InfoTooltip
+                  content="קבל טיפים לשיפור המצב הפיננסי"
+                  type="info"
+                />
+                <span className="text-sm text-theme-secondary">מדריך</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>
     </div>
   )
 }
-
