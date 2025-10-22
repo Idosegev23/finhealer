@@ -909,6 +909,7 @@ export type Database = {
       }
       loan_applications: {
         Row: {
+          additional_amount: number | null
           applicant_email: string | null
           applicant_id_number: string | null
           applicant_name: string | null
@@ -937,6 +938,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          additional_amount?: number | null
           applicant_email?: string | null
           applicant_id_number?: string | null
           applicant_name?: string | null
@@ -965,6 +967,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          additional_amount?: number | null
           applicant_email?: string | null
           applicant_id_number?: string | null
           applicant_name?: string | null
@@ -2840,4 +2843,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
