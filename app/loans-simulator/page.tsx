@@ -59,13 +59,20 @@ export default function LoansSimulatorPage() {
   const fetchUserLoans = async () => {
     setLoadingLoans(true);
     try {
+      console.log("🔄 Starting to fetch user loans...");
+      
       // First, sync loans from profile (creates inferred loans if needed)
-      await fetch("/api/loans/sync-from-profile", { method: "POST" });
+      const syncRes = await fetch("/api/loans/sync-from-profile", { method: "POST" });
+      const syncData = await syncRes.json();
+      console.log("📥 Sync result:", syncData);
       
       // Then fetch all loans (including newly created inferred ones)
       const res = await fetch("/api/loans");
+      console.log("📊 Loans API response status:", res.status);
+      
       if (res.ok) {
         const { data } = await res.json();
+        console.log("✅ Fetched loans data:", data);
         setDbLoans(data || []);
         
         // Populate simulator with actual loans
@@ -77,11 +84,16 @@ export default function LoansSimulatorPage() {
             interest: loan.interest_rate || 8,
             months: loan.remaining_payments || 60,
           }));
+          console.log("🎯 Setting simulator loans:", simulatorLoans);
           setLoans(simulatorLoans);
+        } else {
+          console.log("⚠️ No loans found in database");
         }
+      } else {
+        console.error("❌ Failed to fetch loans, status:", res.status);
       }
     } catch (error) {
-      console.error("Error fetching loans:", error);
+      console.error("❌ Error fetching loans:", error);
     } finally {
       setLoadingLoans(false);
     }
@@ -281,10 +293,15 @@ export default function LoansSimulatorPage() {
             {/* Current Loans */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">ההלוואות הנוכחיות שלך</h2>
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  ההלוואות הנוכחיות שלך
+                  {loadingLoans && (
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                  )}
+                </h2>
                 <Button
                   onClick={addLoan}
-                  disabled={loans.length >= 5}
+                  disabled={loans.length >= 5 || loadingLoans}
                   size="sm"
                   className="bg-[#7ED957] hover:bg-[#6BC949] text-white"
                 >
@@ -293,6 +310,13 @@ export default function LoansSimulatorPage() {
                 </Button>
               </div>
 
+              {loadingLoans ? (
+                <div className="text-center py-12">
+                  <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
+                  <p className="text-gray-600 font-medium">טוען את ההלוואות שלך מהמערכת...</p>
+                  <p className="text-sm text-gray-500 mt-2">מחפש הלוואות בפרופיל שלך</p>
+                </div>
+              ) : (
               <div className="space-y-6">
                 {loans.map((loan) => (
                   <div key={loan.id} className="border border-gray-200 rounded-lg p-4 relative">
@@ -372,8 +396,10 @@ export default function LoansSimulatorPage() {
                   </div>
                 ))}
               </div>
+              )}
 
               {/* Current Totals */}
+              {!loadingLoans && (
               <div className="mt-6 bg-gray-50 rounded-lg p-4 space-y-2">
                 <h3 className="font-bold text-gray-900 mb-3">סיכום נוכחי</h3>
                 <div className="flex justify-between">
@@ -395,6 +421,7 @@ export default function LoansSimulatorPage() {
                   </span>
                 </div>
               </div>
+              )}
             </div>
 
             {/* Consolidated Loan */}
