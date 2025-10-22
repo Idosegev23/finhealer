@@ -148,17 +148,17 @@ export default function LoansPage() {
         </div>
 
         {/* Info Banner for Inferred Loans */}
-        {loans.some((loan: any) => loan.notes?.includes('הוסק אוטומטית')) && (
+        {loans.some((loan: any) => loan.notes?.includes('הוסק אוטומטית') || loan.source === 'inferred_from_profile') && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-4 mb-6 animate-fade-in">
             <div className="flex items-start gap-3">
               <div className="text-blue-600 dark:text-blue-400 text-2xl">💡</div>
               <div className="flex-1">
                 <h4 className="font-bold text-blue-900 dark:text-blue-300 mb-1">
-                  זיהינו הלוואות אוטומטית מהנתונים שמילאת
+                  זיהינו הלוואות אוטומטית מהפרופיל שלך
                 </h4>
                 <p className="text-sm text-blue-800 dark:text-blue-400">
-                  חלק מההלוואות הוסקו אוטומטית מהשדות שמילאת בשלב הראשון (דיור/משכנתא, הלוואות בנק, וכו&apos;).
-                  <strong className="mr-1">מומלץ לעדכן אותן עם הנתונים המדויקים</strong> מלוח הסילוקין או מהבנק.
+                  יצרנו רשומות הלוואה ראשוניות בהתבסס על הנתונים שמילאת.
+                  <strong className="mr-1 block mt-1">👉 לחץ על &quot;ערוך&quot; כדי לעדכן את שם ההלוואה, הבנק, וכל הפרטים המדויקים.</strong>
                 </p>
               </div>
             </div>

@@ -34,14 +34,14 @@ export function inferLoansFromProfile(profile: ProfileData): InferredLoan[] {
     const estimatedBalance = estimateLoanBalance(monthlyPayment, 3.5, 240);
     
     inferredLoans.push({
-      lender_name: 'משכנתא (הוסק אוטומטית)',
+      lender_name: 'משכנתא',
       loan_type: 'mortgage',
       monthly_payment: monthlyPayment,
       current_balance: estimatedBalance,
       interest_rate: 3.5,
       remaining_payments: 240,
       source: 'inferred_from_profile',
-      notes: 'נתון זה הוסק מהשדה "דיור/משכנתא" שמילאת בשלב הראשון. מומלץ לעדכן עם הנתונים המדויקים.',
+      notes: 'הוסק אוטומטית מהפרופיל הפיננסי. עדכן את השם והפרטים המדויקים של ההלוואה.',
     });
   }
 
@@ -52,14 +52,14 @@ export function inferLoansFromProfile(profile: ProfileData): InferredLoan[] {
     const estimatedBalance = estimateLoanBalance(monthlyPayment, 8, 60);
     
     inferredLoans.push({
-      lender_name: 'הלוואת בנק (הוסק אוטומטית)',
+      lender_name: 'הלוואה מהבנק',
       loan_type: 'personal',
       monthly_payment: monthlyPayment,
       current_balance: estimatedBalance,
       interest_rate: 8,
       remaining_payments: 60,
       source: 'inferred_from_profile',
-      notes: 'נתון זה הוסק מהשדה "הלוואות בנק" שמילאת בשלב הראשון. מומלץ לעדכן עם הנתונים המדויקים.',
+      notes: 'הוסק אוטומטית מהפרופיל הפיננסי. עדכן את שם הבנק והפרטים המדויקים.',
     });
   }
 
@@ -70,14 +70,14 @@ export function inferLoansFromProfile(profile: ProfileData): InferredLoan[] {
     const estimatedBalance = estimateLoanBalance(monthlyPayment, 5, 36);
     
     inferredLoans.push({
-      lender_name: 'ליסינג רכב (הוסק אוטומטית)',
+      lender_name: 'ליסינג רכב',
       loan_type: 'car',
       monthly_payment: monthlyPayment,
       current_balance: estimatedBalance,
       interest_rate: 5,
       remaining_payments: 36,
       source: 'inferred_from_profile',
-      notes: 'נתון זה הוסק מהשדה "ליסינג" שמילאת בשלב הראשון. מומלץ לעדכן עם הנתונים המדויקים.',
+      notes: 'הוסק אוטומטית מהפרופיל הפיננסי. עדכן את דגם הרכב והפרטים המדויקים.',
     });
   }
 
@@ -88,14 +88,14 @@ export function inferLoansFromProfile(profile: ProfileData): InferredLoan[] {
     const estimatedBalance = estimateLoanBalance(monthlyPayment, 10, 36);
     
     inferredLoans.push({
-      lender_name: 'חוב אחר (הוסק אוטומטית)',
+      lender_name: 'חוב נוסף',
       loan_type: 'other',
       monthly_payment: monthlyPayment,
       current_balance: estimatedBalance,
       interest_rate: 10,
       remaining_payments: 36,
       source: 'inferred_from_profile',
-      notes: 'נתון זה הוסק מהשדה "חובות אחרים" שמילאת בשלב הראשון. מומלץ לעדכן עם הנתונים המדויקים.',
+      notes: 'הוסק אוטומטית מהפרופיל הפיננסי. עדכן את סוג החוב והפרטים המדויקים.',
     });
   }
 
@@ -128,8 +128,8 @@ function estimateLoanBalance(
  */
 export function isInferredLoan(loan: any): boolean {
   return (
-    loan.notes?.includes('הוסק אוטומטית') ||
-    loan.lender_name?.includes('(הוסק אוטומטית)')
+    loan.source === 'inferred_from_profile' ||
+    loan.notes?.includes('הוסק אוטומטית')
   );
 }
 

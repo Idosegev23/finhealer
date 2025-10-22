@@ -258,17 +258,17 @@ export default function LoansSimulatorPage() {
         </div>
 
         {/* Info Banner for Inferred Loans */}
-        {!loadingLoans && dbLoans.some((loan: any) => loan.notes?.includes('הוסק אוטומטית')) && (
+        {!loadingLoans && dbLoans.some((loan: any) => loan.notes?.includes('הוסק אוטומטית') || loan.source === 'inferred_from_profile') && (
           <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-6 animate-fade-in">
             <div className="flex items-start gap-3">
               <div className="text-blue-600 text-2xl">✨</div>
               <div className="flex-1">
                 <h4 className="font-bold text-blue-900 mb-1">
-                  שאבנו אוטומטית את ההלוואות שמילאת בשלב הראשון!
+                  ✅ טענו את ההלוואות שלך אוטומטית!
                 </h4>
                 <p className="text-sm text-blue-800">
-                  ההלוואות בסימולטור מגיעות מהנתונים שמילאת (משכנתא, הלוואות בנק, אשראי וכו&apos;).
-                  עדכן את הנתונים כאן ללמידה מדויקת יותר, או לחץ על &quot;ערוך&quot; בעמוד ההלוואות לעדכון מלא.
+                  הסימולטור מאוכלס בנתונים מהפרופיל שלך. 
+                  <strong className="block mt-1">💡 עדכן את שמות ההלוואות והסכומים כאן כדי לראות את החיסכון המדויק שלך.</strong>
                 </p>
               </div>
             </div>
@@ -311,6 +311,7 @@ export default function LoansSimulatorPage() {
                         <Input
                           value={loan.name}
                           onChange={(e) => updateLoan(loan.id, "name", e.target.value)}
+                          placeholder="לדוגמה: משכנתא דירה בתל אביב, הלוואה מבנק לאומי, ליסינג מאזדה 3..."
                           className="mt-1"
                         />
                       </div>
