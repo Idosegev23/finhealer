@@ -77,16 +77,29 @@ export async function POST(request: Request) {
       category, 
       category_id,
       vendor, 
-      tx_date, 
+      tx_date,
+      date, // תמיכה בפורמט date או tx_date
+      description, // תמיכה ב-description או notes
       source = 'manual',
       status = 'confirmed',
-      notes 
+      notes,
+      detailed_category,
+      expense_frequency,
+      confidence_score,
+      original_description,
+      is_recurring,
+      recurrence_pattern,
+      auto_categorized = false
     } = body;
 
+    // Normalize dates
+    const finalDate = tx_date || date;
+    const finalNotes = notes || description;
+
     // Validation
-    if (!type || !amount || !tx_date) {
+    if (!type || !amount || !finalDate) {
       return NextResponse.json(
-        { error: 'Missing required fields: type, amount, tx_date' },
+        { error: 'Missing required fields: type, amount, date' },
         { status: 400 }
       );
     }
@@ -116,9 +129,15 @@ export async function POST(request: Request) {
           category,
           category_id,
           vendor,
-          tx_date,
+          tx_date: finalDate,
           status,
-          notes,
+          notes: finalNotes,
+          detailed_category,
+          expense_frequency,
+          confidence_score,
+          original_description,
+          is_recurring,
+          recurrence_pattern,
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
@@ -143,10 +162,17 @@ export async function POST(request: Request) {
           category,
           category_id,
           vendor,
-          tx_date,
+          tx_date: finalDate,
           source,
           status,
-          notes
+          notes: finalNotes,
+          detailed_category,
+          expense_frequency,
+          confidence_score,
+          original_description: original_description || description,
+          is_recurring,
+          recurrence_pattern,
+          auto_categorized
         })
         .select()
         .single();

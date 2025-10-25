@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Wallet, TrendingUp, TrendingDown, Target, PlusCircle, ArrowRight, Calculator } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, Target, PlusCircle, ArrowRight, Calculator, BarChart3 } from 'lucide-react'
 import { PhaseProgressBar } from '@/components/dashboard/PhaseProgressBar'
 import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
@@ -324,6 +324,15 @@ export default async function DashboardPage() {
             >
               <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
               <span className="text-sm text-theme-secondary">רשום הוצאה</span>
+            </Link>
+
+            {/* סקירת הוצאות - חדש */}
+            <Link 
+              href="/dashboard/expenses-overview"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              <BarChart3 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <span className="text-sm text-theme-secondary">סקירת הוצאות</span>
             </Link>
 
             {/* חיסכון - חכם */}

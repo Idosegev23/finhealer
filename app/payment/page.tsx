@@ -15,6 +15,8 @@ export default function PaymentPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<Plan>('basic')
   const [onboardingType, setOnboardingType] = useState<'quick' | 'full'>('quick')
+  const [phone, setPhone] = useState<string>('')
+  const [waOptIn, setWaOptIn] = useState<boolean>(true)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -76,13 +78,19 @@ export default function PaymentPage() {
   const handleDemoPayment = async (plan: Plan) => {
     if (!userId) return
 
+    // Validation - נייד חובה
+    if (!phone || phone.length < 9) {
+      setError('נא להזין מספר נייד תקין (לפחות 9 ספרות)')
+      return
+    }
+
     const amount = plan === 'basic' ? 49 : 119
 
     try {
       setIsProcessing(true)
       setError(null)
 
-      console.log('💳 מעבד תשלום דמה...', { plan, amount })
+      console.log('💳 מעבד תשלום דמה...', { plan, amount, phone, waOptIn })
 
       // קריאה ל-API שמטפל במנוי ויצירת user
       const response = await fetch('/api/subscription/create', {
@@ -92,7 +100,9 @@ export default function PaymentPage() {
         },
         body: JSON.stringify({ 
           plan,
-          onboardingType 
+          onboardingType,
+          phone,
+          waOptIn
         }),
       })
 
@@ -155,6 +165,67 @@ export default function PaymentPage() {
             {error}
           </div>
         )}
+
+        {/* Phone & WhatsApp Opt-in */}
+        <div className="max-w-2xl mx-auto mb-8 bg-white rounded-2xl shadow-lg p-8 border-2 border-blue-100">
+          <h3 className="text-xl font-bold text-dark mb-4 flex items-center gap-2">
+            📱 פרטי התקשרות
+          </h3>
+          <p className="text-sm text-muted-foreground mb-6">
+            נזדקק למספר הנייד שלך כדי לשלוח לך התראות חכמות ב-WhatsApp
+          </p>
+          
+          {/* Phone Input */}
+          <div className="mb-6">
+            <label htmlFor="phone" className="block text-sm font-medium text-dark mb-2">
+              מספר נייד <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              id="phone"
+              value={phone}
+              onChange={(e) => {
+                // רק ספרות
+                const cleaned = e.target.value.replace(/\D/g, '');
+                setPhone(cleaned);
+              }}
+              placeholder="052-123-4567"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-lg"
+              dir="ltr"
+              maxLength={10}
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              הזן מספר ללא מקף או רווח (למשל: 0521234567)
+            </p>
+          </div>
+
+          {/* WhatsApp Opt-in */}
+          <div className="flex items-start gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
+            <input
+              type="checkbox"
+              id="wa-opt-in"
+              checked={waOptIn}
+              onChange={(e) => setWaOptIn(e.target.checked)}
+              className="mt-1 w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
+            />
+            <label htmlFor="wa-opt-in" className="text-sm text-dark flex-1 cursor-pointer">
+              <strong className="block mb-1">📲 אני מאשר/ת קבלת הודעות ב-WhatsApp</strong>
+              <span className="text-muted-foreground">
+                כולל: התראות על הוצאות, סיכומים יומיים, טיפים פיננסיים ושיחה עם המאמן הפיננסי שלי "פיני"
+              </span>
+            </label>
+          </div>
+
+          {waOptIn && (
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-start gap-2">
+              <span className="text-2xl">🤖</span>
+              <p className="text-sm text-blue-800">
+                <strong>פיני המאמן שלך ב-WhatsApp:</strong> תוכל לשלוח לי הודעות חופשיות, לרשום הוצאות מהר, 
+                ולקבל עצות פיננסיות - הכל ישירות ב-WhatsApp! 💬
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-2 gap-6 mb-6">

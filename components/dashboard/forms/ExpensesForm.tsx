@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Home, Shield, Smartphone, Car, Baby, Heart, Tv, Zap, Save, ArrowRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import SmartExpensesForm from './SmartExpensesForm';
 
 interface ExpensesFormProps {
   initialData: any;
@@ -104,6 +105,10 @@ const expenseCategories = [
 ];
 
 export default function ExpensesForm({ initialData }: ExpensesFormProps) {
+  // Use the new smart stepper form instead of the old single-page form
+  return <SmartExpensesForm initialData={initialData} />;
+  
+  /* OLD FORM CODE - KEEPING FOR REFERENCE/BACKUP
   const router = useRouter();
   const [expenses, setExpenses] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};

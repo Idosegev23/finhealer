@@ -1,10 +1,17 @@
 import { createClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+import { SYSTEM_PROMPT, buildContextMessage, parseExpenseFromAI, type UserContext } from '@/lib/ai/system-prompt';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 /**
- * GreenAPI Webhook Handler
+ * GreenAPI Webhook Handler עם AI
  * מקבל הודעות WhatsApp נכנסות (טקסט ותמונות)
+ * משתמש ב-OpenAI GPT-4o לשיחה חכמה וזיהוי הוצאות
  * 
  * Docs: https://green-api.com/en/docs/api/receiving/
  */
@@ -141,29 +148,33 @@ export async function POST(request: NextRequest) {
         await handleSplitTransaction(supabase, userData.id, transactionId, phoneNumber);
       }
     }
-    // טיפול לפי סוג הודעה
+    // טיפול לפי סוג הודעה - עם AI! 🤖
     else if (messageType === 'textMessage') {
       const text = payload.messageData?.textMessageData?.textMessage || '';
       console.log('📝 Text message:', text);
 
-      // נסה לזהות הוצאה
-      const parsedTransaction = await parseExpenseFromText(text);
+      // שליחת ההודעה ל-AI לטיפול חכם
+      const aiResult = await handleAIChat(supabase, userData.id, text, phoneNumber);
       
-      if (parsedTransaction) {
-        // נסה לזהות קטגוריה אוטומטית
-        let category = null;
+      // אם AI זיהה הוצאה → צור transaction
+      if (aiResult.detected_expense && aiResult.detected_expense.expense_detected) {
+        const expense = aiResult.detected_expense;
+        
+        // נסה לזהה קטגוריה אוטומטית
+        let category = expense.category || null;
         let expenseType = null;
         let categoryGroup = null;
-        let autoCategorized = false;
+        let autoCategorized = !!expense.category;
 
+        if (!autoCategorized && expense.description) {
         try {
           const categorizeResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/expenses/categorize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              description: text,
-              vendor: parsedTransaction.vendor,
-              amount: parsedTransaction.amount
+                description: expense.description,
+                vendor: expense.vendor,
+                amount: expense.amount
             })
           });
 
@@ -178,51 +189,48 @@ export async function POST(request: NextRequest) {
           }
         } catch (catError) {
           console.error('❌ Categorization error (non-critical):', catError);
-          // Continue without categorization
+          }
         }
 
-        // צור transaction מוצעת
+        // אם צריך אישור → צור proposed transaction
+        if (expense.needs_confirmation) {
         const { data: transaction, error: txError } = await (supabase as any)
           .from('transactions')
           .insert({
             user_id: userData.id,
             type: 'expense',
-            amount: parsedTransaction.amount,
+              amount: expense.amount,
             category: category,
             expense_type: expenseType,
             category_group: categoryGroup,
             auto_categorized: autoCategorized,
-            vendor: parsedTransaction.vendor,
-            description: text,
-            source: 'wa_text',
+              vendor: expense.vendor,
+              description: expense.description || text,
+              source: 'whatsapp',
             status: 'proposed',
             tx_date: new Date().toISOString().split('T')[0],
           })
           .select()
           .single();
 
-        if (txError) {
-          console.error('❌ Error creating transaction:', txError);
-        } else {
-          console.log('✅ Transaction created:', transaction.id);
-          
-          // שלח הודעת אישור
-          let confirmMessage = `נרשמה הוצאה של ${parsedTransaction.amount} ₪${parsedTransaction.vendor ? ` ב${parsedTransaction.vendor}` : ''} ✅`;
-          
-          if (autoCategorized && category) {
-            confirmMessage += `\nקטגוריה: ${category}`;
+          if (!txError && transaction) {
+            console.log('✅ Proposed transaction created:', transaction.id);
+            
+            // עדכן chat_message שהוצאה נוצרה
+            await supabase
+              .from('chat_messages')
+              .update({ expense_created: true })
+              .eq('user_id', userData.id)
+              .eq('role', 'assistant')
+              .order('created_at', { ascending: false })
+              .limit(1);
           }
-          
-          confirmMessage += `\n\nזה נכון? [כן] [לא]`;
-          
-          await sendWhatsAppMessage(phoneNumber, confirmMessage);
         }
-      } else {
-        // לא הצלחנו לזהות - שאל
-        await sendWhatsAppMessage(
-          phoneNumber,
-          'לא הבנתי 🤔\n\nכתוב למשל: "50 ₪ קפה" או "רכישה 120 שקל"'
-        );
+      }
+      
+      // שלח את תשובת ה-AI ב-WhatsApp
+      if (aiResult.response) {
+        await sendWhatsAppMessage(phoneNumber, aiResult.response);
       }
     } else if (messageType === 'imageMessage') {
       const downloadUrl = payload.messageData?.downloadUrl;
@@ -296,48 +304,180 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Parse expense from text message
- * זיהוי סכומים והוצאות מטקסט חופשי
+ * Handle AI Chat
+ * שליחת הודעה ל-AI וקבלת תשובה חכמה
+ * הפונקציה מחזירה גם זיהוי הוצאה (אם רלוונטי)
  */
-async function parseExpenseFromText(text: string): Promise<{ amount: number; vendor?: string } | null> {
-  // Regex patterns לזיהוי סכומים
-  const patterns = [
-    /(\d+(?:\.\d{1,2})?)\s*₪/,           // "50 ₪"
-    /(\d+(?:\.\d{1,2})?)\s*שקל/,         // "50 שקל"
-    /₪\s*(\d+(?:\.\d{1,2})?)/,           // "₪ 50"
-    /שקל\s*(\d+(?:\.\d{1,2})?)/,         // "שקל 50"
-    /רכישה\s+(\d+(?:\.\d{1,2})?)/,      // "רכישה 50"
-    /קניתי\s+(\d+(?:\.\d{1,2})?)/,      // "קניתי 50"
-    /שילמתי\s+(\d+(?:\.\d{1,2})?)/,     // "שילמתי 50"
-  ];
+async function handleAIChat(
+  supabase: any,
+  userId: string,
+  message: string,
+  phoneNumber: string
+): Promise<{ response: string; detected_expense?: any; tokens_used: number }> {
+  try {
+    // 1. שליפת context של המשתמש
+    const context = await fetchUserContext(supabase, userId);
 
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const amount = parseFloat(match[1]);
-      
-      // נסה לזהות ספק/מקום
-      let vendor: string | undefined;
-      
-      // מילות מפתח נפוצות
-      const vendorPatterns = [
-        /(?:ב|מ|ל)(\w+)/,                  // "בקפה", "מסופר", "לטסט"
-        /(\w+)\s+(?:₪|שקל)/,               // "קפה 50 ₪"
-      ];
+    // 2. שליפת 5 הודעות אחרונות (היסטוריה)
+    const { data: recentMessages } = await supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(5);
 
-      for (const vPattern of vendorPatterns) {
-        const vMatch = text.match(vPattern);
-        if (vMatch && vMatch[1] !== match[1]) {
-          vendor = vMatch[1];
-          break;
-        }
-      }
+    // היסטוריה בסדר הפוך (ישן → חדש)
+    const history = (recentMessages || []).reverse();
 
-      return { amount, vendor };
-    }
+    // 3. בניית messages ל-OpenAI
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      // System prompt
+      { role: 'system', content: SYSTEM_PROMPT },
+      // Context
+      { role: 'system', content: `הנה המידע על המשתמש:\n\n${buildContextMessage(context)}` },
+      // היסטוריה
+      ...history.map((msg: any) => ({
+        role: msg.role as 'user' | 'assistant' | 'system',
+        content: msg.content,
+      })),
+      // ההודעה החדשה
+      { role: 'user', content: message },
+    ];
+
+    // 4. קריאה ל-OpenAI
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages,
+      temperature: 0.7,
+      max_tokens: 300,
+    });
+
+    const aiResponse = completion.choices[0]?.message?.content || 'סליחה, לא הבנתי. תנסה שוב? 🤔';
+    const tokensUsed = completion.usage?.total_tokens || 0;
+
+    // 5. זיהוי הוצאה (אם יש)
+    const detectedExpense = parseExpenseFromAI(aiResponse);
+
+    // 6. שמירת הודעת המשתמש
+    await supabase.from('chat_messages').insert({
+      user_id: userId,
+      role: 'user',
+      content: message,
+      context_used: context,
+    });
+
+    // 7. שמירת תשובת ה-AI
+    await supabase.from('chat_messages').insert({
+      user_id: userId,
+      role: 'assistant',
+      content: aiResponse,
+      tokens_used: tokensUsed,
+      model: 'gpt-4o',
+      detected_expense: detectedExpense,
+      expense_created: false,
+    });
+
+    return {
+      response: aiResponse,
+      detected_expense: detectedExpense,
+      tokens_used: tokensUsed,
+    };
+  } catch (error) {
+    console.error('❌ AI Chat error:', error);
+    
+    // Fallback response
+    return {
+      response: 'סליחה, משהו השתבש. תנסה שוב? 🤔',
+      tokens_used: 0,
+    };
+  }
+}
+
+/**
+ * שליפת context של המשתמש
+ * (זהה לפונקציה ב-/api/wa/chat)
+ */
+async function fetchUserContext(supabase: any, userId: string): Promise<UserContext> {
+  const context: UserContext = {};
+
+  // 1. פרופיל פיננסי
+  const { data: profile } = await supabase
+    .from('user_financial_profile')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (profile) {
+    context.profile = {
+      age: profile.age,
+      monthlyIncome: profile.total_monthly_income,
+      totalFixedExpenses: profile.total_fixed_expenses,
+      availableBudget: (profile.total_monthly_income || 0) - (profile.total_fixed_expenses || 0),
+      totalDebt: profile.total_debt,
+      currentSavings: profile.current_savings,
+    };
   }
 
-  return null;
+  // 2. תקציב חודשי (אם קיים)
+  const currentMonth = new Date().toISOString().substring(0, 7);
+  const { data: budget } = await supabase
+    .from('budgets')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('month', currentMonth)
+    .single();
+
+  if (budget) {
+    const remaining = budget.total_budget - budget.total_spent;
+    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    const currentDay = new Date().getDate();
+    const daysRemaining = daysInMonth - currentDay;
+
+    context.budget = {
+      totalBudget: budget.total_budget,
+      totalSpent: budget.total_spent,
+      remaining,
+      daysRemaining,
+      status: budget.status,
+    };
+  }
+
+  // 3. יעדים פעילים
+  const { data: goals } = await supabase
+    .from('goals')
+    .select('name, target_amount, current_amount')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .limit(5);
+
+  if (goals && goals.length > 0) {
+    context.goals = goals.map((goal: any) => ({
+      name: goal.name,
+      targetAmount: goal.target_amount,
+      currentAmount: goal.current_amount || 0,
+      progress: Math.round(((goal.current_amount || 0) / goal.target_amount) * 100),
+    }));
+  }
+
+  // 4. 5 תנועות אחרונות
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('date, vendor, amount, category')
+    .eq('user_id', userId)
+    .eq('type', 'expense')
+    .order('date', { ascending: false })
+    .limit(5);
+
+  if (transactions && transactions.length > 0) {
+    context.recentTransactions = transactions.map((tx: any) => ({
+      date: new Date(tx.date).toLocaleDateString('he-IL'),
+      description: tx.vendor || tx.category,
+      amount: tx.amount,
+      category: tx.category,
+    }));
+  }
+
+  return context;
 }
 
 /**
