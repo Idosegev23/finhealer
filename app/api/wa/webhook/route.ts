@@ -400,7 +400,13 @@ async function handleAIChat(
 async function fetchUserContext(supabase: any, userId: string): Promise<UserContext> {
   const context: UserContext = {};
 
-  // 1. פרופיל פיננסי
+  // 1. פרופיל פיננסי + Phase
+  const { data: user } = await supabase
+    .from('users')
+    .select('name, phase')
+    .eq('id', userId)
+    .single();
+
   const { data: profile } = await supabase
     .from('user_financial_profile')
     .select('*')
@@ -409,6 +415,7 @@ async function fetchUserContext(supabase: any, userId: string): Promise<UserCont
 
   if (profile) {
     context.profile = {
+      name: user?.name,
       age: profile.age,
       monthlyIncome: profile.total_monthly_income,
       totalFixedExpenses: profile.total_fixed_expenses,
@@ -418,7 +425,15 @@ async function fetchUserContext(supabase: any, userId: string): Promise<UserCont
     };
   }
 
-  // 2. תקציב חודשי (אם קיים)
+  // 2. Phase נוכחי
+  if (user?.phase) {
+    context.phase = {
+      current: user.phase,
+      progress: 50, // TODO: חשב באמת מהדאטה
+    };
+  }
+
+  // 3. תקציב חודשי (אם קיים)
   const currentMonth = new Date().toISOString().substring(0, 7);
   const { data: budget } = await supabase
     .from('budgets')
@@ -442,7 +457,7 @@ async function fetchUserContext(supabase: any, userId: string): Promise<UserCont
     };
   }
 
-  // 3. יעדים פעילים
+  // 4. יעדים פעילים
   const { data: goals } = await supabase
     .from('goals')
     .select('name, target_amount, current_amount')
@@ -459,22 +474,96 @@ async function fetchUserContext(supabase: any, userId: string): Promise<UserCont
     }));
   }
 
-  // 4. 5 תנועות אחרונות
+  // 5. תנועות אחרונות
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('date, vendor, amount, category')
+    .select('tx_date, vendor, amount, category')
     .eq('user_id', userId)
     .eq('type', 'expense')
-    .order('date', { ascending: false })
+    .order('tx_date', { ascending: false })
     .limit(5);
 
   if (transactions && transactions.length > 0) {
     context.recentTransactions = transactions.map((tx: any) => ({
-      date: new Date(tx.date).toLocaleDateString('he-IL'),
+      date: new Date(tx.tx_date).toLocaleDateString('he-IL'),
       description: tx.vendor || tx.category,
       amount: tx.amount,
       category: tx.category,
     }));
+  }
+
+  // 6. התראות אחרונות (3 ימים)
+  const threeDaysAgo = new Date();
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+  const { data: alerts } = await supabase
+    .from('alerts')
+    .select('type, message, created_at')
+    .eq('user_id', userId)
+    .gte('created_at', threeDaysAgo.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(3);
+
+  if (alerts && alerts.length > 0) {
+    context.alerts = alerts.map((alert: any) => ({
+      type: alert.type,
+      message: alert.message,
+      createdAt: new Date(alert.created_at).toLocaleDateString('he-IL'),
+    }));
+  }
+
+  // 7. הלוואות פעילות
+  const { data: loans } = await supabase
+    .from('loans')
+    .select('loan_type, lender_name, current_balance, monthly_payment, interest_rate, remaining_payments')
+    .eq('user_id', userId)
+    .eq('active', true)
+    .order('current_balance', { ascending: false })
+    .limit(10);
+
+  if (loans && loans.length > 0) {
+    context.loans = loans.map((loan: any) => ({
+      type: loan.loan_type === 'mortgage' ? 'משכנתא' : 
+            loan.loan_type === 'personal' ? 'הלוואה אישית' : 
+            loan.loan_type === 'car' ? 'הלוואת רכב' : 'הלוואה',
+      lender: loan.lender_name,
+      amount: loan.current_balance || 0,
+      monthlyPayment: loan.monthly_payment || 0,
+      interestRate: loan.interest_rate,
+      remainingPayments: loan.remaining_payments,
+    }));
+  }
+
+  // 8. ביטוחים פעילים
+  const { data: insurance } = await supabase
+    .from('insurance')
+    .select('insurance_type, provider, monthly_premium, active')
+    .eq('user_id', userId)
+    .eq('active', true)
+    .limit(10);
+
+  if (insurance && insurance.length > 0) {
+    context.insurance = insurance.map((ins: any) => ({
+      type: ins.insurance_type,
+      provider: ins.provider,
+      monthlyPremium: ins.monthly_premium,
+      active: ins.active,
+    }));
+  }
+
+  // 9. מנוי
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('plan, status, billing_cycle')
+    .eq('user_id', userId)
+    .single();
+
+  if (subscription) {
+    context.subscriptions = {
+      plan: subscription.plan,
+      status: subscription.status,
+      billingCycle: subscription.billing_cycle,
+    };
   }
 
   return context;

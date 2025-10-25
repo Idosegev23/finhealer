@@ -138,6 +138,10 @@ export interface UserContext {
     totalDebt?: number;
     currentSavings?: number;
   };
+  phase?: {
+    current: string; // reflection, foundation, building, thriving, sustaining
+    progress: number; // 0-100
+  };
   budget?: {
     totalBudget: number;
     totalSpent: number;
@@ -157,6 +161,30 @@ export interface UserContext {
     amount: number;
     category: string;
   }>;
+  alerts?: Array<{
+    type: string;
+    message: string;
+    createdAt: string;
+  }>;
+  loans?: Array<{
+    type: string;
+    lender: string;
+    amount: number;
+    monthlyPayment: number;
+    interestRate?: number;
+    remainingPayments?: number;
+  }>;
+  insurance?: Array<{
+    type: string;
+    provider: string;
+    monthlyPremium: number;
+    active: boolean;
+  }>;
+  subscriptions?: {
+    plan: string; // basic, premium, enterprise
+    status: string; // active, paused, cancelled
+    billingCycle: string; // monthly, yearly
+  };
 }
 
 /**
@@ -176,6 +204,19 @@ export function buildContextMessage(context: UserContext): string {
     if (availableBudget) parts.push(`- תקציב פנוי: ₪${availableBudget.toLocaleString()}`);
     if (totalDebt) parts.push(`- חובות: ₪${totalDebt.toLocaleString()}`);
     if (currentSavings) parts.push(`- חיסכון: ₪${currentSavings.toLocaleString()}`);
+  }
+
+  // Phase נוכחי
+  if (context.phase) {
+    const phaseNames: Record<string, string> = {
+      reflection: 'הכרה עצמית',
+      foundation: 'יסודות',
+      building: 'בנייה',
+      thriving: 'שגשוג',
+      sustaining: 'שמירה'
+    };
+    parts.push(`\n## שלב נוכחי במסלול ההבראה:`);
+    parts.push(`- ${phaseNames[context.phase.current] || context.phase.current} (${context.phase.progress}% הושלם)`);
   }
 
   // תקציב
@@ -203,6 +244,50 @@ export function buildContextMessage(context: UserContext): string {
     context.recentTransactions.slice(0, 5).forEach(tx => {
       parts.push(`- ${tx.date}: ${tx.description} - ₪${tx.amount.toLocaleString()} (${tx.category})`);
     });
+  }
+
+  // התראות אחרונות
+  if (context.alerts && context.alerts.length > 0) {
+    parts.push(`\n## התראות אחרונות (3 ימים):`);
+    context.alerts.slice(0, 3).forEach(alert => {
+      parts.push(`- [${alert.type}] ${alert.message}`);
+    });
+  }
+
+  // הלוואות פעילות
+  if (context.loans && context.loans.length > 0) {
+    parts.push(`\n## הלוואות פעילות:`);
+    let totalMonthly = 0;
+    context.loans.forEach(loan => {
+      totalMonthly += loan.monthlyPayment;
+      const details = [
+        `${loan.type} (${loan.lender})`,
+        `יתרה: ₪${loan.amount.toLocaleString()}`,
+        `תשלום חודשי: ₪${loan.monthlyPayment.toLocaleString()}`,
+      ];
+      if (loan.interestRate) details.push(`ריבית: ${loan.interestRate}%`);
+      if (loan.remainingPayments) details.push(`תשלומים נותרים: ${loan.remainingPayments}`);
+      parts.push(`- ${details.join(', ')}`);
+    });
+    parts.push(`- **סה״כ תשלומים חודשיים: ₪${totalMonthly.toLocaleString()}**`);
+  }
+
+  // ביטוחים
+  if (context.insurance && context.insurance.length > 0) {
+    const activeInsurance = context.insurance.filter(ins => ins.active);
+    if (activeInsurance.length > 0) {
+      parts.push(`\n## ביטוחים פעילים:`);
+      activeInsurance.forEach(ins => {
+        parts.push(`- ${ins.type} (${ins.provider}): ₪${ins.monthlyPremium.toLocaleString()}/חודש`);
+      });
+    }
+  }
+
+  // מנוי
+  if (context.subscriptions) {
+    parts.push(`\n## מנוי:`);
+    parts.push(`- תוכנית: ${context.subscriptions.plan}`);
+    parts.push(`- סטטוס: ${context.subscriptions.status}`);
   }
 
   return parts.join('\n');
