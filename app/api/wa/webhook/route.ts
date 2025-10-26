@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
@@ -50,7 +50,7 @@ interface GreenAPIWebhookPayload {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = createServiceClient();
     const payload: GreenAPIWebhookPayload = await request.json();
 
     console.log('📱 GreenAPI Webhook received:', payload.typeWebhook);
