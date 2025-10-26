@@ -173,7 +173,7 @@ export default function ExpensesOverviewPage() {
                   <DollarSign className="w-8 h-8 text-blue-100" />
                   <ArrowUpRight className="w-5 h-5 text-blue-200" />
                 </div>
-                <p className="text-blue-100 text-sm font-medium mb-1">סה"כ הוצאות</p>
+                <p className="text-blue-100 text-sm font-medium mb-1">סה&quot;כ הוצאות</p>
                 <p className="text-4xl font-black text-white">₪{stats.total.toLocaleString()}</p>
                 <p className="text-blue-200 text-xs mt-2">{stats.totalTransactions} תנועות</p>
               </CardContent>

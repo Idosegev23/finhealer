@@ -211,7 +211,7 @@ export default function PaymentPage() {
             <label htmlFor="wa-opt-in" className="text-sm text-dark flex-1 cursor-pointer">
               <strong className="block mb-1">📲 אני מאשר/ת קבלת הודעות ב-WhatsApp</strong>
               <span className="text-muted-foreground">
-                כולל: התראות על הוצאות, סיכומים יומיים, טיפים פיננסיים ושיחה עם המאמן הפיננסי שלי "פיני"
+                כולל: התראות על הוצאות, סיכומים יומיים, טיפים פיננסיים ושיחה עם המאמן הפיננסי שלי &quot;פיני&quot;
               </span>
             </label>
           </div>
@@ -220,7 +220,7 @@ export default function PaymentPage() {
             <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-start gap-2">
               <span className="text-2xl">🤖</span>
               <p className="text-sm text-blue-800">
-                <strong>פיני המאמן שלך ב-WhatsApp:</strong> תוכל לשלוח לי הודעות חופשיות, לרשום הוצאות מהר, 
+                <strong>&quot;פיני&quot; המאמן שלך ב-WhatsApp:</strong> תוכל לשלוח לי הודעות חופשיות, לרשום הוצאות מהר, 
                 ולקבל עצות פיננסיות - הכל ישירות ב-WhatsApp! 💬
               </p>
             </div>

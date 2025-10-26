@@ -158,7 +158,7 @@ export default function ExpensesTable({ transactions, onEdit, onDelete, onSave }
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-100 text-sm font-medium mb-1">סה"כ תנועות</p>
+              <p className="text-green-100 text-sm font-medium mb-1">סה&quot;כ תנועות</p>
               <p className="text-3xl font-bold">{filteredAndSorted.length}</p>
             </div>
             <Tag className="w-12 h-12 opacity-50" />

@@ -336,7 +336,7 @@ export default function SmartExpensesForm({ initialData }: SmartExpensesFormProp
                 <Label className="text-base font-bold mb-3 block">סוג ביטוח רכב</Label>
                 <RadioGroup
                   value={carData.insurance_type || ''}
-                  onValueChange={(value) => {
+                  onValueChange={(value: string) => {
                     updateExpense('car_insurance', { ...carData, insurance_type: value });
                   }}
                 >
@@ -496,7 +496,7 @@ export default function SmartExpensesForm({ initialData }: SmartExpensesFormProp
         {/* Step Total */}
         <div className="mt-4 pt-4 border-t border-white/20">
           <div className="flex justify-between items-center">
-            <span className="text-lg">סה"כ {currentStepData.title}:</span>
+            <span className="text-lg">סה&quot;כ {currentStepData.title}:</span>
             <span className="text-3xl font-black">
               {calculateStepTotal(currentStepData.key).toLocaleString('he-IL')} ₪
             </span>
