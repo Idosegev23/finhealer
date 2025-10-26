@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     // שמירת ההודעה בטבלה
     const waMessageData = {
       user_id: userData.id,
-      direction: 'in',
+      direction: 'incoming',
       msg_type: messageType === 'imageMessage' ? 'image' : 'text',
       payload: payload,
       provider_msg_id: messageId,
