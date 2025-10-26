@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       .from('wa_messages')
       .insert({
         user_id: userData.id,
-        direction: 'out',
+        direction: 'outgoing',
         msg_type: buttons ? 'buttons' : 'text',
         payload: { message, buttons },
         provider_msg_id: result.idMessage,
