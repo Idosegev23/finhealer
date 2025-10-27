@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import Stepper, { Step } from '@/components/ui/stepper';
 import { UserCircle, Users, Sparkles, CheckCircle, CreditCard, Smartphone, Zap, Crown } from 'lucide-react';
 
-type Plan = 'basic' | 'advanced';
+type Plan = 'basic' | 'premium';
 
 export function OnboardingSelector() {
   const router = useRouter();
@@ -179,9 +179,9 @@ export function OnboardingSelector() {
       ],
     },
     {
-      id: 'advanced' as Plan,
+      id: 'premium' as Plan,
       name: 'מתקדם',
-      price: 99,
+      price: 119,
       icon: Crown,
       popular: true,
       features: [

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     console.log('📦 Request body:', { plan, onboardingType, phone, waOptIn });
 
-    if (!plan || !['basic', 'advanced'].includes(plan)) {
+    if (!plan || !['basic', 'premium'].includes(plan)) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }
 
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     // צור/עדכן מנוי
-    const amount = plan === 'basic' ? 49 : 119;
+    const amount = plan === 'basic' ? 49 : plan === 'premium' ? 119 : 0;
     const { error: subscriptionError } = await supabaseAdmin
       .from('subscriptions')
       .upsert(

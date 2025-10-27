@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, CreditCard, CheckCircle2, Shield, Star, Calendar } from 'lucide-react'
 
-type Plan = 'basic' | 'advanced'
+type Plan = 'basic' | 'premium'
 
 export default function PaymentPage() {
   const router = useRouter()
@@ -272,10 +272,10 @@ export default function PaymentPage() {
               "דוחות מתקדמים נוספים",
               "תמיכה עדיפות",
             ]}
-            isSelected={selectedPlan === 'advanced'}
-            onSelect={() => setSelectedPlan('advanced')}
-            onPurchase={() => handleDemoPayment('advanced')}
-            isProcessing={isProcessing && selectedPlan === 'advanced'}
+            isSelected={selectedPlan === 'premium'}
+            onSelect={() => setSelectedPlan('premium')}
+            onPurchase={() => handleDemoPayment('premium')}
+            isProcessing={isProcessing && selectedPlan === 'premium'}
             highlight
           />
         </div>
