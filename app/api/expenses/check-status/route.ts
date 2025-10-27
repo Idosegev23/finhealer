@@ -30,30 +30,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Statement not found' }, { status: 404 });
     }
 
+    // Type assertion כי Supabase לא מזהה את הטיפוסים אוטומטית
+    const statementData = statement as any;
+
     // אם הסתיים, לשלוף גם את התנועות
-    if (statement.status === 'completed') {
+    if (statementData.status === 'completed') {
       const { data: transactions } = await supabase
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
         .eq('source', 'ocr')
-        .gte('created_at', statement.processed_at || new Date(Date.now() - 3600000).toISOString())
+        .gte('created_at', statementData.processed_at || new Date(Date.now() - 3600000).toISOString())
         .order('created_at', { ascending: false })
-        .limit(statement.transactions_extracted || 100);
+        .limit(statementData.transactions_extracted || 100);
 
       return NextResponse.json({
-        status: statement.status,
-        transactions_extracted: statement.transactions_extracted,
+        status: statementData.status,
+        transactions_extracted: statementData.transactions_extracted,
         transactions: transactions || [],
-        processed_at: statement.processed_at,
+        processed_at: statementData.processed_at,
       });
     }
 
     // במקרה של עיבוד או שגיאה
     return NextResponse.json({
-      status: statement.status,
-      error_message: statement.error_message,
-      transactions_extracted: statement.transactions_extracted,
+      status: statementData.status,
+      error_message: statementData.error_message,
+      transactions_extracted: statementData.transactions_extracted,
     });
 
   } catch (error: any) {
