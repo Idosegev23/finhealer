@@ -84,53 +84,46 @@ export async function POST(request: NextRequest) {
     const fileName_ = file.name.toLowerCase();
 
     try {
-      // Excel/CSV
+      let transactions: any[] = [];
+
+      // Excel/CSV - עיבוד טקסט ואז AI
       if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || 
           fileName_.endsWith('.xlsx') || fileName_.endsWith('.xls') || fileName_.endsWith('.csv')) {
         console.log('📊 Processing Excel...');
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         extractedText = XLSX.utils.sheet_to_csv(sheet);
+        
+        // ניתוח עם AI
+        transactions = await analyzeTransactionsWithAI(extractedText, fileType);
       }
-      // PDF
-      else if (mimeType === 'application/pdf' || fileName_.endsWith('.pdf')) {
-        console.log('📄 Processing PDF...');
-        const pdfParse = require('pdf-parse');
-        const data = await pdfParse(buffer);
-        extractedText = data.text;
-      }
-      // Image - use GPT-4 Vision
-      else if (mimeType.startsWith('image/')) {
-        console.log('🖼️ Processing image with GPT-4 Vision...');
+      // PDF או Image - שימוש ב-GPT-4 Vision
+      else if (mimeType === 'application/pdf' || fileName_.endsWith('.pdf') || mimeType.startsWith('image/')) {
+        const fileTypeLabel = mimeType.startsWith('image/') ? 'image' : 'PDF';
+        console.log(`🖼️ Processing ${fileTypeLabel} with GPT-4 Vision...`);
+        
         const base64 = buffer.toString('base64');
         const dataUrl = `data:${mimeType};base64,${base64}`;
         
-        const transactions = await analyzeImageWithAI(dataUrl);
-        
-        // עדכון סטטוס
+        transactions = await analyzeImageWithAI(dataUrl);
+      }
+      else {
+        // סוג קובץ לא נתמך
         await supabase
           .from('uploaded_statements')
           .update({
-            processed: true,
-            processed_at: new Date().toISOString(),
-            status: 'completed',
-            transactions_extracted: transactions.length,
-            metadata: { method: 'gpt4-vision' },
+            status: 'failed',
+            error_message: 'Unsupported file type. Please upload Excel, PDF, or image files.',
           })
           .eq('id', statement.id);
 
-        return NextResponse.json({
-          success: true,
-          statement_id: statement.id,
-          transactions,
-          method: 'gpt4-vision',
-        });
+        return NextResponse.json({ 
+          error: 'Unsupported file type. Please upload Excel (.xlsx, .xls, .csv), PDF, or image files.' 
+        }, { status: 400 });
       }
 
-      // שלב 4: ניתוח התנועות עם AI
-      const transactions = await analyzeTransactionsWithAI(extractedText, fileType);
-
-      // שלב 5: עדכון סטטוס
+      // עדכון סטטוס
+      const method = extractedText ? 'gpt4-text' : 'gpt4-vision';
       await supabase
         .from('uploaded_statements')
         .update({
@@ -139,8 +132,9 @@ export async function POST(request: NextRequest) {
           status: 'completed',
           transactions_extracted: transactions.length,
           metadata: { 
-            method: 'gpt4-text',
-            text_length: extractedText.length 
+            method,
+            text_length: extractedText.length || 0,
+            file_type: mimeType,
           },
         })
         .eq('id', statement.id);
@@ -149,7 +143,7 @@ export async function POST(request: NextRequest) {
         success: true,
         statement_id: statement.id,
         transactions,
-        method: 'gpt4-text',
+        method,
       });
 
     } catch (error: any) {
