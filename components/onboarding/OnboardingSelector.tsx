@@ -493,7 +493,7 @@ export function OnboardingSelector() {
                   </label>
                   <input
                     type="number"
-                    value={childrenCount}
+                    value={childrenCount === 0 ? '' : childrenCount}
                     onChange={(e) => setChildrenCount(parseInt(e.target.value) || 0)}
                     min="0"
                     placeholder="0"
