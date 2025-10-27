@@ -79,7 +79,8 @@ export async function middleware(request: NextRequest) {
 
     const userExistsInDB = !!userData && !userError
     const hasActiveSubscription = userData?.subscription_status === 'active'
-    const hasCompletedOnboarding = !!userData?.name || !!userData?.phone
+    // השלים אונבורדינג = יש מנוי פעיל + יש טלפון (name מגיע אוטומטית מGoogle)
+    const hasCompletedOnboarding = hasActiveSubscription && !!userData?.phone
 
     // Debug logging
     console.log('🔐 Middleware check:', {
@@ -112,18 +113,12 @@ export async function middleware(request: NextRequest) {
       if (!currentPath.startsWith('/onboarding') && 
           !currentPath.startsWith('/reflection') &&
           currentPath !== '/payment') {
+        console.log('📝 Redirecting incomplete user to onboarding from:', currentPath)
         return NextResponse.redirect(new URL('/onboarding', request.url))
       }
     }
 
-    // 3. משתמש השלים onboarding אבל אין מנוי פעיל (לא אמור לקרות, אבל...)
-    if (userExistsInDB && hasCompletedOnboarding && !hasActiveSubscription) {
-      if (currentPath !== '/payment') {
-        return NextResponse.redirect(new URL('/payment', request.url))
-      }
-    }
-
-    // 4. משתמש עם הכל - אסור לחזור ל-login/signup/payment
+    // 3. משתמש עם הכל - אסור לחזור ל-login/signup/payment
     if (userExistsInDB && hasCompletedOnboarding && hasActiveSubscription) {
       if (currentPath === '/login' || 
           currentPath === '/signup') {
