@@ -64,15 +64,15 @@ export async function POST(request: NextRequest) {
       { role: 'user', content: message },
     ];
 
-    // 4. קריאה ל-OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages,
+    // 4. קריאה ל-OpenAI (GPT-5 New API)
+    const completion = await openai.responses.create({
+      model: 'gpt-5',
+      input: messages,
       temperature: 0.7,
       max_tokens: 500,
     });
 
-    const aiResponse = completion.choices[0]?.message?.content || 'סליחה, לא הבנתי. תנסה שוב?';
+    const aiResponse = completion.output_text || 'סליחה, לא הבנתי. תנסה שוב?';
     const tokensUsed = completion.usage?.total_tokens || 0;
 
     // 5. זיהוי הוצאה (אם יש)

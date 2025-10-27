@@ -217,18 +217,17 @@ ${text.substring(0, 8000)}
 החזר JSON array עם כל התנועות שמצאת.`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
+    const response = await openai.responses.create({
+      model: 'gpt-5',
+      input: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.1,
       max_tokens: 4000,
-      response_format: { type: 'json_object' },
     });
 
-    const content = response.choices[0]?.message?.content || '{"transactions":[]}';
+    const content = response.output_text || '{"transactions":[]}';
     const result = JSON.parse(content);
     
     return result.transactions || [];
@@ -266,23 +265,22 @@ async function analyzeImageWithAI(dataUrl: string) {
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
+    const response = await openai.responses.create({
+      model: 'gpt-5',
+      input: [
         {
           role: 'user',
           content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+            { type: 'input_text', text: prompt },
+            { type: 'input_image', image_url: dataUrl },
           ],
         },
       ],
       temperature: 0.1,
       max_tokens: 4000,
-      response_format: { type: 'json_object' },
     });
 
-    const content = response.choices[0]?.message?.content || '{"transactions":[]}';
+    const content = response.output_text || '{"transactions":[]}';
     const result = JSON.parse(content);
     
     return result.transactions || [];

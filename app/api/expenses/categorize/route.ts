@@ -64,10 +64,10 @@ export async function POST(request: Request) {
       })
     }
 
-    // 2. שאל את GPT-4 לסיווג
-    const aiResponse = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
+    // 2. שאל את GPT-5 לסיווג
+    const aiResponse = await openai.responses.create({
+      model: 'gpt-5',
+      input: [
         {
           role: 'system',
           content: `אתה מומחה לסיווג הוצאות בישראל.
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
       max_tokens: 300,
     })
 
-    const aiText = aiResponse.choices[0]?.message?.content || '{}'
+    const aiText = aiResponse.output_text || '{}'
     console.log('🎯 AI Categorization:', aiText)
 
     let aiResult: any
