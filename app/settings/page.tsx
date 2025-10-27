@@ -141,7 +141,7 @@ function ProfileTab() {
         .eq('id', user.id)
         .single();
 
-      if (profileError) {
+      if (profileError || !profile) {
         console.error('Error loading profile:', profileError);
         setError('שגיאה בטעינת הפרופיל');
         setLoading(false);
