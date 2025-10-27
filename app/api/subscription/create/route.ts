@@ -98,13 +98,14 @@ export async function POST(request: NextRequest) {
           user_id: user.id,
           plan,
           status: 'active',
-          provider: 'demo',
+          provider: 'manual', // Demo payment - manual provider
           started_at: new Date().toISOString(),
           amount,
           currency: 'ILS',
           billing_cycle: 'monthly',
           metadata: {
             onboarding_type: onboardingType || 'quick',
+            payment_method: 'demo',
           },
         },
         {
