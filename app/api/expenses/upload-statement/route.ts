@@ -55,9 +55,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
     }
 
-    const { data: { publicUrl } } = supabase.storage
+    // יצירת Signed URL (תקף ל-1 שעה)
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('financial-documents')
-      .getPublicUrl(sanitizedFileName);
+      .createSignedUrl(sanitizedFileName, 3600); // 1 hour
+
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      console.error('Signed URL error:', signedUrlError);
+      return NextResponse.json({ error: 'Failed to create signed URL' }, { status: 500 });
+    }
+
+    const fileUrl = signedUrlData.signedUrl;
+    console.log('✅ Signed URL created (valid for 1 hour)');
 
     // שלב 2: יצירת רשומה ב-uploaded_statements
     const { data: statement, error: statementError } = await supabase
@@ -66,7 +75,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         file_name: file.name,
         file_type: fileType || 'bank_statement',
-        file_url: publicUrl,
+        file_url: fileUrl,
         file_size: file.size,
         status: 'processing',
       })
@@ -97,17 +106,17 @@ export async function POST(request: NextRequest) {
         // ניתוח עם AI
         transactions = await analyzeTransactionsWithAI(extractedText, fileType);
       }
-      // PDF - שימוש ב-GPT-5 File Input עם URL מ-Supabase
+      // PDF - שימוש ב-GPT-5 File Input עם Signed URL
       else if (mimeType === 'application/pdf' || fileName_.endsWith('.pdf')) {
-        console.log(`📄 Processing PDF with GPT-5 using Supabase URL: ${publicUrl}`);
+        console.log(`📄 Processing PDF with GPT-5 using Signed URL: ${fileUrl}`);
         
-        transactions = await analyzePDFWithAI(publicUrl, fileType);
+        transactions = await analyzePDFWithAI(fileUrl, fileType);
       }
-      // Image - שימוש ב-GPT-5 Vision עם URL מ-Supabase
+      // Image - שימוש ב-GPT-5 Vision עם Signed URL מ-Supabase
       else if (mimeType.startsWith('image/')) {
-        console.log(`🖼️ Processing Image with GPT-5 Vision using Supabase URL: ${publicUrl}`);
+        console.log(`🖼️ Processing Image with GPT-5 Vision using Signed URL: ${fileUrl}`);
         
-        transactions = await analyzeImageWithAI(publicUrl);
+        transactions = await analyzeImageWithAI(fileUrl);
       }
       else {
         // סוג קובץ לא נתמך
