@@ -87,286 +87,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create statement record' }, { status: 500 });
     }
 
-    // שלב 3: עיבוד הקובץ וחילוץ תנועות
-    let extractedText = '';
-    const mimeType = file.type.toLowerCase();
-    const fileName_ = file.name.toLowerCase();
+    // שלב 3: שליחת event ל-Inngest לעיבוד ברקע
+    console.log(`🚀 Sending statement to Inngest: ${statement.id}`);
+    
+    const { inngest } = await import('@/lib/inngest/client');
+    
+    await inngest.send({
+      name: 'statement.process',
+      data: {
+        statementId: statement.id,
+        userId: user.id,
+        mimeType: file.type,
+        fileName: file.name,
+        fileType: fileType || 'bank_statement',
+      },
+    });
 
-    try {
-      let transactions: any[] = [];
+    console.log(`✅ Event sent to Inngest for statement: ${statement.id}`);
 
-      // Excel/CSV - עיבוד טקסט ואז AI
-      if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || 
-          fileName_.endsWith('.xlsx') || fileName_.endsWith('.xls') || fileName_.endsWith('.csv')) {
-        console.log('📊 Processing Excel...');
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        extractedText = XLSX.utils.sheet_to_csv(sheet);
-        
-        // ניתוח עם AI
-        transactions = await analyzeTransactionsWithAI(extractedText, fileType);
-      }
-      // PDF - שימוש ב-GPT-5 File Input (העלאה ל-OpenAI)
-      else if (mimeType === 'application/pdf' || fileName_.endsWith('.pdf')) {
-        console.log(`📄 Processing PDF with GPT-5 (uploading to OpenAI)...`);
-        
-        transactions = await analyzePDFWithAI(buffer, fileType, file.name);
-      }
-      // Image - שימוש ב-GPT-5 Vision עם Signed URL מ-Supabase
-      else if (mimeType.startsWith('image/')) {
-        console.log(`🖼️ Processing Image with GPT-5 Vision using Signed URL: ${fileUrl}`);
-        
-        transactions = await analyzeImageWithAI(fileUrl);
-      }
-      else {
-        // סוג קובץ לא נתמך
-        await supabase
-          .from('uploaded_statements')
-          .update({
-            status: 'failed',
-            error_message: 'Unsupported file type. Please upload Excel, PDF, or image files.',
-          })
-          .eq('id', statement.id);
-
-        return NextResponse.json({ 
-          error: 'Unsupported file type. Please upload Excel (.xlsx, .xls, .csv), PDF, or image files.' 
-        }, { status: 400 });
-      }
-
-      // עדכון סטטוס
-      const method = extractedText ? 'gpt4-text' : 'gpt4-vision';
-      await supabase
-        .from('uploaded_statements')
-        .update({
-          processed: true,
-          processed_at: new Date().toISOString(),
-          status: 'completed',
-          transactions_extracted: transactions.length,
-          metadata: { 
-            method,
-            text_length: extractedText.length || 0,
-            file_type: mimeType,
-          },
-        })
-        .eq('id', statement.id);
-
-      return NextResponse.json({
-        success: true,
-        statement_id: statement.id,
-        transactions,
-        method,
-      });
-
-    } catch (error: any) {
-      console.error('Processing error:', error);
-      
-      // עדכון סטטוס לכישלון
-      await supabase
-        .from('uploaded_statements')
-        .update({
-          status: 'failed',
-          error_message: error.message,
-        })
-        .eq('id', statement.id);
-
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    // החזרת תגובה מיידית
+    return NextResponse.json({
+      success: true,
+      message: 'הקובץ מעובד כעת... תקבל עדכון כשמוכן 🚀',
+      statementId: statement.id,
+      status: 'processing',
+    });
 
   } catch (error: any) {
-    console.error('Error in upload-statement:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Upload error:', error);
+    return NextResponse.json({ 
+      error: error.message || 'Failed to process file' 
+    }, { status: 500 });
   }
 }
-
-// ניתוח תנועות מטקסט עם GPT-4
-async function analyzeTransactionsWithAI(text: string, fileType: string) {
-  const systemPrompt = `אתה מומחה לניתוח דוחות בנק ואשראי ישראליים.
-תפקידך לחלץ תנועות פיננסיות מהמסמך ולסווג אותן.
-
-החזר JSON array עם התנועות בפורמט:
-[
-  {
-    "date": "YYYY-MM-DD",
-    "description": "תיאור המקור",
-    "vendor": "שם העסק/ספק",
-    "amount": 123.45,
-    "category": "קטגוריה מפורטת",
-    "detailed_category": "food_beverages | cellular_communication | entertainment_leisure | etc",
-    "expense_frequency": "fixed | temporary | special | one_time",
-    "confidence": 0.85
-  }
-]
-
-קטגוריות מפורטות:
-- food_beverages: מזון ומשקאות (סופר, מסעדות, קפה)
-- cellular_communication: סלולר ותקשורת (פלאפון, סלקום, אינטרנט)
-- entertainment_leisure: בילויים ופנאי (קולנוע, ספורט)
-- transportation_fuel: תחבורה ודלק (דלק, חניה, תחבורה ציבורית)
-- housing_maintenance: דיור ותחזוקה (ארנונה, ועד בית, תיקונים)
-- clothing_footwear: ביגוד והנעלה
-- health_medical: בריאות ותרופות (קופת חולים, תרופות, רופאים)
-- education: חינוך והשכלה (לימודים, חוגים)
-- utilities: חשמל, מים, גז
-- shopping_general: קניות כלליות
-- subscriptions: מנויים (Netflix, Spotify, חדר כושר)
-- insurance: ביטוחים
-- loans_debt: הלוואות וחובות
-- other: אחר
-
-תדירות הוצאה:
-- fixed: קבועה (חוזרת כל חודש באותו סכום - ארנונה, ביטוח, מנויים)
-- temporary: זמנית (מנוי לתקופה מוגבלת)
-- special: מיוחדת (לא תכופה אך חשובה - ביטוח שנתי)
-- one_time: חד פעמית
-
-רק תנועות הוצאה (לא הכנסות)!`;
-
-  const userPrompt = `נתח את התנועות מ${fileType === 'credit_statement' ? 'דוח אשראי' : 'דוח בנק'} הבא:
-
-${text.substring(0, 8000)}
-
-החזר JSON array עם כל התנועות שמצאת.`;
-
-  try {
-    const response = await openai.responses.create({
-      model: 'gpt-5',
-      input: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-    });
-
-    const content = response.output_text || '{"transactions":[]}';
-    const result = JSON.parse(content);
-    
-    return result.transactions || [];
-  } catch (error) {
-    console.error('AI analysis error:', error);
-    throw new Error('Failed to analyze transactions with AI');
-  }
-}
-
-// ניתוח PDF עם GPT-5 File Input (העלאה ישירה ל-OpenAI)
-async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
-  const prompt = `נתח את המסמך של ${fileType === 'credit_statement' ? 'דוח אשראי' : 'דוח בנק'} וחלץ את כל התנועות הפיננסיות.
-
-עבור כל תנועה, זהה:
-1. תאריך (YYYY-MM-DD)
-2. תיאור/שם העסק
-3. סכום
-4. קטגוריה מפורטת (food_beverages, cellular_communication, entertainment_leisure, transportation_fuel, housing_maintenance, clothing_footwear, health_medical, education, utilities, shopping_general, subscriptions, insurance, loans_debt, other)
-5. תדירות (fixed/temporary/special/one_time)
-
-החזר JSON:
-{
-  "transactions": [
-    {
-      "date": "YYYY-MM-DD",
-      "description": "תיאור",
-      "vendor": "שם עסק",
-      "amount": 123.45,
-      "category": "קטגוריה",
-      "detailed_category": "food_beverages",
-      "expense_frequency": "fixed",
-      "confidence": 0.9
-    }
-  ]
-}`;
-
-  try {
-    // שלב 1: העלאת הקובץ ל-OpenAI Files API
-    console.log('📤 Uploading PDF to OpenAI Files API...');
-    const file = await openai.files.create({
-      file: new File([buffer], fileName, { type: 'application/pdf' }),
-      purpose: 'assistants',
-    });
-
-    console.log(`✅ File uploaded to OpenAI: ${file.id}`);
-
-    // שלב 2: ניתוח הקובץ עם GPT-5
-    console.log('🤖 Analyzing PDF with GPT-5...');
-    
-    const response = await openai.responses.create({
-      model: 'gpt-5',
-      input: [
-        {
-          role: 'user',
-          content: [
-            { type: 'input_text', text: prompt },
-            { type: 'input_file', file_id: file.id },
-          ],
-        },
-      ],
-    });
-
-    // שלב 3: מחיקת הקובץ מ-OpenAI (ניקיון)
-    try {
-      await openai.files.del(file.id);
-      console.log('🗑️ File deleted from OpenAI');
-    } catch (deleteError) {
-      console.warn('Failed to delete file from OpenAI:', deleteError);
-    }
-
-    const content = response.output_text || '{"transactions":[]}';
-    const result = JSON.parse(content);
-    
-    return result.transactions || [];
-  } catch (error) {
-    console.error('PDF analysis error:', error);
-    throw new Error('Failed to analyze PDF with AI');
-  }
-}
-
-// ניתוח תמונה עם GPT-5 Vision (עם URL מ-Supabase)
-async function analyzeImageWithAI(imageUrl: string) {
-  const prompt = `נתח את התמונה של דוח בנק/אשראי וחלץ את כל התנועות הפיננסיות.
-
-עבור כל תנועה, זהה:
-1. תאריך (YYYY-MM-DD)
-2. תיאור/שם העסק
-3. סכום
-4. קטגוריה מפורטת (food_beverages, cellular_communication, entertainment_leisure, transportation_fuel, housing_maintenance, clothing_footwear, health_medical, education, utilities, shopping_general, subscriptions, insurance, loans_debt, other)
-5. תדירות (fixed/temporary/special/one_time)
-
-החזר JSON:
-{
-  "transactions": [
-    {
-      "date": "YYYY-MM-DD",
-      "description": "תיאור",
-      "vendor": "שם עסק",
-      "amount": 123.45,
-      "category": "קטגוריה",
-      "detailed_category": "food_beverages",
-      "expense_frequency": "fixed",
-      "confidence": 0.9
-    }
-  ]
-}`;
-
-  try {
-    console.log('🤖 Analyzing image with GPT-5 from URL...');
-    
-    const response = await openai.responses.create({
-      model: 'gpt-5',
-      input: [
-        {
-          role: 'user',
-          content: [
-            { type: 'input_text', text: prompt },
-            { type: 'input_image', image_url: imageUrl },
-          ],
-        },
-      ],
-    });
-
-    const content = response.output_text || '{"transactions":[]}';
-    const result = JSON.parse(content);
-    
-    return result.transactions || [];
-  } catch (error) {
-    console.error('Image analysis error:', error);
-    throw new Error('Failed to analyze image with AI');
-  }
-}
-
