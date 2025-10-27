@@ -147,6 +147,9 @@ export async function POST(request: NextRequest) {
       } else if (buttonId.startsWith('split_')) {
         const transactionId = buttonId.replace('split_', '');
         await handleSplitTransaction(supabase, userData.id, transactionId, phoneNumber);
+      } else if (buttonId.startsWith('payment_')) {
+        const [_, paymentType, receiptId] = buttonId.split('_');
+        await handlePaymentMethod(supabase, userData.id, receiptId, paymentType, phoneNumber);
       }
     }
     // טיפול לפי סוג הודעה - עם AI! 🤖
@@ -244,47 +247,180 @@ export async function POST(request: NextRequest) {
         
         await greenAPI.sendMessage({
           phoneNumber,
-          message: 'קיבלתי את התמונה! 📸\n\nאני מעבד אותה עכשיו...',
+          message: 'קיבלתי את התמונה! 📸\n\nאני מנתח אותה עם AI...',
         });
 
         try {
-          // שמור receipt בסטטוס pending - יעובד מאוחר יותר
-            const { data: receipt, error: receiptError } = await (supabase as any)
+          // הורדת התמונה מ-GreenAPI
+          const imageResponse = await fetch(downloadUrl);
+          const imageBuffer = await imageResponse.arrayBuffer();
+          const base64Image = Buffer.from(imageBuffer).toString('base64');
+          const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+          // ניתוח OCR + AI
+          console.log('🤖 Starting OCR analysis with OpenAI Vision...');
+          
+          const visionResponse = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: `אתה מומחה לניתוח קבלות ותדפיסי בנק/אשראי בעברית.
+חלץ את המידע הבא בפורמט JSON:
+{
+  "document_type": "receipt | bank_statement | credit_statement",
+  "transactions": [
+    {
+      "amount": <number>,
+      "vendor": "שם בית העסק",
+      "date": "YYYY-MM-DD",
+      "category": "food | transport | shopping | health | entertainment | education | housing | utilities | other",
+      "detailed_category": "תת-קטגוריה",
+      "expense_frequency": "fixed | temporary | special | one_time",
+      "description": "תיאור",
+      "confidence": <0.0-1.0>
+    }
+  ]
+}`
+              },
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע.'
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:${mimeType};base64,${base64Image}`,
+                      detail: 'high'
+                    }
+                  }
+                ]
+              }
+            ],
+            max_tokens: 2000,
+            temperature: 0.1,
+          });
+
+          const aiText = visionResponse.choices[0]?.message?.content || '{}';
+          console.log('🎯 OCR Result:', aiText);
+
+          let ocrData: any;
+          try {
+            ocrData = JSON.parse(aiText);
+          } catch {
+            // אם AI לא החזיר JSON תקין
+            ocrData = { document_type: 'receipt', transactions: [] };
+          }
+
+          const transactions = ocrData.transactions || [];
+          
+          if (transactions.length === 0) {
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: 'לא הצלחתי לזהות פרטים מהקבלה 😕\n\nתוכל לכתוב את הסכום ידנית? למשל: "50 ₪ קפה"',
+            });
+            return NextResponse.json({ status: 'no_data' });
+          }
+
+          // שמירת קבלה + יצירת הוצאות
+          const { data: receipt } = await (supabase as any)
             .from('receipts')
             .insert({
               user_id: userData.id,
               storage_path: downloadUrl,
-              ocr_text: null,
-              total_amount: null,
-              vendor: null,
-              tx_date: null,
-              confidence: null,
-              status: 'pending',
+              ocr_text: aiText,
+              amount: transactions[0]?.amount || null,
+              vendor: transactions[0]?.vendor || null,
+              tx_date: transactions[0]?.date || new Date().toISOString().split('T')[0],
+              confidence: transactions[0]?.confidence || 0.5,
+              status: 'completed',
+              metadata: {
+                document_type: ocrData.document_type,
+                source: 'whatsapp',
+                model: 'gpt-4o',
+              },
             })
             .select()
             .single();
 
-          if (receiptError) {
-            console.error('❌ Error creating receipt:', receiptError);
+          console.log('✅ Receipt saved:', receipt?.id);
+
+          // יצירת הוצאות אם יש רק 1-2 תנועות (קבלה רגילה)
+          if (transactions.length <= 2) {
+            for (const tx of transactions) {
+              await (supabase as any)
+                .from('transactions')
+                .insert({
+                  user_id: userData.id,
+                  type: 'expense',
+                  amount: tx.amount,
+                  vendor: tx.vendor,
+                  date: tx.date || new Date().toISOString().split('T')[0],
+                  tx_date: tx.date || new Date().toISOString().split('T')[0],
+                  category: tx.category || 'other',
+                  detailed_category: tx.detailed_category,
+                  expense_frequency: tx.expense_frequency || 'one_time',
+                  payment_method: null, // נשאל את המשתמש
+                  source: 'ocr',
+                  status: 'proposed', // דורש אישור
+                  notes: tx.description || '',
+                  original_description: tx.description || '',
+                  auto_categorized: true,
+                  confidence_score: tx.confidence || 0.5,
+                });
+            }
+
+            // שאלה: אשראי או מזומן?
+            const tx = transactions[0];
+            await greenAPI.sendButtons({
+              phoneNumber,
+              message: `✅ זיהיתי קבלה!\n\n💰 ${tx.amount} ₪\n🏪 ${tx.vendor}\n📂 ${tx.category}\n\n⬇️ איך שילמת?`,
+              buttons: [
+                { buttonId: `payment_credit_${receipt?.id}`, buttonText: '💳 אשראי' },
+                { buttonId: `payment_cash_${receipt?.id}`, buttonText: '💵 מזומן' },
+                { buttonId: `payment_debit_${receipt?.id}`, buttonText: '🏦 חיוב' },
+              ],
+            });
+          } else {
+            // תדפיס אשראי/בנק עם הרבה תנועות
             await greenAPI.sendMessage({
               phoneNumber,
-              message: 'אופס! משהו השתבש בשמירת הקבלה 😕\n\nנסה שוב או כתוב את הסכום ידנית.',
+              message: `🎉 זיהיתי ${transactions.length} תנועות!\n\nהן נשמרו בחשבון שלך ב-Dashboard.\n\n👉 כנס לאפליקציה כדי לאשר אותן.`,
             });
-            return NextResponse.json({ status: 'error', error: receiptError.message }, { status: 500 });
+
+            // שמור את כל התנועות כ-proposed
+            for (const tx of transactions) {
+              await (supabase as any)
+                .from('transactions')
+                .insert({
+                  user_id: userData.id,
+                  type: 'expense',
+                  amount: tx.amount,
+                  vendor: tx.vendor,
+                  date: tx.date || new Date().toISOString().split('T')[0],
+                  tx_date: tx.date || new Date().toISOString().split('T')[0],
+                  category: tx.category || 'other',
+                  detailed_category: tx.detailed_category,
+                  expense_frequency: tx.expense_frequency || 'one_time',
+                  payment_method: ocrData.document_type === 'credit_statement' ? 'credit' : null,
+                  source: 'ocr',
+                  status: 'proposed',
+                  notes: tx.description || '',
+                  original_description: tx.description || '',
+                  auto_categorized: true,
+                  confidence_score: tx.confidence || 0.5,
+                });
+            }
           }
 
-          // הודע שהקבלה נשמרה
+        } catch (ocrError: any) {
+          console.error('❌ OCR Error:', ocrError);
           await greenAPI.sendMessage({
             phoneNumber,
-            message: '✅ הקבלה נשמרה!\n\nכרגע תוכל לראות אותה ב-Dashboard. בקרוב נוסיף זיהוי אוטומטי 🚀\n\nבינתיים, כתוב את הסכום ידנית, למשל: "50 ₪ קפה"',
-          });
-
-          console.log('✅ Receipt saved:', receipt.id);
-        } catch (saveError: any) {
-          console.error('❌ Save Error:', saveError);
-          await greenAPI.sendMessage({
-            phoneNumber,
-            message: 'לא הצלחתי לשמור את הקבלה 📄\n\nכתוב את הסכום ידנית, למשל: "50 ₪ קפה"',
+            message: 'משהו השתבש בניתוח הקבלה 😕\n\nנסה שוב או כתוב את הפרטים ידנית.',
           });
         }
       }
@@ -751,6 +887,78 @@ async function handleSplitTransaction(
   });
 
   // TODO: implement split logic in text message handler
+}
+
+/**
+ * Handle Payment Method Selection
+ * עדכון אמצעי תשלום להוצאות מהקבלה
+ */
+async function handlePaymentMethod(
+  supabase: any,
+  userId: string,
+  receiptId: string,
+  paymentType: string,
+  phoneNumber: string
+) {
+  const greenAPI = getGreenAPIClient();
+
+  try {
+    // מצא את כל ההוצאות שקשורות לקבלה הזו (proposed status)
+    const { data: transactions, error: fetchError } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('source', 'ocr')
+      .eq('status', 'proposed')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (fetchError || !transactions || transactions.length === 0) {
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: 'לא מצאתי הוצאות לעדכן 🤔',
+      });
+      return;
+    }
+
+    // עדכן את כל ההוצאות האחרונות עם אמצעי התשלום
+    const paymentMethodMap: Record<string, string> = {
+      credit: 'credit',
+      cash: 'cash',
+      debit: 'debit',
+    };
+
+    const paymentMethod = paymentMethodMap[paymentType] || 'cash';
+
+    for (const tx of transactions) {
+      await supabase
+        .from('transactions')
+        .update({
+          payment_method: paymentMethod,
+          status: 'confirmed', // אישור אוטומטי
+        })
+        .eq('id', tx.id);
+    }
+
+    // הודעת אישור
+    const paymentText = paymentType === 'credit' ? 'אשראי 💳' : 
+                       paymentType === 'cash' ? 'מזומן 💵' : 
+                       'חיוב 🏦';
+
+    await greenAPI.sendMessage({
+      phoneNumber,
+      message: `מעולה! ✅\n\nההוצאות נשמרו כ-${paymentText}\n\nתוכל לראות אותן ב-Dashboard 📊`,
+    });
+
+    console.log('✅ Payment method updated:', { userId, receiptId, paymentMethod, count: transactions.length });
+
+  } catch (error) {
+    console.error('❌ Payment method error:', error);
+    await greenAPI.sendMessage({
+      phoneNumber,
+      message: 'אופס! משהו השתבש 😕',
+    });
+  }
 }
 
 // Allow GET for testing
