@@ -104,7 +104,6 @@ export async function POST(request: Request) {
           content: `סווג את ההוצאה הזו:\nספק: ${vendor || 'לא צוין'}\nתיאור: ${description}\nסכום: ₪${amount || 0}`
         }
       ],
-      temperature: 0.2,
     })
 
     const aiText = aiResponse.output_text || '{}'

@@ -225,7 +225,6 @@ ${text.substring(0, 8000)}
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.1,
     });
 
     const content = response.output_text || '{"transactions":[]}';
@@ -279,7 +278,6 @@ async function analyzePDFWithAI(fileUrl: string, fileType: string) {
           ],
         },
       ],
-      temperature: 0.1,
     });
 
     const content = response.output_text || '{"transactions":[]}';
@@ -333,7 +331,6 @@ async function analyzeImageWithAI(imageUrl: string) {
           ],
         },
       ],
-      temperature: 0.1,
     });
 
     const content = response.output_text || '{"transactions":[]}';

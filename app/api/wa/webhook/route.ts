@@ -298,7 +298,6 @@ export async function POST(request: NextRequest) {
                 ]
               }
             ],
-            temperature: 0.1,
           });
 
           const aiText = visionResponse.output_text || '{}';

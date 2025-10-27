@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
     const completion = await openai.responses.create({
       model: 'gpt-5',
       input: messages,
-      temperature: 0.7,
     });
 
     const aiResponse = completion.output_text || 'סליחה, לא הבנתי. תנסה שוב?';
