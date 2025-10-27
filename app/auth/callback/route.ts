@@ -7,6 +7,9 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const origin = requestUrl.origin
+  
+  // יצירת response שנחזיר עם cookies מעודכנים
+  let response = NextResponse.next()
 
   if (code) {
     const cookieStore = await cookies()
@@ -20,22 +23,12 @@ export async function GET(request: Request) {
             return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: CookieOptions) {
-            try {
-              cookieStore.set({ name, value, ...options })
-            } catch (error) {
-              // The `set` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
+            cookieStore.set({ name, value, ...options })
+            response.cookies.set({ name, value, ...options })
           },
           remove(name: string, options: CookieOptions) {
-            try {
-              cookieStore.set({ name, value: '', ...options })
-            } catch (error) {
-              // The `delete` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
+            cookieStore.set({ name, value: '', ...options })
+            response.cookies.set({ name, value: '', ...options })
           },
         },
       }
@@ -43,8 +36,15 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
+    console.log('🔐 exchangeCodeForSession result:', { 
+      hasUser: !!data.user, 
+      userId: data.user?.id,
+      hasSession: !!data.session,
+      error: error?.message 
+    })
+
     if (!error && data.user) {
-      console.log('✅ התחברות הצליחה:', data.user.id)
+      console.log('✅ התחברות הצליחה:', data.user.id, 'email:', data.user.email)
 
       // המתן רגע קצר כדי שה-trigger יפעל (יצירת רשומה ב-users)
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -73,25 +73,29 @@ export async function GET(request: Request) {
       // אם אין רשומה ב-DB (טרם שילם) - הפנה לתשלום
       if (!userData) {
         console.log('💳 משתמש חדש, מפנה לתשלום')
-        return NextResponse.redirect(new URL('/payment', origin))
+        response = NextResponse.redirect(new URL('/payment', origin))
+        return response
       }
 
       // אם יש רשומה אבל אין מנוי פעיל - הפנה לתשלום
       const userInfo = userData as any
       if (userInfo.subscription_status !== 'active') {
         console.log('💳 אין מנוי פעיל, מפנה לתשלום')
-        return NextResponse.redirect(new URL('/payment', origin))
+        response = NextResponse.redirect(new URL('/payment', origin))
+        return response
       }
 
       // אם אין מספר טלפון (שילם אבל לא השלים onboarding) - הפנה ל-onboarding
       if (!userInfo.phone) {
         console.log('📱 אין מספר טלפון, מפנה ל-onboarding')
-        return NextResponse.redirect(new URL('/onboarding', origin))
+        response = NextResponse.redirect(new URL('/onboarding', origin))
+        return response
       }
 
       // אם יש הכל - הפנה ל-dashboard
       console.log('✅ הכל תקין, מפנה ל-dashboard')
-      return NextResponse.redirect(new URL('/dashboard', origin))
+      response = NextResponse.redirect(new URL('/dashboard', origin))
+      return response
     }
 
     if (error) {
@@ -100,6 +104,7 @@ export async function GET(request: Request) {
   }
 
   // אם יש שגיאה - הפנה בחזרה ל-login עם הודעת שגיאה
-  return NextResponse.redirect(new URL('/login?error=authentication_failed', origin))
+  response = NextResponse.redirect(new URL('/login?error=authentication_failed', origin))
+  return response
 }
 

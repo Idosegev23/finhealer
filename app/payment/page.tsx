@@ -21,8 +21,18 @@ export default function PaymentPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // המתן רגע קצר כדי שה-session יתעדכן אחרי redirect מ-OAuth
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
         const supabase = createClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        console.log('🔐 Payment page auth check:', { 
+          hasUser: !!user, 
+          userId: user?.id, 
+          email: user?.email,
+          error: authError?.message 
+        })
         
         if (authError || !user) {
           console.log('❌ לא מחובר, מפנה להתחברות')
