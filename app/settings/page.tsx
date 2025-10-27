@@ -398,7 +398,7 @@ function WhatsAppTab() {
           </ul>
 
           <p className="text-sm text-gray-600 mb-4">
-            עדכן את מספר הטלפון שלך בטאב "פרופיל אישי" כדי להתחבר
+            עדכן את מספר הטלפון שלך בטאב &quot;פרופיל אישי&quot; כדי להתחבר
           </p>
         </div>
       ) : (

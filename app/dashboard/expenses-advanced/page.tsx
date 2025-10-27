@@ -200,7 +200,7 @@ export default function ExpensesAdvancedPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-600 text-sm font-medium">סה"כ הוצאות</span>
+              <span className="text-gray-600 text-sm font-medium">סה&quot;כ הוצאות</span>
               <TrendingDown className="w-5 h-5 text-red-500" />
             </div>
             <p className="text-3xl font-bold text-gray-900">

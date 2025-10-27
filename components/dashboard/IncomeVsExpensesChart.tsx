@@ -93,7 +93,7 @@ export default function IncomeVsExpensesChart() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg p-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-green-100 text-sm font-medium">סה"כ הכנסות</span>
+            <span className="text-green-100 text-sm font-medium">סה&quot;כ הכנסות</span>
             <TrendingUp className="w-5 h-5 text-green-100" />
           </div>
           <p className="text-3xl font-bold">₪{summary?.totalIncome?.toLocaleString() || 0}</p>
@@ -104,7 +104,7 @@ export default function IncomeVsExpensesChart() {
 
         <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-xl shadow-lg p-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-red-100 text-sm font-medium">סה"כ הוצאות</span>
+            <span className="text-red-100 text-sm font-medium">סה&quot;כ הוצאות</span>
             <TrendingDown className="w-5 h-5 text-red-100" />
           </div>
           <p className="text-3xl font-bold">₪{summary?.totalExpenses?.toLocaleString() || 0}</p>
