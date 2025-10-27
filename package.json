@@ -29,7 +29,7 @@
     "framer-motion": "^11.18.2",
     "gsap": "^3.13.0",
     "lucide-react": "^0.445.0",
-    "motion": "^12.23.22",
+    "motion": "^12.23.24",
     "next": "^14.2.0",
     "openai": "^6.7.0",
     "pdf-parse": "^2.2.11",
