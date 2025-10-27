@@ -148,14 +148,17 @@ function ProfileTab() {
         return;
       }
 
-      setUserData(profile);
+      // Type assertion for Supabase data
+      const userData = profile as any;
+      
+      setUserData(userData);
       setFormData({
-        name: profile.name || '',
-        phone: profile.phone || '',
-        birth_date: profile.birth_date || '',
-        city: profile.city || '',
-        marital_status: profile.marital_status || '',
-        children_count: profile.children_count || 0,
+        name: userData.name || '',
+        phone: userData.phone || '',
+        birth_date: userData.birth_date || '',
+        city: userData.city || '',
+        marital_status: userData.marital_status || '',
+        children_count: userData.children_count || 0,
       });
       setLoading(false);
     } catch (err) {
