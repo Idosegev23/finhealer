@@ -106,11 +106,11 @@ export async function POST(request: NextRequest) {
         // ניתוח עם AI
         transactions = await analyzeTransactionsWithAI(extractedText, fileType);
       }
-      // PDF - שימוש ב-GPT-5 File Input עם Signed URL
+      // PDF - שימוש ב-GPT-5 File Input (העלאה ל-OpenAI)
       else if (mimeType === 'application/pdf' || fileName_.endsWith('.pdf')) {
-        console.log(`📄 Processing PDF with GPT-5 using Signed URL: ${fileUrl}`);
+        console.log(`📄 Processing PDF with GPT-5 (uploading to OpenAI)...`);
         
-        transactions = await analyzePDFWithAI(fileUrl, fileType);
+        transactions = await analyzePDFWithAI(buffer, fileType, file.name);
       }
       // Image - שימוש ב-GPT-5 Vision עם Signed URL מ-Supabase
       else if (mimeType.startsWith('image/')) {
@@ -246,8 +246,8 @@ ${text.substring(0, 8000)}
   }
 }
 
-// ניתוח PDF עם GPT-5 File Input (עם URL מ-Supabase)
-async function analyzePDFWithAI(fileUrl: string, fileType: string) {
+// ניתוח PDF עם GPT-5 File Input (העלאה ישירה ל-OpenAI)
+async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   const prompt = `נתח את המסמך של ${fileType === 'credit_statement' ? 'דוח אשראי' : 'דוח בנק'} וחלץ את כל התנועות הפיננסיות.
 
 עבור כל תנועה, זהה:
@@ -274,7 +274,17 @@ async function analyzePDFWithAI(fileUrl: string, fileType: string) {
 }`;
 
   try {
-    console.log('🤖 Analyzing PDF with GPT-5 from URL...');
+    // שלב 1: העלאת הקובץ ל-OpenAI Files API
+    console.log('📤 Uploading PDF to OpenAI Files API...');
+    const file = await openai.files.create({
+      file: new File([buffer], fileName, { type: 'application/pdf' }),
+      purpose: 'assistants',
+    });
+
+    console.log(`✅ File uploaded to OpenAI: ${file.id}`);
+
+    // שלב 2: ניתוח הקובץ עם GPT-5
+    console.log('🤖 Analyzing PDF with GPT-5...');
     
     const response = await openai.responses.create({
       model: 'gpt-5',
@@ -283,11 +293,19 @@ async function analyzePDFWithAI(fileUrl: string, fileType: string) {
           role: 'user',
           content: [
             { type: 'input_text', text: prompt },
-            { type: 'input_file', file_url: fileUrl },
+            { type: 'input_file', file_id: file.id },
           ],
         },
       ],
     });
+
+    // שלב 3: מחיקת הקובץ מ-OpenAI (ניקיון)
+    try {
+      await openai.files.del(file.id);
+      console.log('🗑️ File deleted from OpenAI');
+    } catch (deleteError) {
+      console.warn('Failed to delete file from OpenAI:', deleteError);
+    }
 
     const content = response.output_text || '{"transactions":[]}';
     const result = JSON.parse(content);
