@@ -37,13 +37,15 @@ export async function POST(request: NextRequest) {
     console.log(`📄 Processing statement: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
 
     // שלב 1: שמירת הקובץ ב-Storage
-    const fileName = `${user.id}/${Date.now()}_${file.name}`;
+    // הסרת תווים לא-ASCII משם הקובץ
+    const fileExtension = file.name.split('.').pop() || 'pdf';
+    const sanitizedFileName = `${user.id}/${Date.now()}.${fileExtension}`;
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('financial-documents')
-      .upload(fileName, buffer, {
+      .upload(sanitizedFileName, buffer, {
         contentType: file.type,
         upsert: false,
       });
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     const { data: { publicUrl } } = supabase.storage
       .from('financial-documents')
-      .getPublicUrl(fileName);
+      .getPublicUrl(sanitizedFileName);
 
     // שלב 2: יצירת רשומה ב-uploaded_statements
     const { data: statement, error: statementError } = await supabase
