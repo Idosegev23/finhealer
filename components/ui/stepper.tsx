@@ -104,7 +104,7 @@ export default function Stepper({
                   <div
                     className="step-indicator-inner"
                     style={{
-                      backgroundColor: isActive || isCompleted ? '#5227ff' : '#52525b',
+                      backgroundColor: isActive || isCompleted ? '#3E6E8C' : '#d1d5db',
                       cursor: stepNumber <= currentStep ? 'pointer' : 'default',
                     }}
                   >
@@ -123,7 +123,7 @@ export default function Stepper({
                     <div
                       className="step-connector-inner"
                       style={{
-                        backgroundColor: isCompleted ? '#5227ff' : '#52525b',
+                        backgroundColor: isCompleted ? '#3E6E8C' : '#d1d5db',
                         width: isCompleted ? '100%' : '0%',
                         transition: 'width 0.3s ease',
                       }}

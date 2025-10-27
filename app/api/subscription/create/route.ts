@@ -15,12 +15,16 @@ export async function POST(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
+    console.log('🔐 User authentication:', { hasUser: !!user, userId: user?.id });
+
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { plan, onboardingType, phone, waOptIn } = body;
+
+    console.log('📦 Request body:', { plan, onboardingType, phone, waOptIn });
 
     if (!plan || !['basic', 'advanced'].includes(plan)) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
