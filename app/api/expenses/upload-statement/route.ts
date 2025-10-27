@@ -224,7 +224,6 @@ ${text.substring(0, 8000)}
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.1,
-      max_tokens: 4000,
     });
 
     const content = response.output_text || '{"transactions":[]}';
@@ -277,7 +276,6 @@ async function analyzeImageWithAI(dataUrl: string) {
         },
       ],
       temperature: 0.1,
-      max_tokens: 4000,
     });
 
     const content = response.output_text || '{"transactions":[]}';

@@ -105,7 +105,6 @@ export async function POST(request: Request) {
         }
       ],
       temperature: 0.2,
-      max_tokens: 300,
     })
 
     const aiText = aiResponse.output_text || '{}'

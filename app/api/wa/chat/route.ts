@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
       model: 'gpt-5',
       input: messages,
       temperature: 0.7,
-      max_tokens: 500,
     });
 
     const aiResponse = completion.output_text || 'סליחה, לא הבנתי. תנסה שוב?';
