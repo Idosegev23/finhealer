@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -8,14 +9,45 @@ export async function GET(request: Request) {
   const origin = requestUrl.origin
 
   if (code) {
-    const supabase = await createClient()
+    const cookieStore = await cookies()
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: CookieOptions) {
+            try {
+              cookieStore.set({ name, value, ...options })
+            } catch (error) {
+              // The `set` method was called from a Server Component.
+              // This can be ignored if you have middleware refreshing
+              // user sessions.
+            }
+          },
+          remove(name: string, options: CookieOptions) {
+            try {
+              cookieStore.set({ name, value: '', ...options })
+            } catch (error) {
+              // The `delete` method was called from a Server Component.
+              // This can be ignored if you have middleware refreshing
+              // user sessions.
+            }
+          },
+        },
+      }
+    )
+
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && data.user) {
       console.log('✅ התחברות הצליחה:', data.user.id)
 
       // המתן רגע קצר כדי שה-trigger יפעל (יצירת רשומה ב-users)
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
       // צור admin client לבדיקה
       const supabaseAdmin = createAdminClient(
@@ -41,25 +73,25 @@ export async function GET(request: Request) {
       // אם אין רשומה ב-DB (טרם שילם) - הפנה לתשלום
       if (!userData) {
         console.log('💳 משתמש חדש, מפנה לתשלום')
-        return NextResponse.redirect(`${origin}/payment`)
+        return NextResponse.redirect(new URL('/payment', origin))
       }
 
       // אם יש רשומה אבל אין מנוי פעיל - הפנה לתשלום
       const userInfo = userData as any
       if (userInfo.subscription_status !== 'active') {
         console.log('💳 אין מנוי פעיל, מפנה לתשלום')
-        return NextResponse.redirect(`${origin}/payment`)
+        return NextResponse.redirect(new URL('/payment', origin))
       }
 
       // אם אין מספר טלפון (שילם אבל לא השלים onboarding) - הפנה ל-onboarding
       if (!userInfo.phone) {
         console.log('📱 אין מספר טלפון, מפנה ל-onboarding')
-        return NextResponse.redirect(`${origin}/onboarding`)
+        return NextResponse.redirect(new URL('/onboarding', origin))
       }
 
       // אם יש הכל - הפנה ל-dashboard
       console.log('✅ הכל תקין, מפנה ל-dashboard')
-      return NextResponse.redirect(`${origin}/dashboard`)
+      return NextResponse.redirect(new URL('/dashboard', origin))
     }
 
     if (error) {
@@ -68,6 +100,6 @@ export async function GET(request: Request) {
   }
 
   // אם יש שגיאה - הפנה בחזרה ל-login עם הודעת שגיאה
-  return NextResponse.redirect(`${origin}/login?error=authentication_failed`)
+  return NextResponse.redirect(new URL('/login?error=authentication_failed', origin))
 }
 
