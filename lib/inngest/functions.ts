@@ -1,6 +1,6 @@
 import { inngest } from './client';
 import { createClient } from '@/lib/supabase/server';
-import { getGreenAPIClient } from '@/lib/greenapi';
+import { getGreenAPIClient } from '@/lib/greenapi/client';
 import * as XLSX from 'xlsx';
 import OpenAI from 'openai';
 
