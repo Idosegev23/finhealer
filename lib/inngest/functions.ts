@@ -31,12 +31,15 @@ export const processStatement = inngest.createFunction(
         .eq('id', statementId)
         .single();
 
-      if (!statement?.file_url) {
+      // Type assertion
+      const statementData = statement as any;
+
+      if (!statementData?.file_url) {
         throw new Error('File not found');
       }
 
       // הורדת הקובץ
-      const response = await fetch(statement.file_url);
+      const response = await fetch(statementData.file_url);
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
