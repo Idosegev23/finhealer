@@ -84,11 +84,14 @@ export async function middleware(request: NextRequest) {
     // Debug logging
     console.log('🔐 Middleware check:', {
       path: currentPath,
+      userId: user.id,
+      userEmail: user.email,
       userExistsInDB,
       hasActiveSubscription,
       hasCompletedOnboarding,
       userName: userData?.name,
-      userPhone: userData?.phone
+      userPhone: userData?.phone,
+      userError: userError?.message
     })
 
     // תהליך: login (auth) → payment (בחירת תוכנית בתוכו) → users table נוצר → onboarding → dashboard
@@ -99,6 +102,7 @@ export async function middleware(request: NextRequest) {
       if (!currentPath.startsWith('/onboarding') &&
           currentPath !== '/login' &&
           currentPath !== '/signup') {
+        console.log('🎯 Redirecting new user to onboarding from:', currentPath)
         return NextResponse.redirect(new URL('/onboarding', request.url))
       }
     }
