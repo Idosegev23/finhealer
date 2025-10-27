@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }
 
-    if (!phone || phone.length < 9) {
+    // אפשר טלפון זמני (0000000000) - יעודכן בשלב הבא
+    if (!phone) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
     }
 
@@ -53,12 +54,15 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .maybeSingle();
 
-    // נקה מספר טלפון (הוסף +972 אם אין)
-    let cleanPhone = phone.replace(/\D/g, ''); // רק ספרות
-    if (cleanPhone.startsWith('0')) {
-      cleanPhone = '972' + cleanPhone.substring(1);
-    } else if (!cleanPhone.startsWith('972')) {
-      cleanPhone = '972' + cleanPhone;
+    // נקה מספר טלפון (הוסף +972 אם אין) - אבל לא אם זה זמני
+    let cleanPhone = phone;
+    if (phone !== '0000000000') {
+      cleanPhone = phone.replace(/\D/g, ''); // רק ספרות
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = '972' + cleanPhone.substring(1);
+      } else if (!cleanPhone.startsWith('972')) {
+        cleanPhone = '972' + cleanPhone;
+      }
     }
 
     // יצור/עדכן משתמש ב-users table (נוצר רק אחרי תשלום מוצלח!)
@@ -68,7 +72,7 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.user_metadata?.name || user.email?.split('@')[0] || '',
-        phone: cleanPhone,
+        phone: phone === '0000000000' ? null : cleanPhone, // null אם זמני
         wa_opt_in: waOptIn !== undefined ? waOptIn : true,
         subscription_status: 'active',
         phase: 'reflection', // יתחיל תמיד מ-reflection
@@ -116,13 +120,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`✅ User ${user.id} created in DB and subscribed to ${plan}. Phone: ${cleanPhone}, WA Opt-in: ${waOptIn}`);
+    console.log(`✅ User ${user.id} created in DB and subscribed to ${plan}. Phone: ${phone === '0000000000' ? 'temporary' : cleanPhone}, WA Opt-in: ${waOptIn}`);
 
     return NextResponse.json({
       success: true,
       message: 'User created and subscription activated',
       onboardingType: onboardingType || 'quick',
-      phone: cleanPhone,
+      phone: phone === '0000000000' ? null : cleanPhone,
       waOptIn: waOptIn,
     });
   } catch (error: any) {
