@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('transactions')
-      .select('*, budget_categories(name, color, icon)', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('user_id', user.id)
       .order('tx_date', { ascending: false });
 
