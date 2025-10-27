@@ -204,14 +204,15 @@ export async function POST(request: NextRequest) {
             user_id: userData.id,
             type: 'expense',
               amount: expense.amount,
-            category: category,
+            category: category || 'other',
             expense_type: expenseType,
             category_group: categoryGroup,
             auto_categorized: autoCategorized,
               vendor: expense.vendor,
-              description: expense.description || text,
+              notes: expense.description || text,
               source: 'whatsapp',
             status: 'proposed',
+            date: new Date().toISOString().split('T')[0],
             tx_date: new Date().toISOString().split('T')[0],
           })
           .select()

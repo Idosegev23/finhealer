@@ -37,17 +37,11 @@ export default async function TransactionsPage() {
 
   const { data: transactions } = await supabase
     .from('transactions')
-    .select(`
-      *,
-      budget_categories (
-        id,
-        name
-      )
-    `)
+    .select('*')
     .eq('user_id', user.id)
     .gte('tx_date', thirtyDaysAgo.toISOString().split('T')[0])
     .order('tx_date', { ascending: false })
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false});
 
   // קבלת קטגוריות למסנן
   const { data: categories } = await supabase
