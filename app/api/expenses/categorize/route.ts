@@ -1,193 +1,172 @@
 // @ts-nocheck
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import OpenAI from 'openai'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+})
 
 /**
- * POST /api/expenses/categorize
- * זיהוי אוטומטי של קטגוריית הוצאה מטקסט חופשי
- * 
- * Body:
- * {
- *   description: string,
- *   vendor?: string,
- *   amount?: number
- * }
- * 
- * Response:
- * {
- *   suggested_category: string,
- *   detailed_category: string,
- *   expense_frequency: 'fixed' | 'temporary' | 'special' | 'one_time',
- *   confidence: number (0-1),
- *   category_group?: string
- * }
+ * AI Category Router
+ * ניתוב חכם של הוצאות לקטגוריות נכונות
+ * לומד מהעדפות המשתמש ומשפר את עצמו עם הזמן
  */
-
-// מיפוי קטגוריות מפורטות
-interface CategoryMapping {
-  keywords: string[];
-  detailed_category: string;
-  expense_frequency: 'fixed' | 'temporary' | 'special' | 'one_time';
-  category_label: string;
-}
-
-const CATEGORY_MAPPINGS: CategoryMapping[] = [
-  // מזון ומשקאות
-  { keywords: ['סופר', 'שופרסל', 'רמי לוי', 'ויקטורי', 'יוחננוף', 'סופרמרקט', 'טיב טעם', 'mega', 'good pharm', 'מכולת', 'שוק'], detailed_category: 'food_beverages', expense_frequency: 'fixed', category_label: 'קניות סופר' },
-  { keywords: ['מסעדה', 'קפה', 'בית קפה', 'פיצה', 'המבורגר', 'סושי', 'מקדונלד', 'בורגר קינג', 'פלאפל', 'שווארמה', 'מזון', 'אוכל'], detailed_category: 'food_beverages', expense_frequency: 'one_time', category_label: 'מסעדות וקפה' },
-  
-  // סלולר ותקשורת
-  { keywords: ['סלולר', 'סלולרי', 'פלאפון', 'cellcom', 'סלקום', 'פרטנר', 'golan', 'גולן טלקום', 'הוט מובייל', '012', '019', 'רמי לוי תקשורת'], detailed_category: 'cellular_communication', expense_frequency: 'fixed', category_label: 'סלולר' },
-  { keywords: ['אינטרנט', 'בזק', 'hot', 'סיבים אופטיים', 'fiber', 'unlimited', 'ibc'], detailed_category: 'cellular_communication', expense_frequency: 'fixed', category_label: 'אינטרנט' },
-  { keywords: ['טלוויזיה', 'yes', 'סלקום tv', 'נטפליקס', 'netflix', 'spotify', 'disney', 'apple tv'], detailed_category: 'subscriptions', expense_frequency: 'fixed', category_label: 'מנויים דיגיטליים' },
-  
-  // תחבורה ודלק
-  { keywords: ['דלק', 'תדלוק', 'פז', 'סונול', 'דור אלון', 'דלק מוטור', 'ten', 'יעלים', 'benzi', 'sonol'], detailed_category: 'transportation_fuel', expense_frequency: 'fixed', category_label: 'דלק' },
-  { keywords: ['חניה', 'פארק', 'parking', 'חנייה'], detailed_category: 'transportation_fuel', expense_frequency: 'fixed', category_label: 'חניה' },
-  { keywords: ['מוסך', 'תיקון רכב', 'שירות רכב', 'טסט', 'טיפול'], detailed_category: 'transportation_fuel', expense_frequency: 'special', category_label: 'תחזוקת רכב' },
-  { keywords: ['כביש 6', 'כביש אגרה', 'מעברים', 'איילון'], detailed_category: 'transportation_fuel', expense_frequency: 'one_time', category_label: 'כבישי אגרה' },
-  { keywords: ['רב קו', 'רכבת', 'אוטובוס', 'מונית', 'אגד', 'דן', 'מטרופולין'], detailed_category: 'transportation_fuel', expense_frequency: 'one_time', category_label: 'תחבורה ציבורית' },
-  
-  // דיור ותחזוקה
-  { keywords: ['ארנונה', 'עירייה', 'מס שבח', 'עיריית'], detailed_category: 'housing_maintenance', expense_frequency: 'fixed', category_label: 'ארנונה' },
-  { keywords: ['חשמל', 'חברת חשמל', 'חח"י'], detailed_category: 'utilities', expense_frequency: 'fixed', category_label: 'חשמל' },
-  { keywords: ['מים', 'מי ירושלים', 'תאגיד מים', 'עיריית'], detailed_category: 'utilities', expense_frequency: 'fixed', category_label: 'מים' },
-  { keywords: ['גז', 'סופרגז', 'אמגז'], detailed_category: 'utilities', expense_frequency: 'fixed', category_label: 'גז' },
-  { keywords: ['ועד בית', 'ועד הבית', 'דמי ניהול', 'ניהול'], detailed_category: 'housing_maintenance', expense_frequency: 'fixed', category_label: 'ועד בית' },
-  { keywords: ['משכנתא', 'הלוואה לדירה'], detailed_category: 'loans_debt', expense_frequency: 'fixed', category_label: 'משכנתא' },
-  { keywords: ['שכירות', 'שכר דירה'], detailed_category: 'housing_maintenance', expense_frequency: 'fixed', category_label: 'שכירות' },
-  
-  // ביטוחים
-  { keywords: ['ביטוח חיים', 'הפניקס', 'מגדל', 'הראל', 'כלל', 'מנורה'], detailed_category: 'insurance', expense_frequency: 'fixed', category_label: 'ביטוח חיים' },
-  { keywords: ['ביטוח רכב', 'ביטוח חובה', 'ביטוח מקיף'], detailed_category: 'insurance', expense_frequency: 'fixed', category_label: 'ביטוח רכב' },
-  { keywords: ['ביטוח דירה', 'ביטוח נכס', 'ביטוח תכולה'], detailed_category: 'insurance', expense_frequency: 'fixed', category_label: 'ביטוח דירה' },
-  
-  // בריאות
-  { keywords: ['קופת חולים', 'כללית', 'מכבי', 'מאוחדת', 'לאומית'], detailed_category: 'health_medical', expense_frequency: 'fixed', category_label: 'קופת חולים' },
-  { keywords: ['תרופות', 'בית מרקחת', 'סופר פארם', 'פארם', 'תרופה'], detailed_category: 'health_medical', expense_frequency: 'one_time', category_label: 'תרופות' },
-  { keywords: ['שיניים', 'רופא שיניים', 'דנטל', 'שיננית'], detailed_category: 'health_medical', expense_frequency: 'special', category_label: 'רופא שיניים' },
-  { keywords: ['רופא', 'מרפאה', 'בדיקה', 'טיפול'], detailed_category: 'health_medical', expense_frequency: 'one_time', category_label: 'רופאים' },
-  
-  // חינוך
-  { keywords: ['גן', 'גן ילדים', 'מעון', 'פעוטון'], detailed_category: 'education', expense_frequency: 'fixed', category_label: 'גן ילדים' },
-  { keywords: ['בית ספר', 'חינוך', 'משרד החינוך', 'בי"ס'], detailed_category: 'education', expense_frequency: 'fixed', category_label: 'בית ספר' },
-  { keywords: ['חוג', 'פעילות', 'שיעור', 'קורס'], detailed_category: 'education', expense_frequency: 'fixed', category_label: 'חוגים' },
-  { keywords: ['צהרון', 'צהריים', 'השגחה'], detailed_category: 'education', expense_frequency: 'fixed', category_label: 'צהרון' },
-  
-  // ביגוד והנעלה
-  { keywords: ['ביגוד', 'בגדים', 'זארה', 'castro', 'fox', 'h&m', 'מנגו', 'נעליים', 'נעל'], detailed_category: 'clothing_footwear', expense_frequency: 'one_time', category_label: 'ביגוד ונעליים' },
-  
-  // בילויים
-  { keywords: ['קולנוע', 'תיאטרון', 'הופעה', 'פארק שעשועים', 'סינמה', 'כרטיס'], detailed_category: 'entertainment_leisure', expense_frequency: 'one_time', category_label: 'בילויים' },
-  { keywords: ['חדר כושר', 'חדכ', 'כושר', 'gym', 'פיטנס'], detailed_category: 'subscriptions', expense_frequency: 'fixed', category_label: 'חדר כושר' },
-  
-  // קניות כלליות
-  { keywords: ['איקאה', 'ikea', 'ace', 'home center', 'רהיטים', 'ציוד לבית'], detailed_category: 'shopping_general', expense_frequency: 'one_time', category_label: 'קניות לבית' },
-];
-
-// פונקציה לזיהוי קטגוריה מפורטת
-function detectCategoryDetailed(text: string): {
-  category_label: string;
-  detailed_category: string;
-  expense_frequency: string;
-  confidence: number;
-} | null {
-  const lowerText = text.toLowerCase();
-  
-  let bestMatch: {
-    category_label: string;
-    detailed_category: string;
-    expense_frequency: string;
-    confidence: number;
-  } | null = null;
-  let highestScore = 0;
-
-  for (const mapping of CATEGORY_MAPPINGS) {
-    let score = 0;
-    let matchedKeywords = 0;
-
-    for (const keyword of mapping.keywords) {
-      if (lowerText.includes(keyword.toLowerCase())) {
-        matchedKeywords++;
-        // ציון גבוה יותר להתאמה מדויקת יותר
-        score += keyword.length;
-      }
-    }
-
-    if (matchedKeywords > 0) {
-      // נרמול הציון לפי מספר המילות המפתח
-      const normalizedScore = score / mapping.keywords.length;
-      if (normalizedScore > highestScore) {
-        highestScore = normalizedScore;
-        bestMatch = {
-          category_label: mapping.category_label,
-          detailed_category: mapping.detailed_category,
-          expense_frequency: mapping.expense_frequency,
-          confidence: Math.min(matchedKeywords / mapping.keywords.length, 0.95)
-        };
-      }
-    }
-  }
-
-  return bestMatch;
-}
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    
-    const body = await request.json();
-    const { description, vendor, amount } = body;
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    if (!description) {
-      return NextResponse.json(
-        { error: 'Missing description' },
-        { status: 400 }
-      );
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // שילוב description + vendor לניתוח טוב יותר
-    const fullText = [description, vendor].filter(Boolean).join(' ');
+    const body = await request.json()
+    const { description, vendor, amount } = body
 
-    // ניסיון לזיהוי הקטגוריה
-    const detection = detectCategoryDetailed(fullText);
+    if (!description && !vendor) {
+      return NextResponse.json({ error: 'Description or vendor required' }, { status: 400 })
+    }
 
-    if (detection) {
+    console.log('🤖 AI Categorization request:', { userId: user.id, description, vendor, amount })
+
+    // 1. בדוק אם יש כלל מותאם אישית למשתמש
+    const { data: userRule } = await supabase
+      .from('user_category_rules')
+      .select('*')
+      .eq('user_id', user.id)
+      .ilike('vendor_pattern', `%${vendor || description}%`)
+      .order('confidence', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (userRule) {
+      // עדכן שימושים
+      await supabase
+        .from('user_category_rules')
+        .update({
+          times_used: (userRule.times_used || 0) + 1,
+          last_used_at: new Date().toISOString(),
+        })
+        .eq('id', userRule.id)
+
+      console.log('✅ Found user rule:', userRule)
+
       return NextResponse.json({
-        suggested_category: detection.category_label,
-        detailed_category: detection.detailed_category,
-        expense_frequency: detection.expense_frequency,
-        confidence: detection.confidence,
-        matched: true
-      });
+        success: true,
+        matched: true,
+        source: 'user_rule',
+        suggested_category: userRule.category,
+        detailed_category: userRule.detailed_category,
+        expense_frequency: userRule.expense_frequency,
+        confidence: userRule.confidence || 0.9,
+      })
     }
 
-    // אם לא מצאנו התאמה, ננסה לנחש לפי סכום
-    let defaultFrequency: 'fixed' | 'temporary' | 'special' | 'one_time' = 'one_time';
-    if (amount) {
-      // סכומים קבועים/חוזרים בדרך כלל באותו טווח
-      if (amount > 50 && amount < 500) {
-        defaultFrequency = 'fixed';
-      } else if (amount > 5000) {
-        defaultFrequency = 'special';
+    // 2. שאל את GPT-4 לסיווג
+    const aiResponse = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `אתה מומחה לסיווג הוצאות בישראל.
+תפקידך לסווג הוצאות לקטגוריות נכונות על פי התיאור והספק.
+
+קטגוריות אפשריות:
+- food: מזון (מסעדות, קפה, סופרמרקט)
+- transport: תחבורה (דלק, חניה, תחבורה ציבורית, מונית)
+- shopping: קניות (ביגוד, אלקטרוניקה, רהיטים)
+- health: בריאות (תרופות, רופא, ביטוח בריאות)
+- entertainment: בילויים (קולנוע, תיאטרון, פארקים)
+- education: חינוך (שכר לימוד, ספרים, קורסים)
+- housing: דיור (שכר דירה, משכנתא, תיקונים)
+- utilities: שירותים (חשמל, מים, גז, אינטרנט, סלולר)
+- other: אחר
+
+סוגי הוצאה (expense_frequency):
+- fixed: הוצאה קבועה חודשית (דירה, ביטוח, סלולר)
+- temporary: הוצאה זמנית (כמה חודשים)
+- special: הוצאה מיוחדת (אירועים, חגים)
+- one_time: הוצאה חד פעמית
+
+החזר JSON:
+{
+  "category": "food",
+  "detailed_category": "restaurants",
+  "expense_frequency": "one_time",
+  "confidence": 0.95,
+  "reasoning": "הסבר קצר"
+}`
+        },
+        {
+          role: 'user',
+          content: `סווג את ההוצאה הזו:\nספק: ${vendor || 'לא צוין'}\nתיאור: ${description}\nסכום: ₪${amount || 0}`
+        }
+      ],
+      temperature: 0.2,
+      max_tokens: 300,
+    })
+
+    const aiText = aiResponse.choices[0]?.message?.content || '{}'
+    console.log('🎯 AI Categorization:', aiText)
+
+    let aiResult: any
+    try {
+      aiResult = JSON.parse(aiText)
+    } catch {
+      aiResult = { category: 'other', confidence: 0.5 }
+    }
+
+    // 3. שמור כלל חדש אם הביטחון גבוה
+    if (aiResult.confidence >= 0.8 && (vendor || description)) {
+      const vendorPattern = vendor || description.substring(0, 50)
+      
+      // בדוק אם כבר קיים
+      const { data: existingRule } = await supabase
+        .from('user_category_rules')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('vendor_pattern', vendorPattern)
+        .maybeSingle()
+
+      if (!existingRule) {
+        await supabase
+          .from('user_category_rules')
+          .insert({
+            user_id: user.id,
+            vendor_pattern: vendorPattern,
+            category: aiResult.category,
+            detailed_category: aiResult.detailed_category,
+            expense_frequency: aiResult.expense_frequency,
+            confidence: aiResult.confidence,
+            times_used: 1,
+            last_used_at: new Date().toISOString(),
+          })
+
+        console.log('💾 Saved new rule:', vendorPattern)
       }
     }
 
     return NextResponse.json({
-      suggested_category: 'אחר',
-      detailed_category: 'other',
-      expense_frequency: defaultFrequency,
-      confidence: 0.3,
-      matched: false,
-      message: 'לא נמצאה התאמה אוטומטית. נא לבחור קטגוריה ידנית.'
-    });
+      success: true,
+      matched: true,
+      source: 'ai',
+      suggested_category: aiResult.category,
+      detailed_category: aiResult.detailed_category,
+      expense_frequency: aiResult.expense_frequency,
+      confidence: aiResult.confidence || 0.7,
+      reasoning: aiResult.reasoning,
+    })
 
-  } catch (error) {
-    console.error('Categorize API error:', error);
+  } catch (error: any) {
+    console.error('❌ Categorization error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Failed to categorize', 
+        details: error.message 
+      },
       { status: 500 }
-    );
+    )
   }
 }
-
