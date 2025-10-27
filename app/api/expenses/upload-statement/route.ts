@@ -97,10 +97,18 @@ export async function POST(request: NextRequest) {
         // ניתוח עם AI
         transactions = await analyzeTransactionsWithAI(extractedText, fileType);
       }
-      // PDF או Image - שימוש ב-GPT-4 Vision
-      else if (mimeType === 'application/pdf' || fileName_.endsWith('.pdf') || mimeType.startsWith('image/')) {
-        const fileTypeLabel = mimeType.startsWith('image/') ? 'image' : 'PDF';
-        console.log(`🖼️ Processing ${fileTypeLabel} with GPT-4 Vision...`);
+      // PDF - שימוש ב-GPT-5 File Input
+      else if (mimeType === 'application/pdf' || fileName_.endsWith('.pdf')) {
+        console.log(`📄 Processing PDF with GPT-5 File Input...`);
+        
+        const base64 = buffer.toString('base64');
+        const dataUrl = `data:${mimeType};base64,${base64}`;
+        
+        transactions = await analyzePDFWithAI(dataUrl, fileType);
+      }
+      // Image - שימוש ב-GPT-5 Vision
+      else if (mimeType.startsWith('image/')) {
+        console.log(`🖼️ Processing Image with GPT-5 Vision...`);
         
         const base64 = buffer.toString('base64');
         const dataUrl = `data:${mimeType};base64,${base64}`;
@@ -236,7 +244,59 @@ ${text.substring(0, 8000)}
   }
 }
 
-// ניתוח תמונה עם GPT-4 Vision
+// ניתוח PDF עם GPT-5 File Input
+async function analyzePDFWithAI(dataUrl: string, fileType: string) {
+  const prompt = `נתח את המסמך של ${fileType === 'credit_statement' ? 'דוח אשראי' : 'דוח בנק'} וחלץ את כל התנועות הפיננסיות.
+
+עבור כל תנועה, זהה:
+1. תאריך (YYYY-MM-DD)
+2. תיאור/שם העסק
+3. סכום
+4. קטגוריה מפורטת (food_beverages, cellular_communication, entertainment_leisure, transportation_fuel, housing_maintenance, clothing_footwear, health_medical, education, utilities, shopping_general, subscriptions, insurance, loans_debt, other)
+5. תדירות (fixed/temporary/special/one_time)
+
+החזר JSON:
+{
+  "transactions": [
+    {
+      "date": "YYYY-MM-DD",
+      "description": "תיאור",
+      "vendor": "שם עסק",
+      "amount": 123.45,
+      "category": "קטגוריה",
+      "detailed_category": "food_beverages",
+      "expense_frequency": "fixed",
+      "confidence": 0.9
+    }
+  ]
+}`;
+
+  try {
+    const response = await openai.responses.create({
+      model: 'gpt-5',
+      input: [
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: prompt },
+            { type: 'input_file', file: dataUrl },
+          ],
+        },
+      ],
+      temperature: 0.1,
+    });
+
+    const content = response.output_text || '{"transactions":[]}';
+    const result = JSON.parse(content);
+    
+    return result.transactions || [];
+  } catch (error) {
+    console.error('PDF analysis error:', error);
+    throw new Error('Failed to analyze PDF with AI');
+  }
+}
+
+// ניתוח תמונה עם GPT-5 Vision
 async function analyzeImageWithAI(dataUrl: string) {
   const prompt = `נתח את התמונה של דוח בנק/אשראי וחלץ את כל התנועות הפיננסיות.
 
