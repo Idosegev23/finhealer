@@ -70,24 +70,17 @@ export async function GET(request: Request) {
 
       console.log('🔍 בדיקת משתמש:', { userData, selectError })
 
-      // אם אין רשומה ב-DB (טרם שילם) - הפנה לתשלום
+      // אם אין רשומה ב-DB (משתמש חדש) - הפנה לאונבורדינג
       if (!userData) {
-        console.log('💳 משתמש חדש, מפנה לתשלום')
-        response = NextResponse.redirect(new URL('/payment', origin))
+        console.log('🎉 משתמש חדש, מפנה לאונבורדינג')
+        response = NextResponse.redirect(new URL('/onboarding', origin))
         return response
       }
 
-      // אם יש רשומה אבל אין מנוי פעיל - הפנה לתשלום
+      // אם יש רשומה אבל טרם השלים את האונבורדינג - הפנה לאונבורדינג
       const userInfo = userData as any
-      if (userInfo.subscription_status !== 'active') {
-        console.log('💳 אין מנוי פעיל, מפנה לתשלום')
-        response = NextResponse.redirect(new URL('/payment', origin))
-        return response
-      }
-
-      // אם אין מספר טלפון (שילם אבל לא השלים onboarding) - הפנה ל-onboarding
-      if (!userInfo.phone) {
-        console.log('📱 אין מספר טלפון, מפנה ל-onboarding')
+      if (userInfo.subscription_status !== 'active' || !userInfo.phone) {
+        console.log('📝 לא השלים אונבורדינג, מפנה להשלמה')
         response = NextResponse.redirect(new URL('/onboarding', origin))
         return response
       }

@@ -16,6 +16,7 @@ interface StepperProps {
   children: ReactNode[];
   initialStep?: number;
   onStepChange?: (step: number) => void;
+  onBeforeStepChange?: (fromStep: number, toStep: number) => Promise<boolean> | boolean;
   onFinalStepCompleted?: () => void;
   backButtonText?: string;
   nextButtonText?: string;
@@ -26,18 +27,40 @@ export default function Stepper({
   children,
   initialStep = 1,
   onStepChange,
+  onBeforeStepChange,
   onFinalStepCompleted,
   backButtonText = 'הקודם',
   nextButtonText = 'הבא',
   finalButtonText = 'סיום',
 }: StepperProps) {
   const [currentStep, setCurrentStep] = useState(initialStep);
+  const [isProcessing, setIsProcessing] = useState(false);
   const steps = React.Children.toArray(children);
   const totalSteps = steps.length;
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (isProcessing) return;
+
     if (currentStep < totalSteps) {
       const nextStep = currentStep + 1;
+      
+      // Call onBeforeStepChange if provided
+      if (onBeforeStepChange) {
+        setIsProcessing(true);
+        try {
+          const canProceed = await onBeforeStepChange(currentStep, nextStep);
+          if (!canProceed) {
+            setIsProcessing(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error in onBeforeStepChange:', error);
+          setIsProcessing(false);
+          return;
+        }
+        setIsProcessing(false);
+      }
+      
       setCurrentStep(nextStep);
       onStepChange?.(nextStep);
     } else {
@@ -125,8 +148,13 @@ export default function Stepper({
                 {backButtonText}
               </button>
             )}
-            <button className="next-button" onClick={handleNext}>
-              {currentStep === totalSteps ? finalButtonText : nextButtonText}
+            <button 
+              className="next-button" 
+              onClick={handleNext}
+              disabled={isProcessing}
+              style={{ opacity: isProcessing ? 0.6 : 1 }}
+            >
+              {isProcessing ? 'מעבד...' : currentStep === totalSteps ? finalButtonText : nextButtonText}
             </button>
           </div>
         </div>
