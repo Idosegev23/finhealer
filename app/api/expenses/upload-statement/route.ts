@@ -97,20 +97,17 @@ export async function POST(request: NextRequest) {
         // ניתוח עם AI
         transactions = await analyzeTransactionsWithAI(extractedText, fileType);
       }
-      // PDF - שימוש ב-GPT-5 File Input
+      // PDF - שימוש ב-GPT-5 File Input עם URL מ-Supabase
       else if (mimeType === 'application/pdf' || fileName_.endsWith('.pdf')) {
-        console.log(`📄 Processing PDF with GPT-5 File Input...`);
+        console.log(`📄 Processing PDF with GPT-5 using Supabase URL: ${publicUrl}`);
         
-        transactions = await analyzePDFWithAI(buffer, fileType, file.name);
+        transactions = await analyzePDFWithAI(publicUrl, fileType);
       }
-      // Image - שימוש ב-GPT-5 Vision
+      // Image - שימוש ב-GPT-5 Vision עם URL מ-Supabase
       else if (mimeType.startsWith('image/')) {
-        console.log(`🖼️ Processing Image with GPT-5 Vision...`);
+        console.log(`🖼️ Processing Image with GPT-5 Vision using Supabase URL: ${publicUrl}`);
         
-        const base64 = buffer.toString('base64');
-        const dataUrl = `data:${mimeType};base64,${base64}`;
-        
-        transactions = await analyzeImageWithAI(dataUrl);
+        transactions = await analyzeImageWithAI(publicUrl);
       }
       else {
         // סוג קובץ לא נתמך
@@ -241,8 +238,8 @@ ${text.substring(0, 8000)}
   }
 }
 
-// ניתוח PDF עם GPT-5 File Input
-async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
+// ניתוח PDF עם GPT-5 File Input (עם URL מ-Supabase)
+async function analyzePDFWithAI(fileUrl: string, fileType: string) {
   const prompt = `נתח את המסמך של ${fileType === 'credit_statement' ? 'דוח אשראי' : 'דוח בנק'} וחלץ את כל התנועות הפיננסיות.
 
 עבור כל תנועה, זהה:
@@ -269,16 +266,8 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 }`;
 
   try {
-    // שלב 1: העלאת הקובץ ל-OpenAI Files API
-    console.log('📤 Uploading PDF to OpenAI...');
-    const file = await openai.files.create({
-      file: new File([buffer], fileName, { type: 'application/pdf' }),
-      purpose: 'assistants',
-    });
-
-    console.log('✅ File uploaded:', file.id);
-
-    // שלב 2: ניתוח הקובץ עם GPT-5
+    console.log('🤖 Analyzing PDF with GPT-5 from URL...');
+    
     const response = await openai.responses.create({
       model: 'gpt-5',
       input: [
@@ -286,20 +275,12 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
           role: 'user',
           content: [
             { type: 'input_text', text: prompt },
-            { type: 'input_file', file_id: file.id },
+            { type: 'input_file', file_url: fileUrl },
           ],
         },
       ],
       temperature: 0.1,
     });
-
-    // שלב 3: מחיקת הקובץ מ-OpenAI (ניקיון)
-    try {
-      await openai.files.del(file.id);
-      console.log('🗑️ File deleted from OpenAI');
-    } catch (deleteError) {
-      console.warn('Failed to delete file:', deleteError);
-    }
 
     const content = response.output_text || '{"transactions":[]}';
     const result = JSON.parse(content);
@@ -311,8 +292,8 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
   }
 }
 
-// ניתוח תמונה עם GPT-5 Vision
-async function analyzeImageWithAI(dataUrl: string) {
+// ניתוח תמונה עם GPT-5 Vision (עם URL מ-Supabase)
+async function analyzeImageWithAI(imageUrl: string) {
   const prompt = `נתח את התמונה של דוח בנק/אשראי וחלץ את כל התנועות הפיננסיות.
 
 עבור כל תנועה, זהה:
@@ -339,6 +320,8 @@ async function analyzeImageWithAI(dataUrl: string) {
 }`;
 
   try {
+    console.log('🤖 Analyzing image with GPT-5 from URL...');
+    
     const response = await openai.responses.create({
       model: 'gpt-5',
       input: [
@@ -346,7 +329,7 @@ async function analyzeImageWithAI(dataUrl: string) {
           role: 'user',
           content: [
             { type: 'input_text', text: prompt },
-            { type: 'input_image', image_url: dataUrl },
+            { type: 'input_image', image_url: imageUrl },
           ],
         },
       ],
@@ -358,7 +341,7 @@ async function analyzeImageWithAI(dataUrl: string) {
     
     return result.transactions || [];
   } catch (error) {
-    console.error('Vision analysis error:', error);
+    console.error('Image analysis error:', error);
     throw new Error('Failed to analyze image with AI');
   }
 }
