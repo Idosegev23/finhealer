@@ -9,7 +9,7 @@ export default function PrivacyPage() {
         <section className="mb-6">
           <h2 className="text-2xl font-semibold mb-3">1. כללי</h2>
           <p>
-            FinHealer ("אנחנו", "שלנו") מחויבת להגן על פרטיותך. מדיניות פרטיות זו מסבירה
+            FinHealer (&quot;אנחנו&quot;, &quot;שלנו&quot;) מחויבת להגן על פרטיותך. מדיניות פרטיות זו מסבירה
             כיצד אנו אוספים, משתמשים ומגנים על המידע האישי שלך.
           </p>
         </section>
