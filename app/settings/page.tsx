@@ -2,7 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Phone, MessageSquare, Bell, User, CreditCard, Lock } from 'lucide-react';
+import { Phone, MessageSquare, Bell, User, CreditCard, Lock, Loader2, CheckCircle } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 type Tab = 'profile' | 'whatsapp' | 'notifications' | 'subscription' | 'privacy';
 
@@ -104,36 +105,216 @@ function TabButton({
 }
 
 function ProfileTab() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+  
+  const [userData, setUserData] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    birth_date: '',
+    city: '',
+    marital_status: '',
+    children_count: 0,
+  });
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setError('לא מחובר');
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error loading profile:', profileError);
+        setError('שגיאה בטעינת הפרופיל');
+        setLoading(false);
+        return;
+      }
+
+      setUserData(profile);
+      setFormData({
+        name: profile.name || '',
+        phone: profile.phone || '',
+        birth_date: profile.birth_date || '',
+        city: profile.city || '',
+        marital_status: profile.marital_status || '',
+        children_count: profile.children_count || 0,
+      });
+      setLoading(false);
+    } catch (err) {
+      console.error('Error:', err);
+      setError('שגיאה בטעינת הנתונים');
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess(false);
+
+    try {
+      const response = await fetch('/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'שגיאה בשמירת הפרופיל');
+      }
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      console.error('Error saving profile:', err);
+      setError(err.message || 'שגיאה בשמירת הפרופיל');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-[#3A7BD5]" />
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
       <h2 className="text-xl font-bold text-[#1E2A3B] mb-6">פרופיל אישי</h2>
+      
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-right">
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-right flex items-center gap-2">
+          <CheckCircle className="w-5 h-5" />
+          <span>הפרופיל עודכן בהצלחה!</span>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-[#555555] mb-2">שם מלא</label>
           <input
             type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
             placeholder="שם מלא"
           />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-[#555555] mb-2">מייל</label>
           <input
             type="email"
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
+            value={userData?.email || ''}
+            disabled
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-100 cursor-not-allowed"
             placeholder="email@example.com"
           />
+          <p className="text-xs text-gray-500 mt-1">לא ניתן לשנות את כתובת המייל</p>
         </div>
+
         <div>
           <label className="block text-sm font-medium text-[#555555] mb-2">טלפון</label>
           <input
             type="tel"
+            value={formData.phone}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            dir="ltr"
             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
             placeholder="050-123-4567"
           />
         </div>
-        <button className="bg-[#3A7BD5] text-white px-6 py-2 rounded-lg hover:bg-[#2E5EA5] transition">
-          שמור שינויים
+
+        <div>
+          <label className="block text-sm font-medium text-[#555555] mb-2">תאריך לידה</label>
+          <input
+            type="date"
+            value={formData.birth_date}
+            onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[#555555] mb-2">עיר מגורים</label>
+          <input
+            type="text"
+            value={formData.city}
+            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
+            placeholder="תל אביב"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[#555555] mb-2">מצב משפחתי</label>
+          <select
+            value={formData.marital_status}
+            onChange={(e) => setFormData({ ...formData, marital_status: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
+          >
+            <option value="">בחר מצב משפחתי</option>
+            <option value="single">רווק/ה</option>
+            <option value="married">נשוי/אה</option>
+            <option value="divorced">גרוש/ה</option>
+            <option value="widowed">אלמן/ה</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[#555555] mb-2">מספר ילדים</label>
+          <input
+            type="number"
+            value={formData.children_count === 0 ? '' : formData.children_count}
+            onChange={(e) => setFormData({ ...formData, children_count: parseInt(e.target.value) || 0 })}
+            min="0"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
+            placeholder="0"
+          />
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-[#3A7BD5] text-white px-6 py-2 rounded-lg hover:bg-[#2E5EA5] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>שומר...</span>
+            </>
+          ) : (
+            'שמור שינויים'
+          )}
         </button>
       </div>
     </div>
@@ -141,7 +322,46 @@ function ProfileTab() {
 }
 
 function WhatsAppTab() {
-  const [isConnected, setIsConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('phone, wa_opt_in')
+        .eq('id', user.id)
+        .single();
+
+      setUserData(profile);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error:', err);
+      setLoading(false);
+    }
+  };
+
+  const isConnected = userData?.wa_opt_in && userData?.phone;
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-[#3A7BD5]" />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
@@ -177,45 +397,24 @@ function WhatsAppTab() {
             </li>
           </ul>
 
-          <div className="max-w-md mx-auto">
-            <label className="block text-sm font-medium text-[#555555] mb-2 text-right">
-              מספר טלפון (עם WhatsApp)
-            </label>
-            <input
-              type="tel"
-              dir="ltr"
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#25D366] focus:border-transparent mb-4"
-              placeholder="050-123-4567"
-            />
-            <button
-              onClick={() => setIsConnected(true)}
-              className="w-full bg-[#25D366] text-white px-6 py-3 rounded-lg hover:bg-[#20BA5A] transition font-semibold"
-            >
-              התחבר עכשיו
-            </button>
-          </div>
-
-          <p className="text-xs text-[#999999] mt-4">
-            נשלח לך קוד אימות ב-WhatsApp
+          <p className="text-sm text-gray-600 mb-4">
+            עדכן את מספר הטלפון שלך בטאב "פרופיל אישי" כדי להתחבר
           </p>
         </div>
       ) : (
         <div className="text-center py-12">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#25D366]/10 flex items-center justify-center">
-            <MessageSquare className="w-10 h-10 text-[#25D366]" />
+            <CheckCircle className="w-10 h-10 text-[#25D366]" />
           </div>
           <h3 className="text-2xl font-bold text-[#1E2A3B] mb-4">
             ✅ מחובר בהצלחה!
           </h3>
           <p className="text-[#555555] mb-6">
-            המספר שלך: <span className="font-semibold">050-123-4567</span>
+            המספר שלך: <span className="font-semibold">{userData?.phone}</span>
           </p>
-          <button
-            onClick={() => setIsConnected(false)}
-            className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition"
-          >
-            נתק חיבור
-          </button>
+          <p className="text-sm text-gray-600">
+            תקבל הודעות ב-WhatsApp במספר זה
+          </p>
         </div>
       )}
     </div>
@@ -286,36 +485,295 @@ function NotificationToggle({
 }
 
 function SubscriptionTab() {
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadSubscription();
+  }, []);
+
+  const loadSubscription = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: sub } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single();
+
+      setSubscription(sub);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error:', err);
+      setLoading(false);
+    }
+  };
+
+  const handleUpgrade = async (newPlan: 'basic' | 'premium') => {
+    setUpdating(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch('/api/subscription/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: newPlan }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'שגיאה בעדכון המנוי');
+      }
+
+      setSuccess(data.message);
+      await loadSubscription();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error updating subscription:', err);
+      setError(err.message || 'שגיאה בעדכון המנוי');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-[#3A7BD5]" />
+      </div>
+    );
+  }
+
+  const currentPlan = subscription?.plan || 'basic';
+  const currentAmount = subscription?.amount || 49;
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
       <h2 className="text-xl font-bold text-[#1E2A3B] mb-6">מנוי ותשלומים</h2>
+      
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-right">
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-right flex items-center gap-2">
+          <CheckCircle className="w-5 h-5" />
+          <span>{success}</span>
+        </div>
+      )}
+
       <div className="border border-[#3A7BD5] rounded-lg p-6 mb-6 bg-[#3A7BD5]/5">
         <div className="flex items-center justify-between mb-4">
           <div className="text-right">
-            <h3 className="text-lg font-bold text-[#1E2A3B]">תוכנית Basic</h3>
+            <h3 className="text-lg font-bold text-[#1E2A3B]">
+              תוכנית {currentPlan === 'basic' ? 'Basic' : 'Premium'}
+            </h3>
             <p className="text-sm text-[#555555]">מנוי חודשי פעיל</p>
           </div>
-          <span className="text-3xl font-bold text-[#3A7BD5]">₪49</span>
+          <span className="text-3xl font-bold text-[#3A7BD5]">₪{currentAmount}</span>
         </div>
         <p className="text-sm text-[#555555] mb-4">
-          התשלום הבא: 15 בנובמבר 2025
+          מנוי חודשי מתחדש אוטומטית
         </p>
-        <button className="w-full bg-[#F6A623] text-white px-4 py-2 rounded-lg hover:bg-[#E09515] transition font-semibold">
-          שדרג ל-Advanced (₪119/חודש)
-        </button>
+        
+        {currentPlan === 'basic' && (
+          <button
+            onClick={() => handleUpgrade('premium')}
+            disabled={updating}
+            className="w-full bg-gradient-to-r from-[#F6A623] to-[#F2994A] text-white px-4 py-2 rounded-lg hover:opacity-90 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {updating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>משדרג...</span>
+              </>
+            ) : (
+              `שדרג ל-Premium (₪119/חודש)`
+            )}
+          </button>
+        )}
+
+        {currentPlan === 'premium' && (
+          <button
+            onClick={() => handleUpgrade('basic')}
+            disabled={updating}
+            className="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {updating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>מוריד...</span>
+              </>
+            ) : (
+              `עבור ל-Basic (₪49/חודש)`
+            )}
+          </button>
+        )}
       </div>
-      <button className="text-red-500 hover:text-red-600 text-sm">
-        בטל מנוי
-      </button>
     </div>
   );
 }
 
 function PrivacyTab() {
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserData(user);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error:', err);
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setError('');
+    setSuccess('');
+
+    if (newPassword.length < 6) {
+      setError('הסיסמה חייבת להכיל לפחות 6 תווים');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('הסיסמאות לא תואמות');
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      const response = await fetch('/api/profile/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'שגיאה בשינוי הסיסמה');
+      }
+
+      setSuccess('הסיסמה שונתה בהצלחה!');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error changing password:', err);
+      setError(err.message || 'שגיאה בשינוי הסיסמה');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  // בדוק אם המשתמש נכנס עם email/password או Google
+  const isEmailPasswordUser = userData?.app_metadata?.provider === 'email';
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-[#3A7BD5]" />
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
       <h2 className="text-xl font-bold text-[#1E2A3B] mb-6">פרטיות ואבטחה</h2>
       <div className="space-y-4">
+        {isEmailPasswordUser && (
+          <div className="border border-gray-200 rounded-lg p-4">
+            <h4 className="font-medium text-[#1E2A3B] mb-2">שינוי סיסמה</h4>
+            
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-right">
+                {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm text-right flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                <span>{success}</span>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-[#555555] mb-1">סיסמה חדשה</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
+                  placeholder="לפחות 6 תווים"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#555555] mb-1">אימות סיסמה</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
+                  placeholder="הזן שוב את הסיסמה החדשה"
+                />
+              </div>
+              <button
+                onClick={handleChangePassword}
+                disabled={changingPassword}
+                className="bg-[#3A7BD5] text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {changingPassword ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>משנה...</span>
+                  </>
+                ) : (
+                  'שמור סיסמה חדשה'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isEmailPasswordUser && (
+          <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+            <p className="text-sm text-gray-700 text-right">
+              💡 התחברת באמצעות Google. לשינוי סיסמה, היכנס להגדרות חשבון Google שלך.
+            </p>
+          </div>
+        )}
+
         <div className="border border-gray-200 rounded-lg p-4">
           <h4 className="font-medium text-[#1E2A3B] mb-2">הורד את הנתונים שלך</h4>
           <p className="text-sm text-[#555555] mb-4">
@@ -325,6 +783,7 @@ function PrivacyTab() {
             הורד נתונים
           </button>
         </div>
+
         <div className="border border-red-200 rounded-lg p-4 bg-red-50">
           <h4 className="font-medium text-red-600 mb-2">מחק חשבון</h4>
           <p className="text-sm text-[#555555] mb-4">
@@ -346,4 +805,3 @@ export default function SettingsPage() {
     </Suspense>
   );
 }
-
