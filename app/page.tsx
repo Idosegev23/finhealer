@@ -37,9 +37,15 @@ export default function HomePage() {
               </Link>
               <Link 
                 href="/login" 
+                className="text-[#3E6E8C] hover:text-[#D96666] transition-colors font-bold"
+              >
+                התחבר
+              </Link>
+              <Link 
+                href="/signup" 
                 className="relative group bg-gradient-to-br from-[#F2C185] to-[#D96666] text-white px-6 py-2.5 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 overflow-hidden"
               >
-                <span className="relative z-10">התחבר</span>
+                <span className="relative z-10">הרשם</span>
                 <div className="absolute inset-0 bg-gradient-to-br from-[#D96666] to-[#F2C185] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </Link>
             </nav>
@@ -87,10 +93,17 @@ export default function HomePage() {
             </Link>
                 <Link 
                   href="/login" 
+                  className="text-[#3E6E8C] hover:text-[#D96666] transition-colors font-bold py-2 px-3 text-center hover:bg-[#BBE8F2]/10 rounded-lg"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  התחבר
+            </Link>
+                <Link 
+                  href="/signup" 
                   className="relative group bg-gradient-to-br from-[#F2C185] to-[#D96666] text-white px-6 py-3 rounded-2xl text-center font-bold shadow-lg active:scale-95 transition-transform overflow-hidden"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  <span className="relative z-10">התחבר</span>
+                  <span className="relative z-10">הרשם</span>
                   <div className="absolute inset-0 bg-gradient-to-br from-[#D96666] to-[#F2C185] opacity-0 group-active:opacity-100 transition-opacity duration-200" />
             </Link>
               </motion.nav>
@@ -692,7 +705,7 @@ export default function HomePage() {
               <h4 className="font-bold mb-4">חשבון</h4>
               <ul className="space-y-2 text-gray-400">
                 <li><Link href="/login" className="hover:text-white transition">התחברות</Link></li>
-                <li><Link href="/login" className="hover:text-white transition">הרשמה</Link></li>
+                <li><Link href="/signup" className="hover:text-white transition">הרשמה</Link></li>
                 <li><Link href="/dashboard" className="hover:text-white transition">דשבורד</Link></li>
               </ul>
             </div>

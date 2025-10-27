@@ -5,14 +5,16 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 
-export default function LoginPage() {
+export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const supabase = createClient()
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignup = async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -30,34 +32,70 @@ export default function LoginPage() {
 
       if (error) throw error
     } catch (err: any) {
-      setError(err.message || 'אירעה שגיאה בהתחברות')
+      setError(err.message || 'אירעה שגיאה בהרשמה')
       setIsLoading(false)
     }
   }
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    if (password !== confirmPassword) {
+      setError('הסיסמאות אינן תואמות')
+      return
+    }
+
+    if (password.length < 6) {
+      setError('הסיסמה חייבת להכיל לפחות 6 תווים')
+      return
+    }
+
     try {
       setIsLoading(true)
       setError(null)
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       })
 
       if (error) throw error
 
       if (data.user) {
-        // הפניה תיעשה אוטומטית על ידי middleware
-        window.location.href = '/dashboard'
+        setSuccess(true)
       }
     } catch (err: any) {
-      setError(err.message || 'אירעה שגיאה בהתחברות')
+      setError(err.message || 'אירעה שגיאה בהרשמה')
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-white to-success/10 px-4">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 text-center">
+            <div className="text-5xl mb-4">✅</div>
+            <h2 className="text-2xl font-bold text-dark mb-4">
+              הרשמה הושלמה בהצלחה!
+            </h2>
+            <p className="text-muted-foreground mb-6">
+              נשלח אליך מייל אימות. אנא לחץ על הקישור במייל כדי להשלים את ההרשמה.
+            </p>
+            <Link
+              href="/login"
+              className="inline-block bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition"
+            >
+              חזרה לכניסה
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -69,17 +107,17 @@ export default function LoginPage() {
             <div className="text-5xl">🏥</div>
           </Link>
           <h1 className="text-3xl font-bold text-dark mb-2">
-            ברוך הבא ל-FinHealer
+            הרשמה ל-FinHealer
           </h1>
           <p className="text-muted-foreground">
-            תוכנית ההבראה הפיננסית הדיגיטלית שלך
+            צור חשבון והתחל את תוכנית ההבראה הפיננסית שלך
           </p>
         </div>
 
-        {/* Login Card */}
+        {/* Signup Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <h2 className="text-2xl font-bold text-center mb-6 text-dark">
-            התחבר לחשבון
+            יצירת חשבון חדש
           </h2>
 
           {error && (
@@ -88,16 +126,16 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Google Sign In Button */}
+          {/* Google Sign Up Button */}
           <button
-            onClick={handleGoogleLogin}
+            onClick={handleGoogleSignup}
             disabled={isLoading}
             className="w-full bg-white border-2 border-gray-300 hover:border-primary hover:bg-gray-50 text-dark font-medium py-4 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
           >
             {isLoading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>מתחבר...</span>
+                <span>נרשם...</span>
               </>
             ) : (
               <>
@@ -135,7 +173,7 @@ export default function LoginPage() {
           </div>
 
           {/* Email/Password Form */}
-          <form onSubmit={handleEmailLogin} className="space-y-4">
+          <form onSubmit={handleEmailSignup} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-dark mb-2">
                 כתובת מייל
@@ -162,8 +200,26 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                placeholder="הסיסמה שלך"
+                placeholder="לפחות 6 תווים"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-dark mb-2">
+                אימות סיסמה
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                placeholder="הזן שוב את הסיסמה"
                 disabled={isLoading}
               />
             </div>
@@ -176,17 +232,17 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>מתחבר...</span>
+                  <span>נרשם...</span>
                 </>
               ) : (
-                <span>כניסה</span>
+                <span>הרשמה</span>
               )}
             </button>
           </form>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>
-              בהתחברות אתה מסכים ל
+              בהרשמה אתה מסכים ל
               <Link href="/legal/terms" className="text-primary hover:underline mx-1">
                 תנאי השימוש
               </Link>
@@ -198,12 +254,12 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Sign Up Link */}
+        {/* Sign In Link */}
         <div className="text-center mt-6">
           <p className="text-muted-foreground text-sm">
-            עדיין אין לך חשבון?{' '}
-            <Link href="/signup" className="text-primary hover:underline font-medium">
-              הירשם כאן
+            כבר יש לך חשבון?{' '}
+            <Link href="/login" className="text-primary hover:underline font-medium">
+              התחבר כאן
             </Link>
           </p>
         </div>

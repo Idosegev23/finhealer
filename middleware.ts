@@ -93,13 +93,13 @@ export async function middleware(request: NextRequest) {
 
     // תהליך: login (auth) → payment (בחירת תוכנית בתוכו) → users table נוצר → onboarding → dashboard
 
-    // 1. משתמש מאומת אבל לא קיים ב-users (טרם שילם)
+    // 1. משתמש מאומת אבל לא קיים ב-users (משתמש חדש לגמרי)
     if (!userExistsInDB) {
-      // הרשה גישה רק ל-payment (בחירת תוכנית בתוך דף התשלום)
-      if (currentPath !== '/payment' &&
+      // הפנה לאונבורדינג (שם יבחר מנוי ויזין פרטים)
+      if (!currentPath.startsWith('/onboarding') &&
           currentPath !== '/login' &&
           currentPath !== '/signup') {
-        return NextResponse.redirect(new URL('/payment', request.url))
+        return NextResponse.redirect(new URL('/onboarding', request.url))
       }
     }
 
