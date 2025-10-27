@@ -48,7 +48,14 @@ export const processStatement = inngest.createFunction(
 
     // שלב 2: ניתוח הקובץ
     const transactions = await step.run('analyze-file', async () => {
-      const { buffer, arrayBuffer } = fileData;
+      const { buffer: bufferData, arrayBuffer } = fileData;
+      
+      // המרת Buffer מJSON חזרה ל-Buffer אמיתי
+      // Inngest מסריאל Buffer ל-{type: "Buffer", data: number[]}
+      const buffer = Buffer.isBuffer(bufferData) 
+        ? bufferData 
+        : Buffer.from((bufferData as any).data || bufferData);
+      
       let extractedText = '';
       let txs: any[] = [];
 
@@ -83,7 +90,7 @@ export const processStatement = inngest.createFunction(
       const supabase = await createClient();
       const method = transactions.extractedText ? 'gpt5-text' : 'gpt5-vision';
 
-      await supabase
+      await (supabase as any)
         .from('uploaded_statements')
         .update({
           processed: true,
@@ -196,13 +203,13 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
   try {
     console.log('📤 Uploading PDF to OpenAI Files API...');
     const file = await openai.files.create({
-      file: new File([buffer], fileName, { type: 'application/pdf' }),
+      file: new File([new Uint8Array(buffer)], fileName, { type: 'application/pdf' }),
       purpose: 'assistants',
     });
 
     console.log(`✅ File uploaded to OpenAI: ${file.id}`);
 
-    const response = await openai.responses.create({
+    const response = await (openai.responses as any).create({
       model: 'gpt-5',
       input: [
         {
@@ -216,7 +223,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     });
 
     try {
-      await openai.files.del(file.id);
+      await openai.files.delete(file.id);
       console.log('🗑️ File deleted from OpenAI');
     } catch (deleteError) {
       console.warn('Failed to delete file from OpenAI:', deleteError);
@@ -261,7 +268,7 @@ async function analyzeImageWithAI(imageUrl: string) {
   try {
     console.log('🤖 Analyzing image with GPT-5...');
     
-    const response = await openai.responses.create({
+    const response = await (openai.responses as any).create({
       model: 'gpt-5',
       input: [
         {
@@ -294,7 +301,10 @@ async function sendWhatsAppNotification(userId: string, transactionsCount: numbe
       .eq('id', userId)
       .single();
 
-    if (!userData?.phone_number) {
+    // Type assertion
+    const user = userData as any;
+
+    if (!user?.phone_number) {
       console.log('No phone number found for user');
       return;
     }
@@ -302,11 +312,11 @@ async function sendWhatsAppNotification(userId: string, transactionsCount: numbe
     const greenAPI = getGreenAPIClient();
     
     await greenAPI.sendMessage({
-      phoneNumber: userData.phone_number,
+      phoneNumber: user.phone_number,
       message: `🎉 התדפיס שלך מוכן!\n\nזיהיתי ${transactionsCount} תנועות חדשות.\n\n👉 היכנס לאפליקציה כדי לראות אותן.`,
     });
 
-    console.log(`✅ WhatsApp notification sent to ${userData.phone_number}`);
+    console.log(`✅ WhatsApp notification sent to ${user.phone_number}`);
   } catch (error) {
     console.error('Failed to send WhatsApp notification:', error);
   }
