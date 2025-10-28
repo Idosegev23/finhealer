@@ -30,9 +30,9 @@ export async function POST(request: Request) {
     } = body;
 
     // ולידציה
-    if (!amount || !vendor || !expense_category) {
+    if (!amount || !date) {
       return NextResponse.json(
-        { error: 'Missing required fields: amount, vendor, expense_category' },
+        { error: 'Missing required fields: amount, date' },
         { status: 400 }
       );
     }
