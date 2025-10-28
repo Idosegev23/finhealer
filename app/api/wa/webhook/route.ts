@@ -73,22 +73,43 @@ export async function POST(request: NextRequest) {
     }
 
     // חילוץ מספר טלפון
-    const phoneNumber = payload.senderData.chatId.replace('@c.us', '');
+    const rawPhoneNumber = payload.senderData.chatId.replace('@c.us', '');
     
-    // מציאת משתמש לפי מספר טלפון
-    const { data: user } = await supabase
+    // נרמול מספר טלפון - להסיר +, רווחים, מקפים
+    const normalizePhone = (phone: string) => {
+      return phone.replace(/[\s\-\+]/g, '');
+    };
+    
+    const phoneNumber = normalizePhone(rawPhoneNumber);
+    
+    console.log('📞 Raw phone:', rawPhoneNumber, '→ Normalized:', phoneNumber);
+    
+    // נסה למצוא משתמש בכמה פורמטים
+    const phoneVariants = [
+      phoneNumber,                                    // 972547667775
+      phoneNumber.replace(/^972/, '0'),              // 0547667775
+      phoneNumber.replace(/^0/, '972'),              // 972547667775 (מ-0547667775)
+    ];
+    
+    console.log('🔍 Trying phone variants:', phoneVariants);
+    
+    // מציאת משתמש לפי מספר טלפון (נסה כל הפורמטים)
+    const { data: users } = await supabase
       .from('users')
-      .select('id, name, wa_opt_in')
-      .eq('phone', phoneNumber)
-      .single();
+      .select('id, name, wa_opt_in, phone')
+      .in('phone', phoneVariants);
+    
+    const user = users?.[0];
 
     if (!user) {
-      console.log('❌ User not found for phone:', phoneNumber);
+      console.log('❌ User not found for any phone variant:', phoneVariants);
       return NextResponse.json({ 
         status: 'error', 
         message: 'User not found' 
       }, { status: 404 });
     }
+    
+    console.log('✅ User found:', user);
 
     const userData = user as any;
 
