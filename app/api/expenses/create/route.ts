@@ -44,13 +44,14 @@ export async function POST(request: Request) {
         user_id: user.id,
         type: 'expense',
         amount: parseFloat(amount),
-        vendor,
+        vendor: vendor || 'לא צוין',
         date: date || new Date().toISOString().split('T')[0],
         tx_date: date || new Date().toISOString().split('T')[0],
-        expense_category, // השם המדויק מהרשימה
+        expense_category: expense_category || 'אחר', // השם המדויק מהרשימה
         expense_category_id: expense_category_id || null,
-        category: mapExpenseCategoryToOldCategory(expense_category), // תאימות לאחור
+        category: expense_category ? mapExpenseCategoryToOldCategory(expense_category) : 'other', // תאימות לאחור
         expense_frequency: expense_type === 'fixed' ? 'fixed' : expense_type === 'special' ? 'special' : 'one_time',
+        expense_type: expense_type || 'variable',
         payment_method: payment_method || null,
         notes: notes || null,
         source,
@@ -84,7 +85,11 @@ export async function POST(request: Request) {
 /**
  * מיפוי מקטגוריה מפורטת לקטגוריה כללית (תאימות לאחור)
  */
-function mapExpenseCategoryToOldCategory(expenseCategory: string): string {
+function mapExpenseCategoryToOldCategory(expenseCategory: string | null | undefined): string {
+  // טיפול במקרי קיצון
+  if (!expenseCategory) {
+    return 'other';
+  }
   const mappings: Record<string, string> = {
     // מזון
     'מזון ומשקאות': 'food',

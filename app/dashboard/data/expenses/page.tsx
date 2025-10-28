@@ -27,6 +27,7 @@ export default function ExpensesDataPage() {
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('credit');
   const [categoryId, setCategoryId] = useState('');
+  const [categoryName, setCategoryName] = useState('');
   const [expenseType, setExpenseType] = useState('');
 
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -43,6 +44,7 @@ export default function ExpensesDataPage() {
           date,
           notes,
           payment_method: paymentMethod,
+          expense_category: categoryName,
           expense_category_id: categoryId,
           expense_type: expenseType,
         }),
@@ -54,8 +56,12 @@ export default function ExpensesDataPage() {
         setAmount('');
         setVendor('');
         setNotes('');
+        setCategoryId('');
+        setCategoryName('');
+        setExpenseType('');
       } else {
-        alert('❌ שגיאה בהוספת הוצאה');
+        const errorData = await response.json();
+        alert(`❌ שגיאה: ${errorData.error || 'שגיאה בהוספת הוצאה'}`);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -156,6 +162,7 @@ export default function ExpensesDataPage() {
                   <ExpenseCategorySelector
                     onChange={(category) => {
                       setCategoryId(category.id);
+                      setCategoryName(category.name);
                       setExpenseType(category.expense_type);
                     }}
                   />
