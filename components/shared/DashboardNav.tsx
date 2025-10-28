@@ -22,20 +22,36 @@ import {
   BarChart3,
   Menu,
   X,
+  Plus,
+  FileText,
+  ChevronDown,
+  Target,
 } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", label: "דשבורד", icon: Home },
-  { href: "/dashboard/phases", label: "השלבים", icon: Activity },
+  { href: "/dashboard", label: "ראשי", icon: Home },
   { href: "/dashboard/overview", label: "תמונת מצב", icon: BarChart3 },
-  { href: "/dashboard/income", label: "הכנסות", icon: TrendingUp },
-  { href: "/dashboard/expenses", label: "הוצאות", icon: Receipt },
-  { href: "/dashboard/loans", label: "הלוואות", icon: DollarSign },
-  { href: "/dashboard/savings", label: "חיסכון", icon: PiggyBank },
-  { href: "/dashboard/insurance", label: "ביטוחים", icon: Shield },
-  { href: "/dashboard/pensions", label: "פנסיה", icon: Briefcase },
+  { href: "/dashboard/goals", label: "יעדים", icon: Target },
   { href: "/loans-simulator", label: "סימולטור", icon: Calculator },
   { href: "/guide", label: "מדריך", icon: BookOpen },
+];
+
+// Data collection dropdown
+const dataItems = [
+  { href: "/dashboard/data/expenses", label: "הוצאות", icon: Receipt },
+  { href: "/dashboard/data/income", label: "הכנסות", icon: TrendingUp },
+  { href: "/dashboard/data/loans", label: "הלוואות", icon: DollarSign },
+  { href: "/dashboard/data/savings", label: "חיסכון", icon: PiggyBank },
+  { href: "/dashboard/data/insurance", label: "ביטוחים", icon: Shield },
+  { href: "/dashboard/data/pensions", label: "פנסיה", icon: Briefcase },
+];
+
+// Reports dropdown
+const reportItems = [
+  { href: "/dashboard/reports/overview", label: "סיכום כללי", icon: BarChart3 },
+  { href: "/dashboard/reports/expenses", label: "הוצאות", icon: TrendingDown },
+  { href: "/dashboard/reports/income", label: "הכנסות", icon: TrendingUp },
+  { href: "/dashboard/reports/cash-flow", label: "תזרים", icon: Activity },
 ];
 
 export function DashboardNav() {
@@ -44,6 +60,8 @@ export function DashboardNav() {
   const [financialData, setFinancialData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dataDropdownOpen, setDataDropdownOpen] = useState(false);
+  const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
   
   const isDark = theme === 'dark';
 
@@ -144,14 +162,97 @@ export function DashboardNav() {
                   >
                     <Icon className="w-6 h-6" />
                     <span className="text-xs font-medium text-center whitespace-nowrap">{item.label}</span>
-                    
-                    {/* Tooltip */}
-                    <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50`}>
-                      {item.label}
-                    </span>
                   </Link>
                 );
               })}
+              
+              {/* Data Collection Dropdown */}
+              <div className="relative flex-1">
+                <button
+                  onClick={() => setDataDropdownOpen(!dataDropdownOpen)}
+                  className={`group w-full flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl transition-all ${
+                    pathname.startsWith('/dashboard/data')
+                      ? "bg-[#3A7BD5] text-white shadow-lg"
+                      : isDark 
+                        ? "text-gray-400 hover:bg-gray-800 hover:text-white"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  }`}
+                >
+                  <Plus className="w-6 h-6" />
+                  <span className="text-xs font-medium whitespace-nowrap">נתונים</span>
+                </button>
+                
+                {dataDropdownOpen && (
+                  <div className={`absolute top-full mt-2 left-1/2 -translate-x-1/2 w-48 rounded-lg shadow-xl border z-50 ${
+                    isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                  }`}>
+                    {dataItems.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setDataDropdownOpen(false)}
+                          className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                            pathname === item.href
+                              ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                              : isDark
+                                ? 'text-gray-300 hover:bg-gray-700'
+                                : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="text-sm">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Reports Dropdown */}
+              <div className="relative flex-1">
+                <button
+                  onClick={() => setReportsDropdownOpen(!reportsDropdownOpen)}
+                  className={`group w-full flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl transition-all ${
+                    pathname.startsWith('/dashboard/reports')
+                      ? "bg-[#3A7BD5] text-white shadow-lg"
+                      : isDark 
+                        ? "text-gray-400 hover:bg-gray-800 hover:text-white"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  }`}
+                >
+                  <FileText className="w-6 h-6" />
+                  <span className="text-xs font-medium whitespace-nowrap">דוחות</span>
+                </button>
+                
+                {reportsDropdownOpen && (
+                  <div className={`absolute top-full mt-2 left-1/2 -translate-x-1/2 w-48 rounded-lg shadow-xl border z-50 ${
+                    isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                  }`}>
+                    {reportItems.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setReportsDropdownOpen(false)}
+                          className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                            pathname === item.href
+                              ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                              : isDark
+                                ? 'text-gray-300 hover:bg-gray-700'
+                                : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="text-sm">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Mobile Menu Button */}
@@ -172,7 +273,8 @@ export function DashboardNav() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-theme">
             <div className="max-w-7xl mx-auto px-4 py-4">
-              <div className="grid grid-cols-3 gap-3">
+              {/* Main Nav */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
@@ -195,6 +297,62 @@ export function DashboardNav() {
                     </Link>
                   );
                 })}
+              </div>
+              
+              {/* Data Collection Section */}
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold text-gray-500 mb-2 px-2">הוסף נתונים</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {dataItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all ${
+                          isActive
+                            ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20"
+                            : isDark 
+                              ? "text-gray-400 hover:bg-gray-800"
+                              : "text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="text-xs text-center">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Reports Section */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 mb-2 px-2">דוחות</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {reportItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex items-center gap-2 p-3 rounded-lg transition-all ${
+                          isActive
+                            ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20"
+                            : isDark 
+                              ? "text-gray-400 hover:bg-gray-800"
+                              : "text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="text-xs">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
