@@ -82,9 +82,10 @@ export async function POST(request: NextRequest) {
           statementId: statement.id,
           userId: user.id,
           documentType,
-          fileName: file.name,
+          fileName,
           mimeType: file.type,
-          fileData: buffer.toString('base64'), // Send file data as base64
+          fileUrl: publicUrl, // Send Storage URL instead of file data
+          fileSize: file.size,
         },
       });
     } catch (inngestError) {

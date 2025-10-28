@@ -9,6 +9,24 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+/**
+ * יצירת Supabase client עם service role לעקיפת RLS
+ * זה נחוץ ב-Inngest functions שרצות ללא הקשר משתמש
+ */
+async function createServiceRoleClient() {
+  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
 // פונקציה לעיבוד statement ברקע
 export const processStatement = inngest.createFunction(
   { 
@@ -77,7 +95,7 @@ export const processStatement = inngest.createFunction(
 
     // שלב 3: עדכון ה-DB
     await step.run('update-database', async () => {
-      const supabase = await createClient();
+      const supabase = await createServiceRoleClient();
       const method = transactions.extractedText ? 'gpt5-text' : 'gpt5-vision';
 
       await (supabase as any)
@@ -230,7 +248,7 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
 
 async function sendWhatsAppNotification(userId: string, transactionsCount: number) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServiceRoleClient();
     
     const { data: userData } = await supabase
       .from('users')
@@ -270,14 +288,39 @@ export const processDocument = inngest.createFunction(
   },
   { event: 'document.process' },
   async ({ event, step }) => {
-    const { statementId, userId, documentType, fileName, mimeType, fileData } = event.data;
+    const { statementId, userId, documentType, fileName, mimeType, fileUrl } = event.data;
 
     console.log(`🚀 Processing document: ${statementId} (${documentType})`);
 
-    // שלב 1: המרת הקובץ
-    const fileDataProcessed = await step.run('prepare-file', async () => {
-      const buffer = Buffer.from(fileData, 'base64');
-      console.log(`✅ File prepared: ${buffer.length} bytes`);
+    // שלב 1: הורדת הקובץ מ-Storage
+    const fileDataProcessed = await step.run('download-file', async () => {
+      console.log(`📥 Downloading file from Storage: ${fileName}`);
+      
+      const supabase = await createServiceRoleClient();
+      
+      // חילוץ הנתיב מה-URL
+      const url = new URL(fileUrl);
+      const pathMatch = url.pathname.match(/\/storage\/v1\/object\/public\/[^\/]+\/(.+)$/);
+      if (!pathMatch) {
+        throw new Error('Invalid file URL format');
+      }
+      const filePath = pathMatch[1];
+      
+      // הורדת הקובץ
+      const { data, error } = await supabase.storage
+        .from('financial-documents')
+        .download(filePath);
+      
+      if (error) {
+        console.error('Storage download error:', error);
+        throw new Error(`Failed to download file: ${error.message}`);
+      }
+      
+      // המרה ל-Buffer
+      const arrayBuffer = await data.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      console.log(`✅ File downloaded: ${buffer.length} bytes`);
+      
       return { buffer };
     });
 
@@ -318,7 +361,7 @@ export const processDocument = inngest.createFunction(
 
     // שלב 3: שמירת תנועות ב-DB
     const saved = await step.run('save-transactions', async () => {
-      const supabase = await createClient();
+      const supabase = await createServiceRoleClient();
       let successCount = 0;
 
       for (const tx of transactions.transactions) {
@@ -351,7 +394,7 @@ export const processDocument = inngest.createFunction(
 
     // שלב 4: עדכון סטטוס ב-DB
     await step.run('update-status', async () => {
-      const supabase = await createClient();
+      const supabase = await createServiceRoleClient();
       
       await (supabase as any).from('uploaded_statements').update({
         processed: true,
