@@ -7,6 +7,13 @@ import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
+// Phase-specific dashboards
+import { OnboardingDashboard } from '@/components/dashboard/phases/OnboardingDashboard'
+import { BehaviorDashboard } from '@/components/dashboard/phases/BehaviorDashboard'
+import { BudgetDashboard } from '@/components/dashboard/phases/BudgetDashboard'
+import { GoalsDashboard } from '@/components/dashboard/phases/GoalsDashboard'
+import { FullDashboard } from '@/components/dashboard/phases/FullDashboard'
+
 export default async function DashboardPage() {
   const supabase = await createClient()
 
@@ -131,6 +138,52 @@ export default async function DashboardPage() {
   const hasInsurance = (insurances?.length || 0) > 0
   const hasPensions = (pensions?.length || 0) > 0
 
+  // Phase-based dashboard selection
+  const currentPhase = userDataInfo.phase || 'reflection'
+  
+  // Phase 1-4 show simplified dashboards
+  // Phase 5 (monitoring) shows full dashboard
+  if (currentPhase === 'reflection') {
+    return (
+      <div className="min-h-screen bg-dashboard">
+        <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <OnboardingDashboard />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentPhase === 'behavior') {
+    return (
+      <div className="min-h-screen bg-dashboard">
+        <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <BehaviorDashboard />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentPhase === 'budget') {
+    return (
+      <div className="min-h-screen bg-dashboard">
+        <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <BudgetDashboard />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentPhase === 'goals') {
+    return (
+      <div className="min-h-screen bg-dashboard">
+        <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <GoalsDashboard />
+        </div>
+      </div>
+    )
+  }
+
+  // Phase 5 (monitoring) or data_collection - show full dashboard
   return (
     <div className="min-h-screen bg-dashboard">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
