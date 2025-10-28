@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ExpenseCategorySelector } from '@/components/expenses/expense-category-selector';
+import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { Upload, PenLine } from 'lucide-react';
 
 /**
@@ -27,10 +28,6 @@ export default function ExpensesDataPage() {
   const [paymentMethod, setPaymentMethod] = useState('credit');
   const [categoryId, setCategoryId] = useState('');
   const [expenseType, setExpenseType] = useState('');
-
-  // File upload state
-  const [file, setFile] = useState<File | null>(null);
-  const [documentType, setDocumentType] = useState('bank');
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,36 +65,6 @@ export default function ExpensesDataPage() {
     }
   };
 
-  const handleFileUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file) return;
-
-    setIsSubmitting(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('documentType', documentType);
-
-      const response = await fetch('/api/expenses/upload-statement', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        alert(`✅ הדוח הועלה בהצלחה! מזהה: ${data.statementId}`);
-        setFile(null);
-      } else {
-        alert('❌ שגיאה בהעלאת הדוח');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('❌ שגיאה בהעלאת הדוח');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -213,46 +180,17 @@ export default function ExpensesDataPage() {
 
             {/* File Upload */}
             <TabsContent value="scan" className="space-y-4 mt-6">
-              <form onSubmit={handleFileUpload} className="space-y-4">
-                <div>
-                  <Label htmlFor="documentType">סוג דוח</Label>
-                  <select
-                    id="documentType"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={documentType}
-                    onChange={(e) => setDocumentType(e.target.value)}
-                  >
-                    <option value="bank">דוח בנק</option>
-                    <option value="credit">דוח אשראי</option>
-                  </select>
-                </div>
-
-                <div>
-                  <Label htmlFor="file">העלה קובץ</Label>
-                  <Input
-                    id="file"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls"
-                    onChange={(e) => setFile(e.target.files?.[0] || null)}
-                    required
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    PDF, תמונה או Excel (עד 50MB)
-                  </p>
-                </div>
-
-                {file && (
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      📄 {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                    </p>
-                  </div>
-                )}
-
-                <Button type="submit" className="w-full" disabled={isSubmitting || !file}>
-                  {isSubmitting ? 'מעלה...' : 'סרוק דוח'}
-                </Button>
-              </form>
+              <DocumentUploader
+                documentType="bank"
+                onSuccess={(data) => {
+                  alert(`✅ הדוח עובד בהצלחה! זוהו ${data.transactions_extracted || 0} תנועות`);
+                }}
+                onError={(error) => {
+                  alert(`❌ שגיאה: ${error}`);
+                }}
+                acceptedFormats=".pdf,.jpg,.jpeg,.png,.xlsx,.xls"
+                maxSizeMB={50}
+              />
             </TabsContent>
           </Tabs>
         </CardContent>

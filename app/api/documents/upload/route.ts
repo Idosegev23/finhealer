@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { inngest } from '@/lib/inngest/client';
 
 /**
  * API Route: /api/documents/upload
@@ -73,22 +74,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create record' }, { status: 500 });
     }
 
-    // TODO: Trigger Inngest background processing
-    // await inngest.send({
-    //   name: 'document.process',
-    //   data: {
-    //     statementId: statement.id,
-    //     userId: user.id,
-    //     documentType,
-    //   },
-    // });
+    // Trigger Inngest background processing
+    try {
+      await inngest.send({
+        name: 'document.process',
+        data: {
+          statementId: statement.id,
+          userId: user.id,
+          documentType,
+          fileName: file.name,
+          mimeType: file.type,
+          fileData: buffer.toString('base64'), // Send file data as base64
+        },
+      });
+    } catch (inngestError) {
+      console.error('Inngest error:', inngestError);
+      // Don't fail the upload if Inngest fails - just log it
+    }
 
     return NextResponse.json({
       success: true,
       statementId: statement.id,
       fileName: file.name,
       fileSize: file.size,
-      status: 'pending',
+      status: 'processing',
+      message: 'קובץ הועלה ונשלח לעיבוד',
     });
   } catch (error) {
     console.error('Upload error:', error);

@@ -252,3 +252,125 @@ async function sendWhatsAppNotification(userId: string, transactionsCount: numbe
   }
 }
 
+// ============================================================================
+// פונקציה לעיבוד מסמך חדש (document.process)
+// ============================================================================
+
+export const processDocument = inngest.createFunction(
+  {
+    id: 'process-document',
+    name: 'Process Financial Document',
+  },
+  { event: 'document.process' },
+  async ({ event, step }) => {
+    const { statementId, userId, documentType, fileName, mimeType, fileData } = event.data;
+
+    console.log(`🚀 Processing document: ${statementId} (${documentType})`);
+
+    // שלב 1: המרת הקובץ
+    const fileDataProcessed = await step.run('prepare-file', async () => {
+      const buffer = Buffer.from(fileData, 'base64');
+      console.log(`✅ File prepared: ${buffer.length} bytes`);
+      return { buffer };
+    });
+
+    // שלב 2: ניתוח הקובץ
+    const transactions = await step.run('analyze-file', async () => {
+      const { buffer: bufferData } = fileDataProcessed;
+      const buffer = Buffer.isBuffer(bufferData) 
+        ? bufferData 
+        : Buffer.from((bufferData as any).data || bufferData);
+
+      let extractedText = '';
+      let txs: any[] = [];
+
+      // בחירת שיטת עיבוד לפי סוג
+      if (mimeType?.includes('excel') || mimeType?.includes('spreadsheet') || fileName?.endsWith('.xlsx')) {
+        // Excel
+        const workbook = XLSX.read(buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        extractedText = XLSX.utils.sheet_to_txt(worksheet);
+        const result = await analyzeTransactionsWithAI(extractedText, documentType);
+        txs = result.transactions;
+      } else if (mimeType?.includes('pdf') || fileName?.endsWith('.pdf')) {
+        // PDF
+        const result = await analyzePDFWithAI(buffer, fileName, documentType);
+        txs = result.transactions;
+        extractedText = result.extractedText;
+      } else {
+        // Image
+        const result = await analyzeImageWithAI(buffer, mimeType || 'image/jpeg', documentType);
+        txs = result.transactions;
+        extractedText = result.extractedText;
+      }
+
+      console.log(`✅ Extracted ${txs.length} transactions`);
+      return { transactions: txs, extractedText };
+    });
+
+    // שלב 3: שמירת תנועות ב-DB
+    const saved = await step.run('save-transactions', async () => {
+      const supabase = await createClient();
+      let successCount = 0;
+
+      for (const tx of transactions.transactions) {
+        try {
+          const { error } = await supabase.from('transactions').insert({
+            user_id: userId,
+            type: tx.type || 'expense',
+            amount: tx.amount,
+            category: tx.category || 'לא מסווג',
+            vendor: tx.vendor || tx.description,
+            date: tx.date,
+            source: 'ocr',
+            status: 'proposed',
+            notes: tx.notes || tx.description,
+            payment_method: tx.payment_method,
+            expense_category: tx.expense_category,
+            expense_type: tx.expense_type,
+            confidence_score: tx.confidence_score || 0.8,
+          });
+
+          if (!error) successCount++;
+        } catch (err) {
+          console.error('Error saving transaction:', err);
+        }
+      }
+
+      console.log(`✅ Saved ${successCount}/${transactions.transactions.length} transactions`);
+      return successCount;
+    });
+
+    // שלב 4: עדכון סטטוס ב-DB
+    await step.run('update-status', async () => {
+      const supabase = await createClient();
+      
+      await (supabase as any).from('uploaded_statements').update({
+        processed: true,
+        processed_at: new Date().toISOString(),
+        status: 'completed',
+        transactions_extracted: transactions.transactions.length,
+        metadata: {
+          method: 'ai',
+          text_length: transactions.extractedText?.length || 0,
+          file_type: mimeType,
+        },
+      }).eq('id', statementId);
+
+      console.log(`✅ Updated document status`);
+    });
+
+    // שלב 5: שליחת התראת WhatsApp
+    await step.run('send-notification', async () => {
+      await sendWhatsAppNotification(userId, statementId, transactions.transactions.length);
+    });
+
+    return { 
+      success: true, 
+      transactionsExtracted: transactions.transactions.length,
+      transactionsSaved: saved,
+    };
+  }
+);
+
