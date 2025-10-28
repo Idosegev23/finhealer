@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import * as XLSX from 'xlsx';
 import OpenAI from 'openai';
+import { EXPENSE_CATEGORIES_SYSTEM_PROMPT, buildStatementAnalysisPrompt } from '@/lib/ai/expense-categories-prompt';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -111,44 +112,16 @@ export const processStatement = inngest.createFunction(
 
 // פונקציות עזר (מהקוד המקורי)
 async function analyzeTransactionsWithAI(text: string, fileType: string) {
-  const systemPrompt = `אתה מומחה לניתוח דוחות בנק ואשראי ישראליים.
-תפקידך לחלץ תנועות פיננסיות מהמסמך ולסווג אותן.
-
-עבור כל תנועה, זהה:
-1. תאריך (YYYY-MM-DD)
-2. תיאור/שם העסק
-3. סכום
-4. קטגוריה (food, transport, shopping, health, entertainment, education, housing, utilities, other)
-5. קטגוריה מפורטת
-6. תדירות (fixed/temporary/special/one_time)
-
-החזר JSON:
-{
-  "transactions": [
-    {
-      "date": "YYYY-MM-DD",
-      "description": "תיאור",
-      "vendor": "שם עסק",
-      "amount": 123.45,
-      "category": "food",
-      "detailed_category": "restaurants",
-      "expense_frequency": "one_time",
-      "confidence": 0.9
-    }
-  ]
-}`;
-
-  const userPrompt = `נתח את התדפיס הבא:
-
-${text.substring(0, 8000)}
-
-החזר JSON array עם כל התנועות שמצאת.`;
+  const userPrompt = buildStatementAnalysisPrompt(
+    fileType as 'bank_statement' | 'credit_statement',
+    text
+  );
 
   try {
     const response = await openai.responses.create({
       model: 'gpt-5',
       input: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: EXPENSE_CATEGORIES_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
     });
@@ -164,30 +137,10 @@ ${text.substring(0, 8000)}
 }
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
-  const prompt = `נתח את המסמך של ${fileType === 'credit_statement' ? 'דוח אשראי' : 'דוח בנק'} וחלץ את כל התנועות הפיננסיות.
+  const userPrompt = `נתח את מסמך ה-PDF של ${fileType === 'credit_statement' ? 'דוח אשראי' : 'דוח בנק'} וחלץ את כל תנועות ההוצאה.
 
-עבור כל תנועה, זהה:
-1. תאריך (YYYY-MM-DD)
-2. תיאור/שם העסק
-3. סכום
-4. קטגוריה מפורטת
-5. תדירות
-
-החזר JSON:
-{
-  "transactions": [
-    {
-      "date": "YYYY-MM-DD",
-      "description": "תיאור",
-      "vendor": "שם עסק",
-      "amount": 123.45,
-      "category": "קטגוריה",
-      "detailed_category": "food_beverages",
-      "expense_frequency": "fixed",
-      "confidence": 0.9
-    }
-  ]
-}`;
+סווג כל תנועה לפי רשימת הקטגוריות המדויקת שקיבלת.
+החזר JSON עם כל התנועות שמצאת.`;
 
   try {
     console.log('📤 Uploading PDF to OpenAI Files API...');
@@ -202,9 +155,13 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       model: 'gpt-5',
       input: [
         {
+          role: 'system',
+          content: EXPENSE_CATEGORIES_SYSTEM_PROMPT,
+        },
+        {
           role: 'user',
           content: [
-            { type: 'input_text', text: prompt },
+            { type: 'input_text', text: userPrompt },
             { type: 'input_file', file_id: file.id },
           ],
         },
@@ -229,30 +186,10 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 }
 
 async function analyzeImageWithAI(imageUrl: string) {
-  const prompt = `נתח את התמונה של דוח בנק/אשראי וחלץ את כל התנועות הפיננסיות.
+  const userPrompt = `נתח את התמונה של דוח בנק/אשראי/קבלה וחלץ את כל תנועות ההוצאה.
 
-עבור כל תנועה, זהה:
-1. תאריך (YYYY-MM-DD)
-2. תיאור/שם העסק
-3. סכום
-4. קטגוריה מפורטת
-5. תדירות
-
-החזר JSON:
-{
-  "transactions": [
-    {
-      "date": "YYYY-MM-DD",
-      "description": "תיאור",
-      "vendor": "שם עסק",
-      "amount": 123.45,
-      "category": "קטגוריה",
-      "detailed_category": "food_beverages",
-      "expense_frequency": "fixed",
-      "confidence": 0.9
-    }
-  ]
-}`;
+סווג כל תנועה לפי רשימת הקטגוריות המדויקת שקיבלת.
+החזר JSON עם כל התנועות שמצאת.`;
 
   try {
     console.log('🤖 Analyzing image with GPT-5...');
@@ -261,9 +198,13 @@ async function analyzeImageWithAI(imageUrl: string) {
       model: 'gpt-5',
       input: [
         {
+          role: 'system',
+          content: EXPENSE_CATEGORIES_SYSTEM_PROMPT,
+        },
+        {
           role: 'user',
           content: [
-            { type: 'input_text', text: prompt },
+            { type: 'input_text', text: userPrompt },
             { type: 'input_image', image_url: imageUrl },
           ],
         },

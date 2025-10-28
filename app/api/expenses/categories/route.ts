@@ -1,124 +1,130 @@
-// @ts-nocheck
-import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
 
 /**
- * GET /api/expenses/categories
- * מחזיר רשימת קטגוריות הוצאות מסוננת לפי employment_status
- * 
- * Query params:
- * - search: חיפוש טקסט חופשי
- * - employment_status: employee | self_employed | both (override)
+ * API לשליפת קטגוריות הוצאות
+ * תומך בחיפוש, סינון לפי סוג, ומעמד
  */
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    
+    // פרמטרים
+    const search = searchParams.get('search') || '';
+    const expenseType = searchParams.get('type'); // fixed, variable, special
+    const applicableTo = searchParams.get('applicable'); // employee, self_employed, both
+    const employmentStatus = searchParams.get('employment'); // employee או self_employed
+
     const supabase = await createClient();
-    
-    // אימות משתמש
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
-    // קבלת פרמטרים
-    const searchParams = request.nextUrl.searchParams;
-    const searchQuery = searchParams.get('search');
-    const employmentOverride = searchParams.get('employment_status');
-
-    // שליפת employment_status של המשתמש
-    const { data: userData } = await (supabase as any)
-      .from('users')
-      .select('employment_status')
-      .eq('id', user.id)
-      .single();
-
-    const employmentStatus = employmentOverride || userData?.employment_status || 'both';
-
-    // שליפת קטגוריות מוגדרות מראש
-    let query = (supabase as any)
+    // בניית query בסיסי
+    let query = supabase
       .from('expense_categories')
       .select('*')
-      .eq('is_active', true)
-      .order('category_group', { ascending: true })
-      .order('display_order', { ascending: true });
+      .eq('is_active', true);
 
-    // סינון לפי employment_status
-    if (employmentStatus === 'employee' || employmentStatus === 'self_employed') {
-      query = query.or(`applicable_to.eq.${employmentStatus},applicable_to.eq.both`);
+    // חיפוש לפי שם
+    if (search) {
+      query = query.ilike('name', `%${search}%`);
     }
 
-    // חיפוש טקסט
-    if (searchQuery && searchQuery.trim()) {
-      query = query.ilike('name', `%${searchQuery.trim()}%`);
+    // סינון לפי סוג הוצאה
+    if (expenseType) {
+      query = query.eq('expense_type', expenseType);
     }
 
-    const { data: predefined, error: predefinedError } = await query;
-
-    if (predefinedError) {
-      console.error('Error fetching predefined categories:', predefinedError);
-      return NextResponse.json(
-        { error: 'Failed to fetch categories' },
-        { status: 500 }
-      );
-    }
-
-    // שליפת קטגוריות מותאמות אישית
-    let customQuery = (supabase as any)
-      .from('user_custom_expenses')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('name', { ascending: true });
-
-    if (searchQuery && searchQuery.trim()) {
-      customQuery = customQuery.ilike('name', `%${searchQuery.trim()}%`);
-    }
-
-    const { data: custom, error: customError } = await customQuery;
-
-    if (customError) {
-      console.error('Error fetching custom categories:', customError);
-      // לא נכשיל את כל הבקשה, רק נחזיר רשימה ריקה
-    }
-
-    // קיבוץ לפי category_group
-    const grouped: Record<string, any[]> = {};
-    
-    (predefined || []).forEach((item: any) => {
-      const group = item.category_group || 'אחר';
-      if (!grouped[group]) {
-        grouped[group] = [];
+    // סינון לפי מעמד (חשוב!)
+    // אם המשתמש עצמאי - מציג רק עצמאי ושניהם
+    // אם המשתמש שכיר - מציג רק שכיר ושניהם
+    if (applicableTo) {
+      if (applicableTo === 'both') {
+        // מציג הכל
+        query = query.in('applicable_to', ['employee', 'self_employed', 'both']);
+      } else {
+        // מציג רק רלוונטי למעמד + both
+        query = query.in('applicable_to', [applicableTo, 'both']);
       }
-      grouped[group].push({
-        ...item,
-        is_custom: false
-      });
-    });
-
-    // הוספת מותאמות אישית לקבוצה נפרדת
-    if (custom && custom.length > 0) {
-      grouped['מותאמות אישית'] = custom.map((item: any) => ({
-        ...item,
-        is_custom: true
-      }));
+    } else if (employmentStatus) {
+      // fallback למצב שלא נשלח applicableTo
+      query = query.in('applicable_to', [employmentStatus, 'both']);
     }
+
+    // מיון לפי סדר תצוגה ושם
+    query = query.order('display_order', { ascending: true });
+
+    const { data: categories, error } = await query;
+
+    if (error) {
+      console.error('Error fetching categories:', error);
+      return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 });
+    }
+
+    // קיבוץ לפי סוג
+    const grouped = {
+      fixed: categories?.filter(c => c.expense_type === 'fixed') || [],
+      variable: categories?.filter(c => c.expense_type === 'variable') || [],
+      special: categories?.filter(c => c.expense_type === 'special') || [],
+    };
 
     return NextResponse.json({
-      predefined: (predefined || []).map((item: any) => ({ ...item, is_custom: false })),
-      custom: (custom || []).map((item: any) => ({ ...item, is_custom: true })),
+      categories: categories || [],
       grouped,
-      total: (predefined?.length || 0) + (custom?.length || 0)
+      total: categories?.length || 0,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Categories API error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
+/**
+ * API ליצירת קטגוריה מותאמת אישית (אופציונלי)
+ */
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+    
+    // בדיקת אימות
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { name, expense_type, applicable_to, category_group } = body;
+
+    // ולידציה
+    if (!name || !expense_type || !applicable_to) {
+      return NextResponse.json({ 
+        error: 'Missing required fields' 
+      }, { status: 400 });
+    }
+
+    // יצירת קטגוריה חדשה
+    const { data: category, error } = await supabase
+      .from('expense_categories')
+      .insert({
+        name,
+        expense_type,
+        applicable_to,
+        category_group: category_group || 'custom',
+        display_order: 9999, // בסוף הרשימה
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating category:', error);
+      return NextResponse.json({ 
+        error: 'Failed to create category' 
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({ category });
+
+  } catch (error: any) {
+    console.error('Create category error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

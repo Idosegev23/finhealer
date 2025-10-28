@@ -1,311 +1,366 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Plus, Download, FileSpreadsheet } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import StatementUploader from '@/components/expenses/StatementUploader';
-import ExpensesTable from '@/components/expenses/ExpensesTable';
-import EditTransactionModal from '@/components/expenses/EditTransactionModal';
-import { useRouter } from 'next/navigation';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import Link from 'next/link';
 
-interface Transaction {
-  id?: string;
-  date: string;
-  description: string;
-  vendor?: string;
-  amount: number;
-  category: string;
-  detailed_category: string;
-  expense_frequency: 'fixed' | 'temporary' | 'special' | 'one_time';
-  confidence: number;
+interface MonthData {
+  month: string;
+  total: number;
+  count: number;
+  byType: {
+    fixed: number;
+    variable: number;
+    special: number;
+  };
+  byCategory: Record<string, {
+    total: number;
+    count: number;
+    items: any[];
+  }>;
+  transactions: any[];
+}
+
+interface ChartDataPoint {
+  month: string;
+  monthName: string;
+  total: number;
+  fixed: number;
+  variable: number;
+  special: number;
 }
 
 export default function ExpensesPage() {
-  const router = useRouter();
-  const [showUploader, setShowUploader] = useState(false);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [existingTransactions, setExistingTransactions] = useState<Transaction[]>([]);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [monthlyDetails, setMonthlyDetails] = useState<Record<string, MonthData>>({});
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
-  // טעינת תנועות קיימות
   useEffect(() => {
-    loadExistingTransactions();
+    fetchExpenses();
   }, []);
 
-  const loadExistingTransactions = async () => {
+  async function fetchExpenses() {
     try {
-      const response = await fetch('/api/transactions?type=expense');
-      if (response.ok) {
-        const data = await response.json();
-        setExistingTransactions(data.transactions || []);
+      setLoading(true);
+      const response = await fetch('/api/expenses/monthly-summary?months=6');
+      const data = await response.json();
+
+      if (data.success) {
+        setChartData(data.chartData.reverse()); // מהישן לחדש
+        setMonthlyDetails(data.monthlyDetails);
       }
     } catch (error) {
-      console.error('Error loading transactions:', error);
+      console.error('Error fetching expenses:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleTransactionsExtracted = (newTransactions: Transaction[]) => {
-    setTransactions(newTransactions);
-    setShowUploader(false);
-  };
-
-  const handleSaveAll = async (transactionsToSave: Transaction[]) => {
-    setSaving(true);
-    try {
-      const promises = transactionsToSave.map((t) =>
-        fetch('/api/transactions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'expense',
-            date: t.date,
-            description: t.description,
-            vendor: t.vendor,
-            amount: t.amount,
-            category: t.category,
-            detailed_category: t.detailed_category,
-            expense_frequency: t.expense_frequency,
-            confidence_score: t.confidence,
-            source: 'statement_upload',
-            status: 'confirmed',
-            auto_categorized: true,
-          }),
-        })
-      );
-
-      await Promise.all(promises);
-      
-      alert(`✅ ${transactionsToSave.length} תנועות נשמרו בהצלחה!`);
-      setTransactions([]);
-      loadExistingTransactions();
-      
-    } catch (error) {
-      console.error('Error saving transactions:', error);
-      alert('❌ שגיאה בשמירת התנועות');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('האם למחוק תנועה זו?')) return;
-    
-    try {
-      const response = await fetch(`/api/transactions/${id}`, {
-        method: 'DELETE',
-      });
-      
-      if (response.ok) {
-        setExistingTransactions((prev) => prev.filter((t) => t.id !== id));
-        alert('✅ התנועה נמחקה');
+  function toggleMonth(month: string) {
+    setExpandedMonths((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(month)) {
+        newSet.delete(month);
+      } else {
+        newSet.add(month);
       }
-    } catch (error) {
-      console.error('Error deleting transaction:', error);
-      alert('❌ שגיאה במחיקת התנועה');
-    }
-  };
+      return newSet;
+    });
+  }
 
-  const handleEdit = (transaction: Transaction) => {
-    setEditingTransaction(transaction);
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center" dir="rtl">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-600">טוען הוצאות...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const handleSaveEdit = async (updated: Transaction) => {
-    try {
-      const response = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: updated.id,
-          type: 'expense',
-          date: updated.date,
-          description: updated.description,
-          vendor: updated.vendor,
-          amount: updated.amount,
-          category: updated.category,
-          detailed_category: updated.detailed_category,
-          expense_frequency: updated.expense_frequency,
-          confidence_score: updated.confidence,
-        }),
-      });
-
-      if (response.ok) {
-        // עדכון ב-state
-        if (updated.id) {
-          setExistingTransactions((prev) =>
-            prev.map((t) => (t.id === updated.id ? updated : t))
-          );
-        } else {
-          setTransactions((prev) =>
-            prev.map((t, i) => (i === transactions.indexOf(editingTransaction!) ? updated : t))
-          );
-        }
-        
-        alert('✅ התנועה עודכנה בהצלחה!');
-        setEditingTransaction(null);
-      }
-    } catch (error) {
-      console.error('Error updating transaction:', error);
-      alert('❌ שגיאה בעדכון התנועה');
-    }
-  };
-
-  const allTransactions = [...transactions, ...existingTransactions];
+  const sortedMonths = Object.keys(monthlyDetails).sort().reverse(); // מהחדש לישן
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 py-12 px-4" dir="rtl">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 p-6" dir="rtl">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h1 className="text-5xl font-black text-gray-900 dark:text-white mb-3 flex items-center gap-3">
-            📊 ניהול הוצאות חכם
-          </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-400">
-            העלה דוחות בנק/אשראי וזהה את ההוצאות שלך אוטומטית עם AI
-          </p>
-        </motion.div>
-
-        {/* Action Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="flex flex-wrap gap-4 mb-8"
-        >
-          <Button
-            onClick={() => setShowUploader(true)}
-            size="lg"
-            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg font-bold px-8"
-          >
-            <Upload className="w-5 h-5 ml-2" />
-            העלה דוח בנק/אשראי
-          </Button>
-
-          <Button
-            variant="outline"
-            size="lg"
-            className="border-2 font-bold"
-          >
-            <Plus className="w-5 h-5 ml-2" />
-            הוסף הוצאה ידנית
-          </Button>
-
-          {allTransactions.length > 0 && (
-            <Button
-              variant="outline"
-              size="lg"
-              className="border-2 font-bold"
-            >
-              <Download className="w-5 h-5 ml-2" />
-              ייצא ל-Excel
-            </Button>
-          )}
-        </motion.div>
-
-        {/* Transactions from Upload (Pending Save) */}
-        {transactions.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mb-8"
-          >
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 rounded-2xl p-6 mb-6">
-              <div className="flex items-center gap-3 mb-2">
-                <FileSpreadsheet className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-                <h2 className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">
-                  תנועות חדשות ממתינות לשמירה
-                </h2>
-              </div>
-              <p className="text-yellow-800 dark:text-yellow-200">
-                זיהינו {transactions.length} תנועות מהקובץ שהעלית. בדוק אותן ושמור.
-              </p>
-            </div>
-            <ExpensesTable
-              transactions={transactions}
-              onSave={handleSaveAll}
-              onEdit={handleEdit}
-            />
-          </motion.div>
-        )}
-
-        {/* Existing Transactions */}
-        {loading ? (
-          <div className="text-center py-20">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-500 dark:text-gray-400">טוען הוצאות...</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">הוצאות</h1>
+            <p className="text-gray-600 mt-1">מעקב והיסטוריה של כל ההוצאות שלך</p>
           </div>
-        ) : existingTransactions.length > 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
+          <Link
+            href="/dashboard/expenses/add"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
-              ההוצאות שלי
-            </h2>
-            <ExpensesTable
-              transactions={existingTransactions}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white dark:bg-gray-900 rounded-3xl shadow-xl p-12 text-center border border-gray-200 dark:border-gray-800"
-          >
-            <div className="max-w-md mx-auto">
-              <div className="w-24 h-24 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-6">
-                <FileSpreadsheet className="w-12 h-12 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                טרם הוספת הוצאות
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg">
-                העלה דוח בנק או אשראי כדי שנזהה את ההוצאות שלך אוטומטית, או הוסף הוצאה ידנית.
-              </p>
-              <Button
-                onClick={() => setShowUploader(true)}
-                size="lg"
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg font-bold px-10"
-              >
-                <Upload className="w-5 h-5 ml-2" />
-                בואו נתחיל!
-              </Button>
+            + הוסף הוצאה
+          </Link>
         </div>
-          </motion.div>
-        )}
 
-        {/* Statement Uploader Modal */}
-        <AnimatePresence>
-          {showUploader && (
-            <StatementUploader
-              onTransactionsExtracted={handleTransactionsExtracted}
-              onClose={() => setShowUploader(false)}
-            />
-          )}
+        {/* Mini Dashboard - גרף חודשי */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold mb-6">מגמת הוצאות חודשית</h2>
           
-          {/* Edit Transaction Modal */}
-          {editingTransaction && (
-            <EditTransactionModal
-              transaction={editingTransaction}
-              onSave={handleSaveEdit}
-              onClose={() => setEditingTransaction(null)}
-            />
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="monthName" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value: number) => `₪${value.toLocaleString()}`}
+                  labelStyle={{ textAlign: 'right' }}
+                />
+                <Legend />
+                <Bar dataKey="fixed" name="קבועות" fill="#3b82f6" />
+                <Bar dataKey="variable" name="משתנות" fill="#10b981" />
+                <Bar dataKey="special" name="מיוחדות" fill="#f59e0b" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <DollarSign className="mx-auto h-12 w-12 mb-4 text-gray-300" />
+              <p>אין נתונים להצגה</p>
+              <p className="text-sm mt-2">התחל להוסיף הוצאות כדי לראות את הגרף</p>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
+
+        {/* פירוט חודשי */}
+        <div className="space-y-4">
+          {sortedMonths.length > 0 ? (
+            sortedMonths.map((month) => {
+              const data = monthlyDetails[month];
+              const isExpanded = expandedMonths.has(month);
+
+              return (
+                <MonthCard
+                  key={month}
+                  month={month}
+                  data={data}
+                  isExpanded={isExpanded}
+                  onToggle={() => toggleMonth(month)}
+                />
+              );
+            })
+          ) : (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <DollarSign className="mx-auto h-16 w-16 mb-4 text-gray-300" />
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">אין הוצאות עדיין</h3>
+              <p className="text-gray-500 mb-6">התחל להוסיף הוצאות כדי לראות אותן כאן</p>
+              <Link
+                href="/dashboard/expenses/add"
+                className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                הוסף הוצאה ראשונה
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
+// ========== קומפוננטת כרטיס חודש ==========
+interface MonthCardProps {
+  month: string;
+  data: MonthData;
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+function MonthCard({ month, data, isExpanded, onToggle }: MonthCardProps) {
+  const monthName = formatMonthName(month);
+
+  // חישוב אחוזים
+  const fixedPercent = data.total > 0 ? (data.byType.fixed / data.total) * 100 : 0;
+  const variablePercent = data.total > 0 ? (data.byType.variable / data.total) * 100 : 0;
+  const specialPercent = data.total > 0 ? (data.byType.special / data.total) * 100 : 0;
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      {/* כותרת - ניתן ללחיצה */}
+      <button
+        onClick={onToggle}
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900">{monthName}</h3>
+            <p className="text-sm text-gray-500">{data.count} תנועות</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <div className="text-left">
+            <p className="text-2xl font-bold text-gray-900">₪{data.total.toLocaleString()}</p>
+            <p className="text-sm text-gray-500">סה"כ הוצאות</p>
+          </div>
+          {isExpanded ? (
+            <ChevronUp className="h-6 w-6 text-gray-400" />
+          ) : (
+            <ChevronDown className="h-6 w-6 text-gray-400" />
+          )}
+        </div>
+      </button>
+
+      {/* תוכן מפורט */}
+      {isExpanded && (
+        <div className="border-t border-gray-200 p-6 space-y-6">
+          {/* פירוק לפי סוג */}
+          <div className="grid grid-cols-3 gap-4">
+            <ExpenseTypeCard
+              title="📌 קבועות"
+              amount={data.byType.fixed}
+              percent={fixedPercent}
+              color="blue"
+            />
+            <ExpenseTypeCard
+              title="🔄 משתנות"
+              amount={data.byType.variable}
+              percent={variablePercent}
+              color="green"
+            />
+            <ExpenseTypeCard
+              title="⭐ מיוחדות"
+              amount={data.byType.special}
+              percent={specialPercent}
+              color="yellow"
+            />
+          </div>
+
+          {/* פירוט לפי קטגוריות */}
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-4">פירוט לפי קטגוריות:</h4>
+            
+            {/* הוצאות קבועות */}
+            {data.byType.fixed > 0 && (
+              <CategoryGroup
+                title="הוצאות קבועות"
+                categories={data.byCategory}
+                transactions={data.transactions}
+                type="fixed"
+              />
+            )}
+
+            {/* הוצאות משתנות */}
+            {data.byType.variable > 0 && (
+              <CategoryGroup
+                title="הוצאות משתנות"
+                categories={data.byCategory}
+                transactions={data.transactions}
+                type="variable"
+              />
+            )}
+
+            {/* הוצאות מיוחדות */}
+            {data.byType.special > 0 && (
+              <CategoryGroup
+                title="הוצאות מיוחדות"
+                categories={data.byCategory}
+                transactions={data.transactions}
+                type="special"
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ========== כרטיס סוג הוצאה ==========
+interface ExpenseTypeCardProps {
+  title: string;
+  amount: number;
+  percent: number;
+  color: 'blue' | 'green' | 'yellow';
+}
+
+function ExpenseTypeCard({ title, amount, percent, color }: ExpenseTypeCardProps) {
+  const colorClasses = {
+    blue: 'bg-blue-50 border-blue-200 text-blue-700',
+    green: 'bg-green-50 border-green-200 text-green-700',
+    yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+  };
+
+  return (
+    <div className={`p-4 rounded-lg border ${colorClasses[color]}`}>
+      <p className="text-sm font-medium mb-2">{title}</p>
+      <p className="text-2xl font-bold">₪{amount.toLocaleString()}</p>
+      <p className="text-sm mt-1">{percent.toFixed(1)}% מהסה"כ</p>
+    </div>
+  );
+}
+
+// ========== קבוצת קטגוריות ==========
+interface CategoryGroupProps {
+  title: string;
+  categories: Record<string, any>;
+  transactions: any[];
+  type: 'fixed' | 'variable' | 'special';
+}
+
+function CategoryGroup({ title, categories, transactions, type }: CategoryGroupProps) {
+  // סינון טרנזקציות לפי סוג
+  const relevantTransactions = transactions.filter((tx) => {
+    const txType = getExpenseTypeFromTransaction(tx);
+    return txType === type;
+  });
+
+  // קיבוץ לפי קטגוריה
+  const grouped: Record<string, any[]> = {};
+  relevantTransactions.forEach((tx) => {
+    const category = tx.expense_category || tx.category || 'אחר';
+    if (!grouped[category]) grouped[category] = [];
+    grouped[category].push(tx);
+  });
+
+  if (Object.keys(grouped).length === 0) return null;
+
+  return (
+    <div className="mb-6">
+      <h5 className="font-medium text-gray-700 mb-3">{title}</h5>
+      <div className="space-y-2">
+        {Object.entries(grouped).map(([category, items]) => {
+          const total = items.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+          
+          return (
+            <div key={category} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium text-gray-900">{category}</p>
+                <p className="text-sm text-gray-500">{items.length} תנועות</p>
+              </div>
+              <p className="font-semibold text-gray-900">₪{total.toLocaleString()}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ========== פונקציות עזר ==========
+function formatMonthName(monthKey: string): string {
+  const [year, month] = monthKey.split('-');
+  const monthNames = [
+    'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+  ];
+  
+  const monthIndex = parseInt(month) - 1;
+  return `${monthNames[monthIndex]} ${year}`;
+}
+
+function getExpenseTypeFromTransaction(tx: any): 'fixed' | 'variable' | 'special' {
+  if (tx.expense_frequency === 'fixed') return 'fixed';
+  if (tx.expense_frequency === 'special') return 'special';
+  if (tx.expense_frequency === 'temporary' || tx.expense_frequency === 'one_time') return 'variable';
+  
+  // ברירת מחדל
+  return 'variable';
+}
