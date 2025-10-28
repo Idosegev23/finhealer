@@ -67,9 +67,9 @@ export const processStatement = inngest.createFunction(
       // Image
       else if (mimeType.startsWith('image/')) {
         console.log(`🖼️ Processing Image with GPT-5 Vision...`);
-        const base64 = buffer.toString('base64');
-        const dataUrl = `data:${mimeType};base64,${base64}`;
-        txs = await analyzeImageWithAI(dataUrl);
+        const result = await analyzeImageWithAI(buffer, mimeType, 'bank_statement');
+        txs = result.transactions;
+        extractedText = result.extractedText;
       }
 
       return { transactions: txs, extractedText };
@@ -185,14 +185,18 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
   }
 }
 
-async function analyzeImageWithAI(imageUrl: string) {
-  const userPrompt = `נתח את התמונה של דוח בנק/אשראי/קבלה וחלץ את כל תנועות ההוצאה.
-
-סווג כל תנועה לפי רשימת הקטגוריות המדויקת שקיבלת.
-החזר JSON עם כל התנועות שמצאת.`;
+async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType: string) {
+  const userPrompt = buildStatementAnalysisPrompt(
+    documentType as 'bank_statement' | 'credit_statement',
+    'תמונה של דוח'
+  );
 
   try {
     console.log('🤖 Analyzing image with GPT-5...');
+    
+    // המר את ה-Buffer ל-base64 data URL
+    const base64Image = buffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
     
     const response = await (openai.responses as any).create({
       model: 'gpt-5',
@@ -205,7 +209,7 @@ async function analyzeImageWithAI(imageUrl: string) {
           role: 'user',
           content: [
             { type: 'input_text', text: userPrompt },
-            { type: 'input_image', image_url: imageUrl },
+            { type: 'input_image', image_url: dataUrl },
           ],
         },
       ],
@@ -214,7 +218,10 @@ async function analyzeImageWithAI(imageUrl: string) {
     const content = response.output_text || '{"transactions":[]}';
     const result = JSON.parse(content);
     
-    return result.transactions || [];
+    return {
+      transactions: result.transactions || [],
+      extractedText: 'תמונה מנותחת',
+    };
   } catch (error) {
     console.error('Image analysis error:', error);
     throw new Error('Failed to analyze image with AI');
@@ -316,7 +323,7 @@ export const processDocument = inngest.createFunction(
 
       for (const tx of transactions.transactions) {
         try {
-          const { error } = await supabase.from('transactions').insert({
+          const { error } = await (supabase as any).from('transactions').insert({
             user_id: userId,
             type: tx.type || 'expense',
             amount: tx.amount,
@@ -363,7 +370,7 @@ export const processDocument = inngest.createFunction(
 
     // שלב 5: שליחת התראת WhatsApp
     await step.run('send-notification', async () => {
-      await sendWhatsAppNotification(userId, statementId, transactions.transactions.length);
+      await sendWhatsAppNotification(userId, transactions.transactions.length);
     });
 
     return { 

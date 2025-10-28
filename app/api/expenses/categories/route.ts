@@ -59,11 +59,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 });
     }
 
+    // Type assertion for categories
+    const categoriesData = categories as any[];
+
     // קיבוץ לפי סוג
     const grouped = {
-      fixed: categories?.filter(c => c.expense_type === 'fixed') || [],
-      variable: categories?.filter(c => c.expense_type === 'variable') || [],
-      special: categories?.filter(c => c.expense_type === 'special') || [],
+      fixed: categoriesData?.filter(c => c.expense_type === 'fixed') || [],
+      variable: categoriesData?.filter(c => c.expense_type === 'variable') || [],
+      special: categoriesData?.filter(c => c.expense_type === 'special') || [],
     };
 
     return NextResponse.json({
@@ -102,7 +105,7 @@ export async function POST(request: Request) {
     }
 
     // יצירת קטגוריה חדשה
-    const { data: category, error } = await supabase
+    const { data: category, error } = await (supabase as any)
       .from('expense_categories')
       .insert({
         name,

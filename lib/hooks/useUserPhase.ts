@@ -58,11 +58,14 @@ export function useUserPhase(): UserPhaseData {
           throw dbError;
         }
 
-        const userPhase = (userData?.phase as Phase) || 'reflection';
+        // Type assertion for userData
+        const userInfo = userData as any;
+
+        const userPhase = (userInfo?.phase as Phase) || 'reflection';
         setPhase(userPhase);
 
         // חשב progress לפי שלב
-        const phaseProgress = calculatePhaseProgress(userPhase, userData?.created_at);
+        const phaseProgress = calculatePhaseProgress(userPhase, userInfo?.created_at);
         setProgress(phaseProgress);
 
       } catch (err) {
@@ -140,7 +143,7 @@ export function useUpdateUserPhase() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('users')
       .update({ phase: newPhase })
       .eq('id', user.id);

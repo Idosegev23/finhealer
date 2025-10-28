@@ -198,7 +198,7 @@ function MonthCard({ month, data, isExpanded, onToggle }: MonthCardProps) {
         <div className="flex items-center gap-6">
           <div className="text-left">
             <p className="text-2xl font-bold text-gray-900">₪{data.total.toLocaleString()}</p>
-            <p className="text-sm text-gray-500">סה"כ הוצאות</p>
+            <p className="text-sm text-gray-500">סה&quot;כ הוצאות</p>
           </div>
           {isExpanded ? (
             <ChevronUp className="h-6 w-6 text-gray-400" />
@@ -292,7 +292,7 @@ function ExpenseTypeCard({ title, amount, percent, color }: ExpenseTypeCardProps
     <div className={`p-4 rounded-lg border ${colorClasses[color]}`}>
       <p className="text-sm font-medium mb-2">{title}</p>
       <p className="text-2xl font-bold">₪{amount.toLocaleString()}</p>
-      <p className="text-sm mt-1">{percent.toFixed(1)}% מהסה"כ</p>
+      <p className="text-sm mt-1">{percent.toFixed(1)}% מהסה&quot;כ</p>
     </div>
   );
 }

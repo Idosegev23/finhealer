@@ -35,9 +35,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Statement not found' }, { status: 404 });
     }
 
+    // Type assertion for statement
+    const statementData = statement as any;
+
     // If completed, fetch extracted transactions
     let transactions = null;
-    if (statement.status === 'completed') {
+    if (statementData.status === 'completed') {
       const { data: txData } = await supabase
         .from('transactions')
         .select('*')
@@ -50,13 +53,13 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      id: statement.id,
-      status: statement.status,
-      document_type: statement.document_type,
-      file_name: statement.file_name,
-      transactions_extracted: statement.transactions_extracted || 0,
-      processed_at: statement.processed_at,
-      error_message: statement.error_message,
+      id: statementData.id,
+      status: statementData.status,
+      document_type: statementData.document_type,
+      file_name: statementData.file_name,
+      transactions_extracted: statementData.transactions_extracted || 0,
+      processed_at: statementData.processed_at,
+      error_message: statementData.error_message,
       transactions: transactions,
     });
   } catch (error) {

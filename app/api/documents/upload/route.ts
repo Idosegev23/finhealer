@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(fileName);
 
     // Create uploaded_statements record
-    const { data: statement, error: dbError } = await supabase
+    const { data: statement, error: dbError } = await (supabase as any)
       .from('uploaded_statements')
       .insert({
         user_id: user.id,

@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('loans')
       .insert({
         user_id: user.id,

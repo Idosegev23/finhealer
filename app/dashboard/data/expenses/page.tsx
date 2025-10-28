@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ExpenseCategorySelector } from '@/components/expenses/expense-category-selector';
+import ExpenseCategorySelector from '@/components/expenses/expense-category-selector';
 import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { Upload, PenLine } from 'lucide-react';
 
@@ -154,7 +154,7 @@ export default function ExpensesDataPage() {
                 <div>
                   <Label>קטגוריה *</Label>
                   <ExpenseCategorySelector
-                    onSelect={(category) => {
+                    onChange={(category) => {
                       setCategoryId(category.id);
                       setExpenseType(category.expense_type);
                     }}
