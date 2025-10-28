@@ -17,38 +17,27 @@ export const processStatement = inngest.createFunction(
   },
   { event: 'statement.process' },
   async ({ event, step }) => {
-    const { statementId, userId, mimeType, fileName } = event.data;
+    const { statementId, userId, mimeType, fileName, fileData } = event.data;
 
     console.log(`🚀 Starting background processing for statement: ${statementId}`);
 
-    // שלב 1: קבלת הקובץ מ-Supabase
-    const fileData = await step.run('fetch-file', async () => {
-      const supabase = await createClient();
+    // שלב 1: המרת הקובץ מ-base64 ל-Buffer
+    const fileDataProcessed = await step.run('prepare-file', async () => {
+      // המרה מbase64 לBuffer
+      const buffer = Buffer.from(fileData, 'base64');
+      const arrayBuffer = buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength
+      );
+
+      console.log(`✅ File prepared: ${buffer.length} bytes`);
       
-      const { data: statement } = await supabase
-        .from('uploaded_statements')
-        .select('file_url')
-        .eq('id', statementId)
-        .single();
-
-      // Type assertion
-      const statementData = statement as any;
-
-      if (!statementData?.file_url) {
-        throw new Error('File not found');
-      }
-
-      // הורדת הקובץ
-      const response = await fetch(statementData.file_url);
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
       return { buffer, arrayBuffer };
     });
 
     // שלב 2: ניתוח הקובץ
     const transactions = await step.run('analyze-file', async () => {
-      const { buffer: bufferData, arrayBuffer } = fileData;
+      const { buffer: bufferData, arrayBuffer } = fileDataProcessed;
       
       // המרת Buffer מJSON חזרה ל-Buffer אמיתי
       // Inngest מסריאל Buffer ל-{type: "Buffer", data: number[]}

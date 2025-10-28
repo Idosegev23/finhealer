@@ -92,6 +92,9 @@ export async function POST(request: NextRequest) {
     
     const { inngest } = await import('@/lib/inngest/client');
     
+    // המרת הקובץ ל-base64 כדי לשלוח אותו ישירות
+    const base64File = buffer.toString('base64');
+    
     await inngest.send({
       name: 'statement.process',
       data: {
@@ -100,6 +103,7 @@ export async function POST(request: NextRequest) {
         mimeType: file.type,
         fileName: file.name,
         fileType: fileType || 'bank_statement',
+        fileData: base64File, // שולחים את הקובץ עצמו!
       },
     });
 
