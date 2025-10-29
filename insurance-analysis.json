@@ -1,0 +1,149 @@
+{
+  "report_info": {
+    "report_date": "29/10/2025",
+    "id_number": "300700556",
+    "source": "הר הביטוח - משרד האוצר"
+  },
+  "insurance_policies": [
+    {
+      "domain": "כללי",
+      "main_branch": "ביטוח דירה",
+      "sub_branch": "מבנה ותכולה",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "איי.די.איי. חברה לביטוח בע\"מ",
+      "coverage_period": "01/05/2025 - 30/04/2026",
+      "premium_amount": 4554,
+      "premium_type": "שנתית",
+      "policy_number": "1528021603"
+    },
+    {
+      "domain": "בריאות ותאונות אישיות",
+      "main_branch": "ביטוח סיעודי",
+      "sub_branch": "סיעודי עד 3 חודשים",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "הראל חברה לביטוח בע\"מ",
+      "coverage_period": "לכל החיים",
+      "premium_amount": 67.05,
+      "premium_type": "חודשית",
+      "policy_number": "875186298",
+      "coverage_details": "אישי"
+    },
+    {
+      "domain": "בריאות ותאונות אישיות",
+      "main_branch": "ביטוח בריאות",
+      "sub_branch": "ייעוץ ובדיקות",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "הראל חברה לביטוח בע\"מ",
+      "coverage_period": "לכל החיים",
+      "premium_amount": 23.9,
+      "premium_type": "חודשית",
+      "policy_number": "896814222",
+      "coverage_details": "אישי"
+    },
+    {
+      "domain": "בריאות ותאונות אישיות",
+      "main_branch": "ביטוח בריאות",
+      "sub_branch": "ניתוחים משלים שב\"ן",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "הראל חברה לביטוח בע\"מ",
+      "coverage_period": "לכל החיים",
+      "premium_amount": 25.29,
+      "premium_type": "חודשית",
+      "policy_number": "896814222",
+      "coverage_details": "אישי"
+    },
+    {
+      "domain": "בריאות ותאונות אישיות",
+      "main_branch": "ביטוח בריאות",
+      "sub_branch": "השתלות",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "הראל חברה לביטוח בע\"מ",
+      "coverage_period": "לכל החיים",
+      "premium_amount": 13.93,
+      "premium_type": "חודשית",
+      "policy_number": "896814222",
+      "coverage_details": "אישי"
+    },
+    {
+      "domain": "בריאות ותאונות אישיות",
+      "main_branch": "ביטוח בריאות",
+      "sub_branch": "תרופות - בסיס",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "הראל חברה לביטוח בע\"מ",
+      "coverage_period": "לכל החיים",
+      "premium_amount": 14.82,
+      "premium_type": "חודשית",
+      "policy_number": "896814222",
+      "coverage_details": "אישי"
+    },
+    {
+      "domain": "בריאות ותאונות אישיות",
+      "main_branch": "ביטוח בריאות",
+      "sub_branch": "ניתוחים בחו\"ל",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "הראל חברה לביטוח בע\"מ",
+      "coverage_period": "לכל החיים",
+      "premium_amount": 11.19,
+      "premium_type": "חודשית",
+      "policy_number": "896814222",
+      "coverage_details": "אישי"
+    },
+    {
+      "domain": "בריאות ותאונות אישיות",
+      "main_branch": "ביטוח בריאות",
+      "sub_branch": "אחר",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "הראל חברה לביטוח בע\"מ",
+      "coverage_period": "לכל החיים",
+      "premium_amount": 2.77,
+      "premium_type": "חודשית",
+      "policy_number": "896814222",
+      "coverage_details": "אישי"
+    },
+    {
+      "domain": "בריאות ותאונות אישיות",
+      "main_branch": "כתב שירות",
+      "sub_branch": "כתב שירות ניהול רפואי אישי",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "הראל חברה לביטוח בע\"מ",
+      "coverage_period": "01/07/2010 - 30/06/2086",
+      "premium_amount": 4.5,
+      "premium_type": "חודשית",
+      "policy_number": "896814222",
+      "coverage_details": "אישי"
+    },
+    {
+      "domain": "חיים ואבדן כושר עבודה",
+      "main_branch": "ביטוח חיים",
+      "sub_branch": "ביטוח חיים למקרה מוות",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "איי.די.איי. חברה לביטוח בע\"מ",
+      "coverage_period": "02/12/2021 - 31/10/2051",
+      "premium_amount": 22.991667,
+      "premium_type": "חודשית",
+      "policy_number": "1491260200",
+      "coverage_details": "אישי"
+    },
+    {
+      "domain": "חיים ואבדן כושר עבודה",
+      "main_branch": "ביטוח חיים",
+      "sub_branch": "ביטוח חיים למקרה מוות",
+      "product_type": "פוליסת ביטוח",
+      "insurance_company": "כלל חברה לביטוח בע\"מ",
+      "coverage_period": "01/04/2023 - 01/04/2067",
+      "premium_amount": 78.43,
+      "premium_type": "חודשית",
+      "policy_number": "4250961",
+      "coverage_details": "אישי"
+    }
+  ],
+  "summary": {
+    "total_policies": 11,
+    "total_annual_premium": 7732.46,
+    "by_domain": {
+      "כללי": 1,
+      "בריאות ותאונות אישיות": 8,
+      "חיים ואבדן כושר עבודה": 2
+    }
+  }
+}

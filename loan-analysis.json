@@ -1,0 +1,44 @@
+{
+  "report_info": {
+    "report_date": "29/10/2025",
+    "customer_names": "ליבוביץ אילנית, שגב עידו",
+    "account_number": "109770449",
+    "branch_name": "סניף אשקלון",
+    "total_debt": 99630.03,
+    "total_monthly_payment": 2024.34
+  },
+  "loans": [
+    {
+      "loan_number": "0-128-0155-00-978020",
+      "loan_type": "הלוואה לא צמודה ברבית משתנה",
+      "original_amount": 120000,
+      "current_balance": 89677.33,
+      "interest_rate": {
+        "formula": "P+1.75%",
+        "effective_rate": 7.75
+      },
+      "monthly_payment": 1432.73,
+      "payments_made": 40,
+      "total_payments": 120,
+      "remaining_payments": 80,
+      "percent_paid": 33.33,
+      "amount_paid": 30322.67
+    },
+    {
+      "loan_number": "0-128-0155-00-936646",
+      "loan_type": "הלוואה לא צמודה ברבית משתנה",
+      "original_amount": 60000,
+      "current_balance": 9952.7,
+      "interest_rate": {
+        "formula": "P+1.75%",
+        "effective_rate": 7.75
+      },
+      "monthly_payment": 581.76,
+      "payments_made": 56,
+      "total_payments": 75,
+      "remaining_payments": 19,
+      "percent_paid": 74.67,
+      "amount_paid": 50047.3
+    }
+  ]
+}

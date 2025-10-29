@@ -1,0 +1,88 @@
+{
+  "report_info": {
+    "report_date": "29/10/2025",
+    "borrower_names": "שגב עידו וליבוביץ שגב אילנית",
+    "address": "סגל צבי 20, אשקלון",
+    "id_number": "300700556",
+    "lender_name": "בנק הפועלים"
+  },
+  "summary": {
+    "total_principal": 1597043.96,
+    "total_balance_to_pay": 1771510.68,
+    "num_mortgages": 6
+  },
+  "mortgages": [
+    {
+      "loan_number": "62/00/369343/545",
+      "account_number": "269499-686",
+      "principal": 448647.28,
+      "principal_indexation": 80370.56,
+      "interest_and_indexation": 1076.55,
+      "deferred_interest": 3388.39,
+      "ancillary_fees": 0,
+      "early_repayment_fee": 0,
+      "balance_to_pay": 533482.78,
+      "monthly_payment": 0
+    },
+    {
+      "loan_number": "62/10/369343/643",
+      "account_number": "269499-686",
+      "principal": 370513.6,
+      "principal_indexation": 0,
+      "interest_and_indexation": 1555.08,
+      "deferred_interest": 5884.52,
+      "ancillary_fees": 0,
+      "early_repayment_fee": 376.4,
+      "balance_to_pay": 378329.6,
+      "monthly_payment": 0
+    },
+    {
+      "loan_number": "62/58/369343/722",
+      "account_number": "269499-686",
+      "principal": 402531.75,
+      "principal_indexation": 72306.96,
+      "interest_and_indexation": 945.66,
+      "deferred_interest": 2721.72,
+      "ancillary_fees": 0,
+      "early_repayment_fee": 391.41,
+      "balance_to_pay": 478897.5,
+      "monthly_payment": 0
+    },
+    {
+      "loan_number": "62/10/391718/333",
+      "account_number": "269499-686",
+      "principal": 108725.55,
+      "principal_indexation": 0,
+      "interest_and_indexation": 339.43,
+      "deferred_interest": 1893.37,
+      "ancillary_fees": 0,
+      "early_repayment_fee": 110.62,
+      "balance_to_pay": 111068.97,
+      "monthly_payment": 0
+    },
+    {
+      "loan_number": "62/42/391718/425",
+      "account_number": "269499-686",
+      "principal": 221822.25,
+      "principal_indexation": 0,
+      "interest_and_indexation": 496.36,
+      "deferred_interest": 2609.69,
+      "ancillary_fees": 0,
+      "early_repayment_fee": 0,
+      "balance_to_pay": 224928.3,
+      "monthly_payment": 0
+    },
+    {
+      "loan_number": "62/69/700650/240",
+      "account_number": "269499-686",
+      "principal": 44803.53,
+      "principal_indexation": 0,
+      "interest_and_indexation": 0,
+      "deferred_interest": 0,
+      "ancillary_fees": 0,
+      "early_repayment_fee": 0,
+      "balance_to_pay": 44803.53,
+      "monthly_payment": 0
+    }
+  ]
+}
