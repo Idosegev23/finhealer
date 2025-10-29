@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { DashboardNav } from '@/components/shared/DashboardNav';
+import { DashboardWrapper } from '@/components/dashboard/DashboardWrapper';
 
 export default async function DashboardLayout({
   children,
@@ -19,10 +20,10 @@ export default async function DashboardLayout({
   }
 
   return (
-    <>
+    <DashboardWrapper>
       <DashboardNav />
       {children}
-    </>
+    </DashboardWrapper>
   );
 }
 
