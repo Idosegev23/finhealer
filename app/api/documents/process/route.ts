@@ -18,9 +18,11 @@ const openai = new OpenAI({
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  let statementId: string | undefined;
   
   try {
-    const { statementId } = await request.json();
+    const body = await request.json();
+    statementId = body.statementId;
     
     console.log(`🚀 [BG] Processing document: ${statementId}`);
 
@@ -139,21 +141,24 @@ export async function POST(request: NextRequest) {
     console.error('❌ [BG] Processing error:', error);
     
     // Update status to failed
-    if (request.json) {
-      const { statementId } = await request.json();
-      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-      const supabase = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-      
-      await supabase
-        .from('uploaded_statements')
-        .update({
-          status: 'failed',
-          error_message: error.message,
-        })
-        .eq('id', statementId);
+    if (statementId) {
+      try {
+        const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+        const supabase = createSupabaseClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+        
+        await supabase
+          .from('uploaded_statements')
+          .update({
+            status: 'failed',
+            error_message: error.message,
+          })
+          .eq('id', statementId);
+      } catch (updateError) {
+        console.error('Failed to update statement status:', updateError);
+      }
     }
 
     return NextResponse.json(
@@ -169,7 +174,26 @@ export async function POST(request: NextRequest) {
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
-    // 1. Extract text from PDF using pdf-parse
+    // 1. Setup polyfills for pdfjs-dist (required in Node.js/Vercel environment)
+    try {
+      const canvasLib = await import('canvas');
+      if (!globalThis.DOMMatrix) {
+        // @ts-ignore
+        globalThis.DOMMatrix = canvasLib.DOMMatrix;
+      }
+      if (!globalThis.ImageData) {
+        // @ts-ignore  
+        globalThis.ImageData = canvasLib.ImageData;
+      }
+      if (!globalThis.Path2D) {
+        // @ts-ignore
+        globalThis.Path2D = canvasLib.Path2D;
+      }
+    } catch (canvasError) {
+      console.warn('Canvas polyfills not available, continuing anyway:', canvasError);
+    }
+
+    // 2. Extract text from PDF using pdf-parse
     console.log('📝 Extracting text from PDF...');
     // @ts-ignore - pdf-parse has ESM/CJS compatibility issues
     const pdfParse = (await import('pdf-parse')) as any;
@@ -179,10 +203,10 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     
     console.log(`✅ Text extracted: ${extractedText.length} characters, ${pdfData.numpages} pages`);
     
-    // 2. Get appropriate prompt for document type
+    // 3. Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText);
     
-    // 3. Analyze with GPT-5 using Responses API
+    // 4. Analyze with GPT-5 using Responses API
     console.log(`🤖 Analyzing with GPT-5 (${fileType})...`);
     
     const response = await (openai.responses as any).create({
