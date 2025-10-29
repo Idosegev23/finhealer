@@ -93,7 +93,7 @@ export default function ExpensesPage() {
             <p className="text-gray-600 mt-1">מעקב והיסטוריה של כל ההוצאות שלך</p>
           </div>
           <Link
-            href="/dashboard/expenses/add"
+            href="/dashboard/data/expenses"
             className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
             + הוסף הוצאה
@@ -152,7 +152,7 @@ export default function ExpensesPage() {
               <h3 className="text-xl font-semibold text-gray-700 mb-2">אין הוצאות עדיין</h3>
               <p className="text-gray-500 mb-6">התחל להוסיף הוצאות כדי לראות אותן כאן</p>
               <Link
-                href="/dashboard/expenses/add"
+                href="/dashboard/data/expenses"
                 className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
               >
                 הוסף הוצאה ראשונה
