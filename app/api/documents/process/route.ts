@@ -1,11 +1,57 @@
+// Setup PDF polyfills FIRST - before any imports that might load pdfjs-dist
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  (globalThis as any).DOMMatrix = class DOMMatrix {
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0;
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0;
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0;
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1;
+    constructor(init?: any) {}
+    scale() { return this; }
+    translate() { return this; }
+    rotate() { return this; }
+    inverse() { return new (globalThis as any).DOMMatrix(); }
+    transformPoint() { return { x: 0, y: 0 }; }
+    multiply() { return this; }
+  };
+}
+
+if (typeof globalThis.Path2D === 'undefined') {
+  (globalThis as any).Path2D = class Path2D {
+    constructor() {}
+    addPath() {}
+    closePath() {}
+    moveTo() {}
+    lineTo() {}
+    bezierCurveTo() {}
+    quadraticCurveTo() {}
+    arc() {}
+    ellipse() {}
+    rect() {}
+  };
+}
+
+if (typeof globalThis.ImageData === 'undefined') {
+  (globalThis as any).ImageData = class ImageData {
+    width = 0;
+    height = 0;
+    data = new Uint8ClampedArray(0);
+    constructor(width: number, height: number) {
+      this.width = width;
+      this.height = height;
+      this.data = new Uint8ClampedArray(width * height * 4);
+    }
+  };
+}
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
-import { setupPDFPolyfills } from '@/lib/ocr/pdf-polyfills';
 
 // ⚡️ Vercel Background Function Configuration
+export const runtime = 'nodejs'; // Force Node.js runtime
 export const maxDuration = 300; // 5 minutes (Pro plan)
 export const dynamic = 'force-dynamic';
 
@@ -179,10 +225,7 @@ export async function POST(request: NextRequest) {
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
-    // 1. Setup polyfills BEFORE loading pdf-parse
-    setupPDFPolyfills();
-
-    // 2. Extract text from PDF using pdf-parse
+    // Extract text from PDF using pdf-parse
     console.log('📝 Extracting text from PDF...');
     // @ts-ignore - pdf-parse has type issues with ESM
     const pdfParseModule: any = await import('pdf-parse');
