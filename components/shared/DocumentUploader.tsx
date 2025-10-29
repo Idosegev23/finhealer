@@ -91,20 +91,13 @@ export function DocumentUploader({
 
       const data = await response.json();
       setStatementId(data.statementId || data.id);
-      setStatus('processing');
+      setStatus('success');
+      onSuccess?.(data);
 
-      // Poll for processing status
-      if (data.statementId) {
-        await pollProcessingStatus(data.statementId);
-      } else {
-        setStatus('success');
-        onSuccess?.(data);
-        
-        // Redirect to dashboard after 2 seconds
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 2000);
-      }
+      // Redirect to dashboard immediately - processing will continue in background
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 1500);
     } catch (error) {
       console.error('Upload error:', error);
       const message = error instanceof Error ? error.message : 'שגיאה בהעלאת הקובץ';
@@ -114,50 +107,6 @@ export function DocumentUploader({
     } finally {
       setUploading(false);
     }
-  };
-
-  const pollProcessingStatus = async (id: string) => {
-    const maxAttempts = 60; // 5 minutes
-    let attempts = 0;
-
-    const poll = async () => {
-      try {
-        const response = await fetch(`/api/documents/status?id=${id}`);
-        if (!response.ok) throw new Error('שגיאה בבדיקת סטטוס');
-
-        const data = await response.json();
-
-        if (data.status === 'completed') {
-          setStatus('success');
-          onSuccess?.(data);
-          
-          // Redirect to dashboard after 2 seconds
-          setTimeout(() => {
-            router.push('/dashboard');
-          }, 2000);
-          return;
-        }
-
-        if (data.status === 'failed') {
-          throw new Error(data.error_message || 'העיבוד נכשל');
-        }
-
-        // Continue polling
-        if (attempts < maxAttempts) {
-          attempts++;
-          setTimeout(poll, 5000); // Poll every 5 seconds
-        } else {
-          throw new Error('תם הזמן - העיבוד לוקח יותר זמן מהצפוי');
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'שגיאה בעיבוד';
-        setErrorMessage(message);
-        setStatus('error');
-        onError?.(message);
-      }
-    };
-
-    await poll();
   };
 
   const handleReset = () => {
@@ -243,8 +192,8 @@ export function DocumentUploader({
           </div>
         )}
 
-        {/* Uploading/Processing */}
-        {(status === 'uploading' || status === 'processing') && (
+        {/* Uploading */}
+        {status === 'uploading' && (
           <div className="space-y-4">
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-12 w-12 text-blue-600 animate-spin" />
@@ -252,9 +201,7 @@ export function DocumentUploader({
             
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">
-                  {status === 'uploading' ? 'מעלה...' : 'מעבד...'}
-                </span>
+                <span className="text-gray-600">מעלה...</span>
                 <span className="font-medium">{progress}%</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -266,9 +213,7 @@ export function DocumentUploader({
             </div>
 
             <p className="text-sm text-gray-600 text-center">
-              {status === 'uploading' 
-                ? 'מעלה את הקובץ...' 
-                : 'מעבד את הנתונים עם AI... זה יכול לקחת כמה דקות'}
+              מעלה את הקובץ לשרת...
             </p>
           </div>
         )}
@@ -279,10 +224,10 @@ export function DocumentUploader({
             <CheckCircle className="h-16 w-16 text-green-600 mx-auto" />
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                העלאה הושלמה! ✅
+                הקובץ הועלה בהצלחה! ✅
               </h3>
               <p className="text-sm text-gray-600">
-                הקובץ הועלה ועובד בהצלחה
+                העיבוד מתבצע ברקע. נודיע לך כשיסתיים 🔔
               </p>
             </div>
             <Button onClick={handleReset} variant="outline">
