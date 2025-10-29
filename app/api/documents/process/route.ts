@@ -18,11 +18,15 @@ const openai = new OpenAI({
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  let statementId: string | undefined;
+  let statementId: string = '';
   
   try {
     const body = await request.json();
     statementId = body.statementId;
+    
+    if (!statementId) {
+      throw new Error('Missing statementId in request body');
+    }
     
     console.log(`🚀 [BG] Processing document: ${statementId}`);
 
@@ -103,16 +107,16 @@ export async function POST(request: NextRequest) {
 
     if (docType.includes('credit') || docType.includes('bank')) {
       // Credit/Bank statements → transactions table
-      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId);
+      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string);
     } else if (docType.includes('loan') || docType.includes('mortgage')) {
       // Loan/Mortgage statements → loans table
-      itemsProcessed = await saveLoans(supabase, result, stmt.user_id, statementId);
+      itemsProcessed = await saveLoans(supabase, result, stmt.user_id, statementId as string);
     } else if (docType.includes('insurance')) {
       // Insurance statements → insurance table
-      itemsProcessed = await saveInsurance(supabase, result, stmt.user_id, statementId);
+      itemsProcessed = await saveInsurance(supabase, result, stmt.user_id, statementId as string);
     } else {
       console.warn(`Unknown document type: ${docType}, defaulting to transactions`);
-      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId);
+      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string);
     }
 
     // 6. Update statement status
