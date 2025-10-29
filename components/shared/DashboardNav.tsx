@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Marquee } from "@/components/ui/marquee";
+import { usePendingExpensesCount } from "@/lib/hooks/usePendingExpensesCount";
 import {
   Home,
   TrendingUp,
@@ -57,6 +58,7 @@ const reportItems = [
 export function DashboardNav() {
   const pathname = usePathname();
   const { theme } = useTheme();
+  const { count: pendingCount, refresh: refreshPendingCount } = usePendingExpensesCount();
   const [financialData, setFinancialData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -188,6 +190,7 @@ export function DashboardNav() {
                   }`}>
                     {dataItems.map((item) => {
                       const Icon = item.icon;
+                      const showBadge = item.href === '/dashboard/data/expenses' && pendingCount > 0;
                       return (
                         <Link
                           key={item.href}
@@ -203,6 +206,11 @@ export function DashboardNav() {
                         >
                           <Icon className="w-4 h-4" />
                           <span className="text-sm">{item.label}</span>
+                          {showBadge && (
+                            <span className="mr-auto bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                              {pendingCount}
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
@@ -306,12 +314,13 @@ export function DashboardNav() {
                   {dataItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = pathname === item.href;
+                    const showBadge = item.href === '/dashboard/data/expenses' && pendingCount > 0;
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-all ${
+                        className={`relative flex flex-col items-center gap-2 p-3 rounded-lg transition-all ${
                           isActive
                             ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20"
                             : isDark 
@@ -319,6 +328,11 @@ export function DashboardNav() {
                               : "text-gray-600 hover:bg-gray-100"
                         }`}
                       >
+                        {showBadge && (
+                          <span className="absolute top-1 left-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            {pendingCount}
+                          </span>
+                        )}
                         <Icon className="w-5 h-5" />
                         <span className="text-xs text-center">{item.label}</span>
                       </Link>

@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { Upload, File, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
 
 interface DocumentUploaderProps {
   documentType: 'bank' | 'credit' | 'payslip' | 'pension' | 'insurance' | 'loan' | 'investment' | 'savings' | 'receipt';
@@ -33,6 +34,7 @@ export function DocumentUploader({
   maxSizeMB = 50,
   showPreview = true,
 }: DocumentUploaderProps) {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'success' | 'error'>('idle');
@@ -97,6 +99,11 @@ export function DocumentUploader({
       } else {
         setStatus('success');
         onSuccess?.(data);
+        
+        // Redirect to dashboard after 2 seconds
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 2000);
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -123,6 +130,11 @@ export function DocumentUploader({
         if (data.status === 'completed') {
           setStatus('success');
           onSuccess?.(data);
+          
+          // Redirect to dashboard after 2 seconds
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 2000);
           return;
         }
 

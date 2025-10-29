@@ -266,9 +266,12 @@ async function sendWhatsAppNotification(userId: string, transactionsCount: numbe
 
     const greenAPI = getGreenAPIClient();
     
+    const userName = user.name || 'שלום';
+    const pendingUrl = 'https://finhealer.vercel.app/dashboard/expenses/pending';
+    
     await greenAPI.sendMessage({
       phoneNumber: user.phone_number,
-      message: `🎉 התדפיס שלך מוכן!\n\nזיהיתי ${transactionsCount} תנועות חדשות.\n\n👉 היכנס לאפליקציה כדי לראות אותן.`,
+      message: `היי ${userName}! 🎉\n\nסיימתי לעבד את הדוח שהעלית.\nמצאתי ${transactionsCount} הוצאות שממתינות לאישור שלך.\n\n👉 היכנס לאתר כדי לאשר: ${pendingUrl}\n\nתודה! 💙`,
     });
 
     console.log(`✅ WhatsApp notification sent to ${user.phone_number}`);
