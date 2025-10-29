@@ -38,12 +38,12 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
     onSave(formData);
   };
 
-  const handleCategoryChange = (categoryId: string, categoryName: string, categoryType: string) => {
+  const handleCategoryChange = (category: any) => {
     setFormData((prev) => ({
       ...prev,
-      expense_category_id: categoryId,
-      expense_category: categoryName,
-      expense_type: categoryType,
+      expense_category_id: category.id,
+      expense_category: category.name,
+      expense_type: category.expense_type,
     }));
   };
 
