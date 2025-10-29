@@ -1,21 +1,7 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/daily-summary",
-      "schedule": "30 20 * * *"
-    },
-    {
-      "path": "/api/cron/weekly-report",
-      "schedule": "0 9 * * 1"
-    },
-    {
-      "path": "/api/cron/monthly-budget",
-      "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/hourly-alerts",
-      "schedule": "0 * * * *"
+  "functions": {
+    "app/api/documents/process/route.ts": {
+      "maxDuration": 300
     }
-  ]
+  }
 }
-

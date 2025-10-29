@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { inngest } from '@/lib/inngest/client';
 
 /**
  * API Route: /api/documents/upload
@@ -127,35 +126,25 @@ export async function POST(request: NextRequest) {
       status: 'processing',
     });
 
-    // Trigger Inngest background processing
-    console.log('🔔 Sending to Inngest:', {
-      eventName: 'document.process',
+    // 🚀 Trigger Vercel Background Function
+    console.log('🔔 Starting background processing:', {
       statementId: statement.id,
       fileUrl: publicUrl,
     });
 
     try {
-      const inngestResult = await inngest.send({
-        name: 'document.process',
-        data: {
-          statementId: statement.id,
-          userId: user.id,
-          documentType,
-          fileName: safeFileName,
-          originalFileName: file.name,
-          mimeType: file.type,
-          fileUrl: publicUrl, // Send Storage URL instead of file data
-          fileSize: file.size,
-        },
+      // קריאה אסינכרונית ל-Background Function (לא ממתינים לתוצאה)
+      fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app'}/api/documents/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statementId: statement.id }),
+      }).catch((error) => {
+        console.error('Failed to trigger background processing:', error);
       });
-      console.log('✅ Inngest event sent:', inngestResult);
-    } catch (inngestError: any) {
-      console.error('❌ Inngest error:', inngestError);
-      console.error('Error details:', {
-        message: inngestError?.message,
-        status: inngestError?.status,
-        body: inngestError?.body,
-      });
+      
+      console.log('✅ Background processing started');
+    } catch (error: any) {
+      console.error('❌ Failed to start background processing:', error);
       // Continue - don't fail the upload
     }
 
