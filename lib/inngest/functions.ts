@@ -162,8 +162,15 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
   try {
     console.log('📤 Uploading PDF to OpenAI Files API...');
+    
+    // וידוא שהשם מסתיים ב-.pdf (OpenAI דורש זאת)
+    const safeName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+    const simpleFileName = safeName.split('/').pop() || 'document.pdf'; // רק שם הקובץ, לא הנתיב
+    
+    console.log('📁 File name for OpenAI:', simpleFileName);
+    
     const file = await openai.files.create({
-      file: new File([new Uint8Array(buffer)], fileName, { type: 'application/pdf' }),
+      file: new File([new Uint8Array(buffer)], simpleFileName, { type: 'application/pdf' }),
       purpose: 'assistants',
     });
 
