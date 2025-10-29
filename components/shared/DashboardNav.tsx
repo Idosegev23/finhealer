@@ -27,10 +27,12 @@ import {
   FileText,
   ChevronDown,
   Target,
+  Scan,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "ראשי", icon: Home },
+  { href: "/dashboard/scan-center", label: "🔍 מרכז סריקה", icon: Scan },
   { href: "/dashboard/overview", label: "תמונת מצב", icon: BarChart3 },
   { href: "/dashboard/goals", label: "יעדים", icon: Target },
   { href: "/loans-simulator", label: "סימולטור", icon: Calculator },
