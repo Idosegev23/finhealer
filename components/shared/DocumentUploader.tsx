@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 
 interface DocumentUploaderProps {
-  documentType: 'bank' | 'credit' | 'payslip' | 'pension' | 'insurance' | 'loan' | 'investment' | 'savings' | 'receipt';
+  documentType: 'bank' | 'credit' | 'payslip' | 'pension' | 'insurance' | 'loan' | 'investment' | 'savings' | 'receipt' | 'mortgage';
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
   acceptedFormats?: string;
@@ -127,6 +127,7 @@ export function DocumentUploader({
     investment: 'דוח השקעות',
     savings: 'דוח חיסכון',
     receipt: 'קבלה',
+    mortgage: 'דוח משכנתא',
   };
 
   return (

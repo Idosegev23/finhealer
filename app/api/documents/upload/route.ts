@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const validTypes = ['bank', 'credit', 'payslip', 'pension', 'insurance', 'loan', 'investment', 'savings', 'receipt', 'bank_statement', 'credit_statement'];
+    const validTypes = ['bank', 'credit', 'payslip', 'pension', 'insurance', 'loan', 'investment', 'savings', 'receipt', 'mortgage', 'bank_statement', 'credit_statement'];
     if (!validTypes.includes(documentType)) {
       console.error('Invalid document type:', documentType);
       return NextResponse.json({ error: `Invalid document type: ${documentType}` }, { status: 400 });
@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
       'investment': 'investment_report',
       'savings': 'savings_statement',
       'receipt': 'receipt',
+      'mortgage': 'loan_statement', // משכנתא זה סוג של הלוואה
       'bank_statement': 'bank_statement',
       'credit_statement': 'credit_statement',
     };
