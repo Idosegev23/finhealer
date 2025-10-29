@@ -168,9 +168,6 @@ export async function POST(request: NextRequest) {
       } else if (buttonId.startsWith('split_')) {
         const transactionId = buttonId.replace('split_', '');
         await handleSplitTransaction(supabase, userData.id, transactionId, phoneNumber);
-      } else if (buttonId.startsWith('payment_')) {
-        const [_, paymentType, receiptId] = buttonId.split('_');
-        await handlePaymentMethod(supabase, userData.id, receiptId, paymentType, phoneNumber);
       }
     }
     // טיפול לפי סוג הודעה - עם AI! 🤖
@@ -217,7 +214,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // אם צריך אישור → צור proposed transaction
+        // אם צריך אישור → צור pending transaction
         if (expense.needs_confirmation) {
         const { data: transaction, error: txError } = await (supabase as any)
           .from('transactions')
@@ -232,7 +229,7 @@ export async function POST(request: NextRequest) {
               vendor: expense.vendor,
               notes: expense.description || text,
               source: 'whatsapp',
-            status: 'proposed',
+            status: 'pending',
             date: new Date().toISOString().split('T')[0],
             tx_date: new Date().toISOString().split('T')[0],
           })
@@ -240,7 +237,7 @@ export async function POST(request: NextRequest) {
           .single();
 
           if (!txError && transaction) {
-            console.log('✅ Proposed transaction created:', transaction.id);
+            console.log('✅ Pending transaction created:', transaction.id);
             
             // עדכן chat_message שהוצאה נוצרה
             await supabase
@@ -250,6 +247,12 @@ export async function POST(request: NextRequest) {
               .eq('role', 'assistant')
               .order('created_at', { ascending: false })
               .limit(1);
+            
+            // שלח הודעה עם קישור לדף אישור
+            const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app';
+            await sendWhatsAppMessage(phoneNumber, 
+              `✅ ההוצאה נקלטה במערכת!\n\n💰 ${expense.amount} ₪${expense.vendor ? ` | ${expense.vendor}` : ''}\n\n👉 אשר את ההוצאה כאן:\n${siteUrl}/dashboard/expenses/pending`
+            );
           }
         }
       }
@@ -365,8 +368,11 @@ export async function POST(request: NextRequest) {
 
           console.log('✅ Receipt saved:', receipt?.id);
 
-          // יצירת הוצאות אם יש רק 1-2 תנועות (קבלה רגילה)
+          // יצירת הוצאות - כולן pending לאישור
+          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app';
+          
           if (transactions.length <= 2) {
+            // קבלה רגילה עם 1-2 פריטים
             for (const tx of transactions) {
               await (supabase as any)
                 .from('transactions')
@@ -380,9 +386,9 @@ export async function POST(request: NextRequest) {
                   category: tx.category || 'other',
                   detailed_category: tx.detailed_category,
                   expense_frequency: tx.expense_frequency || 'one_time',
-                  payment_method: null, // נשאל את המשתמש
+                  payment_method: null,
                   source: 'ocr',
-                  status: 'proposed', // דורש אישור
+                  status: 'pending', // ממתין לאישור
                   notes: tx.description || '',
                   original_description: tx.description || '',
                   auto_categorized: true,
@@ -390,25 +396,13 @@ export async function POST(request: NextRequest) {
                 });
             }
 
-            // שאלה: אשראי או מזומן?
             const tx = transactions[0];
-            await greenAPI.sendButtons({
+            await greenAPI.sendMessage({
               phoneNumber,
-              message: `✅ זיהיתי קבלה!\n\n💰 ${tx.amount} ₪\n🏪 ${tx.vendor}\n📂 ${tx.category}\n\n⬇️ איך שילמת?`,
-              buttons: [
-                { buttonId: `payment_credit_${receipt?.id}`, buttonText: '💳 אשראי' },
-                { buttonId: `payment_cash_${receipt?.id}`, buttonText: '💵 מזומן' },
-                { buttonId: `payment_debit_${receipt?.id}`, buttonText: '🏦 חיוב' },
-              ],
+              message: `✅ קבלה נקלטה במערכת!\n\n💰 ${tx.amount} ₪\n🏪 ${tx.vendor}\n📂 ${tx.category}\n\n👉 אשר את ההוצאה כאן:\n${siteUrl}/dashboard/expenses/pending`,
             });
           } else {
             // תדפיס אשראי/בנק עם הרבה תנועות
-            await greenAPI.sendMessage({
-              phoneNumber,
-              message: `🎉 זיהיתי ${transactions.length} תנועות!\n\nהן נשמרו בחשבון שלך ב-Dashboard.\n\n👉 כנס לאפליקציה כדי לאשר אותן.`,
-            });
-
-            // שמור את כל התנועות כ-proposed
             for (const tx of transactions) {
               await (supabase as any)
                 .from('transactions')
@@ -424,13 +418,18 @@ export async function POST(request: NextRequest) {
                   expense_frequency: tx.expense_frequency || 'one_time',
                   payment_method: ocrData.document_type === 'credit_statement' ? 'credit' : null,
                   source: 'ocr',
-                  status: 'proposed',
+                  status: 'pending', // ממתין לאישור
                   notes: tx.description || '',
                   original_description: tx.description || '',
                   auto_categorized: true,
                   confidence_score: tx.confidence || 0.5,
                 });
             }
+            
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: `🎉 זיהיתי ${transactions.length} תנועות!\n\n👉 אשר את ההוצאות כאן:\n${siteUrl}/dashboard/expenses/pending`,
+            });
           }
 
         } catch (ocrError: any) {

@@ -169,11 +169,12 @@ export async function POST(request: NextRequest) {
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
-    // 1. Extract text from PDF using pdf-parse (dynamic import)
+    // 1. Extract text from PDF using pdf-parse
     console.log('📝 Extracting text from PDF...');
-    const pdfParseModule = await import('pdf-parse');
-    const pdfParse = pdfParseModule.default || pdfParseModule;
-    const pdfData = await pdfParse(buffer);
+    // @ts-ignore - pdf-parse has ESM/CJS compatibility issues
+    const pdfParse = (await import('pdf-parse')) as any;
+    const parseFn = pdfParse.default || pdfParse;
+    const pdfData = await parseFn(buffer);
     const extractedText = pdfData.text;
     
     console.log(`✅ Text extracted: ${extractedText.length} characters, ${pdfData.numpages} pages`);
