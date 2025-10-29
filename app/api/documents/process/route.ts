@@ -178,34 +178,49 @@ export async function POST(request: NextRequest) {
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
-    // 1. Setup polyfills for pdfjs-dist from @napi-rs/canvas
-    try {
-      const canvasModule = await import('@napi-rs/canvas');
-      if (!globalThis.DOMMatrix && canvasModule.DOMMatrix) {
-        // @ts-ignore
-        globalThis.DOMMatrix = canvasModule.DOMMatrix;
-      }
-      if (!globalThis.Path2D && canvasModule.Path2D) {
-        // @ts-ignore
-        globalThis.Path2D = canvasModule.Path2D;
-      }
-      if (!globalThis.ImageData && canvasModule.ImageData) {
-        // @ts-ignore
-        globalThis.ImageData = canvasModule.ImageData;
-      }
-      console.log('✅ @napi-rs/canvas polyfills loaded');
-    } catch (e) {
-      console.warn('⚠️  @napi-rs/canvas not available, using mocks');
-      // Fallback to simple mocks
-      if (!globalThis.DOMMatrix) {
-        // @ts-ignore
-        globalThis.DOMMatrix = class DOMMatrix { constructor() {} };
-      }
-      if (!globalThis.Path2D) {
-        // @ts-ignore
-        globalThis.Path2D = class Path2D { constructor() {} };
-      }
+    // 1. Setup minimal mock polyfills for pdfjs-dist
+    // These are only needed to prevent crashes - we don't actually use rendering
+    if (!globalThis.DOMMatrix) {
+      // @ts-ignore - Minimal mock that satisfies pdfjs-dist
+      globalThis.DOMMatrix = class DOMMatrix {
+        a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+        constructor(init?: any) {}
+        scale(x: number, y?: number) { return this; }
+        translate(x: number, y: number) { return this; }
+        rotate(angle: number) { return this; }
+      } as any;
     }
+    
+    if (!globalThis.Path2D) {
+      // @ts-ignore - Minimal mock
+      globalThis.Path2D = class Path2D {
+        constructor(path?: any) {}
+        addPath(path: any, transform?: any) {}
+        closePath() {}
+        moveTo(x: number, y: number) {}
+        lineTo(x: number, y: number) {}
+        bezierCurveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) {}
+        quadraticCurveTo(cpx: number, cpy: number, x: number, y: number) {}
+        arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, anticlockwise?: boolean) {}
+        rect(x: number, y: number, w: number, h: number) {}
+      } as any;
+    }
+
+    if (!globalThis.ImageData) {
+      // @ts-ignore - Minimal mock
+      globalThis.ImageData = class ImageData {
+        width: number;
+        height: number;
+        data: Uint8ClampedArray;
+        constructor(width: number, height: number) {
+          this.width = width;
+          this.height = height;
+          this.data = new Uint8ClampedArray(width * height * 4);
+        }
+      } as any;
+    }
+
+    console.log('✅ PDF polyfills initialized (mock mode)');
 
     // 2. Extract text from PDF using pdf-parse
     console.log('📝 Extracting text from PDF...');
