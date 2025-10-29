@@ -47,18 +47,22 @@ export async function POST(request: NextRequest) {
     console.log('📦 Buffer created:', buffer.length, 'bytes');
 
     // Upload to Supabase Storage
-    const fileName = `${user.id}/${Date.now()}_${file.name}`;
+    // יצירת שם קובץ safe (בלי תווים מיוחדים)
+    const fileExtension = file.name.split('.').pop() || 'pdf';
+    const timestamp = Date.now();
+    const safeFileName = `${user.id}/${timestamp}.${fileExtension}`;
     
     console.log('☁️ Uploading to Storage:', {
       bucket: 'financial-documents',
-      path: fileName,
+      path: safeFileName,
+      originalName: file.name,
       size: buffer.length,
       contentType: file.type,
     });
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('financial-documents')
-      .upload(fileName, buffer, {
+      .upload(safeFileName, buffer, {
         contentType: file.type,
         upsert: false,
       });
@@ -74,7 +78,7 @@ export async function POST(request: NextRequest) {
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('financial-documents')
-      .getPublicUrl(fileName);
+      .getPublicUrl(safeFileName);
 
     // Create uploaded_statements record
     const { data: statement, error: dbError } = await (supabase as any)
@@ -104,7 +108,8 @@ export async function POST(request: NextRequest) {
           statementId: statement.id,
           userId: user.id,
           documentType,
-          fileName,
+          fileName: safeFileName,
+          originalFileName: file.name,
           mimeType: file.type,
           fileUrl: publicUrl, // Send Storage URL instead of file data
           fileSize: file.size,
