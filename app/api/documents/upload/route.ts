@@ -80,12 +80,29 @@ export async function POST(request: NextRequest) {
       .from('financial-documents')
       .getPublicUrl(safeFileName);
 
+    // Map documentType to file_type
+    const fileTypeMap: Record<string, string> = {
+      'bank': 'bank_statement',
+      'credit': 'credit_statement',
+      'payslip': 'salary_slip',
+      'pension': 'pension_report',
+      'insurance': 'insurance_report',
+      'loan': 'loan_statement',
+      'investment': 'investment_report',
+      'savings': 'savings_statement',
+      'receipt': 'receipt',
+      'bank_statement': 'bank_statement',
+      'credit_statement': 'credit_statement',
+    };
+    const fileType = fileTypeMap[documentType] || 'other';
+
     // Create uploaded_statements record
     const { data: statement, error: dbError } = await (supabase as any)
       .from('uploaded_statements')
       .insert({
         user_id: user.id,
         file_name: file.name,
+        file_type: fileType,
         document_type: documentType,
         file_url: publicUrl,
         file_size: file.size,
@@ -97,8 +114,18 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       console.error('Database error:', dbError);
-      return NextResponse.json({ error: 'Failed to create record' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Failed to create record',
+        details: dbError.message || dbError.code || dbError 
+      }, { status: 500 });
     }
+
+    console.log('✅ Upload completed:', {
+      statementId: statement.id,
+      fileName: file.name,
+      fileType: fileType,
+      status: 'processing',
+    });
 
     // Trigger Inngest background processing
     try {
