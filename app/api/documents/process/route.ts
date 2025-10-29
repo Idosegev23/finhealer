@@ -1,3 +1,17 @@
+// Setup minimal polyfills BEFORE any imports to prevent pdfjs-dist crashes
+// These prevent "DOMMatrix is not defined" errors in Node.js/Vercel
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  (globalThis as any).DOMMatrix = class DOMMatrix {
+    multiplySelf() { return this; }
+  };
+}
+if (typeof globalThis.ImageData === 'undefined') {
+  (globalThis as any).ImageData = class ImageData {};
+}
+if (typeof globalThis.Path2D === 'undefined') {
+  (globalThis as any).Path2D = class Path2D {};
+}
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
