@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
-import pdfParse from 'pdf-parse';
 
 // ⚡️ Vercel Background Function Configuration
 export const maxDuration = 300; // 5 minutes (Pro plan)
@@ -132,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      transactions: transactions.length,
+      itemsProcessed: itemsProcessed,
       duration: `${duration}s`,
     });
 
@@ -170,8 +169,10 @@ export async function POST(request: NextRequest) {
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
-    // 1. Extract text from PDF using pdf-parse
+    // 1. Extract text from PDF using pdf-parse (dynamic import)
     console.log('📝 Extracting text from PDF...');
+    const pdfParseModule = await import('pdf-parse');
+    const pdfParse = pdfParseModule.default || pdfParseModule;
     const pdfData = await pdfParse(buffer);
     const extractedText = pdfData.text;
     

@@ -33,10 +33,34 @@ export class GreenAPIClient {
   }
 
   /**
+   * המרת מספר טלפון ישראלי לפורמט בינלאומי
+   * 0547667775 → 972547667775
+   * 972547667775 → 972547667775 (כבר נכון)
+   * +972547667775 → 972547667775 (הסרת +)
+   */
+  private normalizePhoneNumber(phone: string): string {
+    // הסרת רווחים ומקפים
+    let normalized = phone.replace(/[\s\-]/g, '');
+    
+    // הסרת + אם יש
+    if (normalized.startsWith('+')) {
+      normalized = normalized.substring(1);
+    }
+    
+    // המרה מ-05X ל-972X
+    if (normalized.startsWith('0')) {
+      normalized = '972' + normalized.substring(1);
+    }
+    
+    return normalized;
+  }
+
+  /**
    * שליחת הודעת טקסט פשוטה
    */
   async sendMessage({ phoneNumber, message }: SendMessageParams) {
     const url = `${this.baseUrl}/sendMessage/${this.token}`;
+    const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
 
     try {
       const response = await fetch(url, {
@@ -45,7 +69,7 @@ export class GreenAPIClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          chatId: `${phoneNumber}@c.us`,
+          chatId: `${normalizedPhone}@c.us`,
           message: message,
         }),
       });
@@ -55,7 +79,7 @@ export class GreenAPIClient {
       }
 
       const data = await response.json();
-      console.log('✅ GreenAPI message sent:', data.idMessage);
+      console.log(`✅ GreenAPI message sent to ${normalizedPhone}@c.us:`, data.idMessage);
       return data;
     } catch (error) {
       console.error('❌ GreenAPI send error:', error);
@@ -68,6 +92,7 @@ export class GreenAPIClient {
    */
   async sendButtons({ phoneNumber, message, buttons }: SendButtonsParams) {
     const url = `${this.baseUrl}/sendButtons/${this.token}`;
+    const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
 
     try {
       const response = await fetch(url, {
@@ -76,7 +101,7 @@ export class GreenAPIClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          chatId: `${phoneNumber}@c.us`,
+          chatId: `${normalizedPhone}@c.us`,
           message: message,
           footer: 'FinHealer',
           buttons: buttons.map((btn, index) => ({
@@ -94,7 +119,7 @@ export class GreenAPIClient {
       }
 
       const data = await response.json();
-      console.log('✅ GreenAPI buttons sent:', data.idMessage);
+      console.log(`✅ GreenAPI buttons sent to ${normalizedPhone}@c.us:`, data.idMessage);
       return data;
     } catch (error) {
       console.error('❌ GreenAPI buttons error:', error);
