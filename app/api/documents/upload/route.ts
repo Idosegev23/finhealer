@@ -21,22 +21,41 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File;
     const documentType = formData.get('documentType') as string;
 
+    console.log('📤 Upload request:', {
+      fileName: file?.name,
+      fileSize: file?.size,
+      fileType: file?.type,
+      documentType,
+      userId: user.id,
+    });
+
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     // Validate file type
-    const validTypes = ['bank', 'credit', 'payslip', 'pension', 'insurance', 'loan', 'investment', 'savings', 'receipt'];
+    const validTypes = ['bank', 'credit', 'payslip', 'pension', 'insurance', 'loan', 'investment', 'savings', 'receipt', 'bank_statement', 'credit_statement'];
     if (!validTypes.includes(documentType)) {
-      return NextResponse.json({ error: 'Invalid document type' }, { status: 400 });
+      console.error('Invalid document type:', documentType);
+      return NextResponse.json({ error: `Invalid document type: ${documentType}` }, { status: 400 });
     }
 
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    console.log('📦 Buffer created:', buffer.length, 'bytes');
+
     // Upload to Supabase Storage
     const fileName = `${user.id}/${Date.now()}_${file.name}`;
+    
+    console.log('☁️ Uploading to Storage:', {
+      bucket: 'financial-documents',
+      path: fileName,
+      size: buffer.length,
+      contentType: file.type,
+    });
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('financial-documents')
       .upload(fileName, buffer, {
@@ -46,7 +65,10 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError);
-      return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Failed to upload file', 
+        details: uploadError.message || uploadError 
+      }, { status: 500 });
     }
 
     // Get public URL
