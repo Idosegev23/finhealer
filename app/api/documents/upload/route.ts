@@ -128,8 +128,14 @@ export async function POST(request: NextRequest) {
     });
 
     // Trigger Inngest background processing
+    console.log('🔔 Sending to Inngest:', {
+      eventName: 'document.process',
+      statementId: statement.id,
+      fileUrl: publicUrl,
+    });
+
     try {
-      await inngest.send({
+      const inngestResult = await inngest.send({
         name: 'document.process',
         data: {
           statementId: statement.id,
@@ -142,9 +148,15 @@ export async function POST(request: NextRequest) {
           fileSize: file.size,
         },
       });
-    } catch (inngestError) {
-      console.error('Inngest error:', inngestError);
-      // Don't fail the upload if Inngest fails - just log it
+      console.log('✅ Inngest event sent:', inngestResult);
+    } catch (inngestError: any) {
+      console.error('❌ Inngest error:', inngestError);
+      console.error('Error details:', {
+        message: inngestError?.message,
+        status: inngestError?.status,
+        body: inngestError?.body,
+      });
+      // Continue - don't fail the upload
     }
 
     return NextResponse.json({
