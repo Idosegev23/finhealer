@@ -365,6 +365,116 @@ ${text}
 }
 
 // ============================================================================
+// 6️⃣ דוח מסלקה פנסיונית (Pension Clearinghouse Report)
+// ============================================================================
+
+export function getPensionStatementPrompt(text: string): string {
+  return `אתה מומחה בניתוח דוחות מסלקה פנסיונית ישראלית.
+
+נתח את דוח המסלקה הבא וחלץ את **כל התוכניות והנתונים הפנסיוניים**.
+
+## **מה לחלץ:**
+
+### **1. מידע כללי (report_info):**
+- שם הלקוח (customer_name)
+- תעודת זהות (id_number)
+- תאריך דוח (report_date)
+- שם סוכן/יועץ (agent_name) - אם יש
+- סה"כ יתרה נוכחית (total_balance)
+- סה"כ הפקדה חודשית (total_monthly_deposit)
+
+### **2. תוכניות פנסיוניות (pension_plans):**
+עבור כל תוכנית (קרן פנסיה, קופת גמל, קרן השתלמות, פוליסת ביטוח משולבת):
+
+**שדות חובה:**
+- סוג תוכנית (plan_type): "pension_fund", "provident_fund", "study_fund", "insurance_policy"
+- שם חברה מנהלת (provider)
+- שם תוכנית (plan_name)
+- מספר תוכנית/פוליסה (policy_number)
+- סטטוס (status): "active", "frozen", "settled"
+- וותק - תאריך התחלה (start_date)
+- יתרה נוכחית (current_balance)
+
+**שדות אופציונליים:**
+- הפקדה חודשית (monthly_deposit)
+- הפקדת עובד (employee_deposit)
+- הפקדת מעסיק (employer_deposit)
+- גיל פרישה (retirement_age)
+- חיסכון לקצבה (pension_savings)
+- חיסכון להון (capital_savings)
+- כיסויים ביטוחיים (insurance_coverage): ביטוח חיים, אובדן כושר עבודה, מחלות קשות וכו'
+- תחזית בגיל פרישה (retirement_forecast)
+- מסלול השקעה (investment_track)
+- דמי ניהול (management_fees)
+
+### **3. סיכום כיסויים ביטוחיים (insurance_summary):**
+אם יש כיסויים ביטוחיים, חלץ:
+- ביטוח חיים (life_insurance)
+- ביטוח יסודי (basic_insurance)
+- פנסיית שאירים (survivors_pension)
+- אובדן כושר עבודה (disability)
+- מחלות קשות (critical_illness)
+- ביטוח סיעודי (nursing_care)
+- נכות מתאונה (accident_disability)
+
+## **פורמט JSON:**
+{
+  "report_info": {
+    "report_date": "16/03/2023",
+    "customer_name": "אביתר באבאני",
+    "id_number": "039854880",
+    "agent_name": "גדי ברקאי",
+    "total_balance": 11547.00,
+    "total_monthly_deposit": 1666.00
+  },
+  "pension_plans": [
+    {
+      "plan_type": "pension_fund",
+      "provider": "הפניקס",
+      "plan_name": "הפניקס פנסיה מקיפה",
+      "policy_number": "1124800010",
+      "status": "frozen",
+      "start_date": "01/03/2006",
+      "current_balance": 24.00,
+      "monthly_deposit": 0,
+      "retirement_age": 67,
+      "pension_savings": 24.00,
+      "retirement_forecast": 75.00,
+      "insurance_coverage": {
+        "life_insurance": 398.00,
+        "disability": 6007.00
+      }
+    }
+  ],
+  "insurance_summary": {
+    "life_insurance": 398.00,
+    "survivors_pension": 0,
+    "disability": 8009.00,
+    "critical_illness": 6007.00,
+    "nursing_care": 0
+  },
+  "summary": {
+    "total_plans": 5,
+    "active_plans": 3,
+    "frozen_plans": 2,
+    "total_balance": 11547.00,
+    "total_monthly_deposit": 1666.00,
+    "by_type": {
+      "pension_fund": 1,
+      "provident_fund": 2,
+      "study_fund": 1,
+      "insurance_policy": 1
+    }
+  }
+}
+
+**הדוח:**
+${text}
+
+**חלץ את כל התוכניות - גם קפואות וגם פעילות!**`;
+}
+
+// ============================================================================
 // Helper: בחירת פרומפט לפי סוג מסמך
 // ============================================================================
 
@@ -392,6 +502,10 @@ export function getPromptForDocumentType(
 
   if (normalizedType.includes('insurance')) {
     return getInsuranceStatementPrompt(extractedText);
+  }
+
+  if (normalizedType.includes('pension') || normalizedType.includes('פנסיה') || normalizedType.includes('מסלקה')) {
+    return getPensionStatementPrompt(extractedText);
   }
 
   // Default to credit statement for unknown types

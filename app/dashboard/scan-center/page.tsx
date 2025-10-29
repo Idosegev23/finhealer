@@ -86,11 +86,11 @@ const documentTypes: DocumentTypeConfig[] = [
   },
   {
     type: 'pension',
-    title: 'דוח חיסכון פנסיוני',
-    description: 'פנסיה וקרן השתלמות ממסלקה',
+    title: 'דוח מסלקה פנסיונית',
+    description: 'קרנות פנסיה, גמל, השתלמות, ביטוח חיים',
     icon: Shield,
     color: 'bg-teal-50 text-teal-600 border-teal-200',
-    dataExtracted: 'צבירה, הפקדות, תשואה',
+    dataExtracted: 'יתרות, הפקדות, כיסויים ביטוחיים',
   },
   {
     type: 'insurance',

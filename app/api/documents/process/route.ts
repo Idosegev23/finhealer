@@ -1,49 +1,3 @@
-// Setup PDF polyfills FIRST - before any imports that might load pdfjs-dist
-if (typeof globalThis.DOMMatrix === 'undefined') {
-  (globalThis as any).DOMMatrix = class DOMMatrix {
-    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
-    m11 = 1; m12 = 0; m13 = 0; m14 = 0;
-    m21 = 0; m22 = 1; m23 = 0; m24 = 0;
-    m31 = 0; m32 = 0; m33 = 1; m34 = 0;
-    m41 = 0; m42 = 0; m43 = 0; m44 = 1;
-    constructor(init?: any) {}
-    scale() { return this; }
-    translate() { return this; }
-    rotate() { return this; }
-    inverse() { return new (globalThis as any).DOMMatrix(); }
-    transformPoint() { return { x: 0, y: 0 }; }
-    multiply() { return this; }
-  };
-}
-
-if (typeof globalThis.Path2D === 'undefined') {
-  (globalThis as any).Path2D = class Path2D {
-    constructor() {}
-    addPath() {}
-    closePath() {}
-    moveTo() {}
-    lineTo() {}
-    bezierCurveTo() {}
-    quadraticCurveTo() {}
-    arc() {}
-    ellipse() {}
-    rect() {}
-  };
-}
-
-if (typeof globalThis.ImageData === 'undefined') {
-  (globalThis as any).ImageData = class ImageData {
-    width = 0;
-    height = 0;
-    data = new Uint8ClampedArray(0);
-    constructor(width: number, height: number) {
-      this.width = width;
-      this.height = height;
-      this.data = new Uint8ClampedArray(width * height * 4);
-    }
-  };
-}
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -161,6 +115,9 @@ export async function POST(request: NextRequest) {
     } else if (docType.includes('insurance')) {
       // Insurance statements → insurance table
       itemsProcessed = await saveInsurance(supabase, result, stmt.user_id, statementId as string);
+    } else if (docType.includes('pension') || docType.includes('פנסיה') || docType.includes('מסלקה')) {
+      // Pension statements → pensions table
+      itemsProcessed = await savePensions(supabase, result, stmt.user_id, statementId as string);
     } else {
       console.warn(`Unknown document type: ${docType}, defaulting to transactions`);
       itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string);
@@ -235,10 +192,10 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     
     console.log(`✅ Text extracted: ${extractedText.length} characters, ${pdfData.numpages} pages`);
     
-    // 3. Get appropriate prompt for document type
+    // Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText);
     
-    // 4. Analyze with GPT-5 using Responses API
+    // Analyze with GPT-5 using Responses API
     console.log(`🤖 Analyzing with GPT-5 (${fileType})...`);
     
     const response = await (openai.responses as any).create({
@@ -597,6 +554,73 @@ async function saveInsurance(supabase: any, result: any, userId: string, documen
   }
 }
 
+/**
+ * Save pension plans from pension clearinghouse reports
+ */
+async function savePensions(supabase: any, result: any, userId: string, documentId: string): Promise<number> {
+  try {
+    if (!result.pension_plans || result.pension_plans.length === 0) {
+      console.log('No pension plans to save');
+      return 0;
+    }
+
+    const pensionsToInsert = result.pension_plans.map((plan: any) => {
+      // Parse start_date
+      const startDate = parseDateToISO(plan.start_date);
+
+      // Map plan_type to pension_type
+      const typeMap: Record<string, string> = {
+        'pension_fund': 'pension_fund',
+        'provident_fund': 'provident_fund',
+        'study_fund': 'study_fund',
+        'insurance_policy': 'insurance',
+      };
+      const pensionType = typeMap[plan.plan_type] || 'other';
+
+      return {
+        user_id: userId,
+        pension_type: pensionType,
+        provider: plan.provider,
+        policy_number: plan.policy_number || null,
+        current_balance: parseFloat(plan.current_balance) || 0,
+        monthly_deposit: parseFloat(plan.monthly_deposit) || 0,
+        employer_deposit: parseFloat(plan.employer_deposit) || 0,
+        management_fees: parseFloat(plan.management_fees) || null,
+        annual_return: null, // Not in clearinghouse report
+        start_date: startDate,
+        metadata: {
+          plan_name: plan.plan_name,
+          status: plan.status,
+          retirement_age: plan.retirement_age,
+          pension_savings: plan.pension_savings,
+          capital_savings: plan.capital_savings,
+          retirement_forecast: plan.retirement_forecast,
+          investment_track: plan.investment_track,
+          insurance_coverage: plan.insurance_coverage,
+          employee_deposit: plan.employee_deposit,
+          document_id: documentId,
+          report_info: result.report_info,
+        },
+      };
+    });
+
+    const { error } = await supabase
+      .from('pensions')
+      .insert(pensionsToInsert);
+
+    if (error) {
+      console.error('Failed to insert pensions:', error);
+      throw error;
+    }
+
+    console.log(`💾 Saved ${pensionsToInsert.length} pension plans`);
+    return pensionsToInsert.length;
+  } catch (error) {
+    console.error('Error in savePensions:', error);
+    throw error;
+  }
+}
+
 // Helper: Parse DD/MM/YYYY to YYYY-MM-DD
 function parseDateToISO(dateStr: string): string | null {
   try {
@@ -655,6 +679,8 @@ async function sendWhatsAppNotification(userId: string, itemsCount: number, docT
       message = `היי ${userName}! 🏦\n\nסיימתי לעבד את דוח ההלוואות.\nמצאתי ${itemsCount} הלוואות/מסלולים.\n\n👉 צפה בפירוט: ${url}\n\nתודה! 💙`;
     } else if (docType.includes('insurance')) {
       message = `היי ${userName}! 🛡️\n\nסיימתי לעבד את דוח הביטוחים.\nמצאתי ${itemsCount} פוליסות ביטוח.\n\n👉 צפה בפירוט: ${url}\n\nתודה! 💙`;
+    } else if (docType.includes('pension') || docType.includes('פנסיה') || docType.includes('מסלקה')) {
+      message = `היי ${userName}! 🏦\n\nסיימתי לעבד את דוח המסלקה הפנסיונית.\nמצאתי ${itemsCount} תוכניות חיסכון פנסיוני.\n\n👉 צפה בפירוט: ${url}\n\nתודה! 💙`;
     } else {
       message = `היי ${userName}! 📄\n\nסיימתי לעבד את המסמך שהעלית.\nמצאתי ${itemsCount} פריטים.\n\n👉 צפה בפירוט: ${url}\n\nתודה! 💙`;
     }
