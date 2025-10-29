@@ -197,9 +197,16 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     const result = JSON.parse(content);
     
     return result.transactions || [];
-  } catch (error) {
-    console.error('PDF analysis error:', error);
-    throw new Error('Failed to analyze PDF with AI');
+  } catch (error: any) {
+    console.error('❌ PDF analysis error:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      status: error?.status,
+      type: error?.type,
+      code: error?.code,
+      response: error?.response?.data,
+    });
+    throw new Error(`Failed to analyze PDF with AI: ${error?.message || 'Unknown error'}`);
   }
 }
 
@@ -240,9 +247,16 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
       transactions: result.transactions || [],
       extractedText: 'תמונה מנותחת',
     };
-  } catch (error) {
-    console.error('Image analysis error:', error);
-    throw new Error('Failed to analyze image with AI');
+  } catch (error: any) {
+    console.error('❌ Image analysis error:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      status: error?.status,
+      type: error?.type,
+      code: error?.code,
+      response: error?.response?.data,
+    });
+    throw new Error(`Failed to analyze image with AI: ${error?.message || 'Unknown error'}`);
   }
 }
 
