@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
+import { setupPDFPolyfills } from '@/lib/ocr/pdf-polyfills';
 
 // ⚡️ Vercel Background Function Configuration
 export const maxDuration = 300; // 5 minutes (Pro plan)
@@ -178,56 +179,15 @@ export async function POST(request: NextRequest) {
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
-    // 1. Setup minimal mock polyfills for pdfjs-dist
-    // These are only needed to prevent crashes - we don't actually use rendering
-    if (!globalThis.DOMMatrix) {
-      // @ts-ignore - Minimal mock that satisfies pdfjs-dist
-      globalThis.DOMMatrix = class DOMMatrix {
-        a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
-        constructor(init?: any) {}
-        scale(x: number, y?: number) { return this; }
-        translate(x: number, y: number) { return this; }
-        rotate(angle: number) { return this; }
-      } as any;
-    }
-    
-    if (!globalThis.Path2D) {
-      // @ts-ignore - Minimal mock
-      globalThis.Path2D = class Path2D {
-        constructor(path?: any) {}
-        addPath(path: any, transform?: any) {}
-        closePath() {}
-        moveTo(x: number, y: number) {}
-        lineTo(x: number, y: number) {}
-        bezierCurveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) {}
-        quadraticCurveTo(cpx: number, cpy: number, x: number, y: number) {}
-        arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, anticlockwise?: boolean) {}
-        rect(x: number, y: number, w: number, h: number) {}
-      } as any;
-    }
-
-    if (!globalThis.ImageData) {
-      // @ts-ignore - Minimal mock
-      globalThis.ImageData = class ImageData {
-        width: number;
-        height: number;
-        data: Uint8ClampedArray;
-        constructor(width: number, height: number) {
-          this.width = width;
-          this.height = height;
-          this.data = new Uint8ClampedArray(width * height * 4);
-        }
-      } as any;
-    }
-
-    console.log('✅ PDF polyfills initialized (mock mode)');
+    // 1. Setup polyfills BEFORE loading pdf-parse
+    setupPDFPolyfills();
 
     // 2. Extract text from PDF using pdf-parse
     console.log('📝 Extracting text from PDF...');
-    // @ts-ignore - pdf-parse has ESM/CJS compatibility issues
-    const pdfParse = (await import('pdf-parse')) as any;
-    const parseFn = pdfParse.default || pdfParse;
-    const pdfData = await parseFn(buffer);
+    // @ts-ignore - pdf-parse has type issues with ESM
+    const pdfParseModule: any = await import('pdf-parse');
+    const pdfParse = pdfParseModule.default || pdfParseModule;
+    const pdfData = await pdfParse(buffer);
     const extractedText = pdfData.text;
     
     console.log(`✅ Text extracted: ${extractedText.length} characters, ${pdfData.numpages} pages`);
