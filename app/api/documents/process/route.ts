@@ -178,23 +178,33 @@ export async function POST(request: NextRequest) {
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
-    // 1. Setup polyfills for pdfjs-dist (required in Node.js/Vercel environment)
+    // 1. Setup polyfills for pdfjs-dist from @napi-rs/canvas
     try {
-      const canvasLib = await import('canvas');
+      const canvasModule = await import('@napi-rs/canvas');
+      if (!globalThis.DOMMatrix && canvasModule.DOMMatrix) {
+        // @ts-ignore
+        globalThis.DOMMatrix = canvasModule.DOMMatrix;
+      }
+      if (!globalThis.Path2D && canvasModule.Path2D) {
+        // @ts-ignore
+        globalThis.Path2D = canvasModule.Path2D;
+      }
+      if (!globalThis.ImageData && canvasModule.ImageData) {
+        // @ts-ignore
+        globalThis.ImageData = canvasModule.ImageData;
+      }
+      console.log('✅ @napi-rs/canvas polyfills loaded');
+    } catch (e) {
+      console.warn('⚠️  @napi-rs/canvas not available, using mocks');
+      // Fallback to simple mocks
       if (!globalThis.DOMMatrix) {
         // @ts-ignore
-        globalThis.DOMMatrix = canvasLib.DOMMatrix;
-      }
-      if (!globalThis.ImageData) {
-        // @ts-ignore  
-        globalThis.ImageData = canvasLib.ImageData;
+        globalThis.DOMMatrix = class DOMMatrix { constructor() {} };
       }
       if (!globalThis.Path2D) {
         // @ts-ignore
-        globalThis.Path2D = canvasLib.Path2D;
+        globalThis.Path2D = class Path2D { constructor() {} };
       }
-    } catch (canvasError) {
-      console.warn('Canvas polyfills not available, continuing anyway:', canvasError);
     }
 
     // 2. Extract text from PDF using pdf-parse
