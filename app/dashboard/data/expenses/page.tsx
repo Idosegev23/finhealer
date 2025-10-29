@@ -190,7 +190,8 @@ export default function ExpensesDataPage() {
               <DocumentUploader
                 documentType="bank"
                 onSuccess={(data) => {
-                  alert(`✅ הדוח עובד בהצלחה! זוהו ${data.transactions_extracted || 0} תנועות`);
+                  // אל תציג כלום - ה-redirect קורה אוטומטית
+                  console.log('✅ File uploaded successfully:', data);
                 }}
                 onError={(error) => {
                   alert(`❌ שגיאה: ${error}`);
