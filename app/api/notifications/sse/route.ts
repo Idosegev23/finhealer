@@ -39,8 +39,10 @@ export async function GET(request: NextRequest) {
             .gte('processed_at', new Date(Date.now() - 60000).toISOString()) // אחרון דקה
             .order('processed_at', { ascending: false });
           
-          if (completedStatements && completedStatements.length > 0) {
-            for (const statement of completedStatements) {
+          const statements = completedStatements as any[];
+          
+          if (statements && statements.length > 0) {
+            for (const statement of statements) {
               const event = {
                 type: 'document_processed',
                 statementId: statement.id,
