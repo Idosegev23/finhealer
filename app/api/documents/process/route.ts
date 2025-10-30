@@ -181,33 +181,20 @@ export async function POST(request: NextRequest) {
 // ============================================================================
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
-  // Setup DOM polyfills for pdfjs-dist in Node.js/serverless environment
-  if (typeof globalThis.DOMMatrix === 'undefined') {
-    (globalThis as any).DOMMatrix = class DOMMatrix {
-      multiplySelf() { return this; }
-    };
-  }
-  if (typeof globalThis.ImageData === 'undefined') {
-    (globalThis as any).ImageData = class ImageData {};
-  }
-  if (typeof globalThis.Path2D === 'undefined') {
-    (globalThis as any).Path2D = class Path2D {};
-  }
-
-  let parser: any = undefined;
   try {
-    // Extract text from PDF using pdf-parse
+    // Extract text from PDF using unpdf (serverless-optimized)
     console.log('📝 Extracting text from PDF...');
 
-    // Dynamically import pdf-parse to avoid build-time issues
-    const { PDFParse } = await import('pdf-parse');
+    // Import unpdf - optimized for serverless/edge environments
+    const { getDocumentProxy, extractText } = await import('unpdf');
 
-    // Create parser instance with buffer data
-    parser = new PDFParse({ data: buffer });
-    const pdfData = await parser.getText();
-    const extractedText = pdfData.text;
+    // Create document proxy from buffer
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
 
-    console.log(`✅ Text extracted: ${extractedText.length} characters, ${pdfData.total} pages`);
+    // Extract text with merged pages
+    const { totalPages, text: extractedText } = await extractText(pdf, { mergePages: true });
+
+    console.log(`✅ Text extracted: ${extractedText.length} characters, ${totalPages} pages`);
 
     // Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText);
@@ -248,11 +235,6 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       type: error?.type,
     });
     throw new Error(`Failed to analyze PDF: ${error?.message || 'Unknown error'}`);
-  } finally {
-    // Always cleanup parser to free memory in serverless environment
-    if (parser) {
-      await parser.destroy();
-    }
   }
 }
 
