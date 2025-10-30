@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     if (docType.includes('credit') || docType.includes('bank')) {
       // Credit/Bank statements → transactions table
-      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string);
+      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
     } else if (docType.includes('loan') || docType.includes('mortgage')) {
       // Loan/Mortgage statements → loans table
       itemsProcessed = await saveLoans(supabase, result, stmt.user_id, statementId as string);
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       itemsProcessed = await savePensions(supabase, result, stmt.user_id, statementId as string);
     } else {
       console.warn(`Unknown document type: ${docType}, defaulting to transactions`);
-      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string);
+      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
     }
 
     // 6. Update statement status
@@ -296,10 +296,11 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
 /**
  * Save transactions from credit/bank statements
  */
-async function saveTransactions(supabase: any, result: any, userId: string, documentId: string): Promise<number> {
+async function saveTransactions(supabase: any, result: any, userId: string, documentId: string, documentType: string): Promise<number> {
   try {
     // Extract transactions from various result formats
     let allTransactions: any[] = [];
+    let isBankStatement = false;
     
     if (result.transactions && Array.isArray(result.transactions)) {
       // Credit statement format: { transactions: [...] }
@@ -307,6 +308,7 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
     } else if (result.transactions && typeof result.transactions === 'object') {
       // Bank statement format: { transactions: { income: [...], expenses: [...], ... } }
       const { income, expenses, loan_payments, savings_transfers } = result.transactions;
+      isBankStatement = true; // Bank statements have structured format
       
       if (income) allTransactions.push(...income.map((tx: any) => ({ ...tx, type: 'income' })));
       if (expenses) allTransactions.push(...expenses.map((tx: any) => ({ ...tx, type: 'expense' })));
@@ -318,6 +320,13 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
       console.log('No transactions to save');
       return 0;
     }
+
+    // Get existing loans for matching (for loan payment detection)
+    const { data: existingLoans } = await supabase
+      .from('loans')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('active', true);
 
     const transactionsToInsert = allTransactions.map((tx: any) => {
       // Parse date from DD/MM/YYYY to YYYY-MM-DD
@@ -354,6 +363,25 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         }
       }
 
+      // Detect loan payment and try to match with existing loan
+      let linkedLoanId = null;
+      if (tx.category === 'loan_payment' && existingLoans && existingLoans.length > 0) {
+        const txAmount = Math.abs(parseFloat(tx.amount));
+        
+        // Try to match by monthly payment amount (within 2% tolerance)
+        const matchedLoan = existingLoans.find((loan: any) => {
+          const loanPayment = parseFloat(loan.monthly_payment);
+          const diff = Math.abs(txAmount - loanPayment);
+          const percentDiff = (diff / loanPayment) * 100;
+          return percentDiff <= 2;
+        });
+        
+        if (matchedLoan) {
+          linkedLoanId = matchedLoan.id;
+          console.log(`🔗 Linked loan payment ${txAmount} to loan ${matchedLoan.id}`);
+        }
+      }
+
       return {
         user_id: userId,
         type: transactionType,
@@ -379,12 +407,15 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         auto_categorized: true,
         is_recurring: tx.type === 'הוראת קבע',
         currency: 'ILS',
+        // Linking fields
+        is_summary: isBankStatement, // Bank transactions are summaries that may be detailed later
+        linked_loan_id: linkedLoanId,
       };
     });
 
     const { error } = await supabase
       .from('transactions')
-      .insert(transactionsToInsert);
+      .insert(transactionsToInsert as any);
 
     if (error) {
       console.error('Failed to insert transactions:', error);
@@ -392,6 +423,36 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
     }
 
     console.log(`💾 Saved ${transactionsToInsert.length} transactions`);
+    
+    // Update linked loans with new payment info
+    const linkedTransactions = transactionsToInsert.filter((tx: any) => tx.linked_loan_id);
+    if (linkedTransactions.length > 0) {
+      for (const tx of linkedTransactions) {
+        // Update loan's current_balance (deduct payment amount)
+        const { data: loan } = await supabase
+          .from('loans')
+          .select('current_balance, remaining_payments')
+          .eq('id', tx.linked_loan_id)
+          .single();
+        
+        if (loan) {
+          const newBalance = parseFloat(loan.current_balance) - parseFloat(String(tx.amount));
+          const newRemaining = loan.remaining_payments ? loan.remaining_payments - 1 : null;
+          
+          await supabase
+            .from('loans')
+            .update({
+              current_balance: Math.max(0, newBalance), // Never negative
+              remaining_payments: newRemaining,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tx.linked_loan_id);
+          
+          console.log(`💰 Updated loan ${tx.linked_loan_id}: balance ${newBalance.toFixed(2)}, remaining ${newRemaining}`);
+        }
+      }
+    }
+    
     return transactionsToInsert.length;
   } catch (error) {
     console.error('Error in saveTransactions:', error);
