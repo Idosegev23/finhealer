@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, XCircle, Edit2, Package, Link2 } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Edit2, Package, Link2, CheckCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
 import { EditExpenseModal } from '@/components/expenses/EditExpenseModal';
@@ -43,6 +43,7 @@ export default function PendingExpensesPage() {
   const [matches, setMatches] = useState<Record<string, Match[]>>({});
   const [loadingMatches, setLoadingMatches] = useState<Set<string>>(new Set());
   const [showingMatchesFor, setShowingMatchesFor] = useState<string | null>(null);
+  const [approvingAll, setApprovingAll] = useState(false);
 
   useEffect(() => {
     loadExpenses();
@@ -166,6 +167,48 @@ export default function PendingExpensesPage() {
     }
   };
 
+  const handleApproveAll = async () => {
+    if (expenses.length === 0) return;
+
+    setApprovingAll(true);
+
+    try {
+      // אישור כל התנועות במקביל
+      const approvalPromises = expenses.map((expense) =>
+        fetch('/api/expenses/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expenseId: expense.id }),
+        })
+      );
+
+      const results = await Promise.allSettled(approvalPromises);
+      
+      const successCount = results.filter((r) => r.status === 'fulfilled').length;
+      const failureCount = results.filter((r) => r.status === 'rejected').length;
+
+      if (successCount > 0) {
+        addToast({
+          type: 'success',
+          title: 'אישור המוני הושלם',
+          description: `${successCount} תנועות אושרו בהצלחה${failureCount > 0 ? `, ${failureCount} נכשלו` : ''}`,
+        });
+      }
+
+      // רענון רשימה
+      await loadExpenses();
+    } catch (error: any) {
+      console.error('Approve all error:', error);
+      addToast({
+        type: 'error',
+        title: 'שגיאה',
+        description: 'שגיאה באישור התנועות',
+      });
+    } finally {
+      setApprovingAll(false);
+    }
+  };
+
   const handleReject = async (expenseId: string) => {
     setProcessingIds((prev) => new Set(prev).add(expenseId));
     
@@ -282,13 +325,35 @@ export default function PendingExpensesPage() {
 
   return (
     <div className="container mx-auto p-6" dir="rtl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">תנועות ממתינות לאישור</h1>
-        <p className="text-gray-600">
-          {expenses.length === 0
-            ? 'אין תנועות ממתינות כרגע'
-            : `${expenses.length} תנועות ממתינות לבדיקתך (${expenses.filter(e => e.type === 'income').length} הכנסות, ${expenses.filter(e => e.type === 'expense').length} הוצאות)`}
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">תנועות ממתינות לאישור</h1>
+          <p className="text-gray-600">
+            {expenses.length === 0
+              ? 'אין תנועות ממתינות כרגע'
+              : `${expenses.length} תנועות ממתינות לבדיקתך (${expenses.filter(e => e.type === 'income').length} הכנסות, ${expenses.filter(e => e.type === 'expense').length} הוצאות)`}
+          </p>
+        </div>
+        {expenses.length > 0 && (
+          <Button
+            onClick={handleApproveAll}
+            disabled={approvingAll}
+            size="lg"
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {approvingAll ? (
+              <>
+                <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                מאשר...
+              </>
+            ) : (
+              <>
+                <CheckCheck className="w-4 h-4 ml-2" />
+                אשר הכל ({expenses.length})
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {expenses.length === 0 ? (

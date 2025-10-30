@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Phone, MessageSquare, Bell, User, CreditCard, Lock, Loader2, CheckCircle } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Phone, MessageSquare, Bell, User, CreditCard, Lock, Loader2, CheckCircle, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 type Tab = 'profile' | 'whatsapp' | 'notifications' | 'subscription' | 'privacy';
 
 function SettingsContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('profile');
 
   // טען tab מה-URL אם יש
@@ -21,8 +22,15 @@ function SettingsContent() {
     <div className="min-h-screen bg-[#F5F6F8]">
       {/* Header */}
       <header className="bg-[#1E2A3B] border-b border-gray-700">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-white">⚙️ הגדרות</h1>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center gap-2 text-white hover:text-gray-200 transition-colors bg-[#2E3A4B] hover:bg-[#3A4A5B] px-4 py-2 rounded-lg"
+          >
+            <ArrowRight className="w-4 h-4" />
+            חזרה למסך הראשי
+          </button>
         </div>
       </header>
 
