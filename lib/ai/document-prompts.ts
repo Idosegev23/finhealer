@@ -69,39 +69,85 @@ ${text}
 // 2️⃣ דוח בנק (Bank Statement)
 // ============================================================================
 
-export function getBankStatementPrompt(text: string): string {
+export function getBankStatementPrompt(
+  text: string, 
+  categories?: Array<{name: string; expense_type: string; category_group: string}>
+): string {
+  // Build categories guide from database
+  let categoriesGuide = '';
+  if (categories && categories.length > 0) {
+    const fixed = categories.filter(c => c.expense_type === 'fixed');
+    const variable = categories.filter(c => c.expense_type === 'variable');
+    const special = categories.filter(c => c.expense_type === 'special');
+    
+    categoriesGuide = `
+**קטגוריות הוצאות אפשריות (מהמסד נתונים):**
+
+**קבועות (fixed):**
+${fixed.map(c => `  • ${c.name} (${c.category_group})`).join('\n')}
+
+**משתנות (variable):**
+${variable.map(c => `  • ${c.name} (${c.category_group})`).join('\n')}
+
+**מיוחדות (special):**
+${special.map(c => `  • ${c.name} (${c.category_group})`).join('\n')}
+
+**חשוב:** השתמש בשמות המדויקים מהרשימה למעלה בלבד!
+אל תמציא קטגוריות חדשות - רק מהרשימה הזאת.
+`;
+  }
   return `אתה מומחה בניתוח דוחות בנק ישראליים.
 
 נתח את דוח הבנק הבא וחלץ את כל המידע הרלוונטי בפורמט JSON.
 
-**מטרת העל:** לספק תמונה פיננסית מלאה של החשבון.
+**מטרת העל:** לספק תמונה פיננסית מלאה של החשבון + זיהוי נכון של הכנסות/הוצאות.
+
+## **חשוב מאוד - כללי זיהוי:**
+
+### **1. הכנסות vs הוצאות:**
+- **זכות/הפקדה/העברה נכנסת = INCOME** (type: "income")
+- **חובה/משיכה/העברה יוצאת/תשלום = EXPENSE** (type: "expense")
+- תשלום בכרטיס אשראי = EXPENSE
+- שכירות שאני מקבל = INCOME
+- משכורת/פרילנס = INCOME
+
+### **2. סכומים:**
+- **תמיד החזר מספר חיובי (ללא מינוס)**
+- אם כתוב "-500" → זו הוצאה של 500 (amount: 500, type: "expense")
+- אם כתוב "500" זכות → זו הכנסה של 500 (amount: 500, type: "income")
+
+### **3. תזרים (Account Info):**
+- חפש "יתרה", "יתרת חשבון", "סגירה", "balance"
+- חפש "מסגרת אשראי", "overdraft", "מסגרת"
+- חפש "סכום זמין", "available", "זמין"
+- **current_balance** = היתרה הסוגרת המדויקת (יכולה להיות שלילית!)
 
 ## **1. מידע כללי על הדוח (report_info):**
-- תאריך הפקת הדוח (report_date - DD/MM/YYYY)
-- תקופת הדוח (period_start, period_end - DD/MM/YYYY)
+- תאריך הפקת הדוח (report_date - YYYY-MM-DD)
+- תקופת הדוח (period_start, period_end - YYYY-MM-DD)
 - שם הבנק (bank_name) - "בנק לאומי", "בנק הפועלים", "בנק דיסקונט" וכו'
 
 ## **2. מידע על החשבון (account_info):**
 - מספר חשבון (account_number)
-- שם החשבון (account_name) - "עובר ושב", "חשבון עו\"ש" וכו'
-- סוג חשבון (account_type) - "checking" (עו\"ש), "savings" (חיסכון), "business" (עסקי)
+- סוג חשבון (account_type) - "עו״ש", "חיסכון", "עסקי"
 - מספר סניף (branch_number) - אם מופיע
-- יתרה פותחת (opening_balance)
-- יתרה סוגרת (closing_balance) - **זו היתרה הנוכחית המדויקת של החשבון!**
-- יתרה זמינה (available_balance) - אם שונה מיתרה סוגרת (כולל מסגרת אשראי)
-- מסגרת אשראי (overdraft_limit) - אם יש
+- **current_balance** - **היתרה הנוכחית המדויקת** (יכולה להיות שלילית!)
+- available_balance - אם שונה (כולל מסגרת)
+- overdraft_limit - מסגרת אשראי אם יש
 
-## **2. תנועות לפי סוג (transactions):**
+## **3. תנועות לפי סוג (transactions):**
 
-### **הכנסות (income)** - כל זכות שמגדילה את היתרה:
+### **הכנסות (income)** - כל זכות:
 - משכורת
-- העברות שקיבלתי (גם מחשבונות אחרים שלי!)
+- העברות שקיבלתי
 - החזרי מס
 - גמלאות
 - הכנסות מהשקעות
 - דיבידנדים
 - ביטול חיוב
 - **כלל: כל תנועה עם סימן (+) או "זכות"**
+
+${categoriesGuide}
 
 ### **הוצאות (expense)** - כל חיוב שמקטין את היתרה:
 - קניות
@@ -604,7 +650,8 @@ ${text}
 
 export function getPromptForDocumentType(
   documentType: string,
-  extractedText: string
+  extractedText: string,
+  categories?: Array<{name: string; expense_type: string; category_group: string}>
 ): string {
   const normalizedType = documentType.toLowerCase();
 
@@ -613,7 +660,7 @@ export function getPromptForDocumentType(
   }
 
   if (normalizedType.includes('bank') || normalizedType === 'bank_statement') {
-    return getBankStatementPrompt(extractedText);
+    return getBankStatementPrompt(extractedText, categories);
   }
 
   if (normalizedType.includes('mortgage')) {

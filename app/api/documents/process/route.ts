@@ -254,8 +254,27 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
     console.log(`✅ Text extracted: ${extractedText.length} characters, ${totalPages} pages`);
 
+    // Load expense categories from database (for bank statements)
+    let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
+    if (fileType === 'bank_statement') {
+      // Use the supabase client created at the top of the function
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const supabaseClient = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: categories } = await supabaseClient
+        .from('expense_categories')
+        .select('name, expense_type, category_group')
+        .eq('is_active', true)
+        .order('expense_type, category_group, display_order, name');
+      
+      expenseCategories = categories || [];
+      console.log(`📋 Loaded ${expenseCategories.length} expense categories from database`);
+    }
+
     // Get appropriate prompt for document type
-    const prompt = getPromptForDocumentType(fileType, extractedText);
+    const prompt = getPromptForDocumentType(fileType, extractedText, expenseCategories);
     
     // Analyze with GPT-4o (much faster than GPT-5!)
     console.log(`🤖 Analyzing with GPT-4o (${fileType})...`);
