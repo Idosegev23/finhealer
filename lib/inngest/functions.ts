@@ -136,15 +136,17 @@ async function analyzeTransactionsWithAI(text: string, fileType: string) {
   );
 
   try {
-    const response = await openai.responses.create({
-      model: 'gpt-5',
-      input: [
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
         { role: 'system', content: EXPENSE_CATEGORIES_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
+      temperature: 0.1,
+      max_tokens: 16000,
     });
 
-    const content = response.output_text || '{"transactions":[]}';
+    const content = response.choices[0].message.content || '{"transactions":[]}';
     const result = JSON.parse(content);
     
     return result.transactions || [];
@@ -161,46 +163,32 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 החזר JSON עם כל התנועות שמצאת.`;
 
   try {
-    console.log('📤 Uploading PDF to OpenAI Files API...');
+    console.log('📝 Extracting text from PDF...');
     
-    // וידוא שהשם מסתיים ב-.pdf (OpenAI דורש זאת)
-    const safeName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
-    const simpleFileName = safeName.split('/').pop() || 'document.pdf'; // רק שם הקובץ, לא הנתיב
+    // Extract text using unpdf
+    const { getDocumentProxy, extractText } = await import('unpdf');
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { text } = await extractText(pdf, { mergePages: true });
     
-    console.log('📁 File name for OpenAI:', simpleFileName);
-    
-    const file = await openai.files.create({
-      file: new File([new Uint8Array(buffer)], simpleFileName, { type: 'application/pdf' }),
-      purpose: 'assistants',
-    });
+    console.log(`✅ Text extracted: ${text.length} characters`);
 
-    console.log(`✅ File uploaded to OpenAI: ${file.id}`);
-
-    const response = await (openai.responses as any).create({
-      model: 'gpt-5',
-      input: [
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
         {
           role: 'system',
           content: EXPENSE_CATEGORIES_SYSTEM_PROMPT,
         },
         {
           role: 'user',
-          content: [
-            { type: 'input_text', text: userPrompt },
-            { type: 'input_file', file_id: file.id },
-          ],
+          content: `${userPrompt}\n\nטקסט הדוח:\n${text}`,
         },
       ],
+      temperature: 0.1,
+      max_tokens: 16000,
     });
 
-    try {
-      await openai.files.delete(file.id);
-      console.log('🗑️ File deleted from OpenAI');
-    } catch (deleteError) {
-      console.warn('Failed to delete file from OpenAI:', deleteError);
-    }
-
-    const content = response.output_text || '{"transactions":[]}';
+    const content = response.choices[0].message.content || '{"transactions":[]}';
     const result = JSON.parse(content);
     
     return result.transactions || [];
@@ -224,15 +212,15 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
   );
 
   try {
-    console.log('🤖 Analyzing image with GPT-5...');
+    console.log('🤖 Analyzing image with GPT-4o Vision...');
     
     // המר את ה-Buffer ל-base64 data URL
     const base64Image = buffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
     
-    const response = await (openai.responses as any).create({
-      model: 'gpt-5',
-      input: [
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
         {
           role: 'system',
           content: EXPENSE_CATEGORIES_SYSTEM_PROMPT,
@@ -240,14 +228,16 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
         {
           role: 'user',
           content: [
-            { type: 'input_text', text: userPrompt },
-            { type: 'input_image', image_url: dataUrl },
+            { type: 'text', text: userPrompt },
+            { type: 'image_url', image_url: { url: dataUrl } },
           ],
         },
       ],
+      temperature: 0.1,
+      max_tokens: 4000,
     });
 
-    const content = response.output_text || '{"transactions":[]}';
+    const content = response.choices[0].message.content || '{"transactions":[]}';
     const result = JSON.parse(content);
     
     return {

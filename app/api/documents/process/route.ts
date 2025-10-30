@@ -105,10 +105,10 @@ export async function POST(request: NextRequest) {
     let itemsProcessed = 0;
     
     if (stmt.mime_type?.includes('pdf')) {
-      console.log(`🤖 Analyzing PDF (${stmt.file_type}) with GPT-5...`);
+      console.log(`🤖 Analyzing PDF (${stmt.file_type}) with GPT-4o...`);
       result = await analyzePDFWithAI(buffer, stmt.file_type, stmt.file_name);
     } else if (stmt.mime_type?.includes('image')) {
-      console.log('🤖 Analyzing image with GPT-5...');
+      console.log('🤖 Analyzing image with GPT-4o Vision...');
       result = await analyzeImageWithAI(buffer, stmt.mime_type, stmt.file_type);
     } else if (stmt.mime_type?.includes('spreadsheet') || stmt.mime_type?.includes('excel')) {
       console.log('📊 Analyzing Excel...');
@@ -206,7 +206,7 @@ export async function POST(request: NextRequest) {
         // Determine error type
         const isTimeout = error?.message?.includes('timeout') || error?.code === 'ETIMEDOUT' || error?.code === 'ECONNABORTED';
         const errorMessage = isTimeout 
-          ? `Timeout after ${Math.round((Date.now() - startTime) / 1000)}s - GPT-5 לקח יותר מדי זמן. נסה שוב בעוד 5 דקות.`
+          ? `Timeout after ${Math.round((Date.now() - startTime) / 1000)}s - GPT-4o לקח יותר מדי זמן. נסה שוב בעוד 5 דקות.`
           : error?.message || 'Unknown error';
         
         await supabase
@@ -257,20 +257,19 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText);
     
-    // Analyze with GPT-5 using Responses API
-    console.log(`🤖 Analyzing with GPT-5 (${fileType})...`);
+    // Analyze with GPT-4o (much faster than GPT-5!)
+    console.log(`🤖 Analyzing with GPT-4o (${fileType})...`);
     
-    const response = await (openai.responses as any).create({
-      model: 'gpt-5',
-      input: prompt,
-      reasoning: { effort: 'medium' },
-      text: { verbosity: 'medium' },
-      max_output_tokens: 16000,
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 16000,
     });
 
-    console.log(`✅ GPT-5 analysis complete`);
+    console.log(`✅ GPT-4o analysis complete`);
     
-    const content = response.output_text || '{}';
+    const content = response.choices[0].message.content || '{}';
     
     // Parse JSON
     let jsonStr = content;
@@ -298,7 +297,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
 async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType: string) {
   try {
-    console.log(`🖼️  Analyzing image with GPT-5 (${documentType})...`);
+    console.log(`🖼️  Analyzing image with GPT-4o Vision (${documentType})...`);
     
     const base64Image = buffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
@@ -306,27 +305,25 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
     // Get appropriate prompt (images are usually credit/bank/receipt)
     const prompt = getPromptForDocumentType(documentType, '');
     
-    // For images, we use input_image in Responses API
-    const response = await (openai.responses as any).create({
-      model: 'gpt-5',
-      input: [
+    // Use GPT-4o Vision
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
         {
-          type: 'input_text',
-          text: prompt,
-        },
-        {
-          type: 'input_image',
-          image_url: dataUrl,
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: dataUrl } },
+          ],
         },
       ],
-      reasoning: { effort: 'low' }, // Images usually simpler
-      text: { verbosity: 'low' },
-      max_output_tokens: 4000,
+      temperature: 0.1,
+      max_tokens: 4000,
     });
 
-    console.log(`✅ GPT-5 image analysis complete`);
+    console.log(`✅ GPT-4o Vision analysis complete`);
     
-    const content = response.output_text || '{}';
+    const content = response.choices[0].message.content || '{}';
     
     // Parse JSON
     let jsonStr = content;

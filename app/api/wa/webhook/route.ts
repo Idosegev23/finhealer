@@ -282,12 +282,12 @@ export async function POST(request: NextRequest) {
           const base64Image = Buffer.from(imageBuffer).toString('base64');
           const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
 
-          // ניתוח OCR + AI (GPT-5 New API)
-          console.log('🤖 Starting OCR analysis with OpenAI Vision (GPT-5)...');
+          // ניתוח OCR + AI (GPT-4o Vision)
+          console.log('🤖 Starting OCR analysis with GPT-4o Vision...');
           
-          const visionResponse = await openai.responses.create({
-            model: 'gpt-5',
-            input: [
+          const visionResponse = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
               {
                 role: 'system',
                 content: `אתה מומחה לניתוח קבלות ותדפיסי בנק/אשראי בעברית.
@@ -312,19 +312,21 @@ export async function POST(request: NextRequest) {
                 role: 'user',
                 content: [
                   {
-                    type: 'input_text',
+                    type: 'text',
                     text: 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע.'
                   },
                   {
-                    type: 'input_image',
-                    image_url: `data:${mimeType};base64,${base64Image}`
+                    type: 'image_url',
+                    image_url: { url: `data:${mimeType};base64,${base64Image}` }
                   }
                 ]
               }
             ],
+            temperature: 0.1,
+            max_tokens: 4000,
           });
 
-          const aiText = visionResponse.output_text || '{}';
+          const aiText = visionResponse.choices[0].message.content || '{}';
           console.log('🎯 OCR Result:', aiText);
 
           let ocrData: any;
