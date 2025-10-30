@@ -104,7 +104,8 @@ export function DashboardNav() {
           .select('name')
           .eq('id', user.id)
           .single();
-        setUserName(profile?.name || user.email?.split('@')[0] || 'משתמש');
+        const profileData = profile as any;
+        setUserName(profileData?.name || user.email?.split('@')[0] || 'משתמש');
       }
     } catch (error) {
       console.error("Error fetching user name:", error);
