@@ -11,28 +11,12 @@ function NotificationsListener() {
   const { notifications, clearNotification } = useNotifications()
 
   useEffect(() => {
-    notifications.forEach((notification) => {
-      if (notification.type === 'document_processed') {
-        addToast({
-          type: 'success',
-          title: 'העיבוד הושלם! 🎉',
-          description: `נמצאו ${notification.transactionsCount} הוצאות חדשות`,
-          action: {
-            label: 'לחץ לאישור',
-            onClick: () => {
-              router.push('/dashboard/expenses/pending')
-              clearNotification(notification.statementId)
-            },
-          },
-          duration: 10000, // 10 seconds
-        })
-        
-        // Clear after showing
-        setTimeout(() => {
-          clearNotification(notification.statementId)
-        }, 10000)
-      }
-    })
+    // הוסר Toast - במקום זה יש באנר בדשבורד
+    // notifications.forEach((notification) => {
+    //   if (notification.type === 'document_processed') {
+    //     addToast({...})
+    //   }
+    // })
   }, [notifications, addToast, router, clearNotification])
 
   return null

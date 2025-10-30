@@ -254,9 +254,9 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
     console.log(`✅ Text extracted: ${extractedText.length} characters, ${totalPages} pages`);
 
-    // Load expense categories from database (for bank statements)
+    // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
-    if (fileType === 'bank_statement') {
+    if (fileType === 'bank_statement' || fileType === 'credit_statement') {
       // Use the supabase client created at the top of the function
       const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
       const supabaseClient = createSupabaseClient(

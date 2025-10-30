@@ -490,6 +490,7 @@ function NotificationToggle({
 function SubscriptionTab() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [subscription, setSubscription] = useState<any>(null);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -549,6 +550,37 @@ function SubscriptionTab() {
       setError(err.message || 'שגיאה בעדכון המנוי');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!confirm('האם אתה בטוח שברצונך לבטל את המנוי? תוכל להמשיך להשתמש בשירות עד סוף התקופה ששולמה.')) {
+      return;
+    }
+
+    setCancelling(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch('/api/subscription/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'שגיאה בביטול המנוי');
+      }
+
+      setSuccess(data.message);
+      await loadSubscription();
+    } catch (err: any) {
+      console.error('Error cancelling subscription:', err);
+      setError(err.message || 'שגיאה בביטול המנוי');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -628,12 +660,36 @@ function SubscriptionTab() {
           </button>
         )}
       </div>
+
+      <div className="border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-[#1E2A3B] mb-2">בטל מנוי</h3>
+        <p className="text-sm text-[#555555] mb-4">
+          ביטול המנוי ייכנס לתוקף בסוף התקופה הנוכחית. תוכל להמשיך להשתמש בשירות עד אז.
+        </p>
+        <button
+          onClick={handleCancelSubscription}
+          disabled={cancelling}
+          className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {cancelling ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>מבטל...</span>
+            </>
+          ) : (
+            'בטל מנוי'
+          )}
+        </button>
+      </div>
     </div>
   );
 }
 
 function PrivacyTab() {
   const [changingPassword, setChangingPassword] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [success, setSuccess] = useState('');
@@ -780,21 +836,113 @@ function PrivacyTab() {
         <div className="border border-gray-200 rounded-lg p-4">
           <h4 className="font-medium text-[#1E2A3B] mb-2">הורד את הנתונים שלך</h4>
           <p className="text-sm text-[#555555] mb-4">
-            קבל קובץ עם כל הנתונים שלך
+            קבל קובץ JSON עם כל הנתונים הפיננסיים שלך
           </p>
-          <button className="bg-[#3A7BD5] text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition text-sm">
-            הורד נתונים
+          <button 
+            onClick={async () => {
+              setExporting(true);
+              try {
+                const response = await fetch('/api/profile/export-data');
+                if (!response.ok) throw new Error('שגיאה בייצוא נתונים');
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `finhealer-data-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                
+                setSuccess('הנתונים הורדו בהצלחה!');
+                setTimeout(() => setSuccess(''), 3000);
+              } catch (err: any) {
+                setError(err.message || 'שגיאה בהורדת הנתונים');
+              } finally {
+                setExporting(false);
+              }
+            }}
+            disabled={exporting}
+            className="bg-[#3A7BD5] text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {exporting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>מוריד...</span>
+              </>
+            ) : (
+              'הורד נתונים'
+            )}
           </button>
         </div>
 
         <div className="border border-red-200 rounded-lg p-4 bg-red-50">
           <h4 className="font-medium text-red-600 mb-2">מחק חשבון</h4>
           <p className="text-sm text-[#555555] mb-4">
-            פעולה זו תמחק לצמיתות את כל הנתונים שלך
+            ⚠️ פעולה זו תמחק לצמיתות את כל הנתונים שלך ולא ניתן לשחזר אותם!
           </p>
-          <button className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition text-sm">
-            מחק חשבון
-          </button>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                הקלד &quot;מחק את החשבון שלי&quot; כדי לאשר:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                className="w-full px-4 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="מחק את החשבון שלי"
+              />
+            </div>
+            <button 
+              onClick={async () => {
+                if (deleteConfirm !== 'מחק את החשבון שלי') {
+                  setError('נא להקליד את הטקסט המבוקש בדיוק');
+                  return;
+                }
+                
+                if (!confirm('האם אתה בטוח לחלוטין? פעולה זו לא ניתנת לביטול!')) {
+                  return;
+                }
+                
+                setDeleting(true);
+                setError('');
+                
+                try {
+                  const response = await fetch('/api/profile/delete-account', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirmText: deleteConfirm }),
+                  });
+                  
+                  const data = await response.json();
+                  
+                  if (!response.ok) {
+                    throw new Error(data.error || 'שגיאה במחיקת החשבון');
+                  }
+                  
+                  alert(data.message);
+                  window.location.href = '/';
+                } catch (err: any) {
+                  setError(err.message || 'שגיאה במחיקת החשבון');
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              disabled={deleting || deleteConfirm !== 'מחק את החשבון שלי'}
+              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>מוחק...</span>
+                </>
+              ) : (
+                'מחק חשבון לצמיתות'
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

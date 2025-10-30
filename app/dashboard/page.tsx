@@ -6,6 +6,7 @@ import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { PendingTransactionsBanner } from '@/components/dashboard/PendingTransactionsBanner'
 
 // Phase-specific dashboards
 import { OnboardingDashboard } from '@/components/dashboard/phases/OnboardingDashboard'
@@ -180,6 +181,7 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-dashboard">
         <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <PendingTransactionsBanner />
           <OnboardingDashboard />
         </div>
       </div>
@@ -190,6 +192,7 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-dashboard">
         <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <PendingTransactionsBanner />
           <BehaviorDashboard />
         </div>
       </div>
@@ -200,6 +203,7 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-dashboard">
         <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <PendingTransactionsBanner />
           <BudgetDashboard />
         </div>
       </div>
@@ -210,6 +214,7 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-dashboard">
         <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <PendingTransactionsBanner />
           <GoalsDashboard />
         </div>
       </div>
@@ -220,6 +225,7 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-dashboard">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <PendingTransactionsBanner />
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-theme-primary mb-2">

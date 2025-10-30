@@ -7,62 +7,136 @@
 // 1️⃣ דוח אשראי (Credit Card Statement)
 // ============================================================================
 
-export function getCreditStatementPrompt(text: string): string {
-  return `אתה מומחה בניתוח דוחות אשראי ישראליים מסוג כאל/מקס/ישראכרט.
+export function getCreditStatementPrompt(
+  text: string,
+  categories?: Array<{name: string; expense_type: string; category_group: string}>
+): string {
+  // Build categories guide from database
+  let categoriesGuide = '';
+  if (categories && categories.length > 0) {
+    const fixed = categories.filter(c => c.expense_type === 'fixed');
+    const variable = categories.filter(c => c.expense_type === 'variable');
+    const special = categories.filter(c => c.expense_type === 'special');
+    
+    categoriesGuide = `
 
-נתח את דוח האשראי הבא וחלץ **כל** עסקה שמופיעה בו - ללא יוצא מן הכלל.
+**קטגוריות הוצאות אפשריות (מהמסד נתונים):**
 
-🔴 **קריטי ביותר - חלץ גם עסקאות בעברית!** 🔴
+**קבועות (fixed):**
+${fixed.map(c => `  • ${c.name}`).join('\n')}
 
-דוח זה מכיל עסקאות בשתי שפות:
-1. **עברית**: סופר דוידי, שופרסל, יוחננוף, בבקה בייקרי, סיטי מרקט, פז, פלאפון, בזק, הפניקס, הראל וכו'
-2. **אנגלית**: CURSOR, OPENAI, VERCEL, PROMEAI, Netflix, Apple וכו'
+**משתנות (variable):**
+${variable.map(c => `  • ${c.name}`).join('\n')}
 
-**חובה לחלץ את שתי השפות!**
+**מיוחדות (special):**
+${special.map(c => `  • ${c.name}`).join('\n')}
 
-**סוגי עסקאות לחילוץ:**
-✅ עסקאות רגילות (סופר דוידי, שופרסל, CURSOR, OPENAI)
-✅ עסקאות עם תשלומים (תשלום 1 מ-2, תשלום 27 מ-48)
-✅ עסקאות קרדיט (קרדיט 1 מ-3)
-✅ הוראות קבע (קרן מכבי, פרי טיוי, ביטוחים)
+**חשוב:** השתמש בשמות המדויקים מהרשימה למעלה בלבד!
+אל תמציא קטגוריות חדשות - רק מהרשימה הזאת.
+`;
+  }
+  return `אתה מומחה בניתוח דוחות אשראי ישראליים (כאל/מקס/ישראכרט).
 
-**אל תדלג על אף עסקה - לא באנגלית ולא בעברית!**
+## **מטרה**: חילוץ מידע מלא על החשבון + כל העסקאות בדוח.
 
-עבור כל עסקה, חלץ:
-- **תאריך** (DD/MM/YYYY - בדיוק כפי שמופיע)
-- **שם בית העסק/ספק** (כפי שמופיע, עברית או אנגלית)
-- **סכום בש"ח** (המספר הסופי אחרי המרה, ללא סימן ₪)
-- **קטגוריה** (אם מצוין במסמך - מזון ומשקא, מחשבים, ביטוח וכו')
-- **סוג** (רגיל/תשלום/קרדיט/הוראת קבע)
-- **פירוט תשלום** (אם יש - למשל "תשלום 2 מ-5")
+---
 
-**פורמט JSON בלבד - ללא טקסט נוסף:**
+## **1. מידע כללי (report_info)**
+- report_date (תאריך הפקת הדוח - YYYY-MM-DD)
+- period_start, period_end (תקופת הדוח - YYYY-MM-DD)
+- card_issuer (כאל / מקס / ישראכרט)
+
+## **2. מידע על החשבון (account_info)**
+- account_number (מספר חשבון)
+- card_last_digits (4 ספרות אחרונות של הכרטיס)
+- card_holder (שם בעל הכרטיס)
+- credit_limit (מסגרת אשראי ₪)
+- used_credit (ניצול בפועל ₪)
+- total_debt (סך חוב ₪)
+- next_payment_date (מועד חיוב הבא - YYYY-MM-DD)
+- next_payment_amount (סכום תשלום הבא ₪)
+
+## **3. עסקאות (transactions)**
+
+### **4 סוגי עסקאות:**
+
+**א. רגיל** - עסקה חד-פעמית:
+- סופר, מסעדה, בנזין וכו'
+
+**ב. תשלום X מ-Y** - עסקה מפוצלת:
+- "תשלום 1 מ-10" = תשלום ראשון מתוך 10
+- חשוב: installment: "תשלום 1 מ-10"
+- payment_number: 1, total_payments: 10
+
+**ג. קרדיט X מ-Y** - קרדיט ארוך טווח:
+- "קרדיט 3 מ-3" = תשלום אחרון
+- חשוב: installment: "קרדיט 3 מ-3"
+- payment_number: 3, total_payments: 3
+
+**ד. הוראת קבע** - חיוב חוזר:
+- קרן מכבי, פרי טיוי, נטפליקס
+
+### **שדות לכל עסקה:**
+- date: תאריך העסקה (YYYY-MM-DD)
+- vendor: שם בית העסק (עברית או אנגלית)
+- amount: סכום בש"ח (מספר חיובי תמיד!)
+- expense_category: קטגוריה מדויקת מהמסד נתונים
+- type: סוג העסקה (רגיל / תשלום / קרדיט / הוראת קבע)
+- payment_method: credit_card
+
+אם תשלום/קרדיט:
+- installment: "תשלום 1 מ-10"
+- payment_number: 1
+- total_payments: 10
+
+אם במט"ח:
+- original_amount: 49.31
+- original_currency: USD
+- exchange_rate: 3.435
+- forex_fee: 5.08
+
+${categoriesGuide}
+
+### **🔴 קריטי - חלץ הכל!**
+✅ עברית: סיטי מרקט, שופרסל, פז, קרן מכבי, פרי טיוי
+✅ אנגלית: CURSOR, OPENAI, VERCEL, ZOOM, Netflix
+✅ תשלומים: "תשלום 72 מ-84" (ריהוט)
+✅ קרדיט: "קרדיט 1 מ-3" (מעמ)
+✅ הוראות קבע: ביטוח, קופ"ח, מנויים
+
+---
+
+## **פורמט פלט - JSON בלבד:**
 {
+  "report_info": { ... },
+  "account_info": { ... },
   "transactions": [
     {
-      "date": "21/08/2025",
+      "date": "2025-08-21",
       "vendor": "שפירא גז בע'מ",
-      "amount": 920.00,
-      "category": "גז",
+      "amount": 460.00,
+      "expense_category": "גז",
       "type": "תשלום",
       "installment": "תשלום 1 מ-2",
-      "payment_method": "credit_card"
-    },
-    {
-      "date": "12/08/2025",
-      "vendor": "סופר דוידי",
-      "amount": 350.00,
-      "category": "מזון ומשקא",
-      "type": "רגיל",
+      "payment_number": 1,
+      "total_payments": 2,
       "payment_method": "credit_card"
     }
   ]
 }
 
+---
+
 **הדוח:**
 ${text}
 
-**זכור: חלץ את כל העסקאות כולל תשלומים, קרדיט והוראות קבע - בעברית ובאנגלית!**`;
+---
+
+**חשוב**: 
+- סכומים תמיד חיוביים
+- תאריכים בפורמט YYYY-MM-DD
+- חלץ **כל** עסקה - עברית ואנגלית
+- זהה נכון: רגיל/תשלום/קרדיט/הוראת קבע`;
 }
 
 // ============================================================================
@@ -656,7 +730,7 @@ export function getPromptForDocumentType(
   const normalizedType = documentType.toLowerCase();
 
   if (normalizedType.includes('credit') || normalizedType === 'credit_statement') {
-    return getCreditStatementPrompt(extractedText);
+    return getCreditStatementPrompt(extractedText, categories);
   }
 
   if (normalizedType.includes('bank') || normalizedType === 'bank_statement') {
@@ -685,6 +759,6 @@ export function getPromptForDocumentType(
 
   // Default to credit statement for unknown types
   console.warn(`Unknown document type: ${documentType}, using credit statement prompt`);
-  return getCreditStatementPrompt(extractedText);
+  return getCreditStatementPrompt(extractedText, categories);
 }
 

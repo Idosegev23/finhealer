@@ -28,7 +28,11 @@ import {
   ChevronDown,
   Target,
   Scan,
+  User,
+  Settings,
+  LogOut,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { href: "/dashboard", label: "ראשי", icon: Home },
@@ -66,11 +70,14 @@ export function DashboardNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dataDropdownOpen, setDataDropdownOpen] = useState(false);
   const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [userName, setUserName] = useState<string>('');
   
   const isDark = theme === 'dark';
 
   useEffect(() => {
     fetchFinancialData();
+    fetchUserName();
   }, []);
 
   const fetchFinancialData = async () => {
@@ -85,6 +92,29 @@ export function DashboardNav() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchUserName = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+        setUserName(profile?.name || user.email?.split('@')[0] || 'משתמש');
+      }
+    } catch (error) {
+      console.error("Error fetching user name:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = '/login';
   };
 
   const accountBalance = financialData?.current_account_balance || 0;
@@ -135,9 +165,57 @@ export function DashboardNav() {
           ))}
         </Marquee>
         
-        {/* Theme Toggle positioned absolutely */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-blue-700/50 backdrop-blur-sm rounded-full p-1">
-          <ThemeToggle />
+        {/* Right Side Controls */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
+          {/* User Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex items-center gap-2 bg-blue-700/50 backdrop-blur-sm hover:bg-blue-600/50 transition-colors rounded-full px-3 py-1.5"
+            >
+              <User className="w-4 h-4" />
+              <span className="text-sm font-medium hidden sm:block">{userName}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {userMenuOpen && (
+              <div className={`absolute top-full mt-2 left-0 w-48 rounded-lg shadow-xl border z-50 ${
+                isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+              }`}>
+                <Link
+                  href="/settings"
+                  onClick={() => setUserMenuOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 transition-colors rounded-t-lg ${
+                    isDark
+                      ? 'text-gray-300 hover:bg-gray-700'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm">הגדרות ופרופיל</span>
+                </Link>
+                <button
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 transition-colors rounded-b-lg ${
+                    isDark
+                      ? 'text-red-400 hover:bg-gray-700'
+                      : 'text-red-600 hover:bg-red-50'
+                  }`}
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="text-sm">התנתק</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Theme Toggle */}
+          <div className="bg-blue-700/50 backdrop-blur-sm rounded-full p-1">
+            <ThemeToggle />
+          </div>
         </div>
       </div>
 

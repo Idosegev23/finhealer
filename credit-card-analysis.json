@@ -1,0 +1,95 @@
+{
+  "document_type": "credit_statement",
+  "card_issuer": "כאל",
+  "report_date": "2025-09-10",
+  "account_info": {
+    "account_number": "9440779010-821-11",
+    "card_last_digits": "3493",
+    "card_holder": "עידו שגב",
+    "credit_limit": 49000,
+    "used_credit": 16262,
+    "total_debt": 15612,
+    "next_payment_date": "2025-10-01",
+    "next_payment_amount": 2829.32
+  },
+  "transactions": [
+    {
+      "date": "2025-08-08",
+      "vendor": "PROMEAI.ORG/CUTOUT.PRO",
+      "category": "מחשבים",
+      "amount": 67.22,
+      "original_amount": 19.00,
+      "original_currency": "USD",
+      "exchange_rate": 3.4350,
+      "forex_fee": 1.69,
+      "type": "הוראת קבע",
+      "card_presented": false,
+      "card_identifier": "אינטרנט 9513",
+      "billing_date": "2025-08-11",
+      "payment_method": "credit_card"
+    },
+    {
+      "date": "2025-08-09",
+      "vendor": "CURSOR AUGUST",
+      "category": "מחשבים",
+      "amount": 174.46,
+      "original_amount": 49.31,
+      "original_currency": "USD",
+      "exchange_rate": 3.4350,
+      "forex_fee": 5.08,
+      "type": "הוראת קבע",
+      "card_presented": false,
+      "card_identifier": "אינטרנט 6339",
+      "billing_date": "2025-08-11",
+      "payment_method": "credit_card"
+    },
+    {
+      "date": "2025-08-21",
+      "vendor": "שפירא גז בע'מ",
+      "category": "גז",
+      "amount": 920.00,
+      "type": "תשלום",
+      "installment": "תשלום 1 מ-2",
+      "total_amount": 920.00,
+      "current_payment": 460.00,
+      "payment_number": 1,
+      "total_payments": 2,
+      "card_presented": false,
+      "billing_date": "2025-09-01",
+      "payment_method": "credit_card"
+    },
+    {
+      "date": "2025-05-18",
+      "vendor": "גבייתמעמאינטרנטשע"מ",
+      "category": "מוסדות",
+      "amount": 10232.00,
+      "type": "קרדיט",
+      "installment": "קרדיט 3 מ-3",
+      "current_payment": 3502.02,
+      "payment_number": 3,
+      "total_payments": 3,
+      "card_presented": false,
+      "payment_method": "credit_card"
+    },
+    {
+      "date": "2025-08-04",
+      "vendor": "קרן מכבי",
+      "category": "רפואה וברי",
+      "amount": 64.35,
+      "type": "הוראת קבע",
+      "card_presented": false,
+      "payment_method": "credit_card"
+    },
+    {
+      "date": "2025-08-08",
+      "vendor": "סיטי מרקט אחים לרכש בע\"מ",
+      "category": "מזון ומשקא",
+      "amount": 140.00,
+      "type": "רגיל",
+      "card_presented": true,
+      "card_identifier": "Apple Pay 3932",
+      "payment_method": "credit_card"
+    }
+  ]
+}
+
