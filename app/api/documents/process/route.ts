@@ -106,9 +106,17 @@ export async function POST(request: NextRequest) {
     // 5. Save data to appropriate table(s) based on document type
     const docType = stmt.file_type?.toLowerCase() || '';
 
-    if (docType.includes('credit') || docType.includes('bank')) {
-      // Credit/Bank statements → transactions table
+    if (docType.includes('credit')) {
+      // Credit statements → transactions table only
       itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
+    } else if (docType.includes('bank')) {
+      // Bank statements → transactions + bank_accounts
+      const txCount = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
+      const accountCount = await saveBankAccounts(supabase, result, stmt.user_id, statementId as string);
+      itemsProcessed = txCount + accountCount;
+    } else if (docType.includes('payslip') || docType.includes('salary') || docType.includes('תלוש')) {
+      // Payslips → payslips table + income transaction
+      itemsProcessed = await savePayslips(supabase, result, stmt.user_id, statementId as string);
     } else if (docType.includes('loan') || docType.includes('mortgage')) {
       // Loan/Mortgage statements → loans table
       itemsProcessed = await saveLoans(supabase, result, stmt.user_id, statementId as string);
@@ -471,32 +479,25 @@ async function saveLoans(supabase: any, result: any, userId: string, documentId:
     if (result.tracks && Array.isArray(result.tracks)) {
       // Mortgage: multiple tracks → multiple loans
       loansToInsert = result.tracks.map((track: any) => {
-        // Parse remaining_payments (format: "40/120")
-        let remainingMonths = null;
-        if (track.remaining_payments) {
-          const match = track.remaining_payments.match(/(\d+)\/(\d+)/);
-          if (match) {
-            const paid = parseInt(match[1]);
-            const total = parseInt(match[2]);
-            remainingMonths = total - paid;
-          }
-        }
-
+        // Parse next_payment_date
+        const nextPaymentDate = track.next_payment_date ? parseDateToISO(track.next_payment_date) : null;
+        
         return {
           user_id: userId,
           loan_type: 'mortgage',
-          lender: 'בנק', // Could be extracted from report_info
+          lender: result.report_info?.bank_name || 'בנק',
           original_amount: parseFloat(track.original_amount) || 0,
           current_balance: parseFloat(track.current_balance) || 0,
           interest_rate: parseFloat(track.interest_rate) || 0,
           monthly_payment: parseFloat(track.monthly_payment) || 0,
-          remaining_months: remainingMonths,
+          remaining_payments: parseInt(track.remaining_payments) || null,
+          next_payment_date: nextPaymentDate,
           status: 'active',
           metadata: {
             track_number: track.track_number,
             track_type: track.track_type,
             index_type: track.index_type,
-            remaining_payments: track.remaining_payments,
+            paid_payments: parseInt(track.paid_payments) || null,
             document_id: documentId,
             report_info: result.report_info,
           },
@@ -505,30 +506,25 @@ async function saveLoans(supabase: any, result: any, userId: string, documentId:
     } else if (result.loans && Array.isArray(result.loans)) {
       // Regular loan statement
       loansToInsert = result.loans.map((loan: any) => {
-        let remainingMonths = null;
-        if (loan.remaining_payments) {
-          const match = loan.remaining_payments.match(/(\d+)\/(\d+)/);
-          if (match) {
-            const paid = parseInt(match[1]);
-            const total = parseInt(match[2]);
-            remainingMonths = total - paid;
-          }
-        }
-
+        // Parse next_payment_date
+        const nextPaymentDate = loan.next_payment_date ? parseDateToISO(loan.next_payment_date) : null;
+        
         return {
           user_id: userId,
           loan_type: 'personal',
-          lender: loan.loan_provider || 'לא צוין',
+          lender: result.report_info?.bank_name || loan.loan_provider || 'לא צוין',
           original_amount: parseFloat(loan.original_amount) || 0,
-          current_balance: parseFloat(loan.outstanding_balance) || 0,
-          interest_rate: parseFloat(loan.annual_interest_rate) || 0,
-          monthly_payment: parseFloat(loan.next_payment_amount) || 0,
-          remaining_months: remainingMonths,
+          current_balance: parseFloat(loan.current_balance) || 0,
+          interest_rate: parseFloat(loan.interest_rate) || 0,
+          monthly_payment: parseFloat(loan.monthly_payment) || 0,
+          remaining_payments: parseInt(loan.remaining_payments) || null,
+          next_payment_date: nextPaymentDate,
           status: 'active',
           metadata: {
             loan_number: loan.loan_number,
             loan_name: loan.loan_name,
-            remaining_payments: loan.remaining_payments,
+            index_type: loan.index_type,
+            paid_payments: parseInt(loan.paid_payments) || null,
             document_id: documentId,
             report_info: result.report_info,
           },
@@ -718,6 +714,209 @@ function parseDateToISO(dateStr: string): string | null {
     console.warn(`Failed to parse date: ${dateStr}`, e);
   }
   return null;
+}
+
+// ============================================================================
+// Bank Account Snapshots
+// ============================================================================
+
+/**
+ * Save bank account snapshots from bank statements
+ */
+async function saveBankAccounts(supabase: any, result: any, userId: string, documentId: string): Promise<number> {
+  try {
+    // Extract account_info from bank statement
+    if (!result.account_info) {
+      console.log('No account_info found in bank statement');
+      return 0;
+    }
+
+    const accountInfo = result.account_info;
+    const reportInfo = result.report_info || {};
+    
+    // Mark all previous snapshots as not current
+    await supabase
+      .from('bank_accounts')
+      .update({ is_current: false })
+      .eq('user_id', userId);
+    
+    // Parse statement period end date
+    let snapshotDate = new Date().toISOString().split('T')[0];
+    if (reportInfo.period_end) {
+      const parsed = parseDateToISO(reportInfo.period_end);
+      if (parsed) snapshotDate = parsed;
+    }
+    
+    const accountToInsert = {
+      user_id: userId,
+      bank_name: accountInfo.bank_name || reportInfo.bank_name || 'לא צוין',
+      account_number: accountInfo.account_number || 'לא צוין',
+      account_type: accountInfo.account_type || 'checking',
+      branch_number: accountInfo.branch_number || null,
+      current_balance: parseFloat(accountInfo.current_balance || '0'),
+      available_balance: parseFloat(accountInfo.available_balance || accountInfo.current_balance || '0'),
+      overdraft_limit: parseFloat(accountInfo.overdraft_limit || '0'),
+      snapshot_date: snapshotDate,
+      is_current: true,
+      document_id: documentId,
+      currency: 'ILS',
+    };
+
+    const { error } = await supabase
+      .from('bank_accounts')
+      .insert([accountToInsert]);
+
+    if (error) {
+      console.error('Failed to insert bank account:', error);
+      throw error;
+    }
+
+    console.log(`💰 Saved bank account snapshot: ${accountInfo.current_balance} ₪`);
+    return 1;
+  } catch (error) {
+    console.error('Error in saveBankAccounts:', error);
+    // Don't throw - this is optional data
+    return 0;
+  }
+}
+
+// ============================================================================
+// Payslips (תלושי שכר)
+// ============================================================================
+
+/**
+ * Save payslip data from salary slips
+ */
+async function savePayslips(supabase: any, result: any, userId: string, documentId: string): Promise<number> {
+  try {
+    // Extract payslip info
+    if (!result.payslip_info && !result.salary_info) {
+      console.log('No payslip info found');
+      return 0;
+    }
+
+    const info = result.payslip_info || result.salary_info;
+    
+    // Parse month/year
+    let monthYear = new Date().toISOString().split('T')[0];
+    if (info.month || info.month_year) {
+      const monthStr = info.month || info.month_year;
+      // Try to parse various formats: "01/2025", "January 2025", etc.
+      const parsed = parseDateToISO(monthStr);
+      if (parsed) {
+        monthYear = parsed.substring(0, 7) + '-01'; // YYYY-MM-01
+      }
+    }
+    
+    // Parse pay date
+    let payDate = null;
+    if (info.pay_date) {
+      payDate = parseDateToISO(info.pay_date);
+    }
+    
+    const payslipToInsert = {
+      user_id: userId,
+      employer_name: info.employer_name || 'לא צוין',
+      employer_id: info.employer_id || null,
+      month_year: monthYear,
+      pay_date: payDate,
+      gross_salary: parseFloat(info.gross_salary || '0'),
+      net_salary: parseFloat(info.net_salary || '0'),
+      tax_deducted: parseFloat(info.tax || info.tax_deducted || '0'),
+      social_security: parseFloat(info.social_security || info.bituach_leumi || '0'),
+      health_tax: parseFloat(info.health_tax || info.briut_tax || '0'),
+      pension_employee: parseFloat(info.pension_employee || '0'),
+      pension_employer: parseFloat(info.pension_employer || '0'),
+      advanced_study_fund: parseFloat(info.advanced_study_fund || info.keren_hishtalmut || '0'),
+      overtime_hours: parseFloat(info.overtime_hours || '0'),
+      overtime_pay: parseFloat(info.overtime_pay || '0'),
+      bonus: parseFloat(info.bonus || '0'),
+      document_id: documentId,
+      metadata: result,
+    };
+
+    // Insert payslip
+    const { data: insertedPayslip, error } = await supabase
+      .from('payslips')
+      .insert([payslipToInsert])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to insert payslip:', error);
+      throw error;
+    }
+
+    // Create income transaction linked to this payslip
+    const netSalary = parseFloat(info.net_salary || '0');
+    if (netSalary > 0) {
+      const incomeTransaction = {
+        user_id: userId,
+        type: 'income',
+        amount: netSalary,
+        category: 'salary',
+        vendor: info.employer_name || 'משכורת',
+        date: payDate || monthYear,
+        tx_date: payDate || monthYear,
+        source: 'ocr',
+        status: 'proposed',
+        notes: `תלוש שכר ${monthYear}`,
+        payment_method: 'bank_transfer',
+        confidence_score: 0.9,
+        document_id: documentId,
+        auto_categorized: true,
+        currency: 'ILS',
+      };
+
+      const { error: txError } = await supabase
+        .from('transactions')
+        .insert([incomeTransaction]);
+
+      if (txError) {
+        console.warn('Failed to create income transaction from payslip:', txError);
+      } else {
+        console.log(`💸 Created income transaction for ${netSalary} ₪`);
+      }
+    }
+
+    // Update linked pension funds if we have pension data
+    if (info.pension_employee || info.pension_employer) {
+      const totalPension = 
+        parseFloat(info.pension_employee || '0') + 
+        parseFloat(info.pension_employer || '0');
+      
+      // Try to find existing pension fund for this user
+      const { data: existingPension } = await supabase
+        .from('pension_insurance')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('active', true)
+        .limit(1)
+        .single();
+
+      if (existingPension) {
+        // Update monthly_deposit
+        await supabase
+          .from('pension_insurance')
+          .update({
+            monthly_deposit: totalPension,
+            employee_contribution: parseFloat(info.pension_employee || '0'),
+            employer_contribution: parseFloat(info.pension_employer || '0'),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingPension.id);
+        
+        console.log(`📊 Updated pension fund with ${totalPension} ₪ monthly deposit`);
+      }
+    }
+
+    console.log(`💼 Saved payslip: ${info.employer_name} - ${netSalary} ₪`);
+    return 1;
+  } catch (error) {
+    console.error('Error in savePayslips:', error);
+    // Don't throw - this is optional data
+    return 0;
+  }
 }
 
 // ============================================================================

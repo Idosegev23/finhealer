@@ -31,12 +31,13 @@ export async function GET(request: Request) {
       offset,
     })
 
-    // בניית query
+    // בניית query (רק parent transactions)
     let query = supabase
       .from('transactions')
       .select('*', { count: 'exact' })
       .eq('user_id', user.id)
       .eq('type', 'expense')
+      .or('has_details.is.null,has_details.eq.false')
       .order('tx_date', { ascending: false })
       .order('created_at', { ascending: false })
 

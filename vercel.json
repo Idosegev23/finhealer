@@ -3,5 +3,19 @@
     "app/api/documents/process/route.ts": {
       "maxDuration": 300
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/process-alerts",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/check-recurring",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-views",
+      "schedule": "0 */6 * * *"
+    }
+  ]
 }

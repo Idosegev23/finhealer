@@ -24,6 +24,7 @@ export async function GET(request: Request) {
       .from('transactions')
       .select('*', { count: 'exact' })
       .eq('user_id', user.id)
+      .or('has_details.is.null,has_details.eq.false')
       .order('tx_date', { ascending: false });
 
     // Filters

@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, XCircle, Edit2, Package } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Edit2, Package, Link2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
 import { EditExpenseModal } from '@/components/expenses/EditExpenseModal';
+import TransactionMatchCard from '@/components/dashboard/TransactionMatchCard';
 
 interface PendingTransaction {
   id: string;
@@ -22,6 +23,13 @@ interface PendingTransaction {
   notes: string;
   confidence_score: number;
   created_at: string;
+  is_summary?: boolean;
+  document_type?: string;
+}
+
+interface Match {
+  transaction: PendingTransaction;
+  confidence: number;
 }
 
 export default function PendingExpensesPage() {
@@ -32,6 +40,9 @@ export default function PendingExpensesPage() {
   const [error, setError] = useState('');
   const [editingExpense, setEditingExpense] = useState<PendingTransaction | null>(null);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+  const [matches, setMatches] = useState<Record<string, Match[]>>({});
+  const [loadingMatches, setLoadingMatches] = useState<Set<string>>(new Set());
+  const [showingMatchesFor, setShowingMatchesFor] = useState<string | null>(null);
 
   useEffect(() => {
     loadExpenses();
@@ -50,6 +61,72 @@ export default function PendingExpensesPage() {
       setError(err.message || 'שגיאה בטעינת הוצאות');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMatches = async (transactionId: string, documentType: string) => {
+    setLoadingMatches((prev) => new Set(prev).add(transactionId));
+    
+    try {
+      const response = await fetch('/api/transactions/find-matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId, documentType }),
+      });
+
+      if (!response.ok) throw new Error('Failed to load matches');
+
+      const data = await response.json();
+      if (data.success && data.matches) {
+        setMatches((prev) => ({ ...prev, [transactionId]: data.matches }));
+        setShowingMatchesFor(transactionId);
+      }
+    } catch (error: any) {
+      console.error('Load matches error:', error);
+      addToast({
+        type: 'error',
+        title: 'שגיאה',
+        description: 'לא הצלחנו למצוא התאמות',
+      });
+    } finally {
+      setLoadingMatches((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(transactionId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleLinkTransactions = async (
+    parentId: string,
+    detailIds: string[],
+    documentId?: string
+  ) => {
+    try {
+      const response = await fetch('/api/transactions/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentTransactionId: parentId, detailTransactionIds: detailIds, documentId }),
+      });
+
+      if (!response.ok) throw new Error('Failed to link transactions');
+
+      addToast({
+        type: 'success',
+        title: 'תנועות קושרו',
+        description: 'התנועות קושרו בהצלחה',
+      });
+
+      // Refresh expenses list
+      await loadExpenses();
+      setShowingMatchesFor(null);
+    } catch (error: any) {
+      console.error('Link error:', error);
+      addToast({
+        type: 'error',
+        title: 'שגיאה',
+        description: 'לא הצלחנו לקשר את התנועות',
+      });
     }
   };
 
@@ -285,6 +362,28 @@ export default function PendingExpensesPage() {
                       </p>
                     )}
 
+                    {/* Find Matches Button - for bank statements */}
+                    {expense.is_summary && (
+                      <Button
+                        onClick={() => loadMatches(expense.id, expense.document_type || 'bank')}
+                        disabled={loadingMatches.has(expense.id)}
+                        variant="secondary"
+                        className="w-full mb-2"
+                      >
+                        {loadingMatches.has(expense.id) ? (
+                          <>
+                            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                            מחפש התאמות...
+                          </>
+                        ) : (
+                          <>
+                            <Link2 className="w-4 h-4 ml-2" />
+                            מצא התאמות מדוח אשראי
+                          </>
+                        )}
+                      </Button>
+                    )}
+
                     {/* Actions */}
                     <div className="flex gap-2 pt-2">
                       <Button
@@ -324,6 +423,18 @@ export default function PendingExpensesPage() {
                         דחה
                       </Button>
                     </div>
+
+                    {/* Match Card - show when matches found */}
+                    {showingMatchesFor === expense.id && matches[expense.id] && (
+                      <div className="mt-4">
+                        <TransactionMatchCard
+                          parentTransaction={expense}
+                          matches={matches[expense.id]}
+                          onLink={handleLinkTransactions}
+                          onDismiss={() => setShowingMatchesFor(null)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

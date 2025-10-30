@@ -31,14 +31,15 @@ export async function GET(request: Request) {
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     const fromDate = threeMonthsAgo.toISOString().split('T')[0];
 
-    // שליפת כל ההוצאות מ-3 חודשים אחרונים
+    // שליפת כל ההוצאות מ-3 חודשים אחרונים (רק parent transactions)
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'expense')
       .gte('tx_date', fromDate)
-      .eq('status', 'confirmed');
+      .eq('status', 'confirmed')
+      .or('has_details.is.null,has_details.eq.false');
 
     if (error) {
       console.error('Error fetching transactions:', error);

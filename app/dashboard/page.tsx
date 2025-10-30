@@ -91,6 +91,24 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .eq('active', true)
 
+  // קבלת יתרת בנק נוכחית
+  const { data: bankAccounts } = await supabase
+    .from('bank_accounts')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('is_current', true)
+
+  // קבלת תנועות החודש (רק parent transactions - לא has_details)
+  const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
+  const { data: monthlyTransactions } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('status', 'confirmed')
+    .gte('date', `${currentMonth}-01`)
+    .lte('date', `${currentMonth}-31`)
+    .or('has_details.is.null,has_details.eq.false')
+
   // חישובים
   const profile: any = userProfile || {}
   const score = Number(healthScore) || 0
@@ -107,13 +125,28 @@ export default async function DashboardPage() {
   const totalInsurance = (insurances || []).reduce((sum: number, ins: any) => 
     sum + (Number(ins.monthly_premium) || 0), 0)
   
-  const monthlyIncome = (incomeSources || []).reduce((sum: number, src: any) => 
-    sum + (Number(src.net_amount) || 0), 0)
+  // חישוב הכנסות והוצאות מתנועות בפועל (רק parent transactions)
+  const monthlyIncomeFromTransactions = (monthlyTransactions || [])
+    .filter((tx: any) => tx.type === 'income')
+    .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0)
+  
+  const monthlyExpensesFromTransactions = (monthlyTransactions || [])
+    .filter((tx: any) => tx.type === 'expense')
+    .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0)
 
-  const totalAssets = totalSavings + totalPension + (Number(profile.investments) || 0)
+  // הכנסה חודשית: העדיפו מתנועות בפועל, או מ-income_sources כברירת מחדל
+  const monthlyIncome = monthlyIncomeFromTransactions > 0 
+    ? monthlyIncomeFromTransactions 
+    : (incomeSources || []).reduce((sum: number, src: any) => sum + (Number(src.net_amount) || 0), 0)
+
+  // יתרת בנק נוכחית
+  const currentBankBalance = (bankAccounts || []).reduce((sum: number, acc: any) => 
+    sum + (Number(acc.current_balance) || 0), 0)
+
+  const totalAssets = totalSavings + totalPension + (Number(profile.investments) || 0) + currentBankBalance
   const totalLiabilities = totalLoans + (Number(profile.total_debt) || 0)
   const netWorth = totalAssets - totalLiabilities
-  const currentAccount = Number(profile.current_account_balance) || 0
+  const currentAccount = currentBankBalance > 0 ? currentBankBalance : Number(profile.current_account_balance) || 0
 
   // קבלת סטטוס השלמת סקציות (לשלב data_collection)
   const { data: dataSections } = await supabase
@@ -297,6 +330,31 @@ export default async function DashboardPage() {
                     הוסף הכנסה ראשונה
                   </>
                 )}
+              </Button>
+            </Link>
+          </div>
+
+          {/* הוצאות החודש */}
+          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <TrendingDown className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-theme-tertiary text-sm font-medium">הוצאות החודש</p>
+              <InfoTooltip
+                content="סך כל ההוצאות בחודש הנוכחי (רק תנועות מאושרות)"
+                type="info"
+              />
+            </div>
+            <p className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-3">
+              ₪{monthlyExpensesFromTransactions.toLocaleString('he-IL')}
+            </p>
+            <Link href="/dashboard/expenses" className="block">
+              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <ArrowRight className="w-4 h-4 ml-2" />
+                ניהול הוצאות
               </Button>
             </Link>
           </div>

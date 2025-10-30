@@ -38,21 +38,23 @@ export async function GET(request: NextRequest) {
 
     for (const user of users || []) {
       try {
-        // השבוע הזה (7 ימים אחרונים)
+        // השבוע הזה (7 ימים אחרונים) - רק parent transactions
         const { data: thisWeek } = await supabase
           .from('transactions')
           .select('amount, type, category')
           .eq('user_id', user.id)
           .gte('tx_date', sevenDaysAgo.toISOString().split('T')[0])
-          .lte('tx_date', today.toISOString().split('T')[0]);
+          .lte('tx_date', today.toISOString().split('T')[0])
+          .or('has_details.is.null,has_details.eq.false');
 
-        // השבוע שעבר (14-7 ימים אחרונים)
+        // השבוע שעבר (14-7 ימים אחרונים) - רק parent transactions
         const { data: lastWeek } = await supabase
           .from('transactions')
           .select('amount, type')
           .eq('user_id', user.id)
           .gte('tx_date', fourteenDaysAgo.toISOString().split('T')[0])
-          .lt('tx_date', sevenDaysAgo.toISOString().split('T')[0]);
+          .lt('tx_date', sevenDaysAgo.toISOString().split('T')[0])
+          .or('has_details.is.null,has_details.eq.false');
 
         const thisWeekExpenses = thisWeek
           ?.filter((tx) => tx.type === 'expense')

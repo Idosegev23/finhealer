@@ -76,12 +76,20 @@ export function getBankStatementPrompt(text: string): string {
 
 **מטרת העל:** לספק תמונה פיננסית מלאה של החשבון.
 
-## **1. מידע כללי על החשבון (account_info):**
-- תקופה (from_date, to_date - DD/MM/YYYY)
-- יתרה פותחת (opening_balance)
-- יתרה סוגרת (closing_balance)
+## **1. מידע כללי על הדוח (report_info):**
+- תאריך הפקת הדוח (report_date - DD/MM/YYYY)
+- תקופת הדוח (period_start, period_end - DD/MM/YYYY)
+- שם הבנק (bank_name) - "בנק לאומי", "בנק הפועלים", "בנק דיסקונט" וכו'
+
+## **2. מידע על החשבון (account_info):**
 - מספר חשבון (account_number)
-- שם החשבון (account_name)
+- שם החשבון (account_name) - "עובר ושב", "חשבון עו\"ש" וכו'
+- סוג חשבון (account_type) - "checking" (עו\"ש), "savings" (חיסכון), "business" (עסקי)
+- מספר סניף (branch_number) - אם מופיע
+- יתרה פותחת (opening_balance)
+- יתרה סוגרת (closing_balance) - **זו היתרה הנוכחית המדויקת של החשבון!**
+- יתרה זמינה (available_balance) - אם שונה מיתרה סוגרת (כולל מסגרת אשראי)
+- מסגרת אשראי (overdraft_limit) - אם יש
 
 ## **2. תנועות לפי סוג (transactions):**
 
@@ -121,13 +129,21 @@ export function getBankStatementPrompt(text: string): string {
 
 ## **פורמט JSON:**
 {
+  "report_info": {
+    "report_date": "01/11/2025",
+    "period_start": "01/10/2025",
+    "period_end": "31/10/2025",
+    "bank_name": "בנק הפועלים"
+  },
   "account_info": {
-    "from_date": "01/10/2025",
-    "to_date": "31/10/2025",
-    "opening_balance": 15000.00,
-    "closing_balance": 12000.00,
     "account_number": "123-456789",
-    "account_name": "עובר ושב"
+    "account_name": "חשבון עו״ש",
+    "account_type": "checking",
+    "branch_number": "682",
+    "opening_balance": 15000.00,
+    "current_balance": 12000.00,
+    "available_balance": 14000.00,
+    "overdraft_limit": 2000.00
   },
   "transactions": {
     "income": [
@@ -196,12 +212,15 @@ export function getLoanStatementPrompt(text: string): string {
 ## **2. פירוט הלוואות (loans):**
 עבור כל הלוואה, חלץ:
 - מספר הלוואה (loan_number)
-- שם/סוג הלוואה (loan_name)
+- שם/סוג הלוואה (loan_name) - "הלואה לא צמודה", "הלואה צמודה למדד" וכו'
+- צמדות (index_type) - "לא צמוד", "צמוד למדד", "צמוד לדולר"
 - סכום הלוואה מקורי (original_amount)
-- יתרת חוב נוכחית (outstanding_balance)
-- ריבית שנתית נומינלית (annual_interest_rate)
-- סכום תשלום קרוב (next_payment_amount)
-- יתרת תשלומים (remaining_payments - פורמט X/Y)
+- יתרת חוב נוכחית (current_balance)
+- ריבית שנתית (interest_rate) - רק המספר (לדוגמה: 7.75)
+- החזר חודשי קבוע (monthly_payment) - **הסכום שמשולם כל חודש**
+- תשלומים ששולמו (paid_payments) - מספר
+- תשלומים שנותרו (remaining_payments) - מספר
+- תאריך תשלום הבא (next_payment_date - DD/MM/YYYY) - אם מופיע
 
 **פורמט JSON בלבד - ללא טקסט נוסף:**
 {
@@ -216,11 +235,14 @@ export function getLoanStatementPrompt(text: string): string {
     {
       "loan_number": "0-128-0155-00-978020",
       "loan_name": "הלואה לא צמודה ברבית משתנה",
+      "index_type": "לא צמוד",
       "original_amount": 120000.00,
-      "outstanding_balance": 89677.33,
-      "annual_interest_rate": "P+1.75% (7.75%)",
-      "next_payment_amount": 1432.73,
-      "remaining_payments": "40/120"
+      "current_balance": 89677.33,
+      "interest_rate": 7.75,
+      "monthly_payment": 1432.73,
+      "paid_payments": 80,
+      "remaining_payments": 40,
+      "next_payment_date": "15/11/2025"
     }
   ]
 }
@@ -250,13 +272,15 @@ export function getMortgageStatementPrompt(text: string): string {
 ## **2. פירוט מסלולים (tracks):**
 עבור כל מסלול, חלץ:
 - מספר מסלול (track_number)
-- סוג מסלול (track_type) - "קבועה לא צמודה", "משתנה כל 5 שנים"
+- סוג מסלול (track_type) - "קבועה לא צמודה", "משתנה כל 5 שנים", "פריים" וכו'
 - צמדות (index_type) - "לא צמוד", "צמוד למדד"
 - סכום מקורי (original_amount)
 - יתרה נוכחית (current_balance)
-- ריבית שנתית (interest_rate)
-- החזר חודשי (monthly_payment)
-- תשלומים ששולמו / סה"כ תשלומים (remaining_payments - פורמט X/Y)
+- ריבית שנתית (interest_rate) - רק המספר (לדוגמה: 2.5)
+- החזר חודשי קבוע (monthly_payment) - **הסכום שמשולם כל חודש**
+- תשלומים ששולמו (paid_payments) - מספר
+- תשלומים שנותרו (remaining_payments) - מספר
+- תאריך תשלום הבא (next_payment_date - DD/MM/YYYY) - אם מופיע
 
 **פורמט JSON בלבד - ללא טקסט נוסף:**
 {
@@ -276,7 +300,9 @@ export function getMortgageStatementPrompt(text: string): string {
       "current_balance": 450000.00,
       "interest_rate": 2.5,
       "monthly_payment": 2000.00,
-      "remaining_payments": "180/240"
+      "paid_payments": 60,
+      "remaining_payments": 180,
+      "next_payment_date": "01/12/2025"
     },
     {
       "track_number": "2",
@@ -286,7 +312,9 @@ export function getMortgageStatementPrompt(text: string): string {
       "current_balance": 750000.00,
       "interest_rate": 1.8,
       "monthly_payment": 3500.00,
-      "remaining_payments": "200/300"
+      "paid_payments": 100,
+      "remaining_payments": 200,
+      "next_payment_date": "01/12/2025"
     }
   ]
 }
@@ -365,7 +393,103 @@ ${text}
 }
 
 // ============================================================================
-// 6️⃣ דוח מסלקה פנסיונית (Pension Clearinghouse Report)
+// 6️⃣ תלוש שכר (Payslip / Salary Slip)
+// ============================================================================
+
+export function getPayslipPrompt(text: string): string {
+  return `אתה מומחה בניתוח תלושי שכר ישראליים.
+
+נתח את תלוש השכר הבא וחלץ את **כל המידע הרלוונטי**.
+
+## **מה לחלץ:**
+
+### **1. מידע כללי (payslip_info):**
+- שם המעסיק (employer_name)
+- ח.פ. מעסיק (employer_id) - אם מופיע
+- שם העובד (employee_name)
+- תעודת זהות עובד (employee_id)
+- חודש ושנה (month_year) - פורמט: "MM/YYYY" או "אוקטובר 2025"
+- תאריך תשלום (pay_date - DD/MM/YYYY) - אם מופיע
+- מספר תלוש (payslip_number) - אם מופיע
+
+### **2. רכיבי שכר (salary_components):**
+
+**הכנסה:**
+- שכר ברוטו (gross_salary) - **סה"כ ברוטו לפני הפרשות וניכויים**
+- שכר בסיס (base_salary)
+- שעות נוספות (overtime_hours, overtime_pay) - אם יש
+- בונוסים (bonus) - אם יש
+- תוספות אחרות (allowances) - נסיעות, אוכל, טלפון וכו'
+
+**ניכויים וקצבאות:**
+- ניכוי מס הכנסה (tax_deducted / mas_hachnasa)
+- ביטוח לאומי (social_security / bituach_leumi)
+- מס בריאות (health_tax / briut_tax)
+- פנסיה - עובד (pension_employee)
+- פנסיה - מעסיק (pension_employer)
+- קרן השתלמות - עובד (advanced_study_fund_employee / keren_hishtalmut_employee)
+- קרן השתלמות - מעסיק (advanced_study_fund_employer / keren_hishtalmut_employer)
+- ביטוח מנהלים (managers_insurance) - אם יש
+- גמל/פנסיה מקיפה (provident_fund) - אם יש
+
+**סה"כ:**
+- שכר נטו (net_salary) - **הסכום שמועבר לחשבון הבנק**
+
+### **3. פירוט פנסיה וחיסכון (pension_details):**
+אם יש פירוט, חלץ:
+- שם קופת פנסיה/גמל (fund_name)
+- מספר תוכנית (policy_number)
+- אחוז הפקדה עובד (employee_percentage)
+- אחוז הפקדה מעסיק (employer_percentage)
+
+## **פורמט JSON:**
+{
+  "payslip_info": {
+    "employer_name": "חברת הייטק בע״מ",
+    "employer_id": "515123456",
+    "employee_name": "ישראל ישראלי",
+    "employee_id": "123456789",
+    "month_year": "10/2025",
+    "pay_date": "05/11/2025",
+    "payslip_number": "2025-10-12345"
+  },
+  "salary_components": {
+    "gross_salary": 20000.00,
+    "base_salary": 18000.00,
+    "overtime_hours": 10,
+    "overtime_pay": 1500.00,
+    "bonus": 500.00,
+    "allowances": {
+      "travel": 0,
+      "phone": 0,
+      "food": 0
+    },
+    "tax_deducted": 4200.00,
+    "social_security": 720.00,
+    "health_tax": 310.00,
+    "pension_employee": 1200.00,
+    "pension_employer": 1500.00,
+    "advanced_study_fund_employee": 500.00,
+    "advanced_study_fund_employer": 500.00,
+    "managers_insurance": 0,
+    "net_salary": 13070.00
+  },
+  "pension_details": {
+    "fund_name": "מבטחים קרן פנסיה",
+    "policy_number": "123456789",
+    "employee_percentage": 6.0,
+    "employer_percentage": 7.5
+  }
+}
+
+**התלוש:**
+${text}
+
+**חשוב: זהה במדויק את שכר ברוטו ונטו!**`;
+}
+
+// ============================================================================
+// 7️⃣ דוח מסלקה פנסיונית (Pension Clearinghouse Report)
 // ============================================================================
 
 export function getPensionStatementPrompt(text: string): string {
@@ -506,6 +630,10 @@ export function getPromptForDocumentType(
 
   if (normalizedType.includes('pension') || normalizedType.includes('פנסיה') || normalizedType.includes('מסלקה')) {
     return getPensionStatementPrompt(extractedText);
+  }
+
+  if (normalizedType.includes('payslip') || normalizedType.includes('salary') || normalizedType.includes('תלוש')) {
+    return getPayslipPrompt(extractedText);
   }
 
   // Default to credit statement for unknown types

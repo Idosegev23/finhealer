@@ -27,14 +27,15 @@ export async function GET() {
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const today = now.toISOString().split('T')[0];
 
-    // הוצאות/הכנסות החודש
+    // הוצאות/הכנסות החודש (רק parent transactions)
     const { data: transactions } = await supabase
       .from('transactions')
       .select('type, amount')
       .eq('user_id', user.id)
       .eq('status', 'confirmed')
       .gte('tx_date', firstDayOfMonth)
-      .lte('tx_date', today);
+      .lte('tx_date', today)
+      .or('has_details.is.null,has_details.eq.false');
 
     const txData = (transactions || []) as any[];
     const totalExpenses = txData

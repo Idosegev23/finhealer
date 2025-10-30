@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import Link from 'next/link';
+import TransactionDetailsView from '@/components/dashboard/TransactionDetailsView';
 
 interface MonthData {
   month: string;
@@ -306,6 +307,8 @@ interface CategoryGroupProps {
 }
 
 function CategoryGroup({ title, categories, transactions, type }: CategoryGroupProps) {
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
   // סינון טרנזקציות לפי סוג
   const relevantTransactions = transactions.filter((tx) => {
     const txType = getExpenseTypeFromTransaction(tx);
@@ -322,20 +325,91 @@ function CategoryGroup({ title, categories, transactions, type }: CategoryGroupP
 
   if (Object.keys(grouped).length === 0) return null;
 
+  function toggleCategory(category: string) {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
+    });
+  }
+
+  async function handleUnlink(transactionId: string) {
+    try {
+      const response = await fetch('/api/transactions/link', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentTransactionId: transactionId }),
+      });
+
+      if (response.ok) {
+        // Refresh page to show updated data
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Failed to unlink transaction:', error);
+    }
+  }
+
   return (
     <div className="mb-6">
       <h5 className="font-medium text-gray-700 mb-3">{title}</h5>
       <div className="space-y-2">
         {Object.entries(grouped).map(([category, items]) => {
           const total = items.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+          const isExpanded = expandedCategories.has(category);
           
           return (
-            <div key={category} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <div>
-                <p className="font-medium text-gray-900">{category}</p>
-                <p className="text-sm text-gray-500">{items.length} תנועות</p>
-              </div>
-              <p className="font-semibold text-gray-900">₪{total.toLocaleString()}</p>
+            <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => toggleCategory(category)}
+                className="w-full flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {isExpanded ? (
+                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                  )}
+                  <div className="text-right">
+                    <p className="font-medium text-gray-900">{category}</p>
+                    <p className="text-sm text-gray-500">{items.length} תנועות</p>
+                  </div>
+                </div>
+                <p className="font-semibold text-gray-900">₪{total.toLocaleString()}</p>
+              </button>
+
+              {isExpanded && (
+                <div className="p-3 bg-white space-y-2">
+                  {items.map((tx) => (
+                    <div key={tx.id} className="border-r-4 border-blue-400 pr-3">
+                      <div className="flex justify-between items-start mb-1">
+                        <div>
+                          <p className="font-medium text-gray-900">{tx.vendor || 'לא צוין'}</p>
+                          <p className="text-sm text-gray-500">
+                            {new Date(tx.date).toLocaleDateString('he-IL')}
+                            {tx.payment_method && ` • ${tx.payment_method}`}
+                          </p>
+                        </div>
+                        <p className="text-lg font-semibold text-gray-900">₪{parseFloat(tx.amount).toLocaleString()}</p>
+                      </div>
+                      
+                      {/* Show Details if transaction has details */}
+                      {tx.has_details && (
+                        <TransactionDetailsView
+                          transactionId={tx.id}
+                          amount={parseFloat(tx.amount)}
+                          vendor={tx.vendor || 'לא צוין'}
+                          onUnlink={() => handleUnlink(tx.id)}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

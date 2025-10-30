@@ -36,6 +36,7 @@ export async function GET(request: Request) {
         .eq('type', 'income')
         .gte('tx_date', startOfMonth)
         .lte('tx_date', endOfMonth)
+        .or('has_details.is.null,has_details.eq.false')
 
       incomeTransactions = transactions || []
     }
