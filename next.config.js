@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Prevent Next.js from bundling pdf-parse and pdfjs-dist - they have native dependencies
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
   images: {
     domains: ['lh3.googleusercontent.com'], // Google profile images
     remotePatterns: [

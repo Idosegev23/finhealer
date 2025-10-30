@@ -1,17 +1,3 @@
-// Setup minimal polyfills BEFORE any imports to prevent pdfjs-dist crashes
-// These prevent "DOMMatrix is not defined" errors in Node.js/Vercel
-if (typeof globalThis.DOMMatrix === 'undefined') {
-  (globalThis as any).DOMMatrix = class DOMMatrix {
-    multiplySelf() { return this; }
-  };
-}
-if (typeof globalThis.ImageData === 'undefined') {
-  (globalThis as any).ImageData = class ImageData {};
-}
-if (typeof globalThis.Path2D === 'undefined') {
-  (globalThis as any).Path2D = class Path2D {};
-}
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
@@ -195,17 +181,34 @@ export async function POST(request: NextRequest) {
 // ============================================================================
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
+  // Setup DOM polyfills for pdfjs-dist in Node.js/serverless environment
+  if (typeof globalThis.DOMMatrix === 'undefined') {
+    (globalThis as any).DOMMatrix = class DOMMatrix {
+      multiplySelf() { return this; }
+    };
+  }
+  if (typeof globalThis.ImageData === 'undefined') {
+    (globalThis as any).ImageData = class ImageData {};
+  }
+  if (typeof globalThis.Path2D === 'undefined') {
+    (globalThis as any).Path2D = class Path2D {};
+  }
+
+  let parser: any = undefined;
   try {
     // Extract text from PDF using pdf-parse
     console.log('📝 Extracting text from PDF...');
-    // @ts-ignore - pdf-parse has type issues with ESM
-    const pdfParseModule: any = await import('pdf-parse');
-    const pdfParse = pdfParseModule.default || pdfParseModule;
-    const pdfData = await pdfParse(buffer);
+
+    // Dynamically import pdf-parse to avoid build-time issues
+    const { PDFParse } = await import('pdf-parse');
+
+    // Create parser instance with buffer data
+    parser = new PDFParse({ data: buffer });
+    const pdfData = await parser.getText();
     const extractedText = pdfData.text;
-    
-    console.log(`✅ Text extracted: ${extractedText.length} characters, ${pdfData.numpages} pages`);
-    
+
+    console.log(`✅ Text extracted: ${extractedText.length} characters, ${pdfData.total} pages`);
+
     // Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText);
     
@@ -235,7 +238,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     }
     
     const result = JSON.parse(jsonStr);
-    
+
     return result;
   } catch (error: any) {
     console.error('❌ PDF analysis error:', error);
@@ -245,6 +248,11 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       type: error?.type,
     });
     throw new Error(`Failed to analyze PDF: ${error?.message || 'Unknown error'}`);
+  } finally {
+    // Always cleanup parser to free memory in serverless environment
+    if (parser) {
+      await parser.destroy();
+    }
   }
 }
 
