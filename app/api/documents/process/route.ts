@@ -339,9 +339,24 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         }
       }
 
+      // Determine payment method based on transaction type
+      const transactionType = tx.type || 'expense';
+      let paymentMethod = tx.payment_method;
+      
+      if (!paymentMethod) {
+        // Default payment methods by transaction type
+        if (transactionType === 'income') {
+          paymentMethod = 'bank_transfer'; // Income usually comes via bank transfer
+        } else if (tx.category === 'loan_payment') {
+          paymentMethod = 'bank_transfer'; // Loan payments usually direct debit
+        } else {
+          paymentMethod = 'credit_card'; // Default for expenses
+        }
+      }
+
       return {
         user_id: userId,
-        type: tx.type || 'expense',
+        type: transactionType,
         amount: Math.abs(parseFloat(tx.amount)) || 0,
         category: tx.category || 'other',
         vendor: tx.vendor || tx.description || 'לא צוין',
@@ -352,7 +367,7 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         notes: tx.installment 
           ? `${tx.notes || tx.description || ''} ${tx.installment}`.trim() 
           : (tx.notes || tx.description || null),
-        payment_method: tx.payment_method || 'credit_card',
+        payment_method: paymentMethod,
         expense_type: tx.type === 'הוראת קבע' 
           ? 'fixed' 
           : tx.type === 'תשלום' || tx.type === 'קרדיט'
