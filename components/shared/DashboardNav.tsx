@@ -153,7 +153,7 @@ export function DashboardNav() {
   return (
     <div className={`sticky top-0 z-50 ${isDark ? 'bg-card-dark border-gray-800' : 'bg-white border-gray-200'} border-b shadow-md transition-colors duration-200`} dir="rtl">
       {/* Spybar - נתונים פיננסיים עם Marquee */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white overflow-hidden relative">
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white overflow-visible relative">
         <Marquee pauseOnHover className="[--duration:10s] [--gap:2rem] py-2">
           {financialItems.map((item, idx) => (
             <div key={idx} className="flex items-center gap-2 whitespace-nowrap">
@@ -166,13 +166,13 @@ export function DashboardNav() {
           ))}
         </Marquee>
         
-        {/* Right Side Controls */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
+        {/* Right Side Controls - Outside Marquee */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-[100] flex items-center gap-2">
           {/* User Menu */}
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 bg-blue-700/50 backdrop-blur-sm hover:bg-blue-600/50 transition-colors rounded-full px-3 py-1.5"
+              className="flex items-center gap-2 bg-blue-700/80 backdrop-blur-sm hover:bg-blue-600/80 transition-colors rounded-full px-3 py-1.5 shadow-lg"
             >
               <User className="w-4 h-4" />
               <span className="text-sm font-medium hidden sm:block">{userName}</span>
@@ -180,7 +180,7 @@ export function DashboardNav() {
             </button>
             
             {userMenuOpen && (
-              <div className={`absolute top-full mt-2 left-0 w-48 rounded-lg shadow-xl border z-50 ${
+              <div className={`absolute top-full mt-2 left-0 w-48 rounded-lg shadow-2xl border z-[200] ${
                 isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
               }`}>
                 <Link
@@ -214,7 +214,7 @@ export function DashboardNav() {
           </div>
 
           {/* Theme Toggle */}
-          <div className="bg-blue-700/50 backdrop-blur-sm rounded-full p-1">
+          <div className="bg-blue-700/80 backdrop-blur-sm rounded-full p-1 shadow-lg">
             <ThemeToggle />
           </div>
         </div>
