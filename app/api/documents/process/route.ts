@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 240000, // 4 minutes timeout for OpenAI (leave 1 min buffer)
+  maxRetries: 2, // Retry twice on failure
 });
 
 /**
@@ -58,10 +60,14 @@ export async function POST(request: NextRequest) {
     const stmt = statement as any;
     console.log(`📄 Processing: ${stmt.file_name} (${stmt.file_type})`);
 
-    // 2. Update status to processing
+    // 2. Update status to processing with progress
     await supabase
       .from('uploaded_statements')
-      .update({ status: 'processing' })
+      .update({ 
+        status: 'processing',
+        processing_stage: 'downloading',
+        progress_percent: 10
+      })
       .eq('id', statementId);
 
     // 3. Download file from Storage
@@ -85,6 +91,15 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await fileData.arrayBuffer());
     console.log(`✅ Downloaded: ${buffer.length} bytes`);
 
+    // Update progress
+    await supabase
+      .from('uploaded_statements')
+      .update({ 
+        processing_stage: 'analyzing',
+        progress_percent: 30
+      })
+      .eq('id', statementId);
+
     // 4. Analyze with AI based on document type
     let result: any = {};
     let itemsProcessed = 0;
@@ -102,6 +117,15 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ AI analysis complete:`, result);
+
+    // Update progress
+    await supabase
+      .from('uploaded_statements')
+      .update({ 
+        processing_stage: 'saving',
+        progress_percent: 70
+      })
+      .eq('id', statementId);
 
     // 5. Save data to appropriate table(s) based on document type
     const docType = stmt.file_type?.toLowerCase() || '';
@@ -136,8 +160,12 @@ export async function POST(request: NextRequest) {
       .from('uploaded_statements')
       .update({
         status: 'completed',
+        processing_stage: 'completed',
+        progress_percent: 100,
         processed_at: new Date().toISOString(),
         transactions_extracted: itemsProcessed,
+        error_message: null,
+        retry_count: 0,
       })
       .eq('id', statementId);
 
@@ -156,7 +184,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('❌ [BG] Processing error:', error);
     
-    // Update status to failed
+    // Update status to failed with retry logic
     if (statementId) {
       try {
         const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
@@ -165,13 +193,35 @@ export async function POST(request: NextRequest) {
           process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
         
+        // Get current retry count
+        const { data: stmt } = await supabase
+          .from('uploaded_statements')
+          .select('retry_count')
+          .eq('id', statementId)
+          .single();
+        
+        const retryCount = (stmt?.retry_count || 0) + 1;
+        const shouldRetry = retryCount <= 3;
+        
+        // Determine error type
+        const isTimeout = error?.message?.includes('timeout') || error?.code === 'ETIMEDOUT' || error?.code === 'ECONNABORTED';
+        const errorMessage = isTimeout 
+          ? `Timeout after ${Math.round((Date.now() - startTime) / 1000)}s - GPT-5 לקח יותר מדי זמן. נסה שוב בעוד 5 דקות.`
+          : error?.message || 'Unknown error';
+        
         await supabase
           .from('uploaded_statements')
           .update({
-            status: 'failed',
-            error_message: error.message,
+            status: shouldRetry ? 'pending' : 'failed',
+            processing_stage: 'error',
+            progress_percent: 0,
+            retry_count: retryCount,
+            error_message: errorMessage,
+            next_retry_at: shouldRetry ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : null, // Retry in 5 min
           })
           .eq('id', statementId);
+        
+        console.log(`📊 Retry count: ${retryCount}/3, Will retry: ${shouldRetry}`);
       } catch (updateError) {
         console.error('Failed to update statement status:', updateError);
       }
