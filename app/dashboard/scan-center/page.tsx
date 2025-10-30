@@ -1,8 +1,11 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { DocumentUploader } from '@/components/shared/DocumentUploader';
+import Link from 'next/link';
 import {
   Banknote,
   CreditCard,
@@ -13,6 +16,13 @@ import {
   Receipt,
   DollarSign,
   FileText,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Loader2,
+  ExternalLink,
+  Calendar,
+  FileCheck,
 } from 'lucide-react';
 
 type DocumentType = 
@@ -110,8 +120,41 @@ const documentTypes: DocumentTypeConfig[] = [
   },
 ];
 
+interface ScannedDocument {
+  id: string;
+  file_name: string;
+  document_type: string;
+  status: string;
+  created_at: string;
+  transactions_extracted: number;
+  transactions_created: number;
+  error_message?: string;
+}
+
 export default function ScanCenterPage() {
   const [activeType, setActiveType] = useState<DocumentType | null>(null);
+  const [scannedDocs, setScannedDocs] = useState<ScannedDocument[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  useEffect(() => {
+    loadScannedHistory();
+  }, []);
+
+  const loadScannedHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const response = await fetch('/api/documents/list');
+      const data = await response.json();
+      
+      if (data.success) {
+        setScannedDocs(data.documents || []);
+      }
+    } catch (error) {
+      console.error('Failed to load scanned history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   return (
     <div className="container mx-auto p-6 max-w-7xl" dir="rtl">
@@ -191,6 +234,8 @@ export default function ScanCenterPage() {
               documentType={activeType}
               onSuccess={(data) => {
                 console.log('✅ Document uploaded:', data);
+                // Refresh history to show new document
+                loadScannedHistory();
                 // Reset selection after successful upload
                 setTimeout(() => setActiveType(null), 2000);
               }}
@@ -218,7 +263,203 @@ export default function ScanCenterPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Scanned Documents History */}
+      <div className="mt-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              📂 היסטוריית סריקות
+            </h2>
+            <p className="text-gray-600 text-sm">
+              כל המסמכים שהעלת ומה נוצר מהם
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadScannedHistory}
+            disabled={loadingHistory}
+          >
+            {loadingHistory ? (
+              <>
+                <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                מרענן...
+              </>
+            ) : (
+              'רענן'
+            )}
+          </Button>
+        </div>
+
+        {loadingHistory ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+              <p className="text-gray-600">טוען היסטוריה...</p>
+            </CardContent>
+          </Card>
+        ) : scannedDocs.length === 0 ? (
+          <Card className="bg-gray-50">
+            <CardContent className="py-12 text-center">
+              <FileCheck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                אין עדיין היסטוריה
+              </h3>
+              <p className="text-gray-500 text-sm">
+                העלה את הדוח הראשון שלך כדי להתחיל!
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {scannedDocs.map((doc) => (
+              <DocumentHistoryCard key={doc.id} document={doc} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+// ============================================================================
+// Document History Card Component
+// ============================================================================
+
+interface DocumentHistoryCardProps {
+  document: ScannedDocument;
+}
+
+function DocumentHistoryCard({ document }: DocumentHistoryCardProps) {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return {
+          icon: CheckCircle,
+          text: 'הושלם',
+          className: 'bg-green-100 text-green-800',
+        };
+      case 'processing':
+        return {
+          icon: Loader2,
+          text: 'מעבד...',
+          className: 'bg-blue-100 text-blue-800',
+        };
+      case 'failed':
+        return {
+          icon: XCircle,
+          text: 'נכשל',
+          className: 'bg-red-100 text-red-800',
+        };
+      default:
+        return {
+          icon: Clock,
+          text: 'ממתין',
+          className: 'bg-yellow-100 text-yellow-800',
+        };
+    }
+  };
+
+  const getDocumentTypeLabel = (type: string) => {
+    const typeConfig = documentTypes.find((dt) => dt.type === type);
+    return typeConfig?.title || type;
+  };
+
+  const getActionLink = (doc: ScannedDocument) => {
+    if (doc.status !== 'completed') return null;
+
+    // Different links based on document type
+    switch (doc.document_type) {
+      case 'bank':
+      case 'credit':
+        return { href: '/dashboard/expenses/pending', text: 'לתנועות ממתינות' };
+      case 'loan':
+      case 'mortgage':
+        return { href: '/dashboard/loans', text: 'לדף הלוואות' };
+      case 'pension':
+        return { href: '/dashboard/pensions', text: 'לדף פנסיה' };
+      case 'insurance':
+        return { href: '/dashboard/insurance', text: 'לדף ביטוחים' };
+      case 'payslip':
+        return { href: '/dashboard/income', text: 'לדף הכנסות' };
+      default:
+        return { href: '/dashboard', text: 'לדשבורד' };
+    }
+  };
+
+  const statusBadge = getStatusBadge(document.status);
+  const StatusIcon = statusBadge.icon;
+  const actionLink = getActionLink(document);
+
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-4">
+          {/* Left: Document Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <h3 className="font-semibold text-gray-900 truncate">
+                {document.file_name}
+              </h3>
+              <Badge variant="outline" className="flex-shrink-0">
+                {getDocumentTypeLabel(document.document_type)}
+              </Badge>
+            </div>
+
+            <div className="flex items-center gap-4 text-sm text-gray-500">
+              <span className="flex items-center gap-1">
+                <Calendar className="w-4 h-4" />
+                {new Date(document.created_at).toLocaleDateString('he-IL', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+
+              {document.status === 'completed' && (
+                <>
+                  <span className="w-1 h-1 bg-gray-400 rounded-full" />
+                  <span>
+                    {document.transactions_created || 0} תנועות נוצרו
+                  </span>
+                </>
+              )}
+            </div>
+
+            {document.error_message && (
+              <p className="mt-2 text-sm text-red-600">
+                ⚠️ {document.error_message}
+              </p>
+            )}
+          </div>
+
+          {/* Right: Status & Action */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <Badge className={statusBadge.className}>
+              <StatusIcon
+                className={`w-4 h-4 ml-1 ${
+                  document.status === 'processing' ? 'animate-spin' : ''
+                }`}
+              />
+              {statusBadge.text}
+            </Badge>
+
+            {actionLink && (
+              <Link href={actionLink.href}>
+                <Button size="sm" variant="outline">
+                  {actionLink.text}
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
