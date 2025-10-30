@@ -23,19 +23,33 @@ export async function POST(request: Request) {
 
     console.log('📝 Updating profile for user:', user.id, body)
 
-    // עדכון פרופיל
-    const { data: updatedUser, error: updateError } = await supabase
+    // עדכון פרופיל בסיסי ב-users
+    const { error: usersUpdateError } = await supabase
       .from('users')
       .update({
         name,
         phone,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id)
+
+    if (usersUpdateError) {
+      console.error('❌ Error updating users table:', usersUpdateError)
+    }
+
+    // עדכון פרטים אישיים ב-user_financial_profile
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('user_financial_profile')
+      .upsert({
+        user_id: user.id,
         birth_date,
         city,
         marital_status,
         children_count,
         updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id'
       })
-      .eq('id', user.id)
       .select()
       .single()
 

@@ -135,9 +135,10 @@ function ProfileTab() {
         return;
       }
 
+      // טעינת נתונים בסיסיים מטבלת users
       const { data: profile, error: profileError } = await supabase
         .from('users')
-        .select('*')
+        .select('name, phone, email')
         .eq('id', user.id)
         .single();
 
@@ -148,17 +149,25 @@ function ProfileTab() {
         return;
       }
 
+      // טעינת פרטים אישיים מטבלת user_financial_profile
+      const { data: financialProfile } = await supabase
+        .from('user_financial_profile')
+        .select('birth_date, city, marital_status, children_count')
+        .eq('user_id', user.id)
+        .single();
+
       // Type assertion for Supabase data
       const userData = profile as any;
+      const finData = financialProfile as any;
       
-      setUserData(userData);
+      setUserData({ ...userData, ...finData });
       setFormData({
         name: userData.name || '',
         phone: userData.phone || '',
-        birth_date: userData.birth_date || '',
-        city: userData.city || '',
-        marital_status: userData.marital_status || '',
-        children_count: userData.children_count || 0,
+        birth_date: finData?.birth_date || '',
+        city: finData?.city || '',
+        marital_status: finData?.marital_status || '',
+        children_count: finData?.children_count || 0,
       });
       setLoading(false);
     } catch (err) {
