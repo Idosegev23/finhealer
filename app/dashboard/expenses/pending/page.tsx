@@ -9,12 +9,14 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
 import { EditExpenseModal } from '@/components/expenses/EditExpenseModal';
 
-interface PendingExpense {
+interface PendingTransaction {
   id: string;
+  type: 'income' | 'expense';
   amount: number;
   vendor: string;
   date: string;
-  expense_category: string;
+  category: string;
+  expense_category?: string;
   expense_type: string;
   payment_method: string;
   notes: string;
@@ -25,10 +27,10 @@ interface PendingExpense {
 export default function PendingExpensesPage() {
   const router = useRouter();
   const { addToast } = useToast();
-  const [expenses, setExpenses] = useState<PendingExpense[]>([]);
+  const [expenses, setExpenses] = useState<PendingTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editingExpense, setEditingExpense] = useState<PendingExpense | null>(null);
+  const [editingExpense, setEditingExpense] = useState<PendingTransaction | null>(null);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -123,7 +125,7 @@ export default function PendingExpensesPage() {
     }
   };
 
-  const handleUpdate = async (expenseId: string, updates: Partial<PendingExpense>) => {
+  const handleUpdate = async (expenseId: string, updates: Partial<PendingTransaction>) => {
     try {
       const response = await fetch('/api/expenses/update', {
         method: 'PUT',
@@ -204,11 +206,11 @@ export default function PendingExpensesPage() {
   return (
     <div className="container mx-auto p-6" dir="rtl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">הוצאות ממתינות לאישור</h1>
+        <h1 className="text-3xl font-bold mb-2">תנועות ממתינות לאישור</h1>
         <p className="text-gray-600">
           {expenses.length === 0
-            ? 'אין הוצאות ממתינות כרגע'
-            : `${expenses.length} הוצאות ממתינות לבדיקתך`}
+            ? 'אין תנועות ממתינות כרגע'
+            : `${expenses.length} תנועות ממתינות לבדיקתך (${expenses.filter(e => e.type === 'income').length} הכנסות, ${expenses.filter(e => e.type === 'expense').length} הוצאות)`}
         </p>
       </div>
 
@@ -216,11 +218,11 @@ export default function PendingExpensesPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center p-12">
             <Package className="w-16 h-16 text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">אין הוצאות ממתינות</h3>
+            <h3 className="text-xl font-semibold mb-2">אין תנועות ממתינות</h3>
             <p className="text-gray-600 mb-4 text-center">
-              כל ההוצאות שלך אושרו! העלה דוח חדש כדי לראות הוצאות נוספות.
+              כל התנועות שלך אושרו! העלה דוח חדש כדי לראות תנועות נוספות.
             </p>
-            <Button onClick={() => router.push('/dashboard/data/expenses')}>
+            <Button onClick={() => router.push('/dashboard/scan-center')}>
               העלאת דוח חדש
             </Button>
           </CardContent>
@@ -230,6 +232,7 @@ export default function PendingExpensesPage() {
           {expenses.map((expense) => {
             const confidenceBadge = getConfidenceBadge(expense.confidence_score || 0);
             const isProcessing = processingIds.has(expense.id);
+            const isIncome = expense.type === 'income';
 
             return (
               <Card key={expense.id} className="hover:shadow-lg transition-shadow">
@@ -244,8 +247,8 @@ export default function PendingExpensesPage() {
                       </CardDescription>
                     </div>
                     <div className="text-left">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {formatCurrency(expense.amount)}
+                      <div className={`text-2xl font-bold ${isIncome ? 'text-green-600' : 'text-blue-600'}`}>
+                        {isIncome ? '+' : ''}{formatCurrency(expense.amount)}
                       </div>
                     </div>
                   </div>
@@ -255,8 +258,15 @@ export default function PendingExpensesPage() {
                   <div className="space-y-3">
                     {/* Tags */}
                     <div className="flex flex-wrap gap-2">
+                      {/* Type Badge */}
+                      <Badge variant={isIncome ? "default" : "outline"} className={isIncome ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}>
+                        {isIncome ? '💰 הכנסה' : '💳 הוצאה'}
+                      </Badge>
                       {expense.expense_category && (
                         <Badge variant="outline">{expense.expense_category}</Badge>
+                      )}
+                      {expense.category && expense.category !== expense.expense_category && (
+                        <Badge variant="outline">{expense.category}</Badge>
                       )}
                       {expense.expense_type && (
                         <Badge variant="secondary">{expense.expense_type}</Badge>
@@ -325,7 +335,10 @@ export default function PendingExpensesPage() {
       {/* Edit Modal */}
       {editingExpense && (
         <EditExpenseModal
-          expense={editingExpense}
+          expense={{
+            ...editingExpense,
+            expense_category: editingExpense.expense_category || editingExpense.category || '',
+          }}
           onClose={() => setEditingExpense(null)}
           onSave={(updates) => handleUpdate(editingExpense.id, updates)}
         />

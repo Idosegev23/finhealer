@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 /**
  * API Route: GET /api/expenses/pending
- * מטרה: שליפת הוצאות ממתינות לאישור
+ * מטרה: שליפת תנועות ממתינות לאישור (הכנסות + הוצאות)
  */
 export async function GET() {
   try {
@@ -15,31 +15,38 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // שליפת הוצאות ממתינות
-    const { data: expenses, error } = await supabase
+    // שליפת כל התנועות הממתינות (הכנסות + הוצאות)
+    const { data: transactions, error } = await supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
-      .eq('type', 'expense')
       .eq('status', 'proposed')
       .eq('source', 'ocr')
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching pending expenses:', error);
+      console.error('Error fetching pending transactions:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch expenses' },
+        { error: 'Failed to fetch transactions' },
         { status: 500 }
       );
     }
 
+    // הפרדה לפי סוג
+    const income = (transactions as any[] || []).filter((t: any) => t.type === 'income');
+    const expenses = (transactions as any[] || []).filter((t: any) => t.type === 'expense');
+
     return NextResponse.json({
       success: true,
-      expenses: expenses || [],
-      count: expenses?.length || 0,
+      expenses: transactions || [], // Keep 'expenses' for backward compatibility
+      income,
+      transactions: transactions || [],
+      count: transactions?.length || 0,
+      incomeCount: income.length,
+      expensesCount: expenses.length,
     });
   } catch (error: any) {
-    console.error('Pending expenses error:', error);
+    console.error('Pending transactions error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
