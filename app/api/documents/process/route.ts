@@ -673,14 +673,14 @@ async function sendWhatsAppNotification(userId: string, itemsCount: number, docT
     
     const { data: userData } = await supabase
       .from('users')
-      .select('phone_number, name')
+      .select('phone, name')
       .eq('id', userId)
       .single();
 
     const user = userData as any;
 
-    if (!user?.phone_number) {
-      console.log('No phone number found for user');
+    if (!user?.phone) {
+      console.log('⚠️ No phone number found for user - user needs to update profile');
       return;
     }
 
@@ -705,11 +705,11 @@ async function sendWhatsAppNotification(userId: string, itemsCount: number, docT
     }
     
     await greenAPI.sendMessage({
-      phoneNumber: user.phone_number,
+      phoneNumber: user.phone,
       message,
     });
 
-    console.log(`✅ WhatsApp sent to ${user.phone_number}`);
+    console.log(`✅ WhatsApp sent to ${user.phone}`);
   } catch (error) {
     console.error('Failed to send WhatsApp:', error);
   }
