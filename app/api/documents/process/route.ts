@@ -426,12 +426,33 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
       const transactionType = tx.type || 'expense';
       let paymentMethod = tx.payment_method;
       
-      if (!paymentMethod) {
+      // Translate Hebrew payment methods to English
+      const paymentMethodMap: Record<string, string> = {
+        'העברה בנקאית': 'bank_transfer',
+        'כרטיס אשראי': 'credit_card',
+        'כרטיס חיוב': 'debit_card',
+        'מזומן': 'cash',
+        'המחאה': 'check',
+        'הוראת קבע': 'standing_order',
+        'חיוב ישיר': 'direct_debit',
+        'ארנק דיגיטלי': 'digital_wallet',
+        'ביט': 'bit',
+        'פייבוקס': 'paybox',
+        'paypal': 'paypal',
+        'אחר': 'other',
+      };
+      
+      // Translate if Hebrew
+      if (paymentMethod && paymentMethodMap[paymentMethod]) {
+        paymentMethod = paymentMethodMap[paymentMethod];
+      }
+      
+      if (!paymentMethod || !['cash', 'credit_card', 'debit_card', 'bank_transfer', 'digital_wallet', 'check', 'paypal', 'bit', 'paybox', 'direct_debit', 'standing_order', 'other'].includes(paymentMethod)) {
         // Default payment methods by transaction type
         if (transactionType === 'income') {
           paymentMethod = 'bank_transfer'; // Income usually comes via bank transfer
         } else if (tx.category === 'loan_payment') {
-          paymentMethod = 'bank_transfer'; // Loan payments usually direct debit
+          paymentMethod = 'direct_debit'; // Loan payments usually direct debit
         } else {
           paymentMethod = 'credit_card'; // Default for expenses
         }
