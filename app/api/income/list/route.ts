@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'income')
-      .in('status', ['approved', 'proposed']) // גם מאושרות וגם ממתינות
+      .in('status', ['confirmed', 'proposed']) // מאושרות (confirmed) וממתינות (proposed)
       .or('has_details.is.null,has_details.eq.false')
       .gte('date', startDateStr)
       .order('date', { ascending: false })

@@ -375,11 +375,11 @@ function CategoryGroup({ title, categories, transactions, type }: CategoryGroupP
                     <ChevronDown className="h-5 w-5 text-gray-400" />
                   )}
                   <div className="text-right">
-                    <p className="font-medium text-gray-900">{category}</p>
-                    <p className="text-sm text-gray-500">{items.length} תנועות</p>
+                <p className="font-medium text-gray-900">{category}</p>
+                <p className="text-sm text-gray-500">{items.length} תנועות</p>
                   </div>
-                </div>
-                <p className="font-semibold text-gray-900">₪{total.toLocaleString()}</p>
+              </div>
+              <p className="font-semibold text-gray-900">₪{total.toLocaleString()}</p>
               </button>
 
               {isExpanded && (

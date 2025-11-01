@@ -82,7 +82,7 @@ export default function LoansPage() {
   if (loading) {
     return (
       <DashboardWrapper>
-        <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       </DashboardWrapper>
@@ -94,20 +94,20 @@ export default function LoansPage() {
       <div className="min-h-screen bg-gray-50 p-6" dir="rtl">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
-          <div>
+            <div>
             <h1 className="text-3xl font-bold text-gray-900">💳 הלוואות</h1>
             <p className="text-gray-600 mt-2">מעקב והיסטוריה של כל ההלוואות שלך</p>
-          </div>
-          <Button
+            </div>
+              <Button 
             onClick={() => window.location.href = '/dashboard/loans/add'}
             className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
+              >
             <Plus className="w-5 h-5 ml-2" />
-            הוסף הלוואה
-          </Button>
+                הוסף הלוואה
+              </Button>
         </div>
 
-        {loans.length === 0 ? (
+          {loans.length === 0 ? (
           <Card className="bg-white">
             <CardContent className="p-12 text-center">
               <CreditCard className="w-16 h-16 mx-auto mb-4 text-gray-400" />
@@ -115,7 +115,7 @@ export default function LoansPage() {
               <p className="text-gray-600 mb-6">
                 העלה דוח בנק או הוסף הלוואה ידנית כדי להתחיל לעקוב אחרי ההלוואות שלך
               </p>
-              <Button
+              <Button 
                 onClick={() => window.location.href = '/dashboard/scan'}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
@@ -123,8 +123,8 @@ export default function LoansPage() {
               </Button>
             </CardContent>
           </Card>
-        ) : (
-          <>
+          ) : (
+            <>
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
@@ -155,7 +155,7 @@ export default function LoansPage() {
                   </div>
                   <div className="text-3xl font-bold">
                     {totalDebt > 0 ? `₪${totalDebt.toLocaleString()}` : 'לא ידוע'}
-                  </div>
+                            </div>
                 </CardContent>
               </Card>
 
@@ -164,13 +164,13 @@ export default function LoansPage() {
                   <div className="flex items-center justify-between mb-2">
                     <Clock className="w-8 h-8 opacity-80" />
                     <span className="text-sm opacity-80">ריבית ממוצעת</span>
-                  </div>
+                              </div>
                   <div className="text-3xl font-bold">
                     {averageInterest > 0 ? `${averageInterest.toFixed(1)}%` : 'לא ידוע'}
-                  </div>
+                              </div>
                 </CardContent>
               </Card>
-            </div>
+                            </div>
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -219,7 +219,7 @@ export default function LoansPage() {
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
-            </div>
+              </div>
 
             {/* Loans List */}
             <Card className="bg-white">
@@ -246,8 +246,8 @@ export default function LoansPage() {
                               {loan.loan_type === 'personal' ? 'אישית' : 
                                loan.loan_type === 'mortgage' ? 'משכנתא' :
                                loan.loan_type === 'car' ? 'רכב' : loan.loan_type}
-                            </span>
-                          </div>
+                          </span>
+                        </div>
                           <div className="mt-2 flex gap-6 text-sm text-gray-600">
                             <span>תשלום חודשי: <strong className="text-gray-900">₪{loan.monthly_payment.toLocaleString()}</strong></span>
                             {loan.current_balance && (
@@ -256,7 +256,7 @@ export default function LoansPage() {
                             {loan.interest_rate && (
                               <span>ריבית: <strong className="text-gray-900">{loan.interest_rate}%</strong></span>
                             )}
-                          </div>
+                      </div>
                         </div>
                         {expandedLoan === loan.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                       </div>
@@ -271,7 +271,7 @@ export default function LoansPage() {
                       )}
                     </div>
                   ))}
-                </div>
+              </div>
               </CardContent>
             </Card>
           </>
