@@ -461,8 +461,16 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         }
       }
 
-      // Determine payment method based on transaction type
-      const transactionType = tx.type || 'expense';
+      // Validate and normalize transaction type
+      // MUST be either "income" or "expense"
+      let transactionType = tx.type;
+      
+      // Fix invalid type values from AI
+      if (!transactionType || !['income', 'expense'].includes(transactionType)) {
+        // If AI returned Hebrew values like "תשלום", "קרדיט", "הוראת קבע" - default to expense
+        transactionType = 'expense';
+      }
+      
       let paymentMethod = tx.payment_method;
       
       // Translate Hebrew payment methods to English
@@ -949,20 +957,35 @@ async function updateUserFinancialProfile(supabase: any, result: any, userId: st
  */
 async function saveLoanPaymentsAsLoans(supabase: any, result: any, userId: string): Promise<number> {
   try {
-    if (!result.transactions || !result.transactions.loan_payments) {
-      return 0;
-    }
-
-    const loanPayments = result.transactions.loan_payments;
+    // Try to get loan_payments from dedicated array first
+    let loanPayments = result.transactions?.loan_payments || [];
+    
+    // Fallback: if no loan_payments array, search in expenses with category "loan_payment"
     if (!Array.isArray(loanPayments) || loanPayments.length === 0) {
+      const expenses = result.transactions?.expenses || [];
+      loanPayments = expenses.filter((exp: any) => 
+        exp.category === 'loan_payment' || 
+        exp.category?.includes('הלוואה') ||
+        exp.expense_category === 'loan_payment'
+      );
+    }
+    
+    if (!Array.isArray(loanPayments) || loanPayments.length === 0) {
+      console.log('ℹ️  No loan payments found');
       return 0;
     }
+    
+    console.log(`💳 Found ${loanPayments.length} loan payment(s), creating loan records...`);
 
+    // Get bank name from report (default lender for most loans in bank statements)
+    const reportBankName = result.report_info?.bank_name || '';
+    
     // Group loan payments by lender/provider to identify unique loans
     const loansByProvider: Record<string, any[]> = {};
     
     loanPayments.forEach((payment: any) => {
-      const provider = payment.loan_provider || payment.vendor || 'לא צוין';
+      // Prefer lender_name from payment, then loan_provider, then vendor, fallback to report's bank
+      const provider = payment.lender_name || payment.loan_provider || payment.vendor || reportBankName || 'לא צוין';
       if (!loansByProvider[provider]) {
         loansByProvider[provider] = [];
       }
@@ -986,6 +1009,9 @@ async function saveLoanPaymentsAsLoans(supabase: any, result: any, userId: strin
         // Create new loan record
         const payment = payments[0]; // Use first payment as reference
         const monthlyPayment = parseFloat(payment.amount || 0);
+        
+        // Calculate total monthly payment if multiple payments
+        const totalMonthlyPayment = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
 
         const { error: insertError } = await supabase
           .from('loans')
@@ -993,19 +1019,19 @@ async function saveLoanPaymentsAsLoans(supabase: any, result: any, userId: strin
             user_id: userId,
             loan_type: 'personal',
             lender_name: provider,
-            monthly_payment: monthlyPayment,
-            active: true,
+            original_amount: 0, // Unknown from bank statement
+            current_balance: payment.principal ? parseFloat(payment.principal) : 0,
+            monthly_payment: totalMonthlyPayment,
             interest_rate: payment.interest_rate ? parseFloat(payment.interest_rate) : null,
-            current_balance: payment.principal ? parseFloat(payment.principal) : null,
-            metadata: {
-              identified_from: 'bank_statement',
-              payment_count: payments.length,
-            },
+            active: true,
+            notes: `זוהה אוטומטית מדוח בנק - ${payments.length} תשלום(ים)`,
           });
 
-        if (!insertError) {
+        if (insertError) {
+          console.error(`❌ Failed to insert loan for ${provider}:`, insertError);
+        } else {
           loansCreated++;
-          console.log(`💳 Created loan record for ${provider} (${monthlyPayment} ₪/month)`);
+          console.log(`💳 Created loan record for ${provider} (${totalMonthlyPayment} ₪/month)`);
         }
       } else {
         console.log(`ℹ️  Loan already exists for ${provider}`);

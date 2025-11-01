@@ -119,16 +119,25 @@ ${categoriesGuide}
 ---
 
 ## **פורמט פלט - JSON בלבד:**
+
+🚨 **שדה "type" - חשוב מאוד!** 🚨
+השדה type חייב להיות **רק אחד מאלה:**
+- "expense" - לכל החיובים (תשלום, קרדיט, הוראת קבע)
+- "income" - לזיכויים/החזרים בלבד
+
+אל תשתמש ב"תשלום", "קרדיט", "הוראת קבע" בשדה type!
+
+דוגמת JSON:
 {
-  "report_info": { ... },
-  "account_info": { ... },
+  "report_info": { },
+  "account_info": { },
   "transactions": [
     {
       "date": "2025-08-21",
       "vendor": "שפירא גז בע'מ",
       "amount": 460.00,
       "expense_category": "גז",
-      "type": "תשלום",
+      "type": "expense",
       "installment": "תשלום 1 מ-2",
       "payment_number": 1,
       "total_payments": 2,
