@@ -284,8 +284,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     const response = await openai.responses.create({
       model: 'gpt-5',
       input: prompt,
-      reasoning: { effort: 'high' }, // High reasoning for complex financial analysis
-      thinking: true, // Enable thinking/reasoning visibility
+      reasoning: { effort: 'high' }, // High reasoning for complex financial documents
       max_output_tokens: 16000,
     });
 
