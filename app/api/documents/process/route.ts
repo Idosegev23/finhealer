@@ -278,8 +278,8 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText, expenseCategories);
     
-    // Analyze with GPT-5 (high reasoning + thinking for complex financial documents)
-    console.log(`🤖 Analyzing with GPT-5 (high reasoning + thinking)...`);
+    // Analyze with GPT-5 (high reasoning for complex financial documents)
+    console.log(`🤖 Analyzing with GPT-5 (high reasoning)...`);
     
     const response = await openai.responses.create({
       model: 'gpt-5',
@@ -288,43 +288,48 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       max_output_tokens: 16000,
     });
 
-    console.log(`✅ GPT-5 analysis complete (with reasoning)`);
+    console.log(`✅ GPT-5 analysis complete`);
     
     const content = response.output_text || '{}';
     
-    // Parse JSON with robust error handling
-    let jsonStr = content;
-    
-    // Extract JSON from code blocks or raw text
-    if (content.includes('```')) {
-      const match = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-      if (match) jsonStr = match[1];
-    } else {
-      const match = content.match(/\{[\s\S]*\}/);
-      if (match) jsonStr = match[0];
-    }
-    
-    // Clean up common JSON issues
-    jsonStr = jsonStr
-      .replace(/,\s*}/g, '}')           // Remove trailing commas in objects
-      .replace(/,\s*\]/g, ']')          // Remove trailing commas in arrays
-      .replace(/\n/g, ' ')              // Replace newlines with spaces
-      .replace(/\r/g, '')               // Remove carriage returns
-      .replace(/\t/g, ' ')              // Replace tabs with spaces
-      .replace(/\s+/g, ' ')             // Normalize whitespace
-      .trim();
-    
-    let result;
+    // Parse JSON with improved error handling
     try {
-      result = JSON.parse(jsonStr);
+      // First, try direct parsing
+      const result = JSON.parse(content);
+      return result;
     } catch (parseError: any) {
       console.error('❌ JSON Parse Error:', parseError.message);
-      console.error('JSON String (first 500 chars):', jsonStr.substring(0, 500));
-      console.error('JSON String (around error):', jsonStr.substring(Math.max(0, parseError.message.match(/\d+/)?.[0] - 100 || 0), parseError.message.match(/\d+/)?.[0] + 100 || 500));
-      throw new Error(`Invalid JSON response from AI: ${parseError.message}`);
+      console.error('JSON String (first 1000 chars):', content.substring(0, 1000));
+      
+      // Try to extract JSON if it's wrapped in markdown or has extra text
+      let jsonStr = content;
+      
+      // Remove markdown code blocks
+      if (content.includes('```')) {
+        const match = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (match) jsonStr = match[1];
+      } else {
+        // Extract JSON object from text
+        const match = content.match(/\{[\s\S]*\}/);
+        if (match) jsonStr = match[0];
+      }
+      
+      // Clean up common JSON issues
+      jsonStr = jsonStr
+        .replace(/,\s*}/g, '}')     // Remove trailing commas in objects
+        .replace(/,\s*\]/g, ']')    // Remove trailing commas in arrays
+        .trim();
+      
+      // Try parsing the cleaned version
+      try {
+        const result = JSON.parse(jsonStr);
+        console.log('✅ Successfully parsed JSON after cleanup');
+        return result;
+      } catch (secondError) {
+        console.error('❌ Still failed after cleanup:', (secondError as Error).message);
+        throw new Error(`Invalid JSON response from AI: ${parseError.message}`);
+      }
     }
-
-    return result;
   } catch (error: any) {
     console.error('❌ PDF analysis error:', error);
     console.error('Error details:', {
@@ -346,7 +351,7 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
     // Get appropriate prompt (images are usually credit/bank/receipt)
     const prompt = getPromptForDocumentType(documentType, '');
     
-    // Note: GPT-5 doesn't support vision yet, so we still use GPT-4o for images
+    // GPT-4o Vision with JSON mode
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -360,25 +365,36 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
       ],
       temperature: 0.1,
       max_tokens: 4000,
+      response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
     });
 
     console.log(`✅ GPT-4o Vision analysis complete`);
     
     const content = response.choices[0].message.content || '{}';
     
-    // Parse JSON
-    let jsonStr = content;
-    if (content.includes('```')) {
-      const match = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-      if (match) jsonStr = match[1];
-    } else {
-      const match = content.match(/\{[\s\S]*\}/);
-      if (match) jsonStr = match[0];
+    // With response_format: json_object, GPT-4o returns valid JSON directly
+    try {
+      const result = JSON.parse(content);
+      return result;
+    } catch (parseError: any) {
+      console.error('❌ JSON Parse Error:', parseError.message);
+      console.error('JSON String (first 500 chars):', content.substring(0, 500));
+      
+      // Try to extract JSON if it's wrapped in markdown
+      let jsonStr = content;
+      if (content.includes('```')) {
+        const match = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (match) jsonStr = match[1];
+      }
+      
+      // Last resort
+      try {
+        const result = JSON.parse(jsonStr);
+        return result;
+      } catch (secondError) {
+        throw new Error(`Invalid JSON response from AI: ${parseError.message}`);
+      }
     }
-    
-    const result = JSON.parse(jsonStr);
-    
-    return result;
   } catch (error: any) {
     console.error('❌ Image analysis error:', error);
     throw new Error(`Failed to analyze image: ${error?.message || 'Unknown error'}`);
