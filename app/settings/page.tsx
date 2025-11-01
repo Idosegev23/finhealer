@@ -958,7 +958,7 @@ function PrivacyTab() {
               ) : (
                 'מחק חשבון לצמיתות'
               )}
-            </button>
+          </button>
           </div>
         </div>
       </div>

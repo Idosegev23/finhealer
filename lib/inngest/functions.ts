@@ -169,7 +169,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     const { getDocumentProxy, extractText } = await import('unpdf');
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
     const { text } = await extractText(pdf, { mergePages: true });
-    
+
     console.log(`✅ Text extracted: ${text.length} characters`);
 
     const response = await openai.chat.completions.create({

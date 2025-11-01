@@ -160,10 +160,10 @@ export default function CashFlowReportPage() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">תזרים מזומנים 💹</h1>
-          <p className="mt-2 text-gray-600">
+        <h1 className="text-3xl font-bold text-gray-900">תזרים מזומנים 💹</h1>
+        <p className="mt-2 text-gray-600">
             הכנסות מול הוצאות - תזרים חודשי ב-6 החודשים האחרונים
-          </p>
+        </p>
         </div>
         <Link href="/dashboard/cash-flow">
           <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
