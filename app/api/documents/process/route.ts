@@ -278,19 +278,20 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText, expenseCategories);
     
-    // Analyze with GPT-4o (much faster than GPT-5!)
-    console.log(`🤖 Analyzing with GPT-4o (${fileType})...`);
+    // Analyze with GPT-5 (high reasoning + thinking for complex financial documents)
+    console.log(`🤖 Analyzing with GPT-5 (high reasoning + thinking)...`);
     
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
-      max_tokens: 16000,
+    const response = await openai.responses.create({
+      model: 'gpt-5',
+      input: prompt,
+      reasoning: { effort: 'high' }, // High reasoning for complex financial analysis
+      thinking: true, // Enable thinking/reasoning visibility
+      max_output_tokens: 16000,
     });
 
-    console.log(`✅ GPT-4o analysis complete`);
+    console.log(`✅ GPT-5 analysis complete (with reasoning)`);
     
-    const content = response.choices[0].message.content || '{}';
+    const content = response.output_text || '{}';
     
     // Parse JSON
     let jsonStr = content;
@@ -326,7 +327,7 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
     // Get appropriate prompt (images are usually credit/bank/receipt)
     const prompt = getPromptForDocumentType(documentType, '');
     
-    // Use GPT-4o Vision
+    // Note: GPT-5 doesn't support vision yet, so we still use GPT-4o for images
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -941,7 +942,7 @@ async function saveLoanPaymentsAsLoans(supabase: any, result: any, userId: strin
         .from('loans')
         .select('*')
         .eq('user_id', userId)
-        .eq('lender', provider)
+        .eq('lender_name', provider)
         .eq('active', true)
         .single();
 
@@ -955,9 +956,9 @@ async function saveLoanPaymentsAsLoans(supabase: any, result: any, userId: strin
           .insert({
             user_id: userId,
             loan_type: 'personal',
-            lender: provider,
+            lender_name: provider,
             monthly_payment: monthlyPayment,
-            status: 'active',
+            active: true,
             interest_rate: payment.interest_rate ? parseFloat(payment.interest_rate) : null,
             current_balance: payment.principal ? parseFloat(payment.principal) : null,
             metadata: {
