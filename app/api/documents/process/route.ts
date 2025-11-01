@@ -292,8 +292,10 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     
     const content = response.output_text || '{}';
     
-    // Parse JSON
+    // Parse JSON with robust error handling
     let jsonStr = content;
+    
+    // Extract JSON from code blocks or raw text
     if (content.includes('```')) {
       const match = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
       if (match) jsonStr = match[1];
@@ -302,7 +304,25 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       if (match) jsonStr = match[0];
     }
     
-    const result = JSON.parse(jsonStr);
+    // Clean up common JSON issues
+    jsonStr = jsonStr
+      .replace(/,\s*}/g, '}')           // Remove trailing commas in objects
+      .replace(/,\s*\]/g, ']')          // Remove trailing commas in arrays
+      .replace(/\n/g, ' ')              // Replace newlines with spaces
+      .replace(/\r/g, '')               // Remove carriage returns
+      .replace(/\t/g, ' ')              // Replace tabs with spaces
+      .replace(/\s+/g, ' ')             // Normalize whitespace
+      .trim();
+    
+    let result;
+    try {
+      result = JSON.parse(jsonStr);
+    } catch (parseError: any) {
+      console.error('❌ JSON Parse Error:', parseError.message);
+      console.error('JSON String (first 500 chars):', jsonStr.substring(0, 500));
+      console.error('JSON String (around error):', jsonStr.substring(Math.max(0, parseError.message.match(/\d+/)?.[0] - 100 || 0), parseError.message.match(/\d+/)?.[0] + 100 || 500));
+      throw new Error(`Invalid JSON response from AI: ${parseError.message}`);
+    }
 
     return result;
   } catch (error: any) {
