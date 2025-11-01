@@ -204,7 +204,24 @@ ${special.map(c => `  • ${c.name} (${c.category_group})`).join('\n')}
 - אם כתוב "-500" → זו הוצאה של 500 (amount: 500, type: "expense")
 - אם כתוב "500" זכות → זו הכנסה של 500 (amount: 500, type: "income")
 
-### **3. תזרים (Account Info):**
+### **3. אמצעי תשלום (payment_method) - חובה באנגלית!**
+**🚨 תמיד השתמש באנגלית - לא בעברית! 🚨**
+
+אפשרויות:
+- **bank_transfer** (העברה בנקאית)
+- **credit_card** (כרטיס אשראי)
+- **debit_card** (כרטיס חיוב)
+- **direct_debit** (חיוב ישיר / הוראת קבע)
+- **standing_order** (הוראת קבע)
+- **cash** (מזומן)
+- **check** (המחאה)
+- **bit** (ביט)
+- **paybox** (פייבוקס)
+- **paypal** (פייפאל)
+- **digital_wallet** (ארנק דיגיטלי)
+- **other** (אחר)
+
+### **4. תזרים (Account Info):**
 - חפש "יתרה", "יתרת חשבון", "סגירה", "balance"
 - חפש "מסגרת אשראי", "overdraft", "מסגרת"
 - חפש "סכום זמין", "available", "זמין"
@@ -289,7 +306,7 @@ ${categoriesGuide}
         "balance_before": 5000.00,
         "balance_after": 15000.00,
         "category": "הכנסה מעבודה",
-        "payment_method": "העברה בנקאית",
+        "payment_method": "bank_transfer",
         "notes": "הכנסה - יתרה עלתה מ-5000 ל-15000"
       }
     ],
@@ -303,7 +320,7 @@ ${categoriesGuide}
         "balance_after": 14650.00,
         "category": "סופרמרקט",
         "expense_type": "variable",
-        "payment_method": "כרטיס אשראי",
+        "payment_method": "credit_card",
         "notes": "הוצאה - יתרה ירדה מ-15000 ל-14650"
       }
     ],
@@ -318,7 +335,7 @@ ${categoriesGuide}
         "principal": 1500.00,
         "interest": 500.00,
         "loan_provider": "בנק לאומי",
-        "payment_method": "הוראת קבע",
+        "payment_method": "direct_debit",
         "notes": "תשלום הלוואה"
       }
     ],
@@ -331,7 +348,7 @@ ${categoriesGuide}
         "balance_before": 12650.00,
         "balance_after": 11650.00,
         "to_account": "פיקדון",
-        "payment_method": "העברה בנקאית",
+        "payment_method": "bank_transfer",
         "notes": "העברה לחיסכון"
       }
     ]
