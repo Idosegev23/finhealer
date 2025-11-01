@@ -278,13 +278,13 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText, expenseCategories);
     
-    // Analyze with GPT-5 (high reasoning for complex financial documents)
-    console.log(`🤖 Analyzing with GPT-5 (high reasoning)...`);
+    // Analyze with GPT-5 (medium reasoning - balance between speed and accuracy)
+    console.log(`🤖 Analyzing with GPT-5 (medium reasoning)...`);
     
     const response = await openai.responses.create({
       model: 'gpt-5',
       input: prompt,
-      reasoning: { effort: 'high' }, // High reasoning for complex financial documents
+      reasoning: { effort: 'medium' }, // Medium reasoning - faster but still intelligent
       max_output_tokens: 16000,
     });
 
