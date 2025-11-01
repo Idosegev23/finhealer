@@ -278,19 +278,20 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText, expenseCategories);
     
-    // Analyze with GPT-5 (medium reasoning - balance between speed and accuracy)
-    console.log(`🤖 Analyzing with GPT-5 (medium reasoning)...`);
+    // Analyze with GPT-4o (with JSON mode for guaranteed valid JSON)
+    console.log(`🤖 Analyzing with GPT-4o (JSON mode)...`);
     
-    const response = await openai.responses.create({
-      model: 'gpt-5',
-      input: prompt,
-      reasoning: { effort: 'medium' }, // Medium reasoning - faster but still intelligent
-      max_output_tokens: 16000,
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 16000,
+      response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
     });
 
-    console.log(`✅ GPT-5 analysis complete`);
+    console.log(`✅ GPT-4o analysis complete`);
     
-    const content = response.output_text || '{}';
+    const content = response.choices[0]?.message?.content || '{}';
     
     // Parse JSON with improved error handling
     try {
