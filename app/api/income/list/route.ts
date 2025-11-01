@@ -12,48 +12,48 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const month = searchParams.get('month') // YYYY-MM
+    const months = parseInt(searchParams.get('months') || '6') // כמה חודשים אחורה
 
-    // שליפת הכנסות מפרופיל פיננסי
-    const { data: profile } = await supabase
-      .from('user_financial_profile')
-      .select('total_monthly_income')
+    // חישוב תאריך התחלה (X חודשים אחורה)
+    const startDate = new Date()
+    startDate.setMonth(startDate.getMonth() - months)
+    const startDateStr = startDate.toISOString().split('T')[0]
+
+    // שליפת כל תנועות ההכנסה מתאריך ההתחלה
+    const { data: transactions, error: txError } = await supabase
+      .from('transactions')
+      .select('*')
       .eq('user_id', user.id)
-      .single()
+      .eq('type', 'income')
+      .in('status', ['approved', 'proposed']) // גם מאושרות וגם ממתינות
+      .or('has_details.is.null,has_details.eq.false')
+      .gte('date', startDateStr)
+      .order('date', { ascending: false })
 
-    // אם יש חודש ספציפי - שלוף גם תנועות הכנסה
-    let incomeTransactions = []
-    if (month) {
-      const startOfMonth = `${month}-01`
-      const endOfMonth = new Date(new Date(month).getFullYear(), new Date(month).getMonth() + 1, 0)
-        .toISOString()
-        .split('T')[0]
-
-      const { data: transactions } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('type', 'income')
-        .gte('tx_date', startOfMonth)
-        .lte('tx_date', endOfMonth)
-        .or('has_details.is.null,has_details.eq.false')
-
-      incomeTransactions = transactions || []
+    if (txError) {
+      console.error('Error fetching income transactions:', txError)
+      return NextResponse.json({ error: 'Failed to fetch income' }, { status: 500 })
     }
 
-    const totalFromTransactions = incomeTransactions.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0)
-    const totalIncome = profile?.total_monthly_income || 0
-    const combinedTotal = totalFromTransactions || totalIncome
+    const incomeTransactions = transactions || []
+
+    // מפה כל transaction לפורמט הצפוי
+    const formattedIncome = incomeTransactions.map((tx: any) => ({
+      id: tx.id,
+      amount: parseFloat(tx.amount || 0),
+      source: tx.vendor || tx.category || 'לא צוין',
+      category: tx.category || 'אחר',
+      date: tx.date || tx.tx_date,
+      payment_method: tx.payment_method || 'bank_transfer',
+      notes: tx.notes,
+      is_recurring: tx.is_recurring || false,
+    }))
 
     return NextResponse.json({
       success: true,
-      summary: {
-        total: combinedTotal,
-        fromProfile: totalIncome,
-        fromTransactions: totalFromTransactions,
-        count: incomeTransactions.length,
-      },
-      transactions: incomeTransactions,
+      income: formattedIncome,
+      total: incomeTransactions.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0),
+      count: incomeTransactions.length,
     })
 
   } catch (error: any) {
