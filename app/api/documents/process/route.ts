@@ -134,10 +134,12 @@ export async function POST(request: NextRequest) {
       // Credit statements → transactions table only
       itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
     } else if (docType.includes('bank')) {
-      // Bank statements → transactions + bank_accounts
+      // Bank statements → transactions + bank_accounts + loans + update user profile
       const txCount = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
       const accountCount = await saveBankAccounts(supabase, result, stmt.user_id, statementId as string);
-      itemsProcessed = txCount + accountCount;
+      const loanCount = await saveLoanPaymentsAsLoans(supabase, result, stmt.user_id);
+      await updateUserFinancialProfile(supabase, result, stmt.user_id);
+      itemsProcessed = txCount + accountCount + loanCount;
     } else if (docType.includes('payslip') || docType.includes('salary') || docType.includes('תלוש')) {
       // Payslips → payslips table + income transaction
       itemsProcessed = await savePayslips(supabase, result, stmt.user_id, statementId as string);
@@ -863,6 +865,119 @@ async function saveBankAccounts(supabase: any, result: any, userId: string, docu
   } catch (error) {
     console.error('Error in saveBankAccounts:', error);
     // Don't throw - this is optional data
+    return 0;
+  }
+}
+
+// ============================================================================
+// Update User Financial Profile
+// ============================================================================
+
+/**
+ * Update user_financial_profile with current account balance from bank statement
+ */
+async function updateUserFinancialProfile(supabase: any, result: any, userId: string): Promise<void> {
+  try {
+    if (!result.account_info || !result.account_info.current_balance) {
+      console.log('No account balance to update in user profile');
+      return;
+    }
+
+    const currentBalance = parseFloat(result.account_info.current_balance);
+    
+    const { error } = await supabase
+      .from('user_financial_profile')
+      .upsert({
+        user_id: userId,
+        current_account_balance: currentBalance,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (error) {
+      console.error('Failed to update user financial profile:', error);
+      // Don't throw - this is optional
+    } else {
+      console.log(`📊 Updated user profile: current_account_balance = ${currentBalance} ₪`);
+    }
+  } catch (error) {
+    console.error('Error in updateUserFinancialProfile:', error);
+    // Don't throw - this is optional
+  }
+}
+
+/**
+ * Save loan payments identified in bank statement as loans
+ */
+async function saveLoanPaymentsAsLoans(supabase: any, result: any, userId: string): Promise<number> {
+  try {
+    if (!result.transactions || !result.transactions.loan_payments) {
+      return 0;
+    }
+
+    const loanPayments = result.transactions.loan_payments;
+    if (!Array.isArray(loanPayments) || loanPayments.length === 0) {
+      return 0;
+    }
+
+    // Group loan payments by lender/provider to identify unique loans
+    const loansByProvider: Record<string, any[]> = {};
+    
+    loanPayments.forEach((payment: any) => {
+      const provider = payment.loan_provider || payment.vendor || 'לא צוין';
+      if (!loansByProvider[provider]) {
+        loansByProvider[provider] = [];
+      }
+      loansByProvider[provider].push(payment);
+    });
+
+    let loansCreated = 0;
+
+    // For each provider, check if loan already exists, if not create it
+    for (const [provider, payments] of Object.entries(loansByProvider)) {
+      // Check if loan already exists for this provider
+      const { data: existingLoan } = await supabase
+        .from('loans')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('lender', provider)
+        .eq('active', true)
+        .single();
+
+      if (!existingLoan) {
+        // Create new loan record
+        const payment = payments[0]; // Use first payment as reference
+        const monthlyPayment = parseFloat(payment.amount || 0);
+
+        const { error: insertError } = await supabase
+          .from('loans')
+          .insert({
+            user_id: userId,
+            loan_type: 'personal',
+            lender: provider,
+            monthly_payment: monthlyPayment,
+            status: 'active',
+            interest_rate: payment.interest_rate ? parseFloat(payment.interest_rate) : null,
+            current_balance: payment.principal ? parseFloat(payment.principal) : null,
+            metadata: {
+              identified_from: 'bank_statement',
+              payment_count: payments.length,
+            },
+          });
+
+        if (!insertError) {
+          loansCreated++;
+          console.log(`💳 Created loan record for ${provider} (${monthlyPayment} ₪/month)`);
+        }
+      } else {
+        console.log(`ℹ️  Loan already exists for ${provider}`);
+      }
+    }
+
+    return loansCreated;
+  } catch (error) {
+    console.error('Error in saveLoanPaymentsAsLoans:', error);
     return 0;
   }
 }
