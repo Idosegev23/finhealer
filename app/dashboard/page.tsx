@@ -105,7 +105,7 @@ export default async function DashboardPage() {
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
-    .eq('status', 'confirmed')
+    .in('status', ['confirmed', 'proposed']) // מאושרות + ממתינות לאישור
     .gte('date', `${currentMonth}-01`)
     .lte('date', `${currentMonth}-31`)
     .or('has_details.is.null,has_details.eq.false')

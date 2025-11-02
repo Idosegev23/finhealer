@@ -120,6 +120,7 @@ export function DashboardNav() {
 
   const accountBalance = financialData?.current_account_balance || 0;
   const monthlyIncome = financialData?.monthly_income || 0;
+  const monthlyExpenses = financialData?.monthly_expenses || 0;
   const totalDebt = financialData?.total_debt || 0;
   const netWorth = financialData?.net_worth || 0;
 
@@ -132,9 +133,21 @@ export function DashboardNav() {
     },
     {
       icon: <TrendingUp className="w-4 h-4" />,
-      label: 'הכנסה חודשית',
+      label: 'הכנסות',
       value: loading ? '...' : `₪${monthlyIncome.toLocaleString('he-IL')}`,
       color: 'text-green-300'
+    },
+    {
+      icon: <TrendingDown className="w-4 h-4" />,
+      label: 'הוצאות',
+      value: loading ? '...' : `₪${monthlyExpenses.toLocaleString('he-IL')}`,
+      color: 'text-red-300'
+    },
+    {
+      icon: <Activity className="w-4 h-4" />,
+      label: 'יתרה',
+      value: loading ? '...' : `₪${Math.abs(monthlyIncome - monthlyExpenses).toLocaleString('he-IL')}`,
+      color: (monthlyIncome - monthlyExpenses) >= 0 ? 'text-green-300' : 'text-red-300'
     },
     {
       icon: <TrendingDown className="w-4 h-4" />,
