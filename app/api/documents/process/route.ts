@@ -529,6 +529,7 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         type: transactionType,
         amount: Math.abs(parseFloat(tx.amount)) || 0,
         category: tx.category || 'other',
+        expense_category: tx.expense_category || null, // ⭐ חשוב! הקטגוריה מהמסד נתונים
         vendor: tx.vendor || tx.description || 'לא צוין',
         date: parsedDate,
         tx_date: parsedDate,
@@ -538,11 +539,7 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
           ? `${tx.notes || tx.description || ''} ${tx.installment}`.trim() 
           : (tx.notes || tx.description || null),
         payment_method: paymentMethod,
-        expense_type: tx.type === 'הוראת קבע' 
-          ? 'fixed' 
-          : tx.type === 'תשלום' || tx.type === 'קרדיט'
-            ? 'installment'
-            : 'variable',
+        expense_type: tx.expense_type || 'variable', // ⭐ משתמש ב-expense_type מה-AI!
         confidence_score: tx.confidence_score || 0.85,
         document_id: documentId,
         original_description: tx.vendor || tx.description,

@@ -19,12 +19,14 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const documentType = formData.get('documentType') as string;
+    const statementMonth = formData.get('statementMonth') as string | null; // ⭐ חודש הדוח (YYYY-MM)
 
     console.log('📤 Upload request:', {
       fileName: file?.name,
       fileSize: file?.size,
       fileType: file?.type,
       documentType,
+      statementMonth,
       userId: user.id,
     });
 
@@ -96,6 +98,22 @@ export async function POST(request: NextRequest) {
     };
     const fileType = fileTypeMap[documentType] || 'other';
 
+    // Calculate period_start and period_end from statementMonth
+    let periodStart: string | null = null;
+    let periodEnd: string | null = null;
+    
+    if (statementMonth) {
+      // statementMonth format: "YYYY-MM"
+      const [year, month] = statementMonth.split('-').map(Number);
+      // First day of month
+      periodStart = `${year}-${String(month).padStart(2, '0')}-01`;
+      // Last day of month
+      const lastDay = new Date(year, month, 0).getDate(); // month is 1-based, so month+0 gives us last day of previous month+1
+      periodEnd = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+      
+      console.log('📅 Statement period:', { statementMonth, periodStart, periodEnd });
+    }
+
     // Create uploaded_statements record
     const { data: statement, error: dbError } = await (supabase as any)
       .from('uploaded_statements')
@@ -108,6 +126,8 @@ export async function POST(request: NextRequest) {
         file_size: file.size,
         mime_type: file.type,
         status: 'pending',
+        period_start: periodStart, // ⭐ תחילת תקופת הדוח
+        period_end: periodEnd,     // ⭐ סוף תקופת הדוח
       })
       .select()
       .single();

@@ -36,6 +36,11 @@ export function DocumentUploader({
 }: DocumentUploaderProps) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    // Default to current month (YYYY-MM format)
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'success' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
@@ -70,6 +75,7 @@ export function DocumentUploader({
       const formData = new FormData();
       formData.append('file', file);
       formData.append('documentType', documentType);
+      formData.append('statementMonth', selectedMonth); // ⭐ חודש הדוח
 
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -180,6 +186,26 @@ export function DocumentUploader({
                 <X className="h-5 w-5 text-gray-600" />
               </button>
             </div>
+
+            {/* ⭐ Month selector for bank/credit statements */}
+            {(documentType === 'bank' || documentType === 'credit') && (
+              <div className="space-y-2">
+                <label htmlFor="statement-month" className="block text-sm font-medium text-gray-700">
+                  חודש הדוח 📅
+                </label>
+                <input
+                  id="statement-month"
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  max={new Date().toISOString().slice(0, 7)} // לא מאפשר חודשים עתידיים
+                />
+                <p className="text-xs text-gray-500">
+                  בחר את החודש אליו משתייך הדוח (ברירת מחדל: החודש הנוכחי)
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-2">
               <Button onClick={handleUpload} className="flex-1">
