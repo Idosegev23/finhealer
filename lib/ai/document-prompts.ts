@@ -92,8 +92,9 @@ ${special.map(c => `  • ${c.name}`).join('\n')}
 - date: תאריך העסקה (YYYY-MM-DD)
 - vendor: שם בית העסק (עברית או אנגלית)
 - amount: סכום בש"ח (מספר חיובי תמיד!)
-- expense_category: קטגוריה מדויקת מהמסד נתונים
-- type: סוג העסקה (רגיל / תשלום / קרדיט / הוראת קבע)
+- expense_category: קטגוריה מדויקת מהמסד נתונים (ראה רשימה למטה)
+- expense_type: סוג ההוצאה (fixed/variable/special) - **חובה לקחת מהקטגוריה שבחרת!**
+- type: "expense" או "income" בלבד
 - payment_method: credit_card
 
 אם תשלום/קרדיט:
@@ -108,6 +109,17 @@ ${special.map(c => `  • ${c.name}`).join('\n')}
 - forex_fee: 5.08
 
 ${categoriesGuide}
+
+### **🔴 expense_type - חובה לפי הקטגוריה!**
+**לאחר שבחרת קטגוריה, העתק את ה-expense_type שלה:**
+- אם בחרת קטגוריה מרשימת **קבועות** → expense_type: "fixed"
+- אם בחרת קטגוריה מרשימת **משתנות** → expense_type: "variable"  
+- אם בחרת קטגוריה מרשימת **מיוחדות** → expense_type: "special"
+
+**דוגמאות:**
+- בחרת "ביטוח חיים" (מרשימת קבועות) → expense_type: "fixed"
+- בחרת "מסעדות" (מרשימת משתנות) → expense_type: "variable"
+- בחרת "רהיטים" (מרשימת מיוחדות) → expense_type: "special"
 
 ### **🔴 קריטי - חלץ הכל!**
 ✅ עברית: סיטי מרקט, שופרסל, פז, קרן מכבי, פרי טיוי
@@ -137,6 +149,7 @@ ${categoriesGuide}
       "vendor": "שפירא גז בע'מ",
       "amount": 460.00,
       "expense_category": "גז",
+      "expense_type": "fixed",
       "type": "expense",
       "installment": "תשלום 1 מ-2",
       "payment_number": 1,
@@ -266,6 +279,17 @@ ${special.map(c => `  • ${c.name} (${c.category_group})`).join('\n')}
 **אחר:**
 - השתמש בקטגוריות מהמערכת (expense_categories שסופקו)
 - או תן שם תיאורי מתאים
+
+### **🔴 expense_type - חובה לפי הקטגוריה!**
+**לאחר שבחרת קטגוריה, העתק את ה-expense_type שלה:**
+- אם בחרת קטגוריה מרשימת **קבועות** → expense_type: "fixed"
+- אם בחרת קטגוריה מרשימת **משתנות** → expense_type: "variable"  
+- אם בחרת קטגוריה מרשימת **מיוחדות** → expense_type: "special"
+
+**דוגמאות:**
+- בחרת "ביטוח חיים" (מרשימת קבועות) → expense_type: "fixed"
+- בחרת "מסעדות" (מרשימת משתנות) → expense_type: "variable"
+- בחרת "רהיטים" (מרשימת מיוחדות) → expense_type: "special"
 
 ### **2. סכומים:**
 - **תמיד החזר מספר חיובי (ללא מינוס)**

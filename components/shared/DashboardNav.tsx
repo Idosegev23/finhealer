@@ -215,7 +215,7 @@ export function DashboardNav() {
 
           {/* Theme Toggle */}
           <div className="bg-blue-700/80 backdrop-blur-sm rounded-full p-1 shadow-lg">
-            <ThemeToggle />
+          <ThemeToggle />
           </div>
         </div>
       </div>

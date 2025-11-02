@@ -154,7 +154,7 @@ export default function IncomePage() {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <div>
+            <div>
             <h1 className="text-3xl font-bold text-gray-900">הכנסות 💰</h1>
             <p className="text-gray-600 mt-1">מעקב והיסטוריה של כל ההכנסות שלך</p>
           </div>
@@ -202,7 +202,7 @@ export default function IncomePage() {
                   </>
                 )}
                 <span className="text-sm text-gray-500 mr-1">לעומת חודש קודם</span>
-              </div>
+            </div>
             </CardContent>
           </Card>
 
@@ -220,7 +220,7 @@ export default function IncomePage() {
               </p>
             </CardContent>
           </Card>
-        </div>
+          </div>
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -292,11 +292,11 @@ export default function IncomePage() {
                 <div className="text-center py-12 text-gray-500">
                   <DollarSign className="mx-auto h-12 w-12 mb-4 text-gray-300" />
                   <p>אין נתונים להצגה</p>
-                </div>
+            </div>
               )}
             </CardContent>
           </Card>
-        </div>
+          </div>
 
         {/* Monthly Details */}
         <div className="space-y-4">
@@ -318,8 +318,8 @@ export default function IncomePage() {
                           {formatMonthName(month)}
                         </h3>
                         <p className="text-sm text-gray-500">{data.count} תנועות</p>
-                      </div>
-                    </div>
+          </div>
+        </div>
 
                     <div className="flex items-center gap-6">
                       <div className="text-left">
@@ -394,8 +394,8 @@ export default function IncomePage() {
             </Card>
           )}
         </div>
+        </div>
       </div>
-    </div>
   );
 }
 
