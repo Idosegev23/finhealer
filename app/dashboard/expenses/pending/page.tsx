@@ -18,6 +18,7 @@ interface PendingTransaction {
   date: string;
   category: string;
   expense_category?: string;
+  expense_category_id?: string;
   expense_type: string;
   payment_method: string;
   notes: string;
