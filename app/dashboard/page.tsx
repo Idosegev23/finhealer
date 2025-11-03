@@ -2,7 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Wallet, TrendingUp, TrendingDown, Target, PlusCircle, ArrowRight, Calculator, BarChart3 } from 'lucide-react'
 import { PhaseProgressBar } from '@/components/dashboard/PhaseProgressBar'
-import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
+import { ExpensesDrilldownChart } from '@/components/dashboard/ExpensesDrilldownChart'
+import { IncomeDrilldownChart } from '@/components/dashboard/IncomeDrilldownChart'
+import { AssetsLiabilitiesDrilldownChart } from '@/components/dashboard/AssetsLiabilitiesDrilldownChart'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -425,10 +427,17 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* גרפים ויזואליים - רק אם יש נתונים */}
-        {hasLoans && loans && loans.length > 0 && (
-          <DashboardCharts loans={loans} />
-        )}
+        {/* גרפים אינטראקטיביים */}
+        <div className="mb-8 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ExpensesDrilldownChart />
+            <IncomeDrilldownChart />
+          </div>
+          
+          <div className="w-full">
+            <AssetsLiabilitiesDrilldownChart />
+          </div>
+        </div>
 
         {/* פעולות מהירות חכמות - 4-6 כפתורים בלבד */}
         <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">

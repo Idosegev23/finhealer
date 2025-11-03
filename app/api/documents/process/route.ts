@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
+import { matchCreditTransactions } from '@/lib/reconciliation/credit-matcher';
 
 // ⚡️ Vercel Background Function Configuration
 export const runtime = 'nodejs'; // Force Node.js runtime
@@ -118,6 +119,21 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ AI analysis complete:`, result);
 
+    // Validate and normalize categories from AI
+    if (result.transactions) {
+      if (Array.isArray(result.transactions)) {
+        result.transactions = await validateAndNormalizeCategories(supabase, result.transactions);
+      } else if (typeof result.transactions === 'object') {
+        // Bank statement format with sub-arrays
+        if (result.transactions.expenses) {
+          result.transactions.expenses = await validateAndNormalizeCategories(supabase, result.transactions.expenses);
+        }
+        if (result.transactions.income) {
+          result.transactions.income = await validateAndNormalizeCategories(supabase, result.transactions.income);
+        }
+      }
+    }
+
     // Update progress
     await supabase
       .from('uploaded_statements')
@@ -133,6 +149,9 @@ export async function POST(request: NextRequest) {
     if (docType.includes('credit')) {
       // Credit statements → transactions table only
       itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
+      
+      // ✨ Reconciliation: Match credit details with bank summary and delete duplicates
+      await matchCreditTransactions(supabase, stmt.user_id, statementId as string, docType);
     } else if (docType.includes('bank')) {
       // Bank statements → transactions + bank_accounts + loans + update user profile
       const txCount = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
@@ -168,6 +187,7 @@ export async function POST(request: NextRequest) {
         transactions_extracted: itemsProcessed,
         error_message: null,
         retry_count: 0,
+        extracted_data: result, // ✨ שמור את ה-result המלא (כולל billing_info) למטרות reconciliation
       })
       .eq('id', statementId);
 
@@ -233,6 +253,78 @@ export async function POST(request: NextRequest) {
       { error: error.message },
       { status: 500 }
     );
+  }
+}
+
+// ============================================================================
+// Category Validation & Normalization
+// ============================================================================
+
+/**
+ * Validate and normalize expense categories from AI against database
+ */
+async function validateAndNormalizeCategories(
+  supabase: any,
+  transactions: any[]
+): Promise<any[]> {
+  try {
+    // Load all valid categories from DB
+    const { data: validCategories } = await supabase
+      .from('expense_categories')
+      .select('name, expense_type, category_group')
+      .eq('is_active', true);
+    
+    if (!validCategories || validCategories.length === 0) {
+      console.warn('⚠️ No expense categories found in database');
+      return transactions;
+    }
+    
+    // Create case-insensitive lookup map
+    const categoryMap = new Map(
+      validCategories.map((c: any) => [c.name.toLowerCase().trim(), c])
+    );
+    
+    console.log(`📋 Validating ${transactions.length} transactions against ${validCategories.length} categories`);
+    
+    return transactions.map((tx: any) => {
+      const expenseCategory = tx.expense_category?.trim();
+      
+      // No category provided
+      if (!expenseCategory) {
+        return {
+          ...tx,
+          expense_category: 'לא מסווג',
+          expense_type: 'variable',
+          category_group: 'other'
+        };
+      }
+      
+      // Try exact match (case-insensitive)
+      const match = categoryMap.get(expenseCategory.toLowerCase());
+      
+      if (match) {
+        // Found exact match - use data from DB
+        return {
+          ...tx,
+          expense_category: (match as any).name, // Exact name from DB
+          expense_type: (match as any).expense_type,
+          category_group: (match as any).category_group
+        };
+      }
+      
+      // No match found - mark as uncategorized with lower confidence
+      console.warn(`⚠️ Unknown category: "${expenseCategory}" → marking as "לא מסווג"`);
+      return {
+        ...tx,
+        expense_category: 'לא מסווג',
+        expense_type: 'variable',
+        category_group: 'other',
+        confidence_score: (tx.confidence_score || 0.8) * 0.5 // Reduce confidence
+      };
+    });
+  } catch (error) {
+    console.error('Error in validateAndNormalizeCategories:', error);
+    return transactions; // Return unchanged on error
   }
 }
 
@@ -547,7 +639,7 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         is_recurring: tx.type === 'הוראת קבע',
         currency: 'ILS',
         // Linking fields
-        is_summary: isBankStatement, // Bank transactions are summaries that may be detailed later
+        is_summary: false, // ✨ לא מסמנים כ-summary בשלב זה - רק ה-matcher יעשה זאת!
         linked_loan_id: linkedLoanId,
       };
     });
