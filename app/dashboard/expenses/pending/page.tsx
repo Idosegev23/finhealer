@@ -132,6 +132,17 @@ export default function PendingExpensesPage() {
   };
 
   const handleApprove = async (expenseId: string) => {
+    // ✅ Validation: בדיקה שההוצאה מסווגת לפני אישור
+    const expense = expenses.find((e) => e.id === expenseId);
+    if (expense && expense.type === 'expense' && !expense.expense_category_id && !expense.expense_category) {
+      addToast({
+        type: 'error',
+        title: 'לא ניתן לאשר',
+        description: 'יש לבחור קטגוריה לפני אישור ההוצאה. לחץ על "ערוך" כדי לבחור קטגוריה.',
+      });
+      return;
+    }
+
     setProcessingIds((prev) => new Set(prev).add(expenseId));
     
     try {
@@ -141,7 +152,10 @@ export default function PendingExpensesPage() {
         body: JSON.stringify({ expenseId }),
       });
 
-      if (!response.ok) throw new Error('Failed to approve');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to approve');
+      }
 
       addToast({
         type: 'success',
@@ -170,11 +184,36 @@ export default function PendingExpensesPage() {
   const handleApproveAll = async () => {
     if (expenses.length === 0) return;
 
+    // ✅ סנן רק תנועות שמסווגות (או שהן הכנסות)
+    const approvableExpenses = expenses.filter(
+      (e) => e.type === 'income' || e.expense_category_id || e.expense_category
+    );
+
+    const uncategorizedCount = expenses.length - approvableExpenses.length;
+
+    if (uncategorizedCount > 0) {
+      addToast({
+        type: 'error',
+        title: 'לא ניתן לאשר הכל',
+        description: `יש ${uncategorizedCount} הוצאות ללא קטגוריה. יש לסווג אותן קודם.`,
+      });
+      return;
+    }
+
+    if (approvableExpenses.length === 0) {
+      addToast({
+        type: 'error',
+        title: 'אין תנועות לאישור',
+        description: 'כל ההוצאות חייבות להיות מסווגות לפני אישור.',
+      });
+      return;
+    }
+
     setApprovingAll(true);
 
     try {
-      // אישור כל התנועות במקביל
-      const approvalPromises = expenses.map((expense) =>
+      // אישור כל התנועות המסווגות במקביל
+      const approvalPromises = approvableExpenses.map((expense) =>
         fetch('/api/expenses/approve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -245,8 +284,9 @@ export default function PendingExpensesPage() {
     }
   };
 
-  const handleUpdate = async (expenseId: string, updates: Partial<PendingTransaction>) => {
+  const handleUpdate = async (expenseId: string, updates: Partial<PendingTransaction>, shouldApprove = false) => {
     try {
+      // עדכון התנועה
       const response = await fetch('/api/expenses/update', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -257,16 +297,39 @@ export default function PendingExpensesPage() {
 
       const result = await response.json();
 
-      addToast({
-        type: 'success',
-        title: 'הוצאה עודכנה',
-        description: 'השינויים נשמרו בהצלחה',
-      });
+      // אם צריך לאשר - אשר אחרי העדכון
+      if (shouldApprove) {
+        const approveResponse = await fetch('/api/expenses/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expenseIds: [expenseId] }),
+        });
 
-      // Update in list
-      setExpenses((prev) =>
-        prev.map((e) => (e.id === expenseId ? { ...e, ...result.expense } : e))
-      );
+        if (!approveResponse.ok) {
+          throw new Error('Failed to approve after update');
+        }
+
+        addToast({
+          type: 'success',
+          title: '✓ הוצאה עודכנה ואושרה',
+          description: 'התנועה נשמרה ואושרה בהצלחה',
+        });
+
+        // הסר מהרשימה (כי אושרה)
+        setExpenses((prev) => prev.filter((e) => e.id !== expenseId));
+      } else {
+        addToast({
+          type: 'success',
+          title: 'הוצאה עודכנה',
+          description: 'השינויים נשמרו בהצלחה',
+        });
+
+        // עדכן ברשימה
+        setExpenses((prev) =>
+          prev.map((e) => (e.id === expenseId ? { ...e, ...result.expense } : e))
+        );
+      }
+
       setEditingExpense(null);
     } catch (error: any) {
       console.error('Update error:', error);

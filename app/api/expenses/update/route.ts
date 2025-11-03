@@ -47,10 +47,33 @@ export async function PUT(request: Request) {
       updateData.tx_date = date;
     }
     if (expense_category !== undefined) updateData.expense_category = expense_category;
-    if (expense_category_id !== undefined) updateData.expense_category_id = expense_category_id;
+    // ✅ Fix: Convert empty string to null for FK constraint
+    if (expense_category_id !== undefined) {
+      const categoryId = expense_category_id || null;
+      
+      // Validate that the category exists if an ID is provided
+      if (categoryId) {
+        const { data: categoryExists } = await (supabase as any)
+          .from('expense_categories')
+          .select('id')
+          .eq('id', categoryId)
+          .single();
+        
+        if (!categoryExists) {
+          return NextResponse.json(
+            { error: 'Invalid expense_category_id' },
+            { status: 400 }
+          );
+        }
+      }
+      
+      updateData.expense_category_id = categoryId;
+    }
     if (expense_type !== undefined) updateData.expense_type = expense_type;
     if (notes !== undefined) updateData.notes = notes;
     if (payment_method !== undefined) updateData.payment_method = payment_method;
+
+    console.log('Updating expense:', expenseId, 'with data:', updateData);
 
     // עדכון ההוצאה
     const { data: expense, error } = await (supabase as any)
@@ -63,8 +86,14 @@ export async function PUT(request: Request) {
 
     if (error) {
       console.error('Error updating expense:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      console.error('Update data:', JSON.stringify(updateData, null, 2));
       return NextResponse.json(
-        { error: 'Failed to update expense' },
+        { 
+          error: 'Failed to update expense',
+          details: error.message || error.hint || error.details,
+          code: error.code
+        },
         { status: 500 }
       );
     }

@@ -18,7 +18,7 @@ interface EditExpenseModalProps {
     notes: string;
   };
   onClose: () => void;
-  onSave: (updates: any) => void;
+  onSave: (updates: any, shouldApprove?: boolean) => void;
 }
 
 export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalProps) {
@@ -33,9 +33,16 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
     notes: expense.notes || '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent, shouldApprove = false) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // ✅ Validation: אי אפשר לאשר ללא קטגוריה
+    if (shouldApprove && !formData.expense_category_id) {
+      alert('יש לבחור קטגוריה לפני אישור התנועה');
+      return;
+    }
+    
+    onSave(formData, shouldApprove);
   };
 
   const handleCategoryChange = (category: any) => {
@@ -62,7 +69,7 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={(e) => handleSubmit(e, false)} className="p-6 space-y-4">
           {/* Amount */}
           <div>
             <label className="block text-sm font-medium mb-2">סכום *</label>
@@ -141,13 +148,33 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4">
-            <Button type="submit" className="flex-1">
-              שמור שינויים
+          <div className="flex flex-col gap-3 pt-4">
+            {/* כפתור עיקרי - שמור ואשר */}
+            <Button 
+              type="button"
+              onClick={(e: any) => handleSubmit(e, true)}
+              className="w-full bg-green-600 hover:bg-green-700"
+              disabled={!formData.expense_category_id}
+            >
+              ✓ שמור ואשר
             </Button>
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-              ביטול
-            </Button>
+            
+            {/* שורה של כפתורים משניים */}
+            <div className="flex gap-3">
+              <Button type="submit" variant="outline" className="flex-1">
+                שמור בלבד
+              </Button>
+              <Button type="button" variant="ghost" onClick={onClose} className="flex-1">
+                ביטול
+              </Button>
+            </div>
+            
+            {/* הודעת עזרה */}
+            {!formData.expense_category_id && (
+              <p className="text-sm text-amber-600 text-center">
+                ⚠️ יש לבחור קטגוריה כדי לאשר את התנועה
+              </p>
+            )}
           </div>
         </form>
       </div>
