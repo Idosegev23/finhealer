@@ -153,11 +153,10 @@ export async function POST(request: NextRequest) {
       // ✨ Reconciliation: Match credit details with bank summary and delete duplicates
       await matchCreditTransactions(supabase, stmt.user_id, statementId as string, docType);
     } else if (docType.includes('bank')) {
-      // Bank statements → transactions + bank_accounts + loans + update user profile
+      // Bank statements → transactions + bank_accounts + loans
       const txCount = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
       const accountCount = await saveBankAccounts(supabase, result, stmt.user_id, statementId as string);
       const loanCount = await saveLoanPaymentsAsLoans(supabase, result, stmt.user_id);
-      await updateUserFinancialProfile(supabase, result, stmt.user_id);
       itemsProcessed = txCount + accountCount + loanCount;
     } else if (docType.includes('payslip') || docType.includes('salary') || docType.includes('תלוש')) {
       // Payslips → payslips table + income transaction
@@ -1000,44 +999,6 @@ async function saveBankAccounts(supabase: any, result: any, userId: string, docu
     console.error('Error in saveBankAccounts:', error);
     // Don't throw - this is optional data
     return 0;
-  }
-}
-
-// ============================================================================
-// Update User Financial Profile
-// ============================================================================
-
-/**
- * Update user_financial_profile with current account balance from bank statement
- */
-async function updateUserFinancialProfile(supabase: any, result: any, userId: string): Promise<void> {
-  try {
-    if (!result.account_info || !result.account_info.current_balance) {
-      console.log('No account balance to update in user profile');
-      return;
-    }
-
-    const currentBalance = parseFloat(result.account_info.current_balance);
-    
-    const { error } = await supabase
-      .from('user_financial_profile')
-      .upsert({
-        user_id: userId,
-        current_account_balance: currentBalance,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id'
-      });
-
-    if (error) {
-      console.error('Failed to update user financial profile:', error);
-      // Don't throw - this is optional
-    } else {
-      console.log(`📊 Updated user profile: current_account_balance = ${currentBalance} ₪`);
-    }
-  } catch (error) {
-    console.error('Error in updateUserFinancialProfile:', error);
-    // Don't throw - this is optional
   }
 }
 

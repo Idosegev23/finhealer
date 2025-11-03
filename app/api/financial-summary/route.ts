@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       profileRes,
       incomeSourcesRes,
       monthlyTransactionsRes,
+      bankAccountsRes,
     ] = await Promise.all([
       supabase.from("loans").select("*").eq("user_id", user.id).eq("active", true),
       supabase.from("savings_accounts").select("*").eq("user_id", user.id).eq("active", true),
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
         .gte('date', `${currentMonth}-01`)
         .lte('date', `${currentMonth}-31`)
         .or('has_details.is.null,has_details.eq.false'),
+      supabase.from("bank_accounts").select("*").eq("user_id", user.id).eq("is_current", true).single(),
     ]);
 
     const loans = loansRes.data || [];
@@ -44,6 +46,7 @@ export async function GET(request: NextRequest) {
     const profile: any = profileRes.data || {};
     const incomeSources = incomeSourcesRes.data || [];
     const monthlyTransactions = monthlyTransactionsRes.data || [];
+    const currentBankAccount: any = bankAccountsRes.data || null;
 
     // Calculate income and expenses from actual transactions
     const monthlyIncomeFromTransactions = monthlyTransactions
@@ -60,7 +63,11 @@ export async function GET(request: NextRequest) {
     const pensionTotal = pensions.reduce((sum: number, pen: any) => sum + (Number(pen.current_balance) || 0), 0);
     const investmentsTotal = Number(profile.investments) || 0;
     const currentSavings = Number(profile.current_savings) || 0;
-    const currentAccountBalance = Number(profile.current_account_balance) || 0;
+    
+    // ✅ Get current account balance from bank_accounts (from uploaded statements), fallback to manual profile entry
+    const currentAccountBalance = currentBankAccount 
+      ? Number(currentBankAccount.current_balance) || 0
+      : Number(profile.current_account_balance) || 0;
 
     // Total assets (כל מה שיש לך)
     const totalAssets = 

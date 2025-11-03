@@ -1,36 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle, ArrowRight } from 'lucide-react';
+import { AlertCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { usePendingExpenses } from '@/contexts/PendingExpensesContext';
 
 export function PendingTransactionsBanner() {
-  const [pendingCount, setPendingCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadPendingCount();
-    
-    // רענון כל 30 שניות
-    const interval = setInterval(loadPendingCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadPendingCount = async () => {
-    try {
-      const response = await fetch('/api/expenses/pending');
-      if (!response.ok) return;
-      
-      const data = await response.json();
-      const total = (data.transactions || []).length;
-      setPendingCount(total);
-    } catch (error) {
-      console.error('Failed to load pending count:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { count: pendingCount, loading } = usePendingExpenses();
 
   if (loading || pendingCount === 0) return null;
 
