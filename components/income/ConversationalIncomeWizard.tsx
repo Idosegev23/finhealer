@@ -239,9 +239,9 @@ export default function ConversationalIncomeWizard({
         {step === 3 && (
           <Step3Amount
             value={data.actual_bank_amount}
-            isVariable={data.is_variable}
-            minAmount={data.min_amount}
-            maxAmount={data.max_amount}
+            isVariable={data.is_variable ?? false}
+            minAmount={data.min_amount ?? null}
+            maxAmount={data.max_amount ?? null}
             onChange={(amount) => setData({ ...data, actual_bank_amount: amount })}
             onVariableToggle={(isVariable) => setData({ ...data, is_variable: isVariable })}
             onRangeChange={(min, max) => setData({ ...data, min_amount: min, max_amount: max })}
