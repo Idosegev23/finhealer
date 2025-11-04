@@ -187,3 +187,4 @@ function translateExpenseType(type: string): string {
   return translations[type] || type;
 }
 
+

@@ -83,14 +83,17 @@ export default function PayslipScanner({ onDataExtracted }: PayslipScannerProps)
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 opacity-60 pointer-events-none relative">
+      <div className="bg-orange-100 border border-orange-300 text-orange-700 px-4 py-2 rounded-lg text-sm font-semibold text-center mb-4 pointer-events-auto">
+        🚧 סריקת תלושים נמצאת בפיתוח - אנא מלאו ידנית
+      </div>
       {/* Upload Buttons */}
       <div className="flex gap-3">
         <Button
           type="button"
           variant="outline"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isScanning}
+          disabled={true}
           className="flex-1 border-dashed border-2 border-[#3A7BD5] text-[#3A7BD5] hover:bg-blue-50"
         >
           {isScanning ? (

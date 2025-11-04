@@ -86,7 +86,10 @@ export default function ReceiptUploader({ onSuccess }: { onSuccess?: () => void 
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
+    <div className="bg-white rounded-xl shadow-sm p-6 opacity-60 pointer-events-none relative">
+      <div className="absolute top-4 left-4 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-semibold border border-orange-300">
+        🚧 בפיתוח
+      </div>
       <div className="flex items-center gap-3 mb-6">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
           <Camera className="w-6 h-6 text-white" />

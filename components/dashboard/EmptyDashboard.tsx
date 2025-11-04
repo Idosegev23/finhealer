@@ -179,22 +179,23 @@ export default function EmptyDashboard({ userName, hasProfile }: EmptyDashboardP
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: hasProfile ? 0.3 : 0.3 }}
-              onClick={() => router.push('/transactions?upload=true')}
-              className={`p-4 rounded-xl text-right shadow hover:shadow-lg transition-all group bg-white
-                ${!hasProfile 
-                  ? 'border border-gray-200 opacity-60' 
-                  : 'border border-[#F6A623]/30 hover:border-[#F6A623]'
-                }`}
+              onClick={() => {
+                alert('🚧 תכונת סריקת קבלות נמצאת בפיתוח. אנא הוסיפו הוצאות ידנית בינתיים.');
+              }}
+              className={`p-4 rounded-xl text-right shadow hover:shadow-lg transition-all group bg-white border border-gray-200 opacity-60 cursor-not-allowed relative`}
             >
+              <div className="absolute top-2 left-2 bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-semibold">
+                בפיתוח
+              </div>
               <div className="flex items-center justify-end gap-3 mb-2">
-                <h4 className={`text-sm font-bold ${!hasProfile ? 'text-gray-500' : 'text-gray-900'}`}>
+                <h4 className="text-sm font-bold text-gray-500">
                   העלה קבלה 📸
                 </h4>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${!hasProfile ? 'bg-gray-100' : 'bg-[#F6A623]/10'}`}>
-                  <Receipt className={`w-4 h-4 ${!hasProfile ? 'text-gray-400' : 'text-[#F6A623]'}`} />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100">
+                  <Receipt className="w-4 h-4 text-gray-400" />
                 </div>
               </div>
-              <p className={`text-xs ${!hasProfile ? 'text-gray-400' : 'text-gray-600'}`}>
+              <p className="text-xs text-gray-400">
                 OCR חכם לזיהוי אוטומטי
               </p>
             </motion.button>

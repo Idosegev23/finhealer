@@ -160,12 +160,22 @@ export default function ScanCenterPage() {
     <div className="container mx-auto p-6 max-w-7xl" dir="rtl">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          🔍 מרכז סריקה
-        </h1>
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-3xl font-bold text-gray-900">
+            🔍 מרכז סריקה
+          </h1>
+          <Badge className="bg-orange-100 text-orange-700 border-orange-300">
+            🚧 בפיתוח
+          </Badge>
+        </div>
         <p className="text-gray-600">
           העלה דוחות פיננסיים מכל הסוגים - נזהה ונעבד אותם אוטומטית עם AI
         </p>
+        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            ⚠️ <strong>שימו לב:</strong> מערכת הסריקה נמצאת כרגע בפיתוח. בינתיים, אנא הכניסו נתונים ידנית דרך הדשבורד.
+          </p>
+        </div>
       </div>
 
       {/* Document Type Cards */}
@@ -177,10 +187,12 @@ export default function ScanCenterPage() {
           return (
             <Card
               key={docType.type}
-              className={`cursor-pointer transition-all hover:shadow-lg ${
+              className={`cursor-not-allowed opacity-60 transition-all ${
                 isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''
               }`}
-              onClick={() => setActiveType(isActive ? null : docType.type)}
+              onClick={() => {
+                alert('🚧 תכונת הסריקה נמצאת בפיתוח. אנא הכניסו נתונים ידנית בינתיים.');
+              }}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">

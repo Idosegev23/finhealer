@@ -196,3 +196,4 @@ const MyCustomChart = () => {
 **גרסה**: 1.0.0  
 **מפתחים**: FinHealer Team
 
+

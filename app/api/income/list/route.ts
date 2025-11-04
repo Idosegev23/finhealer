@@ -1,70 +1,91 @@
-// @ts-nocheck
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
+/**
+ * API Route: /api/income/list
+ * שליפת כל מקורות ההכנסה של המשתמש
+ * 
+ * Query params:
+ * - active: true/false (ברירת מחדל: true)
+ * - type: employment_type לסינון
+ * - is_primary: true/false
+ * - sort: name/amount/created_at (ברירת מחדל: created_at)
+ * - order: asc/desc (ברירת מחדל: desc)
+ */
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url)
-    const months = parseInt(searchParams.get('months') || '6') // כמה חודשים אחורה
+    // פרמטרים
+    const { searchParams } = new URL(request.url);
+    const activeFilter = searchParams.get('active');
+    const typeFilter = searchParams.get('type');
+    const isPrimaryFilter = searchParams.get('is_primary');
+    const sortBy = searchParams.get('sort') || 'created_at';
+    const order = searchParams.get('order') || 'desc';
 
-    // חישוב תאריך התחלה (X חודשים אחורה)
-    const startDate = new Date()
-    startDate.setMonth(startDate.getMonth() - months)
-    const startDateStr = startDate.toISOString().split('T')[0]
-
-    // שליפת כל תנועות ההכנסה מתאריך ההתחלה
-    const { data: transactions, error: txError } = await supabase
-      .from('transactions')
+    // שאילתה בסיסית
+    let query = (supabase as any)
+      .from('income_sources')
       .select('*')
-      .eq('user_id', user.id)
-      .eq('type', 'income')
-      .in('status', ['confirmed', 'proposed']) // מאושרות (confirmed) וממתינות (proposed)
-      .or('has_details.is.null,has_details.eq.false')
-      .gte('date', startDateStr)
-      .order('date', { ascending: false })
+      .eq('user_id', user.id);
 
-    if (txError) {
-      console.error('Error fetching income transactions:', txError)
-      return NextResponse.json({ error: 'Failed to fetch income' }, { status: 500 })
+    // פילטרים
+    if (activeFilter !== null) {
+      query = query.eq('active', activeFilter === 'true');
     }
 
-    const incomeTransactions = transactions || []
+    if (typeFilter) {
+      query = query.eq('employment_type', typeFilter);
+    }
 
-    // מפה כל transaction לפורמט הצפוי
-    const formattedIncome = incomeTransactions.map((tx: any) => ({
-      id: tx.id,
-      amount: parseFloat(tx.amount || 0),
-      source: tx.vendor || tx.category || 'לא צוין',
-      category: tx.category || 'אחר',
-      date: tx.date || tx.tx_date,
-      payment_method: tx.payment_method || 'bank_transfer',
-      notes: tx.notes,
-      is_recurring: tx.is_recurring || false,
-    }))
+    if (isPrimaryFilter !== null) {
+      query = query.eq('is_primary', isPrimaryFilter === 'true');
+    }
+
+    // מיון
+    const validSortFields = ['source_name', 'gross_amount', 'actual_bank_amount', 'created_at'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'created_at';
+    query = query.order(sortField, { ascending: order === 'asc' });
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    const incomeSources = data || [];
+
+    // חישוב סטטיסטיקות
+    const stats = {
+      total: incomeSources.length,
+      totalMonthlyIncome: incomeSources
+        .filter((source: any) => source.active && source.payment_frequency === 'monthly')
+        .reduce((sum: number, source: any) => sum + (source.actual_bank_amount || 0), 0),
+      primaryCount: incomeSources.filter((source: any) => source.is_primary).length,
+      typeBreakdown: incomeSources.reduce((acc: any, source: any) => {
+        const type = source.employment_type || 'other';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {}),
+    };
 
     return NextResponse.json({
       success: true,
-      income: formattedIncome,
-      total: incomeTransactions.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0),
-      count: incomeTransactions.length,
-    })
-
-  } catch (error: any) {
-    console.error('❌ List income error:', error)
+      incomeSources,
+      stats,
+      count: incomeSources.length,
+    });
+  } catch (error) {
+    console.error('[/api/income/list] Error:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to list income', 
-        details: error.message 
-      },
+      { error: error instanceof Error ? error.message : 'שגיאה בשליפת מקורות הכנסה' },
       { status: 500 }
-    )
+    );
   }
 }
-

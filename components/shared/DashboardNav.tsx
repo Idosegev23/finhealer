@@ -46,7 +46,7 @@ const navItems = [
 // Data collection dropdown
 const dataItems = [
   { href: "/dashboard/data/expenses", label: "הוצאות", icon: Receipt },
-  { href: "/dashboard/data/income", label: "הכנסות", icon: TrendingUp },
+  { href: "/dashboard/income", label: "הכנסות", icon: TrendingUp },
   { href: "/dashboard/data/loans", label: "הלוואות", icon: DollarSign },
   { href: "/dashboard/data/savings", label: "חיסכון", icon: PiggyBank },
   { href: "/dashboard/data/insurance", label: "ביטוחים", icon: Shield },

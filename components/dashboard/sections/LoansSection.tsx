@@ -191,43 +191,24 @@ export default function LoansSection({ onSave, initialLoans = [] }: LoansSection
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* OCR Upload */}
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          handleScanStatement(index, file);
-                        }
-                        e.target.value = '';
-                      }}
-                      className="hidden"
-                      disabled={isScanning}
-                    />
+                  {/* OCR Upload - Disabled in Development */}
+                  <div className="relative">
                     <Button
                       type="button"
                       variant="outline"
-                      className="gap-2 border-[#7ED957] text-[#7ED957] hover:bg-[#E8F5E9]"
-                      disabled={isScanning}
-                      asChild
+                      className="gap-2 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
+                      disabled={true}
+                      onClick={() => {
+                        alert('🚧 סריקת דוחות נמצאת בפיתוח. אנא מלאו ידנית בינתיים.');
+                      }}
                     >
-                      <span>
-                        {isScanning ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            סורק...
-                          </>
-                        ) : (
-                          <>
-                            <Scan className="w-4 h-4" />
-                            סרוק דוח סילוקין
-                          </>
-                        )}
+                      <Scan className="w-4 h-4" />
+                      סרוק דוח סילוקין
+                      <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+                        בפיתוח
                       </span>
                     </Button>
-                  </label>
+                  </div>
 
                   <Button
                     type="button"
