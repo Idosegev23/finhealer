@@ -277,7 +277,7 @@ export default function HomePage() {
               למה Phi שונה?
             </h2>
             <p className="text-xl text-phi-slate max-w-2xl mx-auto">
-              לא עוד אפליקציה "עוד אחת" - זה מאמן אישי שמלווה אותך
+              לא עוד אפליקציה &quot;עוד אחת&quot; - זה מאמן אישי שמלווה אותך
             </p>
           </motion.div>
 
@@ -497,8 +497,8 @@ export default function HomePage() {
                   גדי יצר את Phi מתוך הבנה שבריאות פיננסית היא לא רק מספרים - זה <strong>איזון</strong>, <strong>תכנון</strong>, ו<strong>ליווי אנושי</strong>.
                 </p>
                 <p className="text-lg text-phi-slate mb-6">
-                  "יצרתי את Phi כי ראיתי שאנשים צריכים מערכת שלא רק עוקבת - אלא גם <strong>מבינה, מלווה ומעודדת</strong>. 
-                  φ הוא היחס הזהב - וזה בדיוק מה שמגיע לכם עם הכסף שלכם." 💪
+                  &quot;יצרתי את Phi כי ראיתי שאנשים צריכים מערכת שלא רק עוקבת - אלא גם <strong>מבינה, מלווה ומעודדת</strong>. 
+                  φ הוא היחס הזהב - וזה בדיוק מה שמגיע לכם עם הכסף שלכם.&quot; 💪
                 </p>
                 <div className="flex items-center gap-3">
                   <span className="text-phi-gold text-2xl">φ</span>

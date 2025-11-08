@@ -144,7 +144,7 @@ export default function PhiPieChart({
 
       {/* Total Display */}
       <div className="text-center mt-4 pt-4 border-t border-phi-frost">
-        <p className="text-sm text-phi-slate">סה"כ</p>
+        <p className="text-sm text-phi-slate">סה&quot;כ</p>
         <p className="text-2xl font-bold text-phi-dark">
           ₪{total.toLocaleString()}
         </p>
