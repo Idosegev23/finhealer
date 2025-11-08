@@ -429,7 +429,7 @@ export default function PendingExpensesPage() {
                   {uncategorizedCount} תנועות ללא קטגוריה!
                 </h3>
                 <p className="text-sm text-amber-800">
-                  לחץ על "ערוך" כדי לבחור קטגוריה מתאימה. בלי קטגוריה לא ניתן לאשר.
+                  לחץ על &quot;ערוך&quot; כדי לבחור קטגוריה מתאימה. בלי קטגוריה לא ניתן לאשר.
                 </p>
               </div>
             </div>
@@ -516,7 +516,7 @@ export default function PendingExpensesPage() {
                 {/* ⚠️ אזהרה אם חסרה קטגוריה */}
                 {needsCategory && (
                   <div className="bg-amber-400 text-amber-900 font-bold text-center py-2 text-sm">
-                    ⚠️ חובה לבחור קטגוריה לפני אישור! לחץ על "ערוך" ↓
+                    ⚠️ חובה לבחור קטגוריה לפני אישור! לחץ על &quot;ערוך&quot; ↓
                   </div>
                 )}
 
