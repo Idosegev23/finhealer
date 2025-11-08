@@ -1,8 +1,19 @@
-# הקשר פעיל - FinHealer
+# הקשר פעיל - Phi (φ)
 
 ## מיקום נוכחי בפרויקט
 
-### 🎉 **עדכון אחרון: 22 באוקטובר 2025 - Loan Application System!**
+### 🎉 **עדכון אחרון: 8 בנובמבר 2025 - PHI REBRAND! 🚀**
+
+**ריברנדינג מלא!** המוצר עבר מ-FinHealer ל-**Phi (φ)** - היחס הזהב של הכסף שלך.
+
+### מה השתנה? ✅
+- ✅ **שם חדש:** Phi (φ) - φ = איזון, נוסחה, תכנון חכם
+- ✅ **פלטת צבעים חדשה:** Nord-inspired (phi-dark, phi-gold, phi-mint, phi-coral)
+- ✅ **דף נחיתה מחדש לגמרי:** עיצוב מינימליסטי מודרני בהשראת Stripe
+- ✅ **קומפוננטות חדשות:** PhiLogo, PhiScore, PhiAnimation
+- ✅ **טיפוגרפיה:** הוספת Inter לheaders + φ Symbol בגופן serif
+- ✅ **אנימציות:** Framer Motion חלקות (phi-glow, phi-rotate)
+- ✅ **מסרים חדשים:** דגש על φ Score (0-100), איזון, וליווי גדי
 
 ### מה עשינו עד כה? ✅
 1. **הקמת מסד נתונים מלא בסופאבייס**
@@ -111,6 +122,28 @@
   - תכנון OCR + AI parsing
   - יעד דיוק 90%+
   - תמיכה ב-PDF/Excel/Images
+
+### Priority 0: Phi Rebrand ✅ הושלם! (8 בנובמבר)
+- ✅ **Branding Update**
+  - שינוי שם מ-FinHealer ל-Phi (φ)
+  - פלטת צבעים חדשה (Nord-inspired)
+  - עדכון .cursorrules + projectbrief.md
+- ✅ **Landing Page Redesign**
+  - דף נחיתה מחדש לגמרי
+  - עיצוב מינימליסטי (Stripe/Linear inspired)
+  - 9 sections: Hero, What is Phi, 5 Phases, Features, Phi Score, Pricing, Meet Gadi, Testimonials, CTA
+- ✅ **New Components**
+  - PhiLogo - לוגו מונפש עם φ
+  - PhiScore - circular progress (0-100)
+  - PhiAnimation - φ symbol animation
+- ✅ **Tailwind Config**
+  - צבעי Phi (dark, gold, mint, coral, slate, frost, bg)
+  - אנימציות (phi-glow, phi-rotate)
+  - font-inter
+- ✅ **Layout & Metadata**
+  - title: "Phi (φ) - היחס הזהב של הכסף שלך"
+  - description מעודכן
+  - theme color: #2E3440
 
 ### Priority 2.7: Loan Application System ✅ הושלם! (22 באוקטובר)
 - ✅ **Database Tables**

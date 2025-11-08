@@ -1,10 +1,13 @@
-# FinHealer - כללי פרויקט
+# Phi (φ) - כללי פרויקט
 
-## שפה ותרבות
+## מיתוג והשפה
+- **שם המוצר:** Phi (φ) - היחס הזהב של הכסף שלך
+- **φ = איזון, נוסחה, תכנון חכם**
 - השפה העיקרית של הפרויקט היא **עברית**
 - כל הממשקים, הודעות, בוטים - בעברית
 - התיעוד הטכני באנגלית
 - קוד ותגובות בקוד באנגלית
+- הסימן φ צריך להיות נוכח בכל מקום בעיצוב
 
 ## סגנון קוד
 
@@ -66,36 +69,47 @@
 - `user_monthly_stats` - סטטיסטיקות חודשיות
 
 ### פונקציות
-- `calculate_financial_health(user_id)` - ציון בריאות (0-100)
+- `calculate_financial_health(user_id)` - ציון φ (φ Score) 0-100 מבוסס על 12 פרמטרים
 - `get_daily_summary(user_id, date)` - סיכום יומי
 
 ## עיצוב (UI/UX)
 
-### צבעים
+### צבעים - Phi Brand
 ```css
---color-primary: #3A7BD5;      /* כחול בינוני */
---color-dark: #1E2A3B;         /* כחול כהה */
---color-bg: #F5F6F8;           /* אפור בהיר */
---color-success: #7ED957;      /* ירוק */
---color-warning: #F6A623;      /* כתום */
+/* Phi Color Palette - Nord-inspired */
+--phi-dark: #2E3440;      /* Primary dark (אפור-כחול רך) */
+--phi-gold: #A96B48;      /* Accent gold (נחושת/ברונזה - קשר ל-φ) */
+--phi-mint: #8FBCBB;      /* Success mint (ירוק-מנטה עדין) */
+--phi-bg: #ECEFF4;        /* Background (אפור בהיר מאוד) */
+--phi-coral: #D08770;     /* Highlight coral (כתום-אדמדם עדין) */
+--phi-slate: #4C566A;     /* Secondary slate */
+--phi-frost: #D8DEE9;     /* Frost (גוון בהיר) */
 ```
 
 ### טיפוגרפיה
-- Font: Heebo
-- Weights: 400 (regular), 500 (medium), 700 (bold)
+- Headers: Inter (clean, modern) - `font-inter`
+- Body: Heebo (עברית) - ברירת מחדל
+- φ Symbol: Georgia, "Times New Roman", serif
+- Weights: 400 (regular), 500 (medium), 600 (semi-bold), 700 (bold), 800 (extra-bold)
 
 ### קומפוננטות
 - שימוש ב-shadcn/ui כבסיס
 - Lucide-react לאייקונים
 - Recharts לגרפים
-- Framer Motion לאנימציות
+- Framer Motion לאנימציות חלקות
+- **PhiLogo** - לוגו עם הסימן φ
+- **PhiScore** - מד ציון φ (0-100)
+- **PhiAnimation** - אנימציות של הסימן φ
 
 ### עקרונות
 1. **Mobile First** - עיצוב למובייל קודם
-2. **Accessibility** - WCAG 2.1 AA
-3. **RTL Support** - תמיכה מלאה בעברית
-4. **Loading States** - תמיד להציג feedback
-5. **Error Boundaries** - תפיסת שגיאות ברמת קומפוננטות
+2. **Minimalist Design** - עיצוב מודרני מינימליסטי (בהשראת Stripe/Linear)
+3. **Phi-Centric** - הסימן φ נוכח בכל מקום
+4. **Accessibility** - WCAG 2.1 AA
+5. **RTL Support** - תמיכה מלאה בעברית
+6. **Loading States** - תמיד להציג feedback
+7. **Error Boundaries** - תפיסת שגיאות ברמת קומפוננטות
+8. **Smooth Animations** - אנימציות עדינות עם Framer Motion
 
 ## אבטחה
 
@@ -141,10 +155,11 @@
 
 ### System Prompt
 ```
-אתה מאמן פיננסי אישי ישראלי. אתה מלווה את המשתמש בשיפור המצב הכלכלי שלו.
+אתה מאמן φ (Phi) - מאמן פיננסי אישי ישראלי. אתה מלווה את המשתמש למצוא את ה-φ שלו - האיזון המושלם בין הכנסות להוצאות.
 דבר בשפה חמה, פשוטה וידידותית. תן עצות מעשיות, לא תיאורטיות.
 אל תיתן ייעוץ פיננסי או משפטי פורמלי - אתה מלווה, לא יועץ.
 השתמש באימוג'ים במידה. תמיד עודד ותמוך.
+השתמש במונח "ציון φ" או "φ Score" כשמדברים על בריאות פיננסית.
 ```
 
 ### Context לכל query

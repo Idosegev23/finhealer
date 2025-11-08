@@ -7,6 +7,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Marquee } from "@/components/ui/marquee";
 import { usePendingExpensesCount } from "@/lib/hooks/usePendingExpensesCount";
+import PhiLogo from "@/components/ui/PhiLogo";
 import {
   Home,
   TrendingUp,
@@ -163,9 +164,20 @@ export function DashboardNav() {
   ];
 
   return (
-    <div className={`sticky top-0 z-50 ${isDark ? 'bg-card-dark border-gray-800' : 'bg-white border-gray-200'} border-b shadow-md transition-colors duration-200`} dir="rtl">
+    <div className={`sticky top-0 z-50 ${isDark ? 'bg-card-dark border-gray-800' : 'bg-white border-phi-frost'} border-b shadow-md transition-colors duration-200`} dir="rtl">
+      {/* Phi Header with Logo */}
+      <div className="bg-gradient-to-l from-phi-gold via-phi-coral to-phi-gold px-4 py-2 flex items-center justify-between">
+        <Link href="/dashboard" className="hover:scale-105 transition-transform">
+          <PhiLogo size="sm" showText animated={false} />
+        </Link>
+        <div className="flex items-center gap-1 text-white text-sm font-medium">
+          <span className="text-xl" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>φ</span>
+          <span className="hidden sm:inline">האיזון המושלם שלך</span>
+        </div>
+      </div>
+      
       {/* Spybar - נתונים פיננסיים עם Marquee */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white overflow-visible relative">
+      <div className="bg-gradient-to-r from-phi-dark via-phi-slate to-phi-dark text-white overflow-visible relative">
         <Marquee pauseOnHover className="[--duration:10s] [--gap:2rem] py-2">
           {financialItems.map((item, idx) => (
             <div key={idx} className="flex items-center gap-2 whitespace-nowrap">
@@ -184,7 +196,7 @@ export function DashboardNav() {
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 bg-blue-700/80 backdrop-blur-sm hover:bg-blue-600/80 transition-colors rounded-full px-3 py-1.5 shadow-lg"
+              className="flex items-center gap-2 bg-phi-gold/90 backdrop-blur-sm hover:bg-phi-coral/90 transition-colors rounded-full px-3 py-1.5 shadow-lg"
             >
               <User className="w-4 h-4" />
               <span className="text-sm font-medium hidden sm:block">{userName}</span>
@@ -226,7 +238,7 @@ export function DashboardNav() {
           </div>
 
           {/* Theme Toggle */}
-          <div className="bg-blue-700/80 backdrop-blur-sm rounded-full p-1 shadow-lg">
+          <div className="bg-phi-gold/90 backdrop-blur-sm rounded-full p-1 shadow-lg">
           <ThemeToggle />
           </div>
         </div>
@@ -249,10 +261,10 @@ export function DashboardNav() {
                     title={item.label}
                     className={`group relative flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl transition-all flex-1 ${
                       isActive
-                        ? "bg-[#3A7BD5] text-white shadow-lg"
+                        ? "bg-gradient-to-l from-phi-gold to-phi-coral text-white shadow-lg"
                         : isDark 
                           ? "text-gray-400 hover:bg-gray-800 hover:text-white"
-                          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                          : "text-phi-slate hover:bg-phi-frost hover:text-phi-dark"
                     }`}
                   >
                     <Icon className="w-6 h-6" />
@@ -267,10 +279,10 @@ export function DashboardNav() {
                   onClick={() => setDataDropdownOpen(!dataDropdownOpen)}
                   className={`group w-full flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl transition-all ${
                     pathname.startsWith('/dashboard/data')
-                      ? "bg-[#3A7BD5] text-white shadow-lg"
+                      ? "bg-gradient-to-l from-phi-gold to-phi-coral text-white shadow-lg"
                       : isDark 
                         ? "text-gray-400 hover:bg-gray-800 hover:text-white"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                        : "text-phi-slate hover:bg-phi-frost hover:text-phi-dark"
                   }`}
                 >
                   <Plus className="w-6 h-6" />
@@ -317,10 +329,10 @@ export function DashboardNav() {
                   onClick={() => setReportsDropdownOpen(!reportsDropdownOpen)}
                   className={`group w-full flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl transition-all ${
                     pathname.startsWith('/dashboard/reports')
-                      ? "bg-[#3A7BD5] text-white shadow-lg"
+                      ? "bg-gradient-to-l from-phi-gold to-phi-coral text-white shadow-lg"
                       : isDark 
                         ? "text-gray-400 hover:bg-gray-800 hover:text-white"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                        : "text-phi-slate hover:bg-phi-frost hover:text-phi-dark"
                   }`}
                 >
                   <FileText className="w-6 h-6" />

@@ -31,9 +31,20 @@ const config: Config = {
   				DEFAULT: 'hsl(var(--secondary))',
   				foreground: 'hsl(var(--secondary-foreground))'
   			},
-  			dark: '#1E2A3B',
-  			success: '#7ED957',
-  			warning: '#F6A623',
+  			// Phi Brand Colors
+  			phi: {
+  				dark: '#2E3440',      // Primary dark (אפור-כחול רך)
+  				gold: '#A96B48',      // Accent gold (נחושת/ברונזה)
+  				mint: '#8FBCBB',      // Success mint (ירוק-מנטה)
+  				bg: '#ECEFF4',        // Background (אפור בהיר)
+  				coral: '#D08770',     // Highlight coral (כתום-אדמדם)
+  				slate: '#4C566A',     // Secondary slate
+  				frost: '#D8DEE9',     // Frost (גוון בהיר)
+  			},
+  			// Legacy colors (for backward compatibility)
+  			dark: '#2E3440',
+  			success: '#8FBCBB',
+  			warning: '#D08770',
   			destructive: {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
@@ -83,16 +94,40 @@ const config: Config = {
   				to: {
   					height: '0'
   				}
+  			},
+  			'phi-glow': {
+  				'0%, 100%': {
+  					opacity: '1',
+  					transform: 'scale(1)'
+  				},
+  				'50%': {
+  					opacity: '0.7',
+  					transform: 'scale(1.05)'
+  				}
+  			},
+  			'phi-rotate': {
+  				'0%': {
+  					transform: 'rotate(0deg)'
+  				},
+  				'100%': {
+  					transform: 'rotate(360deg)'
+  				}
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'phi-glow': 'phi-glow 3s ease-in-out infinite',
+  			'phi-rotate': 'phi-rotate 20s linear infinite'
   		},
   		fontFamily: {
   			sans: [
   				'var(--font-heebo)',
   				'system-ui',
+  				'sans-serif'
+  			],
+  			inter: [
+  				'var(--font-inter)',
   				'sans-serif'
   			]
   		}

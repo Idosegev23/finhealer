@@ -18,6 +18,7 @@ export default function FullReflectionWizard({ categories, userId }: FullReflect
 
   // State רק לפרטים אישיים
   const [data, setData] = useState({
+    full_name: '',  // שם מלא
     age: null,
     marital_status: '',
     city: '',
@@ -29,7 +30,7 @@ export default function FullReflectionWizard({ categories, userId }: FullReflect
     setData(prev => ({ ...prev, [field]: value }));
   };
 
-  const isFormValid = data.age && data.marital_status && data.city && data.employment_status;
+  const isFormValid = data.full_name && data.age && data.marital_status && data.city && data.employment_status;
 
   const handleComplete = async () => {
     if (!isFormValid) return;
@@ -42,6 +43,7 @@ export default function FullReflectionWizard({ categories, userId }: FullReflect
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          full_name: data.full_name,
           age: data.age,
           marital_status: data.marital_status,
           city: data.city,
@@ -112,8 +114,10 @@ export default function FullReflectionWizard({ categories, userId }: FullReflect
                 >
                   <CheckCircle2 className="w-20 h-20 text-green-500 mx-auto mb-4" />
                 </motion.div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">כל הכבוד! 🎉</h2>
-                <p className="text-gray-600">הפרטים נשמרו בהצלחה. מעביר אותך לדשבורד...</p>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  כל הכבוד {data.full_name}! 🎉
+                </h2>
+                <p className="text-gray-600">התחלנו להכיר אותך טוב יותר. מעביר אותך לדשבורד...</p>
               </motion.div>
             </motion.div>
           )}

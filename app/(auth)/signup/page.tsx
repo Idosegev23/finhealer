@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
+import PhiLogo from '@/components/ui/PhiLogo'
 
 export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)

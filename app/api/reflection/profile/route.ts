@@ -17,17 +17,24 @@ export async function POST(request: Request) {
 
     // קבלת נתונים מהבקשה
     const body = await request.json();
-    const { dependents, incomeSources, employment_status, total_fixed_expenses, total_monthly_income, total_debt, ...profile } = body;
+    const { dependents, incomeSources, employment_status, full_name, age, marital_status, city, total_fixed_expenses, total_monthly_income, total_debt, ...profile } = body;
 
-    // עדכון employment_status בטבלת users אם סופק
-    if (employment_status) {
+    // עדכון פרטים אישיים בטבלת users
+    const userUpdates: any = {};
+    if (employment_status) userUpdates.employment_status = employment_status;
+    if (full_name) userUpdates.full_name = full_name;
+    if (age) userUpdates.age = age;
+    if (marital_status) userUpdates.marital_status = marital_status;
+    if (city) userUpdates.city = city;
+
+    if (Object.keys(userUpdates).length > 0) {
       const { error: userUpdateError } = await (supabase as any)
         .from('users')
-        .update({ employment_status })
+        .update(userUpdates)
         .eq('id', user.id);
       
       if (userUpdateError) {
-        console.error('Error updating user employment_status:', userUpdateError);
+        console.error('Error updating user details:', userUpdateError);
         // לא נכשיל את כל הבקשה
       }
     }

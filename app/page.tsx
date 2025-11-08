@@ -1,10 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, Smartphone, TrendingUp, Target, Users, Brain, Zap, Shield, HeartHandshake, Sparkles, Menu, X } from 'lucide-react'
-import DotGrid from '@/components/ui/DotGrid'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useState } from 'react'
+import { 
+  Menu, X, Shield, CheckCircle2, Smartphone, Target, 
+  TrendingUp, Zap, MessageCircle, Brain, Users, BarChart3,
+  Eye, Activity, Sparkles, ArrowLeft, ChevronLeft
+} from 'lucide-react'
+import PhiLogo from '@/components/ui/PhiLogo'
+import PhiAnimation from '@/components/landing/PhiAnimation'
+import PhiScore from '@/components/landing/PhiScore'
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -12,570 +18,448 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-white">
       {/* Header */}
-      <header className="border-b border-[#BBE8F2]/30 bg-white sticky top-0 z-50 shadow-sm">
+      <header className="border-b border-phi-frost/50 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
-            <motion.div 
-              className="text-2xl font-bold text-[#3E6E8C] flex items-center gap-2"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-            💪 FinHealer
-            </motion.div>
+            <PhiLogo size="sm" />
             
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex gap-6 items-center">
-              <Link href="#how-it-works" className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium">
+            <nav className="hidden md:flex gap-8 items-center">
+              <Link href="#how-it-works" className="text-phi-slate hover:text-phi-dark transition-colors font-medium">
                 איך זה עובד
               </Link>
-              <Link href="#features" className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium">
+              <Link href="#features" className="text-phi-slate hover:text-phi-dark transition-colors font-medium">
                 תכונות
               </Link>
-              <Link href="#pricing" className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium">
+              <Link href="#pricing" className="text-phi-slate hover:text-phi-dark transition-colors font-medium">
                 מחירים
               </Link>
               <Link 
                 href="/login" 
-                className="text-[#3E6E8C] hover:text-[#D96666] transition-colors font-bold"
+                className="text-phi-gold hover:text-phi-coral transition-colors font-bold"
               >
                 התחבר
               </Link>
               <Link 
                 href="/signup" 
-                className="relative group bg-gradient-to-br from-[#F2C185] to-[#D96666] text-white px-6 py-2.5 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 overflow-hidden"
+                className="bg-gradient-to-l from-phi-gold to-phi-coral text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
               >
-                <span className="relative z-10">הרשם</span>
-                <div className="absolute inset-0 bg-gradient-to-br from-[#D96666] to-[#F2C185] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                הרשם
               </Link>
             </nav>
 
             {/* Mobile Menu Button */}
             <button
-              className="md:hidden text-[#3E6E8C] p-2 hover:bg-[#BBE8F2]/20 rounded-lg transition-colors"
+              className="md:hidden text-phi-dark p-2"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="תפריט"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
 
           {/* Mobile Navigation */}
-          <AnimatePresence>
-            {mobileMenuOpen && (
-              <motion.nav
-                className="md:hidden mt-4 pb-4 flex flex-col gap-3"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Link 
-                  href="#how-it-works" 
-                  className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium py-2 px-3 hover:bg-[#BBE8F2]/10 rounded-lg"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-              איך זה עובד
-            </Link>
-                <Link 
-                  href="#features" 
-                  className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium py-2 px-3 hover:bg-[#BBE8F2]/10 rounded-lg"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-              תכונות
-            </Link>
-                <Link 
-                  href="#pricing" 
-                  className="text-[#3B3740] hover:text-[#3E6E8C] transition-colors font-medium py-2 px-3 hover:bg-[#BBE8F2]/10 rounded-lg"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-              מחירים
-            </Link>
-                <Link 
-                  href="/login" 
-                  className="text-[#3E6E8C] hover:text-[#D96666] transition-colors font-bold py-2 px-3 text-center hover:bg-[#BBE8F2]/10 rounded-lg"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  התחבר
-            </Link>
-                <Link 
-                  href="/signup" 
-                  className="relative group bg-gradient-to-br from-[#F2C185] to-[#D96666] text-white px-6 py-3 rounded-2xl text-center font-bold shadow-lg active:scale-95 transition-transform overflow-hidden"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <span className="relative z-10">הרשם</span>
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#D96666] to-[#F2C185] opacity-0 group-active:opacity-100 transition-opacity duration-200" />
-            </Link>
-              </motion.nav>
-            )}
-          </AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.nav
+              className="md:hidden mt-4 pb-4 flex flex-col gap-3"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+            >
+              <Link href="#how-it-works" className="text-phi-slate py-2 px-3">איך זה עובד</Link>
+              <Link href="#features" className="text-phi-slate py-2 px-3">תכונות</Link>
+              <Link href="#pricing" className="text-phi-slate py-2 px-3">מחירים</Link>
+              <Link href="/login" className="text-phi-gold py-2 px-3 font-bold">התחבר</Link>
+              <Link href="/signup" className="bg-gradient-to-l from-phi-gold to-phi-coral text-white px-6 py-3 rounded-xl text-center font-bold">
+                הרשם
+              </Link>
+            </motion.nav>
+          )}
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="relative container mx-auto px-4 py-16 md:py-24 text-center overflow-hidden">
-        {/* DotGrid Background */}
-        <div className="absolute inset-0 w-full h-full opacity-50">
-          <DotGrid
-            dotSize={8}
-            gap={20}
-            baseColor="#BBE8F2"
-            activeColor="#3E6E8C"
-            proximity={100}
-            shockRadius={200}
-            shockStrength={3}
-            resistance={800}
-            returnDuration={1.2}
-          />
-        </div>
-        
-        <motion.div 
-          className="relative z-10 max-w-5xl mx-auto"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-        >
-          <motion.div 
-            className="inline-flex items-center gap-2 bg-[#BBE8F2]/30 border border-[#3E6E8C]/20 text-[#3E6E8C] px-4 md:px-5 py-2 md:py-2.5 rounded-full text-xs md:text-sm font-bold mb-6 md:mb-8"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
+      <section className="relative container mx-auto px-4 py-16 md:py-24">
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+          {/* Left: Content */}
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8 }}
           >
-            <Sparkles className="w-4 h-4" />
-            <span>ליווי פיננסי מתמשך שמרגיש כמו CRM חכם</span>
-          </motion.div>
-          
-          <motion.h1 
-            className="text-4xl md:text-6xl lg:text-7xl font-black text-[#3B3740] mb-6 leading-tight px-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            המאמן הפיננסי
-            <br />
-            האישי שלך
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3E6E8C] via-[#F2C185] to-[#D96666]">
-              24/7 בווטסאפ
-            </span>
-          </motion.h1>
-          
-          <motion.p 
-            className="text-lg md:text-xl lg:text-2xl text-[#3B3740]/80 mb-8 md:mb-10 max-w-3xl mx-auto leading-relaxed px-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-          >
-            מעקב חכם, תובנות מותאמות אישית, והליווי של גדי - מאמן פיננסי מוסמך.
-            <br className="hidden md:block" />
-            <strong className="text-[#3B3740]">לא עוד Excel.</strong> לא עוד דאגות. רק שליטה מלאה על הכסף שלך.
-          </motion.p>
-          
-          <motion.div 
-            className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center px-4 mb-10 md:mb-12"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <Link
-              href="/login"
-              className="group relative bg-gradient-to-br from-[#F2C185] via-[#D96666] to-[#F2C185] text-white px-8 md:px-10 py-4 md:py-5 rounded-2xl text-base md:text-lg font-black hover:shadow-2xl transition-all inline-flex items-center justify-center gap-2 shadow-xl overflow-hidden hover:-translate-y-1 active:scale-95"
+            <motion.div 
+              className="inline-flex items-center gap-2 bg-phi-frost/50 border border-phi-gold/20 text-phi-gold px-4 py-2 rounded-full text-sm font-bold mb-6"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
             >
-              <span className="relative z-10">התחל עכשיו - 7 ימים חינם</span>
-              <ArrowLeft className="w-5 h-5 relative z-10 group-hover:translate-x-[-4px] transition-transform" />
-              <div className="absolute inset-0 bg-gradient-to-br from-[#D96666] via-[#F2C185] to-[#D96666] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="absolute -inset-1 bg-gradient-to-r from-[#F2C185] to-[#D96666] blur opacity-30 group-hover:opacity-50 transition-opacity" />
-            </Link>
-            <a
-              href="#how-it-works"
-              className="border-2 border-[#3E6E8C] text-[#3E6E8C] px-8 md:px-10 py-4 md:py-5 rounded-2xl text-base md:text-lg font-bold hover:bg-[#BBE8F2]/20 hover:shadow-lg transition-all"
-            >
-              איך זה עובד?
-            </a>
-          </motion.div>
-
-          {/* Trust indicators */}
-          <motion.div 
-            className="flex items-center justify-center gap-4 md:gap-8 flex-wrap text-xs md:text-sm px-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-          >
-            {[
-              { icon: Shield, text: "מאובטח 100%", color: "#3E6E8C" },
-              { icon: Users, text: "ליווי אנושי של גדי", color: "#F2C185" },
-              { icon: CheckCircle2, text: "ללא התחייבות", color: "#D96666" }
-            ].map((item, i) => (
-              <motion.div 
-                key={i}
-                className="flex items-center gap-2 bg-white px-3 md:px-4 py-2 rounded-full shadow-md border border-gray-100"
-                whileHover={{ scale: 1.05, y: -2 }}
-                transition={{ type: "spring", stiffness: 400 }}
+              <Sparkles className="w-4 h-4" />
+              <span>היחס הזהב של הבריאות הפיננסית</span>
+            </motion.div>
+            
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-phi-dark mb-6 leading-tight">
+              φ
+              <br />
+              האיזון המושלם
+              <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-l from-phi-gold to-phi-coral">
+                לכסף שלך
+              </span>
+            </h1>
+            
+            <p className="text-xl text-phi-slate mb-8 leading-relaxed">
+              פלטפורמה חכמה לבריאות פיננסית עם ליווי אישי של גדי - מאמן פיננסי מוסמך.
+              <br className="hidden md:block" />
+              <strong className="text-phi-dark">מעקב אוטומטי</strong>, תובנות מבוססות AI, ו<strong className="text-phi-dark">בוט WhatsApp חכם</strong>.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <Link
+                href="/login"
+                className="group relative bg-gradient-to-l from-phi-gold to-phi-coral text-white px-8 py-4 rounded-xl text-lg font-black shadow-xl hover:shadow-2xl transition-all inline-flex items-center justify-center gap-2 hover:-translate-y-1"
               >
-                <item.icon className="w-4 md:w-5 h-4 md:h-5" style={{ color: item.color }} />
-                <span className="font-bold text-[#3B3740]">{item.text}</span>
-              </motion.div>
-            ))}
-          </motion.div>
-        </motion.div>
+                <span>התחל עכשיו - 7 ימים חינם</span>
+                <ChevronLeft className="w-5 h-5 group-hover:translate-x-[-4px] transition-transform" />
+              </Link>
+              <a
+                href="#how-it-works"
+                className="border-2 border-phi-dark text-phi-dark px-8 py-4 rounded-xl text-lg font-bold hover:bg-phi-dark hover:text-white transition-all text-center"
+              >
+                גלה את ה-φ שלך
+              </a>
+            </div>
 
-        {/* Floating Elements */}
-        <motion.div
-          className="absolute top-20 right-[10%] w-20 h-20 bg-gradient-to-br from-[#BBE8F2]/40 to-transparent rounded-full blur-xl"
-          animate={{ 
-            y: [0, -20, 0],
-            scale: [1, 1.1, 1]
-          }}
-          transition={{ 
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div
-          className="absolute bottom-20 left-[15%] w-32 h-32 bg-gradient-to-br from-[#F2C185]/40 to-transparent rounded-full blur-xl"
-          animate={{ 
-            y: [0, 20, 0],
-            scale: [1, 1.2, 1]
-          }}
-          transition={{ 
-            duration: 5,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
+            {/* Trust Indicators */}
+            <div className="flex items-center gap-6 flex-wrap text-sm">
+              {[
+                { icon: Shield, text: "מאובטח 100%" },
+                { icon: Users, text: "ליווי אנושי" },
+                { icon: CheckCircle2, text: "ללא התחייבות" }
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-phi-slate">
+                  <item.icon className="w-5 h-5 text-phi-mint" />
+                  <span className="font-medium">{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Right: Animation */}
+          <motion.div
+            className="flex justify-center"
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+          >
+            <PhiAnimation className="w-full max-w-md" />
+          </motion.div>
+        </div>
       </section>
 
-      {/* How It Works - 5 Phases */}
-      <section id="how-it-works" className="bg-gradient-to-b from-white to-[#F5F6F8]/50 py-24">
+      {/* What is Phi Section */}
+      <section className="bg-gradient-to-b from-phi-bg/50 to-white py-20">
         <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
           >
-            <h2 className="text-5xl font-black text-center mb-6 text-[#1E2A3B]">
-            המסע הפיננסי שלך - 5 שלבים
-          </h2>
-            <p className="text-center text-lg text-[#555555] mb-16 max-w-2xl mx-auto">
-            FinHealer מלווה אותך בתהליך מובנה שמתאים לך אישית - מרגע הרישום ועד שליטה מלאה
-          </p>
+            <h2 className="text-4xl md:text-5xl font-black text-phi-dark mb-4">
+              מה זה φ (Phi)?
+            </h2>
+            <p className="text-xl text-phi-slate max-w-2xl mx-auto">
+              φ (פאי) הוא היחס הזהב - הנוסחה המתמטית לאיזון מושלם
+            </p>
           </motion.div>
-          
-          <div className="grid md:grid-cols-5 gap-6 max-w-7xl mx-auto">
-            {([
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {[
               {
-                number: "1",
-                title: "שיקוף עבר",
-                description: "נבנה תמונת מצב 360° - הכנסות, הוצאות, חובות, נכסים",
-                icon: "🔍",
-                color: "primary" as const
+                icon: '🌀',
+                title: 'φ = איזון',
+                desc: 'היחס הזהב בין הכנסות להוצאות - כמו בטבע, באמנות, ובכסף שלך',
+                color: 'phi-gold'
               },
               {
-                number: "2",
-                title: "זיהוי הרגלים",
-                description: "הבוט מזהה דפוסי הוצאה ונותן טיפים מותאמים",
-                icon: "🧠",
-                color: "success" as const
+                icon: '📊',
+                title: 'φ = הנוסחה שלך',
+                desc: 'ציון בריאות פיננסית 0-100 שמחושב מתוך 12 פרמטרים חכמים',
+                color: 'phi-mint'
               },
               {
-                number: "3",
-                title: "תקציב חכם",
-                description: "יצירה אוטומטית של תקציב מבוסס על ההתנהלות שלך",
-                icon: "💰",
-                color: "warning" as const
-              },
-              {
-                number: "4",
-                title: "הגדרת מטרות",
-                description: "יעדי חיסכון אישיים + ילדים ומטרות",
-                icon: "🎯",
-                color: "primary" as const
-              },
-              {
-                number: "5",
-                title: "בקרה רציפה",
-                description: "מעקב יומי, התראות חכמות, ודוחות מפורטים",
-                icon: "📊",
-                color: "success" as const
+                icon: '🎯',
+                title: 'φ = תכנון חכם',
+                desc: 'מעקב אוטומטי, תובנות AI, והשגת יעדים פיננסיים בצורה מדויקת',
+                color: 'phi-coral'
               }
-            ] as const).map((phase, i) => (
+            ].map((item, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1, duration: 0.5 }}
+                transition={{ delay: i * 0.1 }}
+                className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all border border-phi-frost group"
               >
-                <PhaseCard {...phase} />
+                <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">{item.icon}</div>
+                <h3 className="text-2xl font-bold text-phi-dark mb-3">{item.title}</h3>
+                <p className="text-phi-slate leading-relaxed">{item.desc}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="container mx-auto px-4 py-24">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
-          <h2 className="text-5xl font-black text-center mb-6 text-[#1E2A3B]">
-          למה FinHealer שונה?
-        </h2>
-          <p className="text-center text-lg text-[#555555] mb-16 max-w-2xl mx-auto">
-          לא עוד אפליקציה &quot;עוד אחת&quot; - זה מאמן אישי שמלווה אותך בכל צעד
-        </p>
-        </motion.div>
-        
-        {/* Bento Grid Layout */}
-        <div className="grid md:grid-cols-6 gap-6 max-w-7xl mx-auto">
-          {/* Large Feature - WhatsApp Bot */}
-          <motion.div
-            className="md:col-span-3 md:row-span-2 group"
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="h-full bg-gradient-to-br from-[#3A7BD5] to-[#2E5EA5] p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
-              <Smartphone className="w-16 h-16 text-white mb-6 relative z-10" />
-              <h3 className="text-3xl font-bold mb-4 text-white relative z-10">בוט וואטסאפ דו-כיווני</h3>
-              <p className="text-white/90 text-lg leading-relaxed relative z-10">
-                שלח טקסט או תמונת קבלה - הבוט מבין עברית, מעבד OCR ומציע קטגוריות חכמות. כמו לדבר עם חבר!
-              </p>
-              <div className="mt-6 flex gap-2 relative z-10">
-                <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm">OCR</span>
-                <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm">עברית</span>
-                <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm">24/7</span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* AI Assistant */}
-          <motion.div
-            className="md:col-span-3 group"
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <div className="h-full bg-white p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all border-2 border-[#7ED957]/20 relative overflow-hidden">
-              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-[#7ED957]/10 rounded-full blur-2xl" />
-              <Brain className="w-12 h-12 text-[#7ED957] mb-4" />
-              <h3 className="text-2xl font-bold mb-3 text-[#1E2A3B]">AI Assistant בעברית</h3>
-              <p className="text-[#555555] leading-relaxed">
-                מאמן פיננסי AI שמכיר את המצב שלך, נותן עצות מותאמות ומעודד אותך להצליח.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Human Support */}
-          <motion.div
-            className="md:col-span-2 group"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <div className="h-full bg-gradient-to-br from-[#F6A623] to-[#F68B23] p-6 rounded-3xl shadow-lg hover:shadow-2xl transition-all relative overflow-hidden">
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/20 rounded-full blur-2xl" />
-              <HeartHandshake className="w-12 h-12 text-white mb-4 relative z-10" />
-              <h3 className="text-xl font-bold mb-2 text-white relative z-10">ליווי אנושי של גדי</h3>
-              <p className="text-white/90 text-sm relative z-10">
-                לא רק בוט - גדי מלווה אותך אישית
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Smart Budget */}
-          <motion.div
-            className="md:col-span-2 group"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <div className="h-full bg-white p-6 rounded-3xl shadow-lg hover:shadow-2xl transition-all border-2 border-[#3A7BD5]/20">
-              <TrendingUp className="w-12 h-12 text-[#3A7BD5] mb-4" />
-              <h3 className="text-xl font-bold mb-2 text-[#1E2A3B]">תקציב אוטומטי</h3>
-              <p className="text-[#555555] text-sm">
-                המערכת לומדת ובונה תקציב מותאם אישית
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Goals */}
-          <motion.div
-            className="md:col-span-2 group"
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            <div className="h-full bg-gradient-to-br from-[#7ED957]/20 to-[#7ED957]/5 p-6 rounded-3xl shadow-lg hover:shadow-2xl transition-all border-2 border-[#7ED957]/30">
-              <Target className="w-12 h-12 text-[#7ED957] mb-4" />
-              <h3 className="text-xl font-bold mb-2 text-[#1E2A3B]">יעדים ומטרות</h3>
-              <p className="text-[#555555] text-sm">
-                הגדר יעדי חיסכון אישיים ומשפחתיים
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Real-time Alerts */}
-          <motion.div
-            className="md:col-span-2 md:row-span-1 group"
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-          >
-            <div className="h-full bg-white p-6 rounded-3xl shadow-lg hover:shadow-2xl transition-all border-2 border-[#F6A623]/20 relative overflow-hidden">
-              <div className="absolute -bottom-5 -right-5 w-24 h-24 bg-[#F6A623]/10 rounded-full blur-xl" />
-              <Zap className="w-12 h-12 text-[#F6A623] mb-4 relative z-10" />
-              <h3 className="text-xl font-bold mb-2 text-[#1E2A3B] relative z-10">התראות בזמן אמת</h3>
-              <p className="text-[#555555] text-sm relative z-10">
-                הודעות חכמות בווטסאפ - חם וידידותי
-              </p>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Additional Benefits */}
-        <div className="mt-16 bg-gradient-to-br from-[#3A7BD5]/10 to-[#2E5EA5]/5 rounded-2xl p-8 md:p-12">
-          <h3 className="text-2xl font-bold text-center mb-8 text-[#1E2A3B]">
-            ועוד...
-          </h3>
-          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            <BenefitItem text="OCR חכם לקבלות (Tesseract.js)" />
-            <BenefitItem text="דוחות חודשיים ושנתיים אוטומטיים" />
-            <BenefitItem text="מעקב תזרים ויתרות בזמן אמת" />
-            <BenefitItem text="סיכומים יומיים בשעה שבוחרים" />
-            <BenefitItem text="זיהוי דפוסי הוצאה והרגלים" />
-            <BenefitItem text="חישוב ציון בריאות פיננסית (0-100)" />
-            <BenefitItem text="מנוע המלצות מבוסס מגמות" />
-            <BenefitItem text="אינטגרציה עם חשבונית ירוקה" />
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="bg-gradient-to-b from-white to-[#F5F6F8]/50 py-24">
+      {/* How It Works - 5 Phases */}
+      <section id="how-it-works" className="py-20">
         <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
           >
-            <h2 className="text-5xl font-black text-center mb-6 text-[#1E2A3B]">
-            בחר את התוכנית המתאימה לך
-          </h2>
-            <p className="text-center text-lg text-[#555555] mb-16">
-            שתי תוכניות פשוטות - כל אחת עם ערך אמיתי
-          </p>
+            <h2 className="text-4xl md:text-5xl font-black text-phi-dark mb-4">
+              המסע שלך ל-φ המושלם
+            </h2>
+            <p className="text-xl text-phi-slate max-w-2xl mx-auto">
+              5 שלבים מובנים שמתאימים לך אישית
+            </p>
           </motion.div>
-          
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {/* Basic Plan */}
-            <motion.div 
-              className="bg-white rounded-3xl shadow-xl p-8 border-2 border-[#3A7BD5]/20 hover:border-[#3A7BD5] hover:shadow-2xl transition-all relative"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
+
+          {/* Timeline */}
+          <div className="max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-5 gap-6">
+              {[
+                { num: '1', title: 'שיקוף עבר', desc: 'תמונת מצב 360°', icon: Eye },
+                { num: '2', title: 'זיהוי הרגלים', desc: 'למידת דפוסים', icon: Activity },
+                { num: '3', title: 'תקציב חכם', desc: 'יצירה אוטומטית', icon: TrendingUp },
+                { num: '4', title: 'הגדרת מטרות', desc: 'יעדי חיסכון', icon: Target },
+                { num: '5', title: 'בקרה רציפה', desc: 'מעקב יומי', icon: BarChart3 }
+              ].map((phase, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="relative"
+                >
+                  <div className="bg-white p-6 rounded-2xl shadow-lg border-2 border-phi-frost hover:border-phi-gold transition-all group">
+                    <div className="absolute -top-4 right-4 w-10 h-10 rounded-full bg-phi-gold text-white flex items-center justify-center font-bold shadow-lg">
+                      {phase.num}
+                    </div>
+                    <phase.icon className="w-12 h-12 text-phi-gold mb-4 group-hover:scale-110 transition-transform" />
+                    <h3 className="text-lg font-bold text-phi-dark mb-2">{phase.title}</h3>
+                    <p className="text-sm text-phi-slate">{phase.desc}</p>
+                  </div>
+                  {/* Connector Line */}
+                  {i < 4 && (
+                    <div className="hidden md:block absolute top-1/2 left-full w-6 h-0.5 bg-phi-frost" />
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Bento Grid */}
+      <section id="features" className="bg-gradient-to-b from-white to-phi-bg/50 py-20">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl md:text-5xl font-black text-phi-dark mb-4">
+              למה Phi שונה?
+            </h2>
+            <p className="text-xl text-phi-slate max-w-2xl mx-auto">
+              לא עוד אפליקציה "עוד אחת" - זה מאמן אישי שמלווה אותך
+            </p>
+          </motion.div>
+
+          {/* Bento Grid */}
+          <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto">
+            {/* Large - WhatsApp Bot */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              whileHover={{ scale: 1.02, y: -5 }}
+              className="md:col-span-2 md:row-span-2 bg-gradient-to-br from-phi-gold to-phi-coral p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all text-white relative overflow-hidden group"
             >
-              <div className="absolute -top-4 right-8 bg-[#7ED957] text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg">
-                הכי פופולרי
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+              <Smartphone className="w-16 h-16 mb-4 relative z-10" />
+              <h3 className="text-3xl font-bold mb-4 relative z-10">בוט WhatsApp חכם</h3>
+              <p className="text-lg mb-4 relative z-10 opacity-90">
+                שלח הודעה או תמונת קבלה - הבוט מבין עברית, מעבד OCR ומציע קטגוריות אוטומטית
+              </p>
+              <div className="flex gap-2 relative z-10">
+                <span className="bg-white/20 px-3 py-1 rounded-full text-sm">OCR</span>
+                <span className="bg-white/20 px-3 py-1 rounded-full text-sm">24/7</span>
+                <span className="bg-white/20 px-3 py-1 rounded-full text-sm">עברית</span>
               </div>
-              
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold mb-2 text-[#1E2A3B]">Basic</h3>
-                <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-5xl font-bold text-[#3A7BD5]">₪49</span>
-                  <span className="text-[#555555]">לחודש</span>
-                </div>
-                <p className="text-sm text-[#555555] mt-2">מושלם למתחילים</p>
-              </div>
-              
-              <ul className="space-y-3 mb-8">
-                <PricingFeature text="מעקב הוצאות והכנסות בלתי מוגבל" />
-                <PricingFeature text="בוט וואטסאפ חכם 24/7" />
-                <PricingFeature text="AI Assistant אישי (GPT-4)" />
-                <PricingFeature text="OCR לקבלות (זיהוי אוטומטי)" />
-                <PricingFeature text="תקציב אוטומטי + רמזור חכם" />
-                <PricingFeature text="יעדי חיסכון + מעקב התקדמות" />
-                <PricingFeature text="דוחות וגרפים מתקדמים" />
-                <PricingFeature text="התראות חכמות בזמן אמת" />
-                <PricingFeature text="ציון בריאות פיננסית" />
+            </motion.div>
+
+            {/* AI Assistant */}
+            <FeatureCard
+              icon={Brain}
+              title="AI Assistant"
+              desc="מאמן AI שמכיר את המצב שלך ונותן עצות מותאמות"
+              color="mint"
+            />
+
+            {/* Human Support */}
+            <FeatureCard
+              icon={Users}
+              title="ליווי אישי"
+              desc="גדי מלווה אותך בתוכנית VIP"
+              color="coral"
+            />
+
+            {/* Tracking */}
+            <FeatureCard
+              icon={TrendingUp}
+              title="מעקב אוטומטי"
+              desc="תקציב חכם שמתעדכן בזמן אמת"
+              color="gold"
+            />
+
+            {/* Alerts */}
+            <FeatureCard
+              icon={Zap}
+              title="התראות חכמות"
+              desc="הודעות בזמן אמת בשפה חמה"
+              color="mint"
+            />
+
+            {/* Goals */}
+            <FeatureCard
+              icon={Target}
+              title="יעדים ומטרות"
+              desc="חיסכון אישי ומשפחתי"
+              color="coral"
+            />
+
+            {/* Reports */}
+            <FeatureCard
+              icon={BarChart3}
+              title="דוחות מתקדמים"
+              desc="גרפים וסיכומים ויזואליים"
+              color="gold"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Phi Score Section */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="grid md:grid-cols-2 gap-12 items-center max-w-5xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+            >
+              <h2 className="text-4xl md:text-5xl font-black text-phi-dark mb-6">
+                מה זה ציון φ?
+              </h2>
+              <p className="text-xl text-phi-slate mb-6 leading-relaxed">
+                ציון φ הוא מדד מתמטי (0-100) שמחושב מתוך <strong>12 פרמטרים</strong> של הבריאות הפיננסית שלך:
+              </p>
+              <ul className="space-y-3 mb-6">
+                {[
+                  'יחס הכנסות להוצאות',
+                  'אחוז חיסכון חודשי',
+                  'גובה חובות לעומת הכנסה',
+                  'קיום קרן חירום',
+                  'עמידה ביעדים',
+                  'ותובנות נוספות...'
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-phi-mint" />
+                    <span className="text-phi-dark">{item}</span>
+                  </li>
+                ))}
               </ul>
-              
-              <Link
-                href="/login"
-                className="block w-full bg-gradient-to-r from-[#3A7BD5] to-[#2E5EA5] text-white py-4 rounded-xl text-center font-bold hover:shadow-xl hover:scale-105 transition-all"
-              >
-                התחל עכשיו - 7 ימים חינם
-              </Link>
-              
-              <p className="text-sm text-[#555555] text-center mt-4">
-                ללא התחייבות • ביטול בכל עת
+              <p className="text-lg text-phi-slate">
+                ככל שה-φ שלך גבוה יותר - הבריאות הפיננסית שלך טובה יותר! 🎯
               </p>
             </motion.div>
 
-            {/* Advanced Plan */}
-            <motion.div 
-              className="bg-gradient-to-br from-[#1E2A3B] to-[#2E5EA5] rounded-3xl shadow-xl p-8 border-2 border-[#3A7BD5] relative text-white hover:shadow-2xl transition-all"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              whileHover={{ scale: 1.02, y: -5 }}
+              className="flex justify-center"
             >
-              <div className="absolute -top-4 right-8 bg-[#F6A623] text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg">
-                ליווי VIP
-              </div>
-              
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold mb-2">Advanced</h3>
-                <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-5xl font-bold">₪119</span>
-                  <span className="opacity-90">לחודש</span>
-                </div>
-                <p className="text-sm opacity-90 mt-2">ליווי אישי מלא</p>
-              </div>
-              
-              <ul className="space-y-3 mb-8">
-                <PricingFeature text="כל התכונות של Basic" light />
-                <PricingFeature text="⭐ 2 פגישות אישיות עם גדי בחודש" light highlight />
-                <PricingFeature text="⭐ הערות אישיות שבועיות מגדי" light highlight />
-                <PricingFeature text="⭐ ליווי צמוד בווטסאפ" light highlight />
-                <PricingFeature text="⭐ תכנון פיננסי מותאם אישית" light highlight />
-                <PricingFeature text="⭐ ייעוץ למיחזור הלוואות" light highlight />
-                <PricingFeature text="⭐ אסטרטגיות חיסכון מתקדמות" light highlight />
-                <PricingFeature text="תמיכה מועדפת בצ'אט" light />
-              </ul>
-              
-              <Link
-                href="/login"
-                className="block w-full bg-white text-[#1E2A3B] py-4 rounded-xl text-center font-bold hover:bg-gray-100 hover:shadow-xl transition-all"
-              >
-                התחל עכשיו - 7 ימים חינם
-              </Link>
-              
-              <p className="text-sm text-center mt-4 opacity-90">
-                ללא התחייבות • ביטול בכל עת
-              </p>
+              <PhiScore score={73} size="lg" animated showLabel />
             </motion.div>
           </div>
+        </div>
+      </section>
 
-          {/* Money Back Guarantee */}
-          <div className="mt-12 text-center">
-            <div className="inline-flex items-center gap-2 bg-[#7ED957]/10 text-[#7ED957] px-6 py-3 rounded-full font-medium">
+      {/* Pricing */}
+      <section id="pricing" className="bg-gradient-to-b from-phi-bg/50 to-white py-20">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl md:text-5xl font-black text-phi-dark mb-4">
+              בחר את התוכנית שלך
+            </h2>
+            <p className="text-xl text-phi-slate">
+              שתי תוכניות - כל אחת עם ערך אמיתי
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Basic Phi */}
+            <PricingCard
+              name="Basic φ"
+              price="₪49"
+              badge="פופולרי"
+              badgeColor="phi-mint"
+              features={[
+                'מעקב בלתי מוגבל',
+                'בוט WhatsApp 24/7',
+                'AI Assistant (GPT-4)',
+                'OCR לקבלות',
+                'תקציב אוטומטי',
+                'יעדי חיסכון',
+                'דוחות וגרפים',
+                'התראות חכמות',
+                'ציון φ בזמן אמת'
+              ]}
+            />
+
+            {/* VIP Phi */}
+            <PricingCard
+              name="φ VIP"
+              price="₪119"
+              badge="ליווי אישי"
+              badgeColor="phi-coral"
+              vip
+              features={[
+                'כל התכונות של Basic',
+                '⭐ 2 פגישות חודשיות עם גדי',
+                '⭐ הערות אישיות שבועיות',
+                '⭐ ליווי צמוד בWhatsApp',
+                '⭐ תכנון פיננסי מותאם',
+                '⭐ ייעוץ למיחזור הלוואות',
+                '⭐ אסטרטגיות חיסכון',
+                'תמיכה מועדפת'
+              ]}
+            />
+          </div>
+
+          <div className="text-center mt-12">
+            <div className="inline-flex items-center gap-2 bg-phi-mint/10 text-phi-mint px-6 py-3 rounded-full font-medium">
               <Shield className="w-5 h-5" />
               <span>אחריות החזר כספי מלא עד 14 יום</span>
             </div>
@@ -583,98 +467,132 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Social Proof / Testimonials */}
-      <section className="container mx-auto px-4 py-24">
-        <motion.h2 
-          className="text-5xl font-black text-center mb-16 text-[#1E2A3B]"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
-          מה אומרים המשתמשים?
-        </motion.h2>
-        <div className="grid md:grid-cols-3 gap-8">
-          {[
-            {
-              quote: "תוך חודש הצלחתי לחסוך 800 ₪ שלא ידעתי שיש לי. הבוט פשוט עזר לי לראות איפה הכסף נעלם.",
-              name: "רועי, 32",
-              role: "עצמאי"
-            },
-            {
-              quote: "השיחה עם גדי שינתה לי את כל התפיסה על כסף. זה לא רק אפליקציה - זה באמת מאמן.",
-              name: "מיכל, 28",
-              role: "אם לשניים"
-            },
-            {
-              quote: "הצלחתי להקטין את החוב בכרטיס אשראי ב-40% תוך 3 חודשים. התוכנית שבנה לי גדי פשוט עובדת.",
-              name: "אורי, 45",
-              role: "שכיר"
-            }
-          ].map((testimonial, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1, duration: 0.5 }}
-            >
-              <TestimonialCard {...testimonial} />
-            </motion.div>
-          ))}
+      {/* Meet Gadi */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto bg-gradient-to-br from-phi-frost/50 to-white p-8 md:p-12 rounded-3xl shadow-xl border border-phi-frost">
+            <div className="grid md:grid-cols-3 gap-8 items-center">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                className="flex justify-center"
+              >
+                <div className="w-48 h-48 rounded-full bg-gradient-to-br from-phi-gold to-phi-coral flex items-center justify-center text-white text-6xl font-bold shadow-2xl">
+                  ג
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="md:col-span-2"
+              >
+                <h2 className="text-3xl md:text-4xl font-black text-phi-dark mb-4">
+                  פגוש את גדי
+                </h2>
+                <p className="text-lg text-phi-slate mb-4 leading-relaxed">
+                  <strong className="text-phi-dark">מאמן פיננסי מוסמך</strong> עם למעלה מ-10 שנות ניסיון בליווי אישי ועסקי. 
+                  גדי יצר את Phi מתוך הבנה שבריאות פיננסית היא לא רק מספרים - זה <strong>איזון</strong>, <strong>תכנון</strong>, ו<strong>ליווי אנושי</strong>.
+                </p>
+                <p className="text-lg text-phi-slate mb-6">
+                  "יצרתי את Phi כי ראיתי שאנשים צריכים מערכת שלא רק עוקבת - אלא גם <strong>מבינה, מלווה ומעודדת</strong>. 
+                  φ הוא היחס הזהב - וזה בדיוק מה שמגיע לכם עם הכסף שלכם." 💪
+                </p>
+                <div className="flex items-center gap-3">
+                  <span className="text-phi-gold text-2xl">φ</span>
+                  <span className="text-phi-slate">גדי, מייסד Phi</span>
+                </div>
+              </motion.div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="relative bg-gradient-to-br from-[#3A7BD5] via-[#2E5EA5] to-[#1E4A8A] py-24 text-white overflow-hidden">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        </div>
-        
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <motion.h2 
-            className="text-5xl md:text-6xl font-black mb-6"
+      {/* Social Proof */}
+      <section className="bg-phi-bg/30 py-20">
+        <div className="container mx-auto px-4">
+          <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+            className="text-4xl md:text-5xl font-black text-center mb-16 text-phi-dark"
           >
-            מוכן לקחת שליטה על הכסף שלך?
+            מה אומרים המשתמשים?
           </motion.h2>
-          <motion.p 
-            className="text-xl md:text-2xl mb-10 opacity-90 max-w-2xl mx-auto leading-relaxed"
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {[
+              {
+                quote: "תוך חודש הצלחתי לחסוך 800 ₪ שלא ידעתי שיש לי. הבוט פשוט עזר לי לראות איפה הכסף נעלם. ה-φ שלי עלה מ-42 ל-68!",
+                name: "רועי, 32",
+                role: "עצמאי"
+              },
+              {
+                quote: "השיחה עם גדי שינתה לי את כל התפיסה על כסף. זה לא רק אפליקציה - זה באמת מאמן שמכיר אותך ואכפת לו.",
+                name: "מיכל, 28",
+                role: "אם לשניים"
+              },
+              {
+                quote: "הצלחתי להקטין את החוב בכרטיס אשראי ב-40% תוך 3 חודשים. התוכנית שבנה לי גדי בתוכנית VIP פשוט עובדת.",
+                name: "אורי, 45",
+                role: "שכיר"
+              }
+            ].map((t, i) => (
+              <TestimonialCard key={i} {...t} delay={i * 0.1} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="relative bg-gradient-to-br from-phi-dark via-phi-slate to-phi-dark py-24 text-white overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-phi-gold rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-phi-coral rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        </div>
+
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-4xl md:text-6xl font-black mb-6"
+          >
+            מוכן למצוא את ה-φ שלך?
+          </motion.h2>
+          <motion.p
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.2, duration: 0.6 }}
+            transition={{ delay: 0.2 }}
+            className="text-xl md:text-2xl mb-10 opacity-90 max-w-2xl mx-auto"
           >
-            הצטרף עכשיו ל-FinHealer וקבל 7 ימי ניסיון חינם.
+            הצטרף עכשיו ל-Phi וקבל 7 ימי ניסיון חינם
             <br />
-            ללא כרטיס אשראי, ללא התחייבות.
+            ללא כרטיס אשראי, ללא התחייבות
           </motion.p>
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.4, duration: 0.5 }}
+            transition={{ delay: 0.4 }}
           >
-          <Link
-            href="/login"
-              className="group bg-white text-[#3A7BD5] px-10 py-5 rounded-xl text-xl font-black hover:shadow-2xl hover:scale-105 transition-all inline-flex items-center gap-2 shadow-xl relative overflow-hidden"
+            <Link
+              href="/login"
+              className="group bg-white text-phi-dark px-10 py-5 rounded-xl text-xl font-black hover:shadow-2xl hover:scale-105 transition-all inline-flex items-center gap-2 shadow-xl"
             >
-              <span className="relative z-10">התחל עכשיו בחינם</span>
-              <ArrowLeft className="w-6 h-6 relative z-10 group-hover:translate-x-[-4px] transition-transform" />
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-50 to-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span>התחל עכשיו בחינם</span>
+              <ArrowLeft className="w-6 h-6 group-hover:translate-x-[-4px] transition-transform" />
             </Link>
           </motion.div>
-          <motion.p 
-            className="mt-8 text-lg opacity-80"
+          <motion.p
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 0.8 }}
             viewport={{ once: true }}
             transition={{ delay: 0.6 }}
+            className="mt-8 text-lg"
           >
             🎁 המשתמשים הראשונים מקבלים חודש ראשון ב-50% הנחה
           </motion.p>
@@ -682,44 +600,41 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#1E2A3B] text-white py-12">
+      <footer className="bg-phi-dark text-white py-12">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                💪 FinHealer
-              </h3>
-              <p className="text-gray-400">
-                המאמן הפיננסי האישי שלך 24/7
+              <PhiLogo size="sm" className="mb-4" />
+              <p className="text-phi-frost">
+                האיזון המושלם לכסף שלך
               </p>
             </div>
             <div>
-              <h4 className="font-bold mb-4">מוצר</h4>
-              <ul className="space-y-2 text-gray-400">
+              <h4 className="font-bold mb-4 text-phi-gold">מוצר</h4>
+              <ul className="space-y-2 text-phi-frost">
                 <li><Link href="#how-it-works" className="hover:text-white transition">איך זה עובד</Link></li>
                 <li><Link href="#features" className="hover:text-white transition">תכונות</Link></li>
                 <li><Link href="#pricing" className="hover:text-white transition">מחירים</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-bold mb-4">חשבון</h4>
-              <ul className="space-y-2 text-gray-400">
+              <h4 className="font-bold mb-4 text-phi-gold">חשבון</h4>
+              <ul className="space-y-2 text-phi-frost">
                 <li><Link href="/login" className="hover:text-white transition">התחברות</Link></li>
                 <li><Link href="/signup" className="hover:text-white transition">הרשמה</Link></li>
                 <li><Link href="/dashboard" className="hover:text-white transition">דשבורד</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-bold mb-4">משפטי</h4>
-              <ul className="space-y-2 text-gray-400">
+              <h4 className="font-bold mb-4 text-phi-gold">משפטי</h4>
+              <ul className="space-y-2 text-phi-frost">
                 <li><Link href="/legal/terms" className="hover:text-white transition">תנאי שימוש</Link></li>
                 <li><Link href="/legal/privacy" className="hover:text-white transition">מדיניות פרטיות</Link></li>
-                <li><Link href="/contact" className="hover:text-white transition">צור קשר</Link></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-            <p>© 2025 FinHealer. כל הזכויות שמורות. | עם ❤️ מגדי</p>
+          <div className="border-t border-phi-slate/30 pt-8 text-center text-phi-frost">
+            <p>© 2025 Phi (φ). כל הזכויות שמורות. | עם ❤️ מגדי</p>
           </div>
         </div>
       </footer>
@@ -727,93 +642,115 @@ export default function HomePage() {
   )
 }
 
-function PhaseCard({ number, title, description, icon, color }: { 
-  number: string
+// Helper Components
+
+function FeatureCard({ icon: Icon, title, desc, color }: {
+  icon: any
   title: string
-  description: string
-  icon: string
-  color: 'primary' | 'success' | 'warning'
+  desc: string
+  color: 'gold' | 'mint' | 'coral'
 }) {
-  const colorClasses = {
-    primary: 'from-[#3A7BD5]/20 to-[#2E5EA5]/10 border-[#3A7BD5]/30 hover:border-[#3A7BD5]',
-    success: 'from-[#7ED957]/20 to-[#7ED957]/10 border-[#7ED957]/30 hover:border-[#7ED957]',
-    warning: 'from-[#F6A623]/20 to-[#F6A623]/10 border-[#F6A623]/30 hover:border-[#F6A623]',
+  const colors = {
+    gold: 'from-phi-gold/20 to-phi-gold/5 border-phi-gold/30 hover:border-phi-gold',
+    mint: 'from-phi-mint/20 to-phi-mint/5 border-phi-mint/30 hover:border-phi-mint',
+    coral: 'from-phi-coral/20 to-phi-coral/5 border-phi-coral/30 hover:border-phi-coral',
   }
 
-  const numberColors = {
-    primary: 'bg-[#3A7BD5] text-white',
-    success: 'bg-[#7ED957] text-white',
-    warning: 'bg-[#F6A623] text-white',
+  const iconColors = {
+    gold: 'text-phi-gold',
+    mint: 'text-phi-mint',
+    coral: 'text-phi-coral',
   }
 
   return (
-    <div className={`relative bg-gradient-to-br ${colorClasses[color]} border-2 rounded-2xl p-6 hover:shadow-2xl hover:scale-105 transition-all duration-300 group`}>
-      <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{icon}</div>
-      <div className={`absolute top-4 left-4 w-10 h-10 rounded-full ${numberColors[color]} shadow-lg flex items-center justify-center font-bold text-lg`}>
-        {number}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true }}
+      className={`bg-gradient-to-br ${colors[color]} p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all border-2 group`}
+    >
+      <Icon className={`w-12 h-12 ${iconColors[color]} mb-4 group-hover:scale-110 transition-transform`} />
+      <h3 className="text-xl font-bold text-phi-dark mb-2">{title}</h3>
+      <p className="text-phi-slate text-sm">{desc}</p>
+    </motion.div>
+  )
+}
+
+function PricingCard({ name, price, badge, badgeColor, vip = false, features }: {
+  name: string
+  price: string
+  badge: string
+  badgeColor: string
+  vip?: boolean
+  features: string[]
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className={`relative ${vip ? 'bg-gradient-to-br from-phi-dark to-phi-slate text-white' : 'bg-white'} p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border-2 ${vip ? 'border-phi-gold' : 'border-phi-frost'}`}
+    >
+      <div className={`absolute -top-4 right-8 bg-${badgeColor} text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg`}>
+        {badge}
       </div>
-      <h3 className="text-lg font-bold mb-2 text-[#1E2A3B]">{title}</h3>
-      <p className="text-sm text-[#555555] leading-relaxed">{description}</p>
-    </div>
+
+      <div className="text-center mb-6">
+        <h3 className="text-2xl font-bold mb-2">{name}</h3>
+        <div className="flex items-baseline justify-center gap-2">
+          <span className="text-5xl font-bold">{price}</span>
+          <span className={vip ? 'opacity-90' : 'text-phi-slate'}>לחודש</span>
+        </div>
+      </div>
+
+      <ul className="space-y-3 mb-8">
+        {features.map((f, i) => (
+          <li key={i} className="flex items-start gap-3">
+            <CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${vip ? 'text-phi-gold' : 'text-phi-mint'} mt-0.5`} />
+            <span className={vip ? 'text-white' : 'text-phi-dark'}>{f}</span>
+          </li>
+        ))}
+      </ul>
+
+      <Link
+        href="/login"
+        className={`block w-full ${vip ? 'bg-white text-phi-dark hover:bg-phi-frost' : 'bg-gradient-to-l from-phi-gold to-phi-coral text-white hover:shadow-xl'} py-4 rounded-xl text-center font-bold transition-all`}
+      >
+        התחל עכשיו - 7 ימים חינם
+      </Link>
+
+      <p className={`text-sm text-center mt-4 ${vip ? 'opacity-90' : 'text-phi-slate'}`}>
+        ללא התחייבות • ביטול בכל עת
+      </p>
+    </motion.div>
   )
 }
 
-function FeatureCard({ icon, title, description }: { 
-  icon: React.ReactNode
-  title: string
-  description: string
-}) {
-  return (
-    <div className="bg-white p-8 rounded-xl shadow-sm hover:shadow-xl transition border border-gray-100">
-      <div className="mb-4">{icon}</div>
-      <h3 className="text-xl font-bold mb-2 text-[#1E2A3B]">{title}</h3>
-      <p className="text-[#555555]">{description}</p>
-    </div>
-  )
-}
-
-function BenefitItem({ text }: { text: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <CheckCircle2 className="w-6 h-6 text-[#7ED957] flex-shrink-0" />
-      <span className="text-[#1E2A3B]">{text}</span>
-    </div>
-  )
-}
-
-function PricingFeature({ text, light = false, highlight = false }: { 
-  text: string
-  light?: boolean
-  highlight?: boolean
-}) {
-  return (
-    <li className="flex items-center gap-3">
-      <CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${light ? 'text-white' : 'text-[#7ED957]'}`} />
-      <span className={`${light ? 'text-white' : 'text-[#1E2A3B]'} ${highlight ? 'font-semibold' : ''}`}>
-        {text}
-      </span>
-    </li>
-  )
-}
-
-function TestimonialCard({ quote, name, role }: {
+function TestimonialCard({ quote, name, role, delay }: {
   quote: string
   name: string
   role: string
+  delay: number
 }) {
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all border-2 border-gray-100 hover:border-[#3A7BD5]/30 group h-full flex flex-col">
-      <div className="text-[#3A7BD5] text-5xl mb-4 group-hover:scale-110 transition-transform">&quot;</div>
-      <p className="text-[#555555] mb-6 italic leading-relaxed flex-grow">{quote}</p>
-      <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#3A7BD5] to-[#2E5EA5] flex items-center justify-center text-white font-bold text-lg shadow-md">
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay }}
+      className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all border border-phi-frost group"
+    >
+      <div className="text-phi-gold text-5xl mb-4 group-hover:scale-110 transition-transform">&quot;</div>
+      <p className="text-phi-slate mb-6 italic leading-relaxed">{quote}</p>
+      <div className="flex items-center gap-3 pt-4 border-t border-phi-frost">
+        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-phi-gold to-phi-coral flex items-center justify-center text-white font-bold text-lg shadow-md">
           {name[0]}
         </div>
         <div>
-          <p className="font-bold text-[#1E2A3B]">{name}</p>
-          <p className="text-sm text-[#555555]">{role}</p>
+          <p className="font-bold text-phi-dark">{name}</p>
+          <p className="text-sm text-phi-slate">{role}</p>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

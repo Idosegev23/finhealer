@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Heebo } from 'next/font/google'
+import { Heebo, Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 
@@ -10,17 +10,24 @@ const heebo = Heebo({
   display: 'swap',
 })
 
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-inter',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
-  title: 'FinHealer - תוכנית ההבראה הפיננסית הדיגיטלית',
-  description: 'מערכת מתקדמת לניהול ושיפור המצב הפיננסי האישי, עם בוט WhatsApp חכם, בינה מלאכותית ומעקב בזמן אמת.',
-  keywords: ['ניהול תקציב', 'בריאות פיננסית', 'חיסכון', 'מעקב הוצאות', 'יעדים פיננסיים'],
-  authors: [{ name: 'FinHealer' }],
+  title: 'Phi (φ) - היחס הזהב של הכסף שלך',
+  description: 'פלטפורמה חכמה לבריאות פיננסית עם ליווי אישי. מעקב אוטומטי, תובנות מבוססות AI, ובוט WhatsApp חכם. גלה את ה-φ שלך - האיזון המושלם בין הכנסות להוצאות.',
+  keywords: ['phi', 'בריאות פיננסית', 'ניהול תקציב', 'חיסכון', 'מעקב הוצאות', 'יעדים פיננסיים', 'ליווי פיננסי'],
+  authors: [{ name: 'Phi - גדי' }],
   viewport: {
     width: 'device-width',
     initialScale: 1,
     maximumScale: 1,
   },
-  themeColor: '#3A7BD5',
+  themeColor: '#2E3440',
 }
 
 export default function RootLayout({
@@ -29,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="he" dir="rtl" className={heebo.variable}>
+    <html lang="he" dir="rtl" className={`${heebo.variable} ${inter.variable}`}>
       <body className={`${heebo.className} antialiased`}>
         <ThemeProvider>
           {children}

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
+import PhiLogo from '@/components/ui/PhiLogo'
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -61,24 +62,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-white to-success/10 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-phi-frost via-white to-phi-bg px-4">
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-4">
-            <div className="text-5xl">🏥</div>
+            <PhiLogo size="lg" />
           </Link>
-          <h1 className="text-3xl font-bold text-dark mb-2">
-            ברוך הבא ל-FinHealer
+          <h1 className="text-3xl font-bold text-phi-dark mb-2">
+            ברוך הבא ל-Phi
           </h1>
-          <p className="text-muted-foreground">
-            תוכנית ההבראה הפיננסית הדיגיטלית שלך
+          <p className="text-phi-slate">
+            האיזון המושלם של הכסף שלך
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          <h2 className="text-2xl font-bold text-center mb-6 text-dark">
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-phi-frost">
+          <h2 className="text-2xl font-bold text-center mb-6 text-phi-dark">
             התחבר לחשבון
           </h2>
 
@@ -92,7 +93,7 @@ export default function LoginPage() {
           <button
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full bg-white border-2 border-gray-300 hover:border-primary hover:bg-gray-50 text-dark font-medium py-4 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+            className="w-full bg-white border-2 border-phi-frost hover:border-phi-gold hover:bg-phi-frost/30 text-phi-dark font-medium py-4 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
           >
             {isLoading ? (
               <>

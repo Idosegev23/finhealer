@@ -33,7 +33,10 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
   const [showScanner, setShowScanner] = useState(false);
   
   const userAge = data.age || 0;
-  const isOver60 = userAge >= 60;
+  const isYoung = userAge > 0 && userAge <= 35;
+  const isMiddleAge = userAge > 35 && userAge <= 50;
+  const isMature = userAge > 50;
+  const showGrandchildren = isMature; // הצג נכדים רק למבוגרים מעל 50
 
   const addDependent = (type: 'child' | 'grandchild') => {
     const newDependent: Dependent = {
@@ -104,14 +107,11 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
 
       // Auto-fill personal data
       if (idCard.fullName) {
-        // We don't have name field in current data, but we can add it
+        onChange('full_name', idCard.fullName);
       }
       if (idCard.birthDate) {
         const age = calculateAge(idCard.birthDate);
         onChange('age', age);
-      }
-      if (idCard.gender) {
-        // Convert to marital status if needed - though gender !== marital status
       }
       if (idCard.address) {
         onChange('city', idCard.address);
@@ -154,11 +154,11 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">שלב 1: בואו נכיר 👋</h2>
-        <p className="text-[#555555] mb-2">כמה פרטים אישיים שיעזרו לנו להתאים את הליווי בצורה הטובה ביותר</p>
-        <div className="inline-block bg-[#E8F4FD] px-4 py-2 rounded-lg mt-2">
-          <p className="text-xs text-[#3A7BD5]">
-            <strong>מה נלקח:</strong> גיל • מצב משפחתי • ילדים (שם, מין, ת. לידה) • כתובת מגורים
+        <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">ספר/י לנו קצת על עצמך 👋</h2>
+        <p className="text-[#555555] mb-2">נכיר אותך טוב יותר כדי להתאים לך את החוויה המושלמת</p>
+        <div className="inline-block bg-gradient-to-r from-blue-50 to-purple-50 px-6 py-3 rounded-full mt-2 border border-blue-200">
+          <p className="text-sm text-[#3A7BD5] font-medium">
+            💡 הפרטים שלך בטוחים איתנו ומאובטחים לחלוטין
           </p>
         </div>
       </div>
@@ -304,10 +304,25 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
       </div>
 
       <div className="grid gap-4">
+        {/* שם מלא */}
+        <FieldTooltip
+          label="👤 איך קוראים לך?"
+          tooltip="השם שלך עוזר לנו להתאים את החוויה ולפנות אליך בצורה אישית"
+        >
+          <Input
+            id="full_name"
+            type="text"
+            value={data.full_name || ''}
+            onChange={(e) => onChange('full_name', e.target.value)}
+            placeholder="לדוגמה: דני כהן"
+            className="mt-1 text-lg font-medium"
+          />
+        </FieldTooltip>
+
         {/* גיל */}
         <FieldTooltip
-          label="מה הגיל שלך?"
-          tooltip="הגיל עוזר לנו להבין את האופק הזמני שלך ולתת המלצות מותאמות - מי שצעיר יותר יכול לקחת יותר סיכון בהשקעות"
+          label="🎂 בן/בת כמה את/ה?"
+          tooltip="הגיל עוזר לנו להבין באיזה שלב חיים את/ה נמצא/ת ולתת עצות מתאימות. למשל, צעירים יכולים להרשות לעצמם יותר סיכון בהשקעות"
         >
           <Input
             id="age"
@@ -320,11 +335,13 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
         </FieldTooltip>
 
         {/* מצב משפחתי */}
-        <div>
-          <Label htmlFor="marital" className="text-[#1E2A3B] font-medium">מצב משפחתי</Label>
+        <FieldTooltip
+          label="💍 מה המצב המשפחתי שלך?"
+          tooltip="המצב המשפחתי משפיע על הוצאות, הכנסות והתכנון הפיננסי שלך"
+        >
           <Select value={data.marital_status || ''} onValueChange={(val) => onChange('marital_status', val)}>
             <SelectTrigger className="mt-1">
-              <SelectValue placeholder="בחר..." />
+              <SelectValue placeholder="בחר/י..." />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="single">רווק/ה</SelectItem>
@@ -333,11 +350,13 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
               <SelectItem value="widowed">אלמן/ה</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </FieldTooltip>
 
         {/* כתובת מגורים */}
-        <div>
-          <Label htmlFor="city" className="text-[#1E2A3B] font-medium">כתובת מגורים</Label>
+        <FieldTooltip
+          label="🏠 איפה את/ה גר/ה?"
+          tooltip="המיקום עוזר לנו להבין את רמת הוצאות המחיה באזור שלך ולתת המלצות מותאמות"
+        >
           <Input
             id="city"
             value={data.city || ''}
@@ -345,15 +364,16 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
             placeholder="לדוגמה: תל אביב, רחוב הרצל 10"
             className="mt-1"
           />
-          <p className="text-xs text-[#555555] mt-1">יעזור לנו להבין הוצאות מחיה אופייניות לאזור</p>
-        </div>
+        </FieldTooltip>
 
         {/* מעמד תעסוקתי */}
-        <div>
-          <Label htmlFor="employment" className="text-[#1E2A3B] font-medium">מעמד תעסוקתי</Label>
+        <FieldTooltip
+          label="💼 מה מעמד התעסוקה שלך?"
+          tooltip="המעמד התעסוקתי משפיע על סוגי ההוצאות שלך - לעצמאים יש הוצאות אחרות משכירים"
+        >
           <Select value={data.employment_status || ''} onValueChange={(val) => onChange('employment_status', val)}>
             <SelectTrigger className="mt-1">
-              <SelectValue placeholder="בחר..." />
+              <SelectValue placeholder="בחר/י..." />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="employee">שכיר</SelectItem>
@@ -361,19 +381,25 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
               <SelectItem value="both">שכיר + עצמאי</SelectItem>
             </SelectContent>
           </Select>
-          <p className="text-xs text-[#555555] mt-1">יעזור לנו להתאים את קטגוריות ההוצאות עבורך</p>
-        </div>
+        </FieldTooltip>
 
-        {/* ילדים מתחת לגיל 18 */}
-        <div className="mt-6">
+        {/* ילדים */}
+        <div className="mt-6 p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border-2 border-blue-200">
           <div className="flex items-center justify-between mb-3">
-            <Label className="text-[#1E2A3B] font-semibold">ילדים מתחת לגיל 18</Label>
+            <div>
+              <Label className="text-[#1E2A3B] font-semibold flex items-center gap-2">
+                👨‍👩‍👧‍👦 יש לך ילדים? ספר/י לנו עליהם
+              </Label>
+              <p className="text-xs text-[#555555] mt-1">
+                ילדים משפיעים על התקציב והתכנון הפיננסי
+              </p>
+            </div>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => addDependent('child')}
-              className="gap-2"
+              className="gap-2 bg-white hover:bg-blue-50"
             >
               <Plus className="w-4 h-4" />
               הוסף ילד/ה
@@ -381,8 +407,8 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
           </div>
 
           {children.length === 0 && (
-            <p className="text-sm text-[#888888] text-center py-4 bg-[#F5F6F8] rounded-lg">
-              אין ילדים רשומים. לחץ על &quot;הוסף ילד/ה&quot; כדי להוסיף
+            <p className="text-sm text-[#666666] text-center py-4 bg-white rounded-lg border border-blue-100">
+              אין ילדים רשומים. לחץ על &quot;הוסף ילד/ה&quot; אם יש לך ילדים 😊
             </p>
           )}
 
@@ -459,11 +485,11 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
                       </div>
                     </div>
 
-                    {/* אם מעל 18 - שאלה על תמיכה */}
+                      {/* אם מעל 18 - שאלה על תמיכה */}
                     {!isUnder18 && age >= 18 && (
-                      <div className="mt-2 p-3 bg-white rounded border border-[#F6A623]">
-                        <Label className="text-xs text-[#555555] mb-2 block">
-                          האם אתה תומך כלכלית ב{child.name || 'ילד/ה זה/זו'}?
+                      <div className="mt-2 p-3 bg-white rounded border-2 border-orange-300">
+                        <Label className="text-sm text-[#1E2A3B] font-medium mb-2 block flex items-center gap-2">
+                          💰 האם את/ה תומך/ת כלכלית ב{child.name || 'ילד/ה זה/זו'}?
                         </Label>
                         <div className="flex gap-3">
                           <label className="flex items-center gap-2 cursor-pointer">
@@ -494,20 +520,24 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
           </div>
         </div>
 
-        {/* נכדים - רק אם מעל גיל 60 */}
-        {isOver60 && (
-          <div className="mt-6">
+        {/* נכדים - רק אם מעל גיל 50 */}
+        {showGrandchildren && (
+          <div className="mt-6 p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border-2 border-yellow-300">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <Label className="text-[#1E2A3B] font-semibold">נכדים</Label>
-                <p className="text-xs text-[#888888] mt-1">האם יש לך נכדים שאתה תומך בהם כלכלית?</p>
+                <Label className="text-[#1E2A3B] font-semibold flex items-center gap-2">
+                  👴👵 יש לך נכדים?
+                </Label>
+                <p className="text-xs text-[#555555] mt-1">
+                  האם יש נכדים שאת/ה תומך/ת בהם כלכלית?
+                </p>
               </div>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => addDependent('grandchild')}
-                className="gap-2"
+                className="gap-2 bg-white hover:bg-yellow-50"
               >
                 <Plus className="w-4 h-4" />
                 הוסף נכד/ה
@@ -515,8 +545,8 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
             </div>
 
             {grandchildren.length === 0 && (
-              <p className="text-sm text-[#888888] text-center py-4 bg-[#F5F6F8] rounded-lg">
-                אין נכדים רשומים. לחץ על &quot;הוסף נכד/ה&quot; אם יש נכדים שאתה תומך בהם
+              <p className="text-sm text-[#666666] text-center py-4 bg-white rounded-lg border border-yellow-200">
+                אין נכדים רשומים. לחץ על &quot;הוסף נכד/ה&quot; אם יש נכדים שאת/ה תומך/ת בהם 💛
               </p>
             )}
 
@@ -588,9 +618,9 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
                       </div>
 
                       {/* תמיכה כלכלית */}
-                      <div className="mt-2 p-3 bg-white rounded border border-[#FFD700]">
-                        <Label className="text-xs text-[#555555] mb-2 block">
-                          האם אתה תומך כלכלית ב{grandchild.name || 'נכד/ה זה/זו'}?
+                      <div className="mt-2 p-3 bg-white rounded border-2 border-yellow-400">
+                        <Label className="text-sm text-[#1E2A3B] font-medium mb-2 block flex items-center gap-2">
+                          💰 האם את/ה תומך/ת כלכלית ב{grandchild.name || 'נכד/ה זה/זו'}?
                         </Label>
                         <div className="flex gap-3">
                           <label className="flex items-center gap-2 cursor-pointer">
