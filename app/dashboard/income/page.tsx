@@ -52,6 +52,7 @@ export default function IncomePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
+  const [editingIncome, setEditingIncome] = useState<IncomeSource | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
   useEffect(() => {
@@ -175,8 +176,8 @@ export default function IncomePage() {
               incomeSources={incomeSources}
               onRefresh={loadIncome}
               onEdit={(income) => {
-                // TODO: implement edit
-                alert('עריכה תתווסף בקרוב');
+                setEditingIncome(income);
+                setShowWizard(true);
               }}
             />
           )}
@@ -191,7 +192,10 @@ export default function IncomePage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowWizard(false)}
+            onClick={() => {
+              setShowWizard(false);
+              setEditingIncome(null);
+            }}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -201,11 +205,27 @@ export default function IncomePage() {
               className="w-full max-w-2xl"
             >
               <ConversationalIncomeWizard
+                editMode={!!editingIncome}
+                incomeId={editingIncome?.id}
+                initialData={editingIncome ? {
+                  source_name: editingIncome.source_name,
+                  employment_type: editingIncome.employment_type,
+                  actual_bank_amount: editingIncome.actual_bank_amount,
+                  gross_amount: editingIncome.gross_amount,
+                  net_amount: editingIncome.net_amount,
+                  payment_frequency: editingIncome.payment_frequency,
+                  employer_name: editingIncome.employer_name,
+                  is_primary: editingIncome.is_primary,
+                } : {}}
                 onSuccess={() => {
                   setShowWizard(false);
+                  setEditingIncome(null);
                   loadIncome();
                 }}
-                onCancel={() => setShowWizard(false)}
+                onCancel={() => {
+                  setShowWizard(false);
+                  setEditingIncome(null);
+                }}
               />
             </motion.div>
           </motion.div>
@@ -261,17 +281,48 @@ function EmptyState({ onAddIncome }: { onAddIncome: () => void }) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="text-center py-20 bg-gradient-to-br from-blue-50 to-green-50 rounded-2xl"
+      className="text-center py-20 bg-gradient-to-br from-blue-50 via-purple-50 to-green-50 rounded-2xl border-2 border-dashed border-blue-200"
     >
-      <div className="w-24 h-24 rounded-full bg-white shadow-lg flex items-center justify-center mx-auto mb-6">
+      <motion.div 
+        className="w-24 h-24 rounded-full bg-white shadow-lg flex items-center justify-center mx-auto mb-6"
+        animate={{ 
+          scale: [1, 1.05, 1],
+          rotate: [0, 5, -5, 0]
+        }}
+        transition={{ 
+          duration: 3,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+      >
         <DollarSign className="w-12 h-12 text-[#3A7BD5]" />
-      </div>
+      </motion.div>
       <h2 className="text-2xl font-bold text-gray-900 mb-3">
         עדיין לא הוספת הכנסות
       </h2>
       <p className="text-gray-600 mb-8 max-w-md mx-auto">
         בואו נתחיל! הוספת מקורות הכנסה תעזור לנו לתת לך תובנות טובות יותר ולנהל את התקציב שלך בצורה חכמה.
       </p>
+      
+      {/* Benefits List */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto mb-8 text-right">
+        <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-blue-100">
+          <div className="text-2xl mb-2">📊</div>
+          <h3 className="font-semibold text-gray-900 mb-1">ניתוח חכם</h3>
+          <p className="text-sm text-gray-600">נחשב אוטומטית את הניכויים והמסים</p>
+        </div>
+        <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-purple-100">
+          <div className="text-2xl mb-2">💡</div>
+          <h3 className="font-semibold text-gray-900 mb-1">תובנות מותאמות</h3>
+          <p className="text-sm text-gray-600">נזהה הזדמנויות לחסוך כסף</p>
+        </div>
+        <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-green-100">
+          <div className="text-2xl mb-2">🎯</div>
+          <h3 className="font-semibold text-gray-900 mb-1">תכנון מדויק</h3>
+          <p className="text-sm text-gray-600">נבנה תקציב חכם בהתאם להכנסות</p>
+        </div>
+      </div>
+
       <Button
         onClick={onAddIncome}
         size="lg"

@@ -285,6 +285,56 @@ export default function PendingExpensesPage() {
     }
   };
 
+  const handleRejectAll = async () => {
+    if (expenses.length === 0) {
+      return;
+    }
+
+    const confirmReject = confirm(
+      `האם אתה בטוח שברצונך לדחות את כל ${expenses.length} התנועות?\n\nלא ניתן לבטל פעולה זו.`
+    );
+
+    if (!confirmReject) {
+      return;
+    }
+
+    setApprovingAll(true);
+
+    try {
+      const rejectPromises = expenses.map((expense) =>
+        fetch('/api/expenses/reject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expenseId: expense.id }),
+        })
+      );
+
+      const results = await Promise.allSettled(rejectPromises);
+      
+      const successCount = results.filter((r) => r.status === 'fulfilled').length;
+      const failureCount = results.filter((r) => r.status === 'rejected').length;
+
+      if (successCount > 0) {
+        addToast({
+          type: 'info',
+          title: 'דחייה המונית הושלמה',
+          description: `${successCount} תנועות נדחו${failureCount > 0 ? `, ${failureCount} נכשלו` : ''}`,
+        });
+      }
+
+      await loadExpenses();
+    } catch (error: any) {
+      console.error('Reject all error:', error);
+      addToast({
+        type: 'error',
+        title: 'שגיאה',
+        description: 'שגיאה בדחיית התנועות',
+      });
+    } finally {
+      setApprovingAll(false);
+    }
+  };
+
   const handleUpdate = async (expenseId: string, updates: Partial<PendingTransaction>, shouldApprove = false) => {
     try {
       // עדכון התנועה
@@ -463,27 +513,49 @@ export default function PendingExpensesPage() {
         )}
       </div>
 
-      {/* כפתור אשר הכל */}
-      <div className="mb-6 flex items-center justify-between">
+      {/* כפתורי פעולה המונית */}
+      <div className="mb-6 flex items-center gap-4">
         {expenses.length > 0 && (
-          <Button
-            onClick={handleApproveAll}
-            disabled={approvingAll}
-            size="lg"
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            {approvingAll ? (
-              <>
-                <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                מאשר...
-              </>
-            ) : (
-              <>
-                <CheckCheck className="w-4 h-4 ml-2" />
-                אשר הכל ({expenses.length})
-              </>
-            )}
-          </Button>
+          <>
+            <Button
+              onClick={handleApproveAll}
+              disabled={approvingAll}
+              size="lg"
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {approvingAll ? (
+                <>
+                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                  מעבד...
+                </>
+              ) : (
+                <>
+                  <CheckCheck className="w-4 h-4 ml-2" />
+                  אשר הכל ({expenses.length})
+                </>
+              )}
+            </Button>
+            
+            <Button
+              onClick={handleRejectAll}
+              disabled={approvingAll}
+              size="lg"
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {approvingAll ? (
+                <>
+                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                  מעבד...
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4 ml-2" />
+                  דחה הכל ({expenses.length})
+                </>
+              )}
+            </Button>
+          </>
         )}
       </div>
 

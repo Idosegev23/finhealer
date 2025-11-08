@@ -331,6 +331,77 @@ async function validateAndNormalizeCategories(
 // AI Analysis Functions
 // ============================================================================
 
+/**
+ * Fix RTL (Right-to-Left) text reversal issues from PDF extraction
+ * unpdf often reverses English words and removes spaces in Hebrew
+ */
+function fixRTLTextFromPDF(text: string): string {
+  try {
+    // Split into lines
+    const lines = text.split('\n');
+    
+    const fixedLines = lines.map(line => {
+      // 1. Fix reversed English/Latin text
+      let fixedLine = line.replace(/[A-Za-z0-9._\-@\/]+/g, (match) => {
+        // Always try reversing to see if it makes more sense
+        const reversed = match.split('').reverse().join('');
+        
+        // Strong indicators that reversal is correct:
+        if (
+          // Domain names
+          reversed.match(/\.(com|net|org|il|co\.il|gov|edu|app|io|ai)$/i) ||
+          // URLs
+          reversed.match(/^(www|http|https|ftp)/i) ||
+          // Email
+          reversed.includes('@') ||
+          // File extensions
+          reversed.match(/\.(pdf|jpg|png|docx?)$/i) ||
+          // Common tech/brand names (must start with capital)
+          reversed.match(/^(CURSOR|OPENAI|VERCEL|ANTHROPIC|GOOGLE|MICROSOFT|ADOBE|NETFLIX|ZOOM|APPLE|PAYPAL|AMAZON|STRIPE|GITHUB|GITLAB|SLACK|DISCORD|TELEGRAM|WHATSAPP|FACEBOOK|INSTAGRAM|TWITTER|LINKEDIN|YOUTUBE|SPOTIFY|DROPBOX|NOTION|FIGMA|CANVA)/i) ||
+          // Common English words that indicate proper direction
+          reversed.match(/^(usage|subscription|payment|invoice|receipt|statement|report|summary|total|balance|credit|debit|account|customer|vendor|service|product|order|transaction|fee|charge|refund|discount|tax|vat|net|gross)/i)
+        ) {
+          return reversed;
+        }
+        
+        // If original looks like gibberish but reversed looks like real words, reverse it
+        // Check if reversed version has more common letter patterns
+        const reversedScore = (reversed.match(/[aeiou]/gi) || []).length; // vowel count
+        const originalScore = (match.match(/[aeiou]/gi) || []).length;
+        
+        if (reversedScore > originalScore && reversed.length > 3) {
+          return reversed;
+        }
+        
+        return match; // Keep original if unsure
+      });
+      
+      // 2. Fix Hebrew text - add spaces between concatenated words
+      // Common patterns where words get stuck together:
+      fixedLine = fixedLine
+        // פז + אפליקציית → פז אפליקציית
+        .replace(/(פז)(אפליקצ[^\s]+)/g, '$1 $2')
+        // שופרסל + דיל → שופרסל דיל
+        .replace(/(שופרסל)(דיל[^\s]*)/g, '$1 $2')
+        // סופר + דוידי/פארם → סופר דוידי/פארם
+        .replace(/(סופר)(דוידי|פארם|דיל)/g, '$1 $2')
+        // בזק/פלאפון + חשבון → בזק חשבון
+        .replace(/(בזק|פלאפון|הוט|סלקום)(חשבון[^\s]*)/g, '$1 $2')
+        // קרן + מכבי/כללית → קרן מכבי
+        .replace(/(קרן|ביטוח)(מכבי|כללית|לאומי|הראל|מגדל)/g, '$1 $2')
+        // מקדונלד'ס, ארקפה, etc - city names stuck to brand
+        .replace(/(מקדונלד'ס|ארקפה|בורגר[^\s]+|קפה[^\s]+)(תל[^\s]+|ירושל[^\s]+|חיפה|אשקלון|אשדוד|רחובות|פתח[^\s]+)/g, '$1 $2');
+      
+      return fixedLine;
+    });
+    
+    return fixedLines.join('\n');
+  } catch (error) {
+    console.error('Error in fixRTLTextFromPDF:', error);
+    return text; // Return original on error
+  }
+}
+
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
     // Extract text from PDF using unpdf (serverless-optimized)
@@ -343,7 +414,10 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
 
     // Extract text with merged pages
-    const { totalPages, text: extractedText } = await extractText(pdf, { mergePages: true });
+    const { totalPages, text: rawText } = await extractText(pdf, { mergePages: true });
+
+    // 🔧 Fix RTL text reversal issues from unpdf
+    const extractedText = fixRTLTextFromPDF(rawText);
 
     console.log(`✅ Text extracted: ${extractedText.length} characters, ${totalPages} pages`);
 

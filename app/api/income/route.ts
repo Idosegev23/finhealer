@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { validateFullIncome, quickValidate } from '@/lib/utils/income-validator';
 
 /**
  * API Route: /api/income
@@ -35,6 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    console.log('✅ Credit statement uploaded:', body);
 
     // ולידציה בסיסית
     if (!body.source_name || !body.employment_type) {
@@ -44,35 +44,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ולידציה מתקדמת
-    const validation = validateFullIncome({
-      source_name: body.source_name,
-      employment_type: body.employment_type,
-      gross_amount: body.gross_amount,
-      net_amount: body.net_amount,
-      actual_bank_amount: body.actual_bank_amount,
-      pension_contribution: body.pension_contribution,
-      advanced_study_fund: body.advanced_study_fund,
-      other_deductions: body.other_deductions,
-      employer_name: body.employer_name,
-      payment_frequency: body.payment_frequency,
-      is_variable: body.is_variable,
-      min_amount: body.min_amount,
-      max_amount: body.max_amount,
-    });
+    // ולידציה בסיסית של סכומים
+    const actualAmount = body.actual_bank_amount ?? null;
+    const grossAmount = body.gross_amount ?? null;
+    const netAmount = body.net_amount ?? null;
 
-    // אם יש שגיאות קריטיות - לא ליצור
-    if (!validation.valid) {
-      const criticalErrors = validation.messages.filter(m => m.level === 'error');
-      if (criticalErrors.length > 0) {
-        return NextResponse.json(
-          {
-            error: 'נתונים לא תקינים',
-            validation: validation.messages,
-          },
-          { status: 400 }
-        );
-      }
+    // בדיקה שיש לפחות סכום אחד
+    if (!actualAmount && !grossAmount && !netAmount) {
+      return NextResponse.json(
+        { error: 'חובה למלא לפחות סכום אחד (נכנס לבנק/נטו/ברוטו)' },
+        { status: 400 }
+      );
+    }
+
+    // בדיקת יחסים בסיסיים
+    if (grossAmount && netAmount && grossAmount < netAmount) {
+      return NextResponse.json(
+        { error: 'ברוטו לא יכול להיות נמוך מנטו' },
+        { status: 400 }
+      );
+    }
+
+    if (netAmount && actualAmount && netAmount < actualAmount) {
+      return NextResponse.json(
+        { error: 'נטו לא יכול להיות נמוך מסכום בנק' },
+        { status: 400 }
+      );
     }
 
     // הכנת נתונים להכנסה
@@ -80,9 +77,9 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       source_name: body.source_name.trim(),
       employment_type: body.employment_type,
-      gross_amount: body.gross_amount ?? 0,
-      net_amount: body.net_amount ?? 0,
-      actual_bank_amount: body.actual_bank_amount ?? 0,
+      gross_amount: grossAmount ?? 0,
+      net_amount: netAmount ?? 0,
+      actual_bank_amount: actualAmount ?? 0,
       employer_name: body.employer_name?.trim() || null,
       pension_contribution: body.pension_contribution ?? 0,
       advanced_study_fund: body.advanced_study_fund ?? 0,
@@ -95,6 +92,8 @@ export async function POST(request: NextRequest) {
       min_amount: body.min_amount ?? null,
       max_amount: body.max_amount ?? null,
     };
+
+    console.log('💾 Saving income data:', incomeData);
 
     // יצירה
     const { data, error } = await (supabase as any)
@@ -117,16 +116,21 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
+    console.log('✅ Income created successfully:', data.id);
+
     return NextResponse.json({
       success: true,
       income: data,
-      validation: validation.messages.filter(m => m.level === 'warning' || m.level === 'info'),
+      message: 'מקור הכנסה נוצר בהצלחה!',
     }, { status: 201 });
 
   } catch (error) {
     console.error('[/api/income] Error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'שגיאה ביצירת מקור הכנסה' },
+      { 
+        error: error instanceof Error ? error.message : 'שגיאה ביצירת מקור הכנסה',
+        details: error instanceof Error ? error.stack : undefined 
+      },
       { status: 500 }
     );
   }

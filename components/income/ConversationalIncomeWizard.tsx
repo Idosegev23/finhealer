@@ -51,6 +51,8 @@ interface ConversationalIncomeWizardProps {
   onSuccess?: (data: any) => void;
   onCancel?: () => void;
   initialData?: Partial<WizardData>;
+  editMode?: boolean;
+  incomeId?: string;
 }
 
 // ============================================================================
@@ -93,11 +95,15 @@ export default function ConversationalIncomeWizard({
   onSuccess,
   onCancel,
   initialData = {},
+  editMode = false,
+  incomeId,
 }: ConversationalIncomeWizardProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [calculatedData, setCalculatedData] = useState<any>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [uploadingPayslip, setUploadingPayslip] = useState(false);
+  const [payslipData, setPayslipData] = useState<any>(null);
 
   const [data, setData] = useState<WizardData>({
     source_name: initialData.source_name || '',
@@ -158,32 +164,37 @@ export default function ConversationalIncomeWizard({
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      // שליחת הנתונים
-      const response = await fetch('/api/income', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source_name: data.source_name,
-          employment_type: data.employment_type,
-          actual_bank_amount: data.actual_bank_amount,
-          payment_frequency: data.payment_frequency,
-          gross_amount: calculatedData?.gross || null,
-          net_amount: calculatedData?.net || null,
-          employer_name: data.employer_name || null,
-          pension_contribution: calculatedData?.pension || null,
-          advanced_study_fund: calculatedData?.advancedStudy || null,
-          other_deductions: data.other_deductions || null,
-          is_primary: data.is_primary,
-          is_variable: data.is_variable,
-          min_amount: data.min_amount,
-          max_amount: data.max_amount,
-        }),
-      });
+      const bodyData = {
+        source_name: data.source_name,
+        employment_type: data.employment_type,
+        actual_bank_amount: data.actual_bank_amount,
+        payment_frequency: data.payment_frequency,
+        gross_amount: calculatedData?.gross || null,
+        net_amount: calculatedData?.net || null,
+        employer_name: data.employer_name || null,
+        pension_contribution: calculatedData?.pension || null,
+        advanced_study_fund: calculatedData?.advancedStudy || null,
+        other_deductions: data.other_deductions || null,
+        is_primary: data.is_primary,
+        is_variable: data.is_variable,
+        min_amount: data.min_amount,
+        max_amount: data.max_amount,
+      };
+
+      // עדכון או יצירה
+      const response = await fetch(
+        editMode && incomeId ? `/api/income/${incomeId}` : '/api/income',
+        {
+          method: editMode ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyData),
+        }
+      );
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'שגיאה ביצירת מקור הכנסה');
+        throw new Error(result.error || (editMode ? 'שגיאה בעדכון מקור הכנסה' : 'שגיאה ביצירת מקור הכנסה'));
       }
 
       onSuccess?.(result.income);
@@ -200,6 +211,19 @@ export default function ConversationalIncomeWizard({
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6 bg-white rounded-2xl shadow-xl" dir="rtl">
+      {/* Header with Edit Mode Indicator */}
+      {editMode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2 text-blue-900">
+            <span className="text-lg">✏️</span>
+            <span className="font-semibold">מצב עריכה</span>
+          </div>
+          <p className="text-sm text-blue-700 mt-1">
+            אתה עורך הכנסה קיימת - כל השינויים ישמרו
+          </p>
+        </div>
+      )}
+
       {/* Progress Bar */}
       <div className="mb-8">
         <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
@@ -233,6 +257,19 @@ export default function ConversationalIncomeWizard({
             onChange={(name) => setData({ ...data, source_name: name })}
             onNext={handleNext}
             onBack={handleBack}
+            onUploadPayslip={async (file: File) => {
+              setUploadingPayslip(true);
+              try {
+                // TODO: Implement OCR
+                // For now, just show a message
+                alert('🚀 תכונת OCR תתווסף בקרוב! נוכל לקרוא את התלוש אוטומטית');
+                setUploadingPayslip(false);
+              } catch (error) {
+                alert('❌ שגיאה בקריאת התלוש');
+                setUploadingPayslip(false);
+              }
+            }}
+            uploadingPayslip={uploadingPayslip}
           />
         )}
 
@@ -312,6 +349,9 @@ function Step1EmploymentType({
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">בואו נתחיל! 👋</h2>
         <p className="text-gray-600">איך אתה מרוויח?</p>
+        <div className="mt-3 text-sm text-gray-500 bg-blue-50 border border-blue-100 rounded-lg p-3">
+          💡 בחר את סוג התעסוקה הראשי שלך - זה יעזור לנו לחשב את הניכויים בצורה מדויקת
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -350,14 +390,26 @@ function Step2SourceName({
   onChange,
   onNext,
   onBack,
+  onUploadPayslip,
+  uploadingPayslip,
 }: {
   value: string;
   employmentType: string;
   onChange: (value: string) => void;
   onNext: () => void;
   onBack: () => void;
+  onUploadPayslip?: (file: File) => void;
+  uploadingPayslip?: boolean;
 }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const fileInputRef = useState<HTMLInputElement | null>(null)[1];
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onUploadPayslip) {
+      onUploadPayslip(file);
+    }
+  };
 
   return (
     <motion.div
@@ -370,6 +422,9 @@ function Step2SourceName({
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">נהדר! ✨</h2>
         <p className="text-gray-600">איך תרצה לקרוא למקור הכנסה הזה?</p>
+        <div className="mt-3 text-sm text-gray-500 bg-green-50 border border-green-100 rounded-lg p-3">
+          💡 תן שם ברור - למשל "משכורת ראשית", "פרויקט X", "דירה להשכרה"
+        </div>
       </div>
 
       <div className="relative">
@@ -401,6 +456,37 @@ function Step2SourceName({
           </div>
         )}
       </div>
+
+      {/* Upload Payslip Option */}
+      {employmentType === 'employee' && onUploadPayslip && (
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#3A7BD5] transition-colors cursor-pointer bg-gray-50 hover:bg-blue-50">
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            onChange={handleFileChange}
+            className="hidden"
+            id="payslip-upload"
+            disabled={uploadingPayslip}
+          />
+          <label htmlFor="payslip-upload" className="cursor-pointer">
+            <div className="flex flex-col items-center gap-2">
+              {uploadingPayslip ? (
+                <>
+                  <Loader2 className="w-8 h-8 text-[#3A7BD5] animate-spin" />
+                  <p className="text-sm text-gray-600">קורא את התלוש...</p>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-8 h-8 text-[#3A7BD5]" />
+                  <p className="font-semibold text-gray-900">יש לך תלוש משכורת?</p>
+                  <p className="text-sm text-gray-600">העלה אותו ונמלא הכל אוטומטית! ✨</p>
+                  <p className="text-xs text-gray-500 mt-1">תומך בתמונות ו-PDF</p>
+                </>
+              )}
+            </div>
+          </label>
+        </div>
+      )}
 
       <div className="flex gap-3">
         <Button onClick={onBack} variant="outline" className="flex-1">
@@ -466,6 +552,9 @@ function Step3Amount({
         <p className="text-gray-600 text-sm">
           {isVariable ? 'הזן את הסכום הממוצע שלך' : 'הסכום שבאמת מגיע לחשבון בכל חודש'}
         </p>
+        <div className="mt-3 text-sm text-gray-500 bg-yellow-50 border border-yellow-100 rounded-lg p-3">
+          💡 זה הסכום שרואים בחשבון הבנק <strong>אחרי</strong> כל הניכויים (מס, ביטוח לאומי, פנסיה)
+        </div>
       </div>
 
       {/* הכנסה משתנה Toggle */}
@@ -602,6 +691,9 @@ function Step4Frequency({
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">באיזו תדירות? 📅</h2>
         <p className="text-gray-600">כל כמה זמן ההכנסה הזו מגיעה?</p>
+        <div className="mt-3 text-sm text-gray-500 bg-purple-50 border border-purple-100 rounded-lg p-3">
+          💡 רוב האנשים מקבלים משכורת פעם בחודש, אבל יש גם תשלומים שבועיים או חד-פעמיים
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -673,6 +765,9 @@ function Step5Confirm({
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">כל הכבוד! 🎉</h2>
         <p className="text-gray-600">בואו נוודא שהכל נכון</p>
+        <div className="mt-3 text-sm text-gray-500 bg-green-50 border border-green-100 rounded-lg p-3">
+          ✅ זה סיכום הנתונים - אם משהו לא נכון, תמיד אפשר לחזור אחורה
+        </div>
       </div>
 
       {/* סיכום */}
@@ -741,12 +836,12 @@ function Step5Confirm({
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              שומר...
+              {editMode ? 'מעדכן...' : 'שומר...'}
             </>
           ) : (
             <>
               <Check className="w-4 h-4 mr-2" />
-              סיימתי!
+              {editMode ? 'עדכן!' : 'סיימתי!'}
             </>
           )}
         </Button>
