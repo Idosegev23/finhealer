@@ -423,7 +423,7 @@ function Step2SourceName({
         <h2 className="text-2xl font-bold text-gray-900 mb-2">נהדר! ✨</h2>
         <p className="text-gray-600">איך תרצה לקרוא למקור הכנסה הזה?</p>
         <div className="mt-3 text-sm text-gray-500 bg-green-50 border border-green-100 rounded-lg p-3">
-          💡 תן שם ברור - למשל "משכורת ראשית", "פרויקט X", "דירה להשכרה"
+          💡 תן שם ברור - למשל &quot;משכורת ראשית&quot;, &quot;פרויקט X&quot;, &quot;דירה להשכרה&quot;
         </div>
       </div>
 
