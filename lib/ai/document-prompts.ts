@@ -142,12 +142,11 @@ ${special.map(c => `  • ${c.name}`).join('\n')}
 - forex_fee: 5.08 (עמלת המרה 3% בדרך כלל)
 
 **דוגמה לעסקה במט"ח:**
-```
 CURSOR USAGE JUL 09/08/2025  $25.16
 הוראת קבע ארצות הברית. ב-10/08/25 הומר לש"ח בשער יציג 3.4350
 ומסכום זה נגבתה עמלת עסקה במט"ח 3.00% בסך 5.08 ש"ח
 סכום חיוב: ₪89.02
-```
+
 → original_amount: 25.16, original_currency: "USD", exchange_rate: 3.435, forex_fee: 5.08, amount: 89.02
 
 ${categoriesGuide}
