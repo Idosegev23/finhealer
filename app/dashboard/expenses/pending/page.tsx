@@ -186,8 +186,9 @@ export default function PendingExpensesPage() {
     if (expenses.length === 0) return;
 
     // ✅ סנן רק תנועות שמסווגות (או שהן הכנסות)
+    // 🚨 חובה: לא לאשר "לא מסווג" או ללא קטגוריה בכלל!
     const approvableExpenses = expenses.filter(
-      (e) => e.type === 'income' || e.expense_category_id || e.expense_category
+      (e) => e.type === 'income' || (e.expense_category && e.expense_category !== 'לא מסווג')
     );
 
     const uncategorizedCount = expenses.length - approvableExpenses.length;

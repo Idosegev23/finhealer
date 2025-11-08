@@ -42,8 +42,9 @@ export async function POST(request: Request) {
     }
 
     // בדוק שכל ההוצאות מסווגות
+    // 🚨 חשוב: "לא מסווג" נחשב כלא מסווג!
     const uncategorizedExpenses = transactions?.filter(
-      (tx: any) => tx.type === 'expense' && !tx.expense_category_id && !tx.expense_category
+      (tx: any) => tx.type === 'expense' && (!tx.expense_category || tx.expense_category === 'לא מסווג')
     ) || [];
 
     if (uncategorizedExpenses.length > 0) {

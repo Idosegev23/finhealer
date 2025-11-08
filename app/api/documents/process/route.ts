@@ -148,13 +148,13 @@ export async function POST(request: NextRequest) {
 
     if (docType.includes('credit')) {
       // Credit statements → transactions table only
-      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
+      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
       
       // ✨ Reconciliation: Match credit details with bank summary and delete duplicates
       await matchCreditTransactions(supabase, stmt.user_id, statementId as string, docType);
     } else if (docType.includes('bank')) {
       // Bank statements → transactions + bank_accounts + loans
-      const txCount = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
+      const txCount = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
       const accountCount = await saveBankAccounts(supabase, result, stmt.user_id, statementId as string);
       const loanCount = await saveLoanPaymentsAsLoans(supabase, result, stmt.user_id);
       itemsProcessed = txCount + accountCount + loanCount;
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
       itemsProcessed = await savePensions(supabase, result, stmt.user_id, statementId as string);
     } else {
       console.warn(`Unknown document type: ${docType}, defaulting to transactions`);
-      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType);
+      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
     }
 
     // 6. Update statement status
@@ -574,8 +574,10 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
 /**
  * Save transactions from credit/bank statements
  */
-async function saveTransactions(supabase: any, result: any, userId: string, documentId: string, documentType: string): Promise<number> {
+async function saveTransactions(supabase: any, result: any, userId: string, documentId: string, documentType: string, statementMonth?: string): Promise<number> {
   try {
+    console.log(`💾 Saving transactions for statement month: ${statementMonth || 'not provided, using AI dates'}`);
+    
     // Extract transactions from various result formats
     let allTransactions: any[] = [];
     let isBankStatement = false;
@@ -607,9 +609,29 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
       .eq('active', true);
 
     const transactionsToInsert = allTransactions.map((tx: any) => {
-      // Parse date from DD/MM/YYYY to YYYY-MM-DD
+      // 🎯 Use statementMonth (user selected) if available, otherwise parse from AI
       let parsedDate = new Date().toISOString().split('T')[0];
-      if (tx.date) {
+      
+      if (statementMonth) {
+        // ✅ statementMonth format: "YYYY-MM"
+        // Keep the day from AI if available, otherwise use day 15 as middle of month
+        if (tx.date) {
+          try {
+            const parts = tx.date.split('/');
+            if (parts.length === 3) {
+              const day = parts[0].padStart(2, '0');
+              parsedDate = `${statementMonth}-${day}`;
+            } else {
+              parsedDate = `${statementMonth}-15`; // Default to 15th
+            }
+          } catch (e) {
+            parsedDate = `${statementMonth}-15`; // Default to 15th
+          }
+        } else {
+          parsedDate = `${statementMonth}-15`; // Default to 15th
+        }
+      } else if (tx.date) {
+        // Fallback: Parse date from DD/MM/YYYY to YYYY-MM-DD (original logic)
         try {
           const parts = tx.date.split('/');
           if (parts.length === 3) {
