@@ -305,6 +305,7 @@ export default function ConversationalIncomeWizard({
             onSubmit={handleSubmit}
             onBack={handleBack}
             loading={loading}
+            editMode={editMode}
           />
         )}
       </AnimatePresence>
@@ -743,6 +744,7 @@ function Step5Confirm({
   onSubmit,
   onBack,
   loading,
+  editMode,
 }: {
   data: WizardData;
   calculatedData: any;
@@ -750,6 +752,7 @@ function Step5Confirm({
   onSubmit: () => void;
   onBack: () => void;
   loading: boolean;
+  editMode?: boolean;
 }) {
   const employmentLabel = EMPLOYMENT_TYPES.find((t) => t.value === data.employment_type)?.label;
   const frequencyLabel = FREQUENCY_OPTIONS.find((f) => f.value === data.payment_frequency)?.label;
