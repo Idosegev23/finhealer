@@ -36,7 +36,7 @@ import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { href: "/dashboard", label: "ראשי", icon: Home },
-  { href: "/dashboard/scan-center", label: "🔍 מרכז סריקה", icon: Scan },
+  { href: "/dashboard/scan-center", label: "🔍 מרכז סריקה", icon: Scan, disabled: true, badge: "בקרוב" },
   { href: "/dashboard/overview", label: "תמונת מצב", icon: BarChart3 },
   { href: "/dashboard/goals", label: "יעדים", icon: Target },
   { href: "/loans-simulator", label: "סימולטור", icon: Calculator },
@@ -243,6 +243,30 @@ export function DashboardNav() {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
                 
+                if (item.disabled) {
+                  return (
+                    <div
+                      key={item.href}
+                      title={`${item.label} - ${item.badge}`}
+                      className={`group relative flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl transition-all flex-1 cursor-not-allowed ${
+                        isDark 
+                          ? "text-gray-500 bg-gray-800/50"
+                          : "text-gray-400 bg-gray-50"
+                      }`}
+                    >
+                      <Icon className="w-6 h-6 opacity-50" />
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-center whitespace-nowrap opacity-50">{item.label}</span>
+                        {item.badge && (
+                          <span className="text-[10px] font-bold bg-orange-500 text-white px-1.5 py-0.5 rounded-full">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+                
                 return (
                   <Link
                     key={item.href}
@@ -380,6 +404,29 @@ export function DashboardNav() {
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
+                  
+                  if (item.disabled) {
+                    return (
+                      <div
+                        key={item.href}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all cursor-not-allowed ${
+                          isDark 
+                            ? "text-gray-500 bg-gray-800/50"
+                            : "text-gray-400 bg-gray-50"
+                        }`}
+                      >
+                        <Icon className="w-6 h-6 opacity-50" />
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-xs font-medium text-center opacity-50">{item.label}</span>
+                          {item.badge && (
+                            <span className="text-[9px] font-bold bg-orange-500 text-white px-1.5 py-0.5 rounded-full">
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
                   
                   return (
                     <Link
