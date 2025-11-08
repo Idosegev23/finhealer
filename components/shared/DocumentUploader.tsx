@@ -137,16 +137,8 @@ export function DocumentUploader({
   };
 
   return (
-    <Card className="relative">
-      <div className="absolute top-4 right-4 z-10 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-semibold border border-orange-300">
-        🚧 בפיתוח
-      </div>
-      <CardContent className="p-6 opacity-60 pointer-events-none">
-        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 pointer-events-auto">
-          <p className="text-sm text-yellow-800 text-center">
-            ⚠️ העלאת מסמכים נמצאת בפיתוח. אנא הכניסו נתונים ידנית בינתיים.
-          </p>
-        </div>
+    <Card>
+      <CardContent className="p-6">
         {/* Idle State - File Selection */}
         {status === 'idle' && !file && (
           <div

@@ -164,17 +164,28 @@ export default function ScanCenterPage() {
           <h1 className="text-3xl font-bold text-gray-900">
             🔍 מרכז סריקה
           </h1>
-          <Badge className="bg-orange-100 text-orange-700 border-orange-300">
-            🚧 בפיתוח
+          <Badge className="bg-green-100 text-green-700 border-green-300">
+            ✅ פעיל
           </Badge>
         </div>
         <p className="text-gray-600">
-          העלה דוחות פיננסיים מכל הסוגים - נזהה ונעבד אותם אוטומטית עם AI
+          העלה דוחות בנק ופירוט אשראי - נזהה ונסווג את ההוצאות אוטומטית עם AI
         </p>
-        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-800">
-            ⚠️ <strong>שימו לב:</strong> מערכת הסריקה נמצאת כרגע בפיתוח. בינתיים, אנא הכניסו נתונים ידנית דרך הדשבורד.
-          </p>
+        <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="text-2xl">💡</div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-900 mb-1">
+                איך זה עובד?
+              </p>
+              <ol className="text-sm text-blue-800 space-y-1 mr-4">
+                <li>1. בחר סוג דוח (בנק או אשראי)</li>
+                <li>2. העלה קובץ PDF</li>
+                <li>3. המערכת תזהה ותסווג את ההוצאות לקטגוריות</li>
+                <li>4. אשר או ערוך לפני השמירה</li>
+              </ol>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -183,15 +194,20 @@ export default function ScanCenterPage() {
         {documentTypes.map((docType) => {
           const Icon = docType.icon;
           const isActive = activeType === docType.type;
+          const isEnabled = docType.type === 'bank' || docType.type === 'credit';
 
           return (
             <Card
               key={docType.type}
-              className={`cursor-not-allowed opacity-60 transition-all ${
-                isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''
+              className={`transition-all ${
+                isEnabled 
+                  ? `cursor-pointer hover:shadow-lg ${isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''}` 
+                  : 'cursor-not-allowed opacity-40'
               }`}
               onClick={() => {
-                alert('🚧 תכונת הסריקה נמצאת בפיתוח. אנא הכניסו נתונים ידנית בינתיים.');
+                if (isEnabled) {
+                  setActiveType(docType.type);
+                }
               }}
             >
               <CardHeader className="pb-3">
@@ -202,9 +218,17 @@ export default function ScanCenterPage() {
                     <Icon className="w-6 h-6" />
                   </div>
                   <div className="flex-1">
-                    <CardTitle className="text-lg mb-1">
-                      {docType.title}
-                    </CardTitle>
+                    <div className="flex items-center gap-2 mb-1">
+                      <CardTitle className="text-lg">
+                        {docType.title}
+                      </CardTitle>
+                      {isEnabled && (
+                        <Badge className="bg-green-100 text-green-700 text-xs">✓ פעיל</Badge>
+                      )}
+                      {!isEnabled && (
+                        <Badge className="bg-gray-100 text-gray-500 text-xs">בקרוב</Badge>
+                      )}
+                    </div>
                     <CardDescription className="text-sm">
                       {docType.description}
                     </CardDescription>
@@ -218,9 +242,10 @@ export default function ScanCenterPage() {
                 <div className="text-sm text-gray-700">
                   {docType.dataExtracted}
                 </div>
-                {isActive && (
-                  <div className="mt-4 text-xs text-blue-600 font-medium">
-                    ✓ נבחר - העלה את הדוח למטה
+                {isActive && isEnabled && (
+                  <div className="mt-4 text-xs text-blue-600 font-medium flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    נבחר - העלה את הדוח למטה
                   </div>
                 )}
               </CardContent>

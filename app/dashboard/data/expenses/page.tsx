@@ -77,7 +77,7 @@ export default function ExpensesDataPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">הוסף הוצאה 💸</h1>
         <p className="mt-2 text-gray-600">
-          הזן הוצאה חדשה או סרוק דוח בנק/אשראי
+          הזן הוצאה חדשה או סרוק פירוט ויזה/אשראי
         </p>
       </div>
 
@@ -85,7 +85,7 @@ export default function ExpensesDataPage() {
         <CardHeader>
           <CardTitle>בחר שיטת הזנה</CardTitle>
           <CardDescription>
-            הזנה ידנית מהירה או סריקה אוטומטית של דוח
+            הזנה ידנית מהירה או סריקה אוטומטית של פירוט ויזה
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -97,7 +97,7 @@ export default function ExpensesDataPage() {
               </TabsTrigger>
               <TabsTrigger value="scan">
                 <Upload className="h-4 w-4 mr-2" />
-                סריקת דוח
+                סריקת פירוט ויזה
               </TabsTrigger>
             </TabsList>
 
@@ -185,19 +185,33 @@ export default function ExpensesDataPage() {
               </form>
             </TabsContent>
 
-            {/* File Upload */}
+            {/* File Upload - Credit Card Statements Only */}
             <TabsContent value="scan" className="space-y-4 mt-6">
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="text-2xl">💳</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900 mb-1">
+                      סריקת פירוט ויזה/אשראי
+                    </p>
+                    <ul className="text-sm text-blue-800 space-y-1 mr-4 list-disc">
+                      <li>העלה PDF של פירוט ויזה (כאל/מקס/ישראכרט/לאומי קארד וכו')</li>
+                      <li>המערכת תזהה את כל ההוצאות ותסווג אותן אוטומטית לקטגוריות</li>
+                      <li>תוכל לאשר או לערוך את הסיווג לפני השמירה</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
               <DocumentUploader
-                documentType="bank"
+                documentType="credit"
                 onSuccess={(data) => {
-                  // אל תציג כלום - ה-redirect קורה אוטומטית
-                  console.log('✅ File uploaded successfully:', data);
+                  console.log('✅ Credit statement uploaded:', data);
                 }}
                 onError={(error) => {
                   alert(`❌ שגיאה: ${error}`);
                 }}
-                acceptedFormats=".pdf,.jpg,.jpeg,.png,.xlsx,.xls"
-                maxSizeMB={50}
+                acceptedFormats=".pdf,.jpg,.jpeg,.png"
+                maxSizeMB={20}
               />
             </TabsContent>
           </Tabs>
