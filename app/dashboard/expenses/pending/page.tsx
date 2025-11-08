@@ -387,17 +387,84 @@ export default function PendingExpensesPage() {
     );
   }
 
+  const uncategorizedCount = expenses.filter(e => !e.expense_category || e.expense_category === 'לא מסווג').length;
+
   return (
     <div className="container mx-auto p-6" dir="rtl">
+      {/* 🎯 Header עם הסבר */}
+      <div className="mb-6">
+        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          בדוק ואשר את ההוצאות שלך 💳
+        </h1>
+        <p className="text-lg text-gray-700 mb-4">
+          {expenses.length === 0
+            ? 'אין תנועות ממתינות כרגע ✅'
+            : `${expenses.length} תנועות ממתינות לבדיקה`}
+        </p>
+        
+        {/* ℹ️ Info Box */}
+        {expenses.length > 0 && (
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="text-3xl">📊</div>
+              <div className="flex-1">
+                <h3 className="font-bold text-blue-900 mb-1">למה חשוב לבדוק?</h3>
+                <ul className="text-sm text-blue-800 space-y-1 list-disc mr-4">
+                  <li>וודא שכל העסקאות נכונות ושייכות לך</li>
+                  <li>ודא שהסיווג לקטגוריות מדויק (קבועות/משתנות/מיוחדות)</li>
+                  <li>עדכן פרטים לפני אישור סופי</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ⚠️ Warning Box - אם יש לא מסווגות */}
+        {uncategorizedCount > 0 && (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="text-3xl">⚠️</div>
+              <div className="flex-1">
+                <h3 className="font-bold text-amber-900 mb-1">
+                  {uncategorizedCount} תנועות ללא קטגוריה!
+                </h3>
+                <p className="text-sm text-amber-800">
+                  לחץ על "ערוך" כדי לבחור קטגוריה מתאימה. בלי קטגוריה לא ניתן לאשר.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 📈 סטטיסטיקה */}
+        {expenses.length > 0 && (
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="text-2xl font-bold text-green-700">
+                {expenses.filter(e => e.type === 'income').length}
+              </div>
+              <div className="text-xs text-green-600">הכנסות 💰</div>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="text-2xl font-bold text-blue-700">
+                {expenses.filter(e => e.type === 'expense').length}
+              </div>
+              <div className="text-xs text-blue-600">הוצאות 💳</div>
+            </div>
+            <div className={`${uncategorizedCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'} border rounded-lg p-3`}>
+              <div className={`text-2xl font-bold ${uncategorizedCount > 0 ? 'text-amber-700' : 'text-gray-700'}`}>
+                {uncategorizedCount}
+              </div>
+              <div className={`text-xs ${uncategorizedCount > 0 ? 'text-amber-600' : 'text-gray-600'}`}>
+                לא מסווג {uncategorizedCount > 0 ? '⚠️' : '✅'}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* כפתור אשר הכל */}
       <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">תנועות ממתינות לאישור</h1>
-          <p className="text-gray-600">
-            {expenses.length === 0
-              ? 'אין תנועות ממתינות כרגע'
-              : `${expenses.length} תנועות ממתינות לבדיקתך (${expenses.filter(e => e.type === 'income').length} הכנסות, ${expenses.filter(e => e.type === 'expense').length} הוצאות)`}
-          </p>
-        </div>
         {expenses.length > 0 && (
           <Button
             onClick={handleApproveAll}
@@ -439,21 +506,39 @@ export default function PendingExpensesPage() {
             const confidenceBadge = getConfidenceBadge(expense.confidence_score || 0);
             const isProcessing = processingIds.has(expense.id);
             const isIncome = expense.type === 'income';
+            const needsCategory = !expense.expense_category || expense.expense_category === 'לא מסווג';
 
             return (
-              <Card key={expense.id} className="hover:shadow-lg transition-shadow">
+              <Card 
+                key={expense.id} 
+                className={`hover:shadow-lg transition-all ${needsCategory ? 'border-4 border-amber-400 bg-amber-50' : 'border-2 border-gray-200'}`}
+              >
+                {/* ⚠️ אזהרה אם חסרה קטגוריה */}
+                {needsCategory && (
+                  <div className="bg-amber-400 text-amber-900 font-bold text-center py-2 text-sm">
+                    ⚠️ חובה לבחור קטגוריה לפני אישור! לחץ על "ערוך" ↓
+                  </div>
+                )}
+
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-xl mb-1">
-                        {expense.vendor || 'לא צוין'}
-                      </CardTitle>
-                      <CardDescription>
-                        {formatDate(expense.date)} • {expense.payment_method || 'לא צוין'}
+                      <div className="flex items-center gap-2 mb-1">
+                        <CardTitle className="text-2xl font-bold">
+                          {expense.vendor || 'לא צוין'}
+                        </CardTitle>
+                        {needsCategory && (
+                          <Badge className="bg-amber-500 text-white animate-pulse">
+                            דורש תשומת לב!
+                          </Badge>
+                        )}
+                      </div>
+                      <CardDescription className="text-base">
+                        📅 {formatDate(expense.date)} • 💳 {expense.payment_method || 'לא צוין'}
                       </CardDescription>
                     </div>
                     <div className="text-left">
-                      <div className={`text-2xl font-bold ${isIncome ? 'text-green-600' : 'text-blue-600'}`}>
+                      <div className={`text-3xl font-bold ${isIncome ? 'text-green-600' : 'text-blue-600'}`}>
                         {isIncome ? '+' : ''}{formatCurrency(expense.amount)}
                       </div>
                     </div>
@@ -514,43 +599,51 @@ export default function PendingExpensesPage() {
                     )}
 
                     {/* Actions */}
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        onClick={() => handleApprove(expense.id)}
-                        disabled={isProcessing}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                      >
-                        {isProcessing ? (
-                          <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="w-4 h-4 ml-2" />
-                        )}
-                        אשר
-                      </Button>
-
+                    <div className="space-y-2 pt-2">
+                      {/* כפתור ערוך - בולט אם חסרה קטגוריה */}
                       <Button
                         onClick={() => setEditingExpense(expense)}
                         disabled={isProcessing}
-                        variant="outline"
-                        className="flex-1"
+                        className={`w-full text-lg py-6 ${
+                          needsCategory 
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold animate-pulse' 
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
                       >
-                        <Edit2 className="w-4 h-4 ml-2" />
-                        ערוך
+                        <Edit2 className="w-5 h-5 ml-2" />
+                        {needsCategory ? 'ערוך וסווג קטגוריה ⚠️' : 'ערוך פרטים'}
                       </Button>
 
-                      <Button
-                        onClick={() => handleReject(expense.id)}
-                        disabled={isProcessing}
-                        variant="destructive"
-                        className="flex-1"
-                      >
-                        {isProcessing ? (
-                          <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                        ) : (
-                          <XCircle className="w-4 h-4 ml-2" />
-                        )}
-                        דחה
-                      </Button>
+                      {/* שורת כפתורי פעולה */}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleApprove(expense.id)}
+                          disabled={isProcessing || needsCategory}
+                          className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={needsCategory ? 'יש לבחור קטגוריה לפני אישור' : ''}
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 ml-2" />
+                          )}
+                          {needsCategory ? '🔒 אשר' : '✅ אשר'}
+                        </Button>
+
+                        <Button
+                          onClick={() => handleReject(expense.id)}
+                          disabled={isProcessing}
+                          variant="destructive"
+                          className="flex-1"
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                          ) : (
+                            <XCircle className="w-4 h-4 ml-2" />
+                          )}
+                          ❌ דחה
+                        </Button>
+                      </div>
                     </div>
 
                     {/* Match Card - show when matches found */}
