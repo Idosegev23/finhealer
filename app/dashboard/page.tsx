@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Wallet, TrendingUp, TrendingDown, Target, PlusCircle, ArrowRight, Calculator, BarChart3 } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, Target, PlusCircle, ArrowRight, Calculator, BarChart3, BookOpen } from 'lucide-react'
 import { PhaseProgressBar } from '@/components/dashboard/PhaseProgressBar'
 import { ExpensesDrilldownChart } from '@/components/dashboard/ExpensesDrilldownChart'
 import { IncomeDrilldownChart } from '@/components/dashboard/IncomeDrilldownChart'
