@@ -523,7 +523,6 @@ export async function POST(request: NextRequest) {
             message: 'משהו השתבש בניתוח הקבלה 😕\n\nנסה שוב או כתוב את הפרטים ידנית.',
           });
         }
-      }
     } else if (messageType === 'documentMessage') {
       // 🆕 טיפול במסמכים (PDF, Excel, וכו')
       console.log('📄 Document message received. Full messageData:', JSON.stringify(payload.messageData, null, 2));
@@ -555,12 +554,117 @@ export async function POST(request: NextRequest) {
           message: 'קיבלתי את המסמך! 📄\n\nאני מנתח אותו עם AI...',
         });
         
-        // כאן אפשר להוסיף טיפול ב-PDF בעתיד
-        // כרגע נשלח הודעה שזה בפיתוח
-        await greenAPI.sendMessage({
-          phoneNumber,
-          message: '📄 קבלתי את ה-PDF!\n\nכרגע ניתוח PDF בפיתוח 🚧\n\nבינתיים, תוכל לצלם את המסך או לכתוב את הפרטים ידנית.',
-        });
+        try {
+          // הורדת ה-PDF
+          const pdfResponse = await fetch(downloadUrl);
+          const pdfBuffer = await pdfResponse.arrayBuffer();
+          const base64PDF = Buffer.from(pdfBuffer).toString('base64');
+          
+          // GPT-4o יכול לקרוא PDF ישירות כמו תמונות!
+          console.log('🤖 Starting PDF analysis with GPT-4o Vision...');
+          
+          // שימוש באותו פרומפט כמו לתמונות
+          const visionResponse = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: `${EXPENSE_CATEGORIES_SYSTEM_PROMPT}
+
+**פורמט החזרה:**
+{
+  "document_type": "receipt | bank_statement | credit_statement",
+  "transactions": [
+    {
+      "amount": <number>,
+      "vendor": "שם העסק",
+      "date": "YYYY-MM-DD",
+      "expense_category": "הקטגוריה המדויקת",
+      "expense_type": "fixed | variable | special",
+      "description": "תיאור",
+      "confidence": <0.0-1.0>
+    }
+  ]
+}`
+              },
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'נתח את דוח הבנק/אשראי הזה וחלץ את כל התנועות. שים לב מיוחד לתאריכים!'
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: { url: `data:application/pdf;base64,${base64PDF}` }
+                  }
+                ]
+              }
+            ],
+            temperature: 0.1,
+            max_tokens: 4000,
+            response_format: { type: 'json_object' },
+          });
+
+          const aiText = visionResponse.choices[0].message.content || '{}';
+          console.log('🎯 PDF OCR Result:', aiText);
+
+          let ocrData: any;
+          try {
+            ocrData = JSON.parse(aiText);
+          } catch {
+            ocrData = { document_type: 'credit_statement', transactions: [] };
+          }
+
+          const transactions = ocrData.transactions || [];
+          
+          if (transactions.length === 0) {
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: 'לא הצלחתי לזהות תנועות ב-PDF 😕\n\nנסה לצלם את המסך או כתוב את הפרטים ידנית.',
+            });
+            return NextResponse.json({ status: 'no_data' });
+          }
+
+          // שמירת כל התנועות
+          for (const tx of transactions) {
+            const txDate = tx.date || new Date().toISOString().split('T')[0];
+            
+            await (supabase as any)
+              .from('transactions')
+              .insert({
+                user_id: userData.id,
+                type: 'expense',
+                amount: tx.amount,
+                vendor: tx.vendor,
+                date: txDate,
+                tx_date: txDate,
+                category: tx.category || 'other',
+                expense_category: tx.expense_category || null,
+                expense_type: tx.expense_type || 'variable',
+                payment_method: ocrData.document_type === 'credit_statement' ? 'credit_card' : 'bank_transfer',
+                source: 'ocr',
+                status: 'pending',
+                notes: tx.description || '',
+                original_description: tx.description || '',
+                auto_categorized: true,
+                confidence_score: tx.confidence || 0.5,
+              });
+          }
+          
+          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app';
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: `🎉 זיהיתי ${transactions.length} תנועות מה-PDF!\n\n👉 אשר את ההוצאות כאן:\n${siteUrl}/dashboard/expenses/pending`,
+          });
+          
+        } catch (pdfError: any) {
+          console.error('❌ PDF Error:', pdfError);
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: 'משהו השתבש בניתוח ה-PDF 😕\n\nנסה לצלם את המסך או כתוב את הפרטים ידנית.',
+          });
+        }
       } else {
         await greenAPI.sendMessage({
           phoneNumber,
