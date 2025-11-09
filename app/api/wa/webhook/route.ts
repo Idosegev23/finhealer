@@ -283,8 +283,9 @@ export async function POST(request: NextRequest) {
       // 🔍 Debug: הצג את כל ה-payload
       console.log('🖼️ Image message received. Full messageData:', JSON.stringify(payload.messageData, null, 2));
       
-      const downloadUrl = payload.messageData?.downloadUrl;
-      const caption = payload.messageData?.caption || '';
+      // 🔧 GreenAPI שולח את הנתונים ב-fileMessageData!
+      const downloadUrl = payload.messageData?.fileMessageData?.downloadUrl || payload.messageData?.downloadUrl;
+      const caption = payload.messageData?.fileMessageData?.caption || payload.messageData?.caption || '';
       
       console.log('📥 Download URL:', downloadUrl);
       console.log('📝 Caption:', caption);
@@ -527,9 +528,10 @@ export async function POST(request: NextRequest) {
       // 🆕 טיפול במסמכים (PDF, Excel, וכו')
       console.log('📄 Document message received. Full messageData:', JSON.stringify(payload.messageData, null, 2));
       
-      const downloadUrl = payload.messageData?.downloadUrl;
-      const fileName = payload.messageData?.fileName || 'document';
-      const caption = payload.messageData?.caption || '';
+      // 🔧 GreenAPI שולח את הנתונים ב-fileMessageData!
+      const downloadUrl = payload.messageData?.fileMessageData?.downloadUrl || payload.messageData?.downloadUrl;
+      const fileName = payload.messageData?.fileMessageData?.fileName || payload.messageData?.fileName || 'document';
+      const caption = payload.messageData?.fileMessageData?.caption || payload.messageData?.caption || '';
       
       console.log('📥 Document URL:', downloadUrl);
       console.log('📝 File name:', fileName);
