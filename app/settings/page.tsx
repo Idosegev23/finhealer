@@ -639,7 +639,6 @@ function ProfileTab() {
           </div>
         )}
       </div>
-      </div>
     </div>
   );
 }
