@@ -25,7 +25,7 @@ export function OnboardingSelector() {
   const [waOptIn, setWaOptIn] = useState(true);
 
   // Step 4: Personal Info
-  const [age, setAge] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [maritalStatus, setMaritalStatus] = useState('');
   const [city, setCity] = useState('');
 
@@ -130,7 +130,7 @@ export function OnboardingSelector() {
         .from('user_financial_profile')
         .upsert({
           user_id: userId,
-          age: age ? parseInt(age) : null,
+          birth_date: birthDate || null,
           marital_status: maritalStatus || null,
           city: city || null,
           children_count: childrenCount,
@@ -431,13 +431,12 @@ export function OnboardingSelector() {
               <div className="space-y-4 max-w-md mx-auto">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    גיל
+                    תאריך לידה
                   </label>
                   <input
-                    type="number"
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    placeholder="למשל: 35"
+                    type="date"
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
@@ -503,7 +502,7 @@ export function OnboardingSelector() {
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-right">
                   <p className="text-sm text-gray-700">
-                    <strong>💡 טיפ:</strong> פרטים נוספים על ילדים (שמות, גילאים) תוכל למלא מאוחר יותר בדשבורד
+                    <strong>💡 טיפ:</strong> פרטים נוספים על ילדים (שמות, תאריכי לידה, הערות) תוכל למלא בהגדרות &gt; פרופיל אישי
                   </p>
                 </div>
               </div>

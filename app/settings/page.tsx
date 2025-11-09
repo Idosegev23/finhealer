@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Phone, MessageSquare, Bell, User, CreditCard, Lock, Loader2, CheckCircle, ArrowRight } from 'lucide-react';
+import { Phone, MessageSquare, Bell, User, CreditCard, Lock, Loader2, CheckCircle, ArrowRight, Plus, Pencil, Trash2, Baby, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 type Tab = 'profile' | 'whatsapp' | 'notifications' | 'subscription' | 'privacy';
@@ -112,6 +112,13 @@ function TabButton({
   );
 }
 
+interface Child {
+  id: string;
+  name: string;
+  birth_date: string;
+  notes?: string;
+}
+
 function ProfileTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -127,10 +134,162 @@ function ProfileTab() {
     marital_status: '',
     children_count: 0,
   });
+  
+  // Children management
+  const [children, setChildren] = useState<Child[]>([]);
+  const [childrenLoading, setChildrenLoading] = useState(false);
+  const [showAddChild, setShowAddChild] = useState(false);
+  const [editingChild, setEditingChild] = useState<Child | null>(null);
+  const [childForm, setChildForm] = useState({
+    name: '',
+    birth_date: '',
+    notes: '',
+  });
 
   useEffect(() => {
     loadUserData();
+    loadChildren();
   }, []);
+
+  const loadChildren = async () => {
+    try {
+      setChildrenLoading(true);
+      const response = await fetch('/api/children');
+      const data = await response.json();
+      
+      if (data.children) {
+        setChildren(data.children);
+      }
+    } catch (err) {
+      console.error('Error loading children:', err);
+    } finally {
+      setChildrenLoading(false);
+    }
+  };
+
+  const calculateAge = (birthDate: string) => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const handleAddChild = async () => {
+    if (!childForm.name || !childForm.birth_date) {
+      setError('שם ותאריך לידה הם שדות חובה');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await fetch('/api/children', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(childForm),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setChildren([...children, data.child]);
+        setChildForm({ name: '', birth_date: '', notes: '' });
+        setShowAddChild(false);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      } else {
+        setError(data.error || 'שגיאה בהוספת ילד');
+      }
+    } catch (err) {
+      console.error('Error adding child:', err);
+      setError('שגיאה בהוספת ילד');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateChild = async () => {
+    if (!editingChild || !childForm.name || !childForm.birth_date) {
+      setError('שם ותאריך לידה הם שדות חובה');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await fetch('/api/children', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingChild.id,
+          ...childForm,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setChildren(children.map(c => c.id === editingChild.id ? data.child : c));
+        setChildForm({ name: '', birth_date: '', notes: '' });
+        setEditingChild(null);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      } else {
+        setError(data.error || 'שגיאה בעדכון ילד');
+      }
+    } catch (err) {
+      console.error('Error updating child:', err);
+      setError('שגיאה בעדכון ילד');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteChild = async (childId: string) => {
+    if (!confirm('האם אתה בטוח שברצונך למחוק ילד זה?')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await fetch(`/api/children?id=${childId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setChildren(children.filter(c => c.id !== childId));
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      } else {
+        setError(data.error || 'שגיאה במחיקת ילד');
+      }
+    } catch (err) {
+      console.error('Error deleting child:', err);
+      setError('שגיאה במחיקת ילד');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEditChild = (child: Child) => {
+    setEditingChild(child);
+    setChildForm({
+      name: child.name,
+      birth_date: child.birth_date,
+      notes: child.notes || '',
+    });
+    setShowAddChild(true);
+  };
+
+  const cancelChildForm = () => {
+    setShowAddChild(false);
+    setEditingChild(null);
+    setChildForm({ name: '', birth_date: '', notes: '' });
+  };
 
   const loadUserData = async () => {
     try {
@@ -336,6 +495,150 @@ function ProfileTab() {
             'שמור שינויים'
           )}
         </button>
+      </div>
+
+      {/* Children Management Section */}
+      <div className="mt-8 pt-8 border-t border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-[#1E2A3B] flex items-center gap-2">
+            <Baby className="w-5 h-5" />
+            פרטי ילדים
+          </h3>
+          {!showAddChild && (
+            <button
+              onClick={() => setShowAddChild(true)}
+              className="flex items-center gap-2 text-[#3A7BD5] hover:text-[#2E5EA5] transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm font-medium">הוסף ילד</span>
+            </button>
+          )}
+        </div>
+
+        {/* Add/Edit Child Form */}
+        {showAddChild && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-medium text-[#1E2A3B]">
+                {editingChild ? 'ערוך פרטי ילד' : 'הוסף ילד חדש'}
+              </h4>
+              <button
+                onClick={cancelChildForm}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-[#555555] mb-1">
+                  שם <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={childForm.name}
+                  onChange={(e) => setChildForm({ ...childForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent text-sm"
+                  placeholder="שם הילד/ה"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#555555] mb-1">
+                  תאריך לידה <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={childForm.birth_date}
+                  onChange={(e) => setChildForm({ ...childForm, birth_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#555555] mb-1">
+                  הערות (אופציונלי)
+                </label>
+                <textarea
+                  value={childForm.notes}
+                  onChange={(e) => setChildForm({ ...childForm, notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent text-sm"
+                  placeholder="הערות נוספות..."
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={editingChild ? handleUpdateChild : handleAddChild}
+                  disabled={saving}
+                  className="flex-1 bg-[#3A7BD5] text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition disabled:opacity-50 text-sm font-medium"
+                >
+                  {editingChild ? 'עדכן' : 'הוסף'}
+                </button>
+                <button
+                  onClick={cancelChildForm}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Children List */}
+        {childrenLoading ? (
+          <div className="text-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+          </div>
+        ) : children.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <Baby className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+            <p className="text-sm">טרם הוספת פרטי ילדים</p>
+            <p className="text-xs mt-1">לחץ על &quot;הוסף ילד&quot; כדי להתחיל</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {children.map((child) => (
+              <div
+                key={child.id}
+                className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition"
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-medium text-[#1E2A3B]">{child.name}</h4>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                      גיל {calculateAge(child.birth_date)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    תאריך לידה: {new Date(child.birth_date).toLocaleDateString('he-IL')}
+                  </p>
+                  {child.notes && (
+                    <p className="text-xs text-gray-400 mt-1">{child.notes}</p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => startEditChild(child)}
+                    className="p-2 text-[#3A7BD5] hover:bg-blue-50 rounded-lg transition"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteChild(child.id)}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       </div>
     </div>
   );

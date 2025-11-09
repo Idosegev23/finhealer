@@ -225,15 +225,15 @@ export default async function DashboardPage() {
 
   // Phase 5 (monitoring) or data_collection - show full dashboard
   return (
-    <div className="min-h-screen bg-dashboard">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+      <div className="container mx-auto px-8 py-8 max-w-7xl">
         <PendingTransactionsBanner />
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-theme-primary mb-2">
+        <div className="mb-8 bg-gradient-to-l from-phi-gold/10 to-phi-coral/10 dark:from-phi-gold/5 dark:to-phi-coral/5 rounded-2xl p-6 border-4 border-phi-gold/20">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
             שלום, {userDataInfo.name}! 👋
           </h1>
-          <p className="text-lg text-theme-secondary">
+          <p className="text-lg text-gray-600 dark:text-gray-300">
             סקירה כללית של המצב הפיננסי שלך
           </p>
         </div>
@@ -245,27 +245,27 @@ export default async function DashboardPage() {
         />
 
         {/* ציון בריאות פיננסית */}
-        <div className="bg-card-dark border border-theme rounded-2xl p-8 mb-8 shadow-lg hover:shadow-xl transition-shadow duration-300">
+        <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-8 mb-8 shadow-xl hover:shadow-2xl transition-all duration-300">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold text-theme-primary">ציון בריאות פיננסית</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">ציון φ (Phi)</h2>
               <InfoTooltip
                 content="הציון מחושב על בסיס הכנסות, הוצאות, חובות, חיסכון והתנהלות פיננסית כללית. ציון גבוה = מצב פיננסי טוב יותר"
                 type="info"
               />
             </div>
-            <div className="text-6xl font-black text-blue-600">
-              {score}<span className="text-3xl text-theme-tertiary">/100</span>
+            <div className="text-6xl font-black text-phi-gold">
+              {score}<span className="text-3xl text-gray-500 dark:text-gray-400">/100</span>
             </div>
           </div>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-4">
             <div 
-              className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full transition-all duration-500 shadow-sm"
+              className="bg-gradient-to-r from-phi-gold to-phi-coral h-4 rounded-full transition-all duration-500 shadow-lg"
               style={{ width: `${score}%` }}
             ></div>
           </div>
           <div className="flex items-center justify-between">
-            <p className="text-base text-theme-secondary">
+            <p className="text-base text-gray-600 dark:text-gray-300">
               {score >= 80 ? '🎉 מעולה! המצב הפיננסי שלך נהדר' : 
                score >= 60 ? '👍 טוב! אתה בכיוון הנכון' : 
                score >= 40 ? '⚠️ ניתן לשפר - יש לך פוטנציאל' : 
@@ -273,7 +273,7 @@ export default async function DashboardPage() {
             </p>
             {score < 80 && (
               <Link href="/dashboard/phases">
-                <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <Button variant="outline" size="sm" className="text-phi-gold border-phi-gold hover:bg-phi-gold/10">
                   טיפים לשיפור
                 </Button>
               </Link>
@@ -284,14 +284,17 @@ export default async function DashboardPage() {
         {/* סיכום פיננסי - 4 כרטיסים עם כפתורים חכמים */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* מצב חשבון */}
-          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <div className="bg-white dark:bg-phi-dark border border-phi-gold/20 rounded-xl p-6 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 group">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Wallet className="w-6 h-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="bg-green-500 rounded-full h-6 px-2 flex items-center text-white font-semibold text-xs">
+                <span>פעיל</span>
               </div>
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-theme-tertiary text-sm font-medium">חשבון עו&quot;ש</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">חשבון עו&quot;ש</p>
               <InfoTooltip
                 content="היתרה הנוכחית בחשבון העו&quot;ש שלך"
                 type="info"
@@ -301,7 +304,7 @@ export default async function DashboardPage() {
               {currentAccount >= 0 ? '+' : ''}₪{currentAccount.toLocaleString('he-IL')}
             </p>
             <Link href="/dashboard/cash-flow" className="block">
-              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+              <Button variant="ghost" size="sm" className="w-full text-phi-gold hover:bg-phi-gold/10 border border-phi-gold/30">
                 <PlusCircle className="w-4 h-4 ml-2" />
                 עדכן יתרה
               </Button>
@@ -309,24 +312,27 @@ export default async function DashboardPage() {
           </div>
 
           {/* הכנסה חודשית */}
-          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <div className="bg-white dark:bg-phi-dark border border-phi-gold/20 rounded-xl p-6 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 group">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="bg-blue-500 rounded-full h-6 px-2 flex items-center text-white font-semibold text-xs">
+                <span>חודשי</span>
               </div>
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-theme-tertiary text-sm font-medium">הכנסה חודשית</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">הכנסה חודשית</p>
               <InfoTooltip
                 content="סכום כל ההכנסות החודשיות הקבועות שלך"
                 type="info"
               />
             </div>
-            <p className="text-3xl font-bold text-theme-primary mb-3">
+            <p className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
               ₪{monthlyIncome.toLocaleString('he-IL')}
             </p>
             <Link href="/dashboard/income" className="block">
-              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+              <Button variant="ghost" size="sm" className="w-full text-phi-gold hover:bg-phi-gold/10 border border-phi-gold/30">
                 {hasIncome ? (
                   <>
                     <ArrowRight className="w-4 h-4 ml-2" />
@@ -343,14 +349,17 @@ export default async function DashboardPage() {
           </div>
 
           {/* הוצאות החודש */}
-          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <div className="bg-white dark:bg-phi-dark border border-phi-gold/20 rounded-xl p-6 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 group">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <TrendingDown className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="bg-red-500 rounded-full h-6 px-2 flex items-center text-white font-semibold text-xs">
+                <span>חודשי</span>
               </div>
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-theme-tertiary text-sm font-medium">הוצאות החודש</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">הוצאות החודש</p>
               <InfoTooltip
                 content="סך כל ההוצאות בחודש הנוכחי (רק תנועות מאושרות)"
                 type="info"
@@ -360,7 +369,7 @@ export default async function DashboardPage() {
               ₪{monthlyExpensesFromTransactions.toLocaleString('he-IL')}
             </p>
             <Link href="/dashboard/expenses" className="block">
-              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+              <Button variant="ghost" size="sm" className="w-full text-phi-gold hover:bg-phi-gold/10 border border-phi-gold/30">
                 <ArrowRight className="w-4 h-4 ml-2" />
                 ניהול הוצאות
               </Button>
@@ -368,14 +377,17 @@ export default async function DashboardPage() {
           </div>
 
           {/* חובות */}
-          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <div className="bg-white dark:bg-phi-dark border border-phi-gold/20 rounded-xl p-6 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 group">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <div className="bg-yellow-500 rounded-full h-6 px-2 flex items-center text-white font-semibold text-xs">
+                <span>פעיל</span>
               </div>
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-theme-tertiary text-sm font-medium">סך החובות</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">סך החובות</p>
               <InfoTooltip
                 content="סך כל ההלוואות והחובות הפעילים שלך"
                 type="info"
@@ -386,14 +398,14 @@ export default async function DashboardPage() {
             </p>
             {hasLoans ? (
               <Link href="/loans-simulator" className="block">
-                <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <Button variant="ghost" size="sm" className="w-full text-phi-gold hover:bg-phi-gold/10 border border-phi-gold/30">
                   <Calculator className="w-4 h-4 ml-2" />
                   סימולטור איחוד
                 </Button>
               </Link>
             ) : (
               <Link href="/dashboard/loans" className="block">
-                <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <Button variant="ghost" size="sm" className="w-full text-phi-gold hover:bg-phi-gold/10 border border-phi-gold/30">
                   <PlusCircle className="w-4 h-4 ml-2" />
                   הוסף הלוואה
                 </Button>
@@ -402,14 +414,17 @@ export default async function DashboardPage() {
           </div>
 
           {/* שווי נטו */}
-          <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+          <div className="bg-white dark:bg-phi-dark border border-phi-gold/20 rounded-xl p-6 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 group">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Target className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className={`${netWorth >= 0 ? 'bg-green-500' : 'bg-red-500'} rounded-full h-6 px-2 flex items-center text-white font-semibold text-xs`}>
+                <span>{netWorth >= 0 ? 'חיובי' : 'שלילי'}</span>
               </div>
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-theme-tertiary text-sm font-medium">שווי נטו</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">שווי נטו</p>
               <InfoTooltip
                 content="נכסים פחות חובות - המצב הפיננסי הכולל שלך"
                 type="info"
@@ -419,7 +434,7 @@ export default async function DashboardPage() {
               {netWorth >= 0 ? '+' : ''}₪{netWorth.toLocaleString('he-IL')}
             </p>
             <Link href="/dashboard/overview" className="block">
-              <Button variant="ghost" size="sm" className="w-full text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+              <Button variant="ghost" size="sm" className="w-full text-phi-gold hover:bg-phi-gold/10 border border-phi-gold/30">
                 <ArrowRight className="w-4 h-4 ml-2" />
                 צפה בפירוט
               </Button>
@@ -440,34 +455,34 @@ export default async function DashboardPage() {
         </div>
 
         {/* פעולות מהירות חכמות - 4-6 כפתורים בלבד */}
-        <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-theme-primary mb-4">פעולות נוספות</h3>
+        <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-xl p-6 shadow-lg">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">פעולות נוספות</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {/* הוצאות - תמיד מוצג */}
             <Link 
               href="/dashboard/expenses"
-              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-phi-gold/30 hover:bg-phi-gold/10 dark:hover:bg-phi-gold/5 transition-colors"
             >
               <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
-              <span className="text-sm text-theme-secondary">רשום הוצאה</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">רשום הוצאה</span>
             </Link>
 
             {/* סקירת הוצאות - חדש */}
             <Link 
               href="/dashboard/expenses-overview"
-              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-phi-gold/30 hover:bg-phi-gold/10 dark:hover:bg-phi-gold/5 transition-colors"
             >
               <BarChart3 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-              <span className="text-sm text-theme-secondary">סקירת הוצאות</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">סקירת הוצאות</span>
             </Link>
 
             {/* חיסכון - חכם */}
             <Link 
               href="/dashboard/savings"
-              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-phi-gold/30 hover:bg-phi-gold/10 dark:hover:bg-phi-gold/5 transition-colors"
             >
               <Wallet className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm text-theme-secondary">
+              <span className="text-sm text-gray-600 dark:text-gray-300">
                 {hasSavings ? 'חיסכון' : 'פתח חיסכון'}
               </span>
             </Link>
@@ -476,10 +491,10 @@ export default async function DashboardPage() {
             {!hasInsurance && (
               <Link 
                 href="/dashboard/insurance"
-                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-phi-gold/30 hover:bg-phi-gold/10 dark:hover:bg-phi-gold/5 transition-colors"
               >
                 <Target className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-                <span className="text-sm text-theme-secondary">הוסף ביטוח</span>
+                <span className="text-sm text-gray-600 dark:text-gray-300">הוסף ביטוח</span>
               </Link>
             )}
 
@@ -487,10 +502,10 @@ export default async function DashboardPage() {
             {!hasPensions && (
               <Link 
                 href="/dashboard/pensions"
-                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-phi-gold/30 hover:bg-phi-gold/10 dark:hover:bg-phi-gold/5 transition-colors"
               >
                 <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
-                <span className="text-sm text-theme-secondary">הוסף פנסיה</span>
+                <span className="text-sm text-gray-600 dark:text-gray-300">הוסף פנסיה</span>
               </Link>
             )}
 
@@ -498,10 +513,10 @@ export default async function DashboardPage() {
             {hasLoans && (
               <Link 
                 href="/dashboard/loans"
-                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-phi-gold/30 hover:bg-phi-gold/10 dark:hover:bg-phi-gold/5 transition-colors"
               >
                 <ArrowRight className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                <span className="text-sm text-theme-secondary">נהל הלוואות</span>
+                <span className="text-sm text-gray-600 dark:text-gray-300">נהל הלוואות</span>
               </Link>
             )}
 
@@ -509,13 +524,10 @@ export default async function DashboardPage() {
             {score < 70 && (
               <Link 
                 href="/guide"
-                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-theme hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-phi-gold/30 hover:bg-phi-gold/10 dark:hover:bg-phi-gold/5 transition-colors"
               >
-                <InfoTooltip
-                  content="קבל טיפים לשיפור המצב הפיננסי"
-                  type="info"
-                />
-                <span className="text-sm text-theme-secondary">מדריך</span>
+                <BookOpen className="w-6 h-6 text-phi-gold" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">מדריך</span>
               </Link>
             )}
           </div>

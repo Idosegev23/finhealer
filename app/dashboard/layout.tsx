@@ -1,29 +1,43 @@
-import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
-import { DashboardNav } from '@/components/shared/DashboardNav';
-import { DashboardWrapper } from '@/components/dashboard/DashboardWrapper';
+"use client";
 
-export default async function DashboardLayout({
+import { useState } from 'react';
+import { PhiSidebar } from '@/components/dashboard/PhiSidebar';
+import { PhiHeader } from '@/components/dashboard/PhiHeader';
+
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // בדיקת אימות
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
 
-  if (!user) {
-    redirect('/login');
-  }
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
 
   return (
-    <DashboardWrapper>
-      <DashboardNav />
-      {children}
-    </DashboardWrapper>
+    <div className="flex h-screen bg-gray-900 overflow-hidden" dir="rtl">
+      {/* Sidebar */}
+      <PhiSidebar 
+        isMobileMenuOpen={isMobileMenuOpen} 
+        closeMobileMenu={closeMobileMenu} 
+      />
+
+      {/* Main Content */}
+      <div className="flex flex-col flex-1 w-full overflow-y-auto">
+        {/* Header */}
+        <PhiHeader toggleMobileMenu={toggleMobileMenu} />
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto bg-gray-100 dark:bg-gray-900">
+          {children}
+        </main>
+      </div>
+    </div>
   );
 }
 

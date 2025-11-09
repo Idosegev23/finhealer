@@ -72,14 +72,14 @@ export default function EmptyDashboard({ userName, hasProfile }: EmptyDashboardP
                     </div>
                   </div>
                   <p className="text-gray-600 text-sm mb-3">
-                    גיל, מצב משפחתי, פרטי ילדים וכתובת מגורים
+                    תאריך לידה, מצב משפחתי, פרטי ילדים (שמות וגילאים) וכתובת מגורים
                   </p>
                   <ul className="text-xs text-gray-600 mb-3 space-y-1">
                     <li className="flex items-center justify-end gap-2">
-                      <span>✓ אפשרות לסריקת ת&quot;ז לmילוי אוטומטי</span>
+                      <span>✓ ניהול מלא של פרטי הילדים</span>
                     </li>
                     <li className="flex items-center justify-end gap-2">
-                      <span>✓ מידע נוסף (הכנסות, הוצאות) בדשבורד</span>
+                      <span>✓ מידע נוסף (הכנסות, הוצאות) בשלבים הבאים</span>
                     </li>
                   </ul>
                   <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
