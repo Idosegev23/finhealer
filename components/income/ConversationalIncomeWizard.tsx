@@ -171,20 +171,20 @@ export default function ConversationalIncomeWizard({
     setLoading(true);
     try {
       const bodyData = {
-          source_name: data.source_name,
-          employment_type: data.employment_type,
-          actual_bank_amount: data.actual_bank_amount,
-          payment_frequency: data.payment_frequency,
-          gross_amount: calculatedData?.gross || null,
-          net_amount: calculatedData?.net || null,
-          employer_name: data.employer_name || null,
-          pension_contribution: calculatedData?.pension || null,
-          advanced_study_fund: calculatedData?.advancedStudy || null,
-          other_deductions: data.other_deductions || null,
-          is_primary: data.is_primary,
-          is_variable: data.is_variable,
-          min_amount: data.min_amount,
-          max_amount: data.max_amount,
+        source_name: data.source_name,
+        employment_type: data.employment_type,
+        actual_bank_amount: data.actual_bank_amount,
+        payment_frequency: data.payment_frequency,
+        gross_amount: calculatedData?.gross || null,
+        net_amount: calculatedData?.net || null,
+        employer_name: data.employer_name || null,
+        pension_contribution: calculatedData?.pension || null,
+        advanced_study_fund: calculatedData?.advancedStudy || null,
+        other_deductions: data.other_deductions || null,
+        is_primary: data.is_primary,
+        is_variable: data.is_variable,
+        min_amount: data.min_amount,
+        max_amount: data.max_amount,
       };
 
       // עדכון או יצירה
@@ -662,7 +662,7 @@ function Step3Amount({
         {isEmployee && (
           <div className="mt-3 text-sm text-gray-500 bg-blue-50 border border-blue-100 rounded-lg p-3">
             💡 אם יש לך תלוש משכורת, נוכל למלא הכל אוטומטית!
-          </div>
+        </div>
         )}
       </div>
 
@@ -805,7 +805,7 @@ function Step3Amount({
                   <span className="text-xl font-bold text-gray-900">{SmartIncomeCalculator.formatAmount(detailed.net)}</span>
                 </div>
 
-                {/* פנסיה וקה"ש */}
+                {/* פנסיה וקה&quot;ש */}
                 <div className="space-y-1">
                   <div className="flex justify-between items-center p-2 bg-white/60 rounded-lg text-xs">
                     <span className="text-gray-600">🏦 פנסיה עובד (6%):</span>
@@ -831,7 +831,7 @@ function Step3Amount({
                     <span className="font-medium">+{SmartIncomeCalculator.formatAmount(detailed.pension.employer)}</span>
                   </div>
                   <div className="flex justify-between text-purple-700">
-                    <span>קה"ש מעסיק (7.5%):</span>
+                    <span>קה&quot;ש מעסיק (7.5%):</span>
                     <span className="font-medium">+{SmartIncomeCalculator.formatAmount(detailed.studyFund.employer)}</span>
                 </div>
               </div>
@@ -871,7 +871,7 @@ function Step3Amount({
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
               <p className="font-semibold text-amber-900 mb-2">❓ האם אתה רשום כעוסק מורשה (עם מע״ם)?</p>
               <p className="text-amber-700 text-xs mb-3">
-                אם אתה מדווח ומשלם מע״מ 18%, בחר "עוסק מורשה" בשלב הראשון
+                אם אתה מדווח ומשלם מע״מ 18%, בחר &quot;עוסק מורשה&quot; בשלב הראשון
               </p>
               <div className="flex items-center gap-2 bg-amber-100 border border-amber-300 rounded-lg p-2">
                 <label className="flex items-center gap-2 cursor-pointer flex-1">
