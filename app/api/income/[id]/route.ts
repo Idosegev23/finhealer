@@ -80,6 +80,21 @@ export async function PATCH(
       'is_variable',
       'min_amount',
       'max_amount',
+      
+      // שדות ישראליים חדשים
+      'vat_status',
+      'includes_vat',
+      'vat_amount',
+      'has_withholding_tax',
+      'withholding_tax_amount',
+      'is_hybrid',
+      'hybrid_salary_part',
+      'hybrid_freelance_part',
+      'capital_gain_tax_paid',
+      'capital_gain_tax_rate',
+      'allowance_type',
+      'is_tax_exempt',
+      'detailed_breakdown',
     ];
 
     // סינון שדות

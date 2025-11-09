@@ -229,6 +229,96 @@ export class SmartIncomeCalculator {
   }
 
   /**
+   * חישוב פירוט מפורט עם תקרות והסברים - ישראלי
+   */
+  static calculateDetailedBreakdown(
+    gross: number,
+    employmentType: string = 'employee',
+    options?: {
+      creditPoints?: number;
+      hasPension?: boolean;
+      hasStudyFund?: boolean;
+    }
+  ): {
+    incomeTax: { amount: number; rate: number; brackets: { bracket: number; amount: number; rate: number }[] };
+    nationalInsurance: { amount: number; lowerPart: number; upperPart: number; breakdown: any[] };
+    healthTax: { amount: number; lowerPart: number; upperPart: number; breakdown: any[] };
+    pension: { employee: number; employer: number; total: number };
+    studyFund: { employee: number; employer: number; total: number };
+    thresholds: {
+      isAboveNationalInsuranceCeiling: boolean;
+      nationalInsuranceThreshold: number;
+      nationalInsuranceCeiling: number;
+      minimumWage: number;
+    };
+    totalTaxes: number;
+    totalDeductions: number;
+    net: number;
+    actualBank: number;
+  } | null {
+    if (gross <= 0) return null;
+
+    const fullCalc = calculateFullIncome({
+      grossSalary: gross,
+      pension: options?.hasPension ? calculatePensionDeductions(gross).employee : 0,
+      advancedStudyFund: options?.hasStudyFund ? calculateAdvancedStudyFund(gross).employee : 0,
+      otherDeductions: 0,
+    });
+
+    const pension = calculatePensionDeductions(gross);
+    const studyFund = calculateAdvancedStudyFund(gross);
+
+    // חישוב סכומים לפי טווחים
+    const niThreshold = 7522;
+    const niCeiling = 49030;
+    const lowerNI = Math.min(gross, niThreshold);
+    const upperNI = Math.max(0, Math.min(gross, niCeiling) - niThreshold);
+
+    const lowerHealth = Math.min(gross, niThreshold);
+    const upperHealth = Math.max(0, gross - niThreshold);
+
+    return {
+      incomeTax: {
+        amount: fullCalc.incomeTax,
+        rate: fullCalc.effectiveTaxRate,
+        brackets: fullCalc.breakdown.incomeTaxBreakdown,
+      },
+      nationalInsurance: {
+        amount: fullCalc.nationalInsurance,
+        lowerPart: Math.round(lowerNI * (employmentType === 'employee' || employmentType === 'contractor' ? 0.035 : 0.1783)),
+        upperPart: Math.round(upperNI * (employmentType === 'employee' || employmentType === 'contractor' ? 0.07 : 0.1263)),
+        breakdown: fullCalc.breakdown.nationalInsuranceBreakdown,
+      },
+      healthTax: {
+        amount: fullCalc.healthTax,
+        lowerPart: Math.round(lowerHealth * 0.031),
+        upperPart: Math.round(upperHealth * 0.05),
+        breakdown: fullCalc.breakdown.healthTaxBreakdown,
+      },
+      pension: {
+        employee: options?.hasPension ? pension.employee : 0,
+        employer: options?.hasPension ? pension.employer : 0,
+        total: options?.hasPension ? pension.total : 0,
+      },
+      studyFund: {
+        employee: options?.hasStudyFund ? studyFund.employee : 0,
+        employer: options?.hasStudyFund ? studyFund.employer : 0,
+        total: options?.hasStudyFund ? studyFund.total : 0,
+      },
+      thresholds: {
+        isAboveNationalInsuranceCeiling: gross > niCeiling,
+        nationalInsuranceThreshold: niThreshold,
+        nationalInsuranceCeiling: niCeiling,
+        minimumWage: 5880,
+      },
+      totalTaxes: fullCalc.totalTaxes,
+      totalDeductions: fullCalc.totalDeductions,
+      net: fullCalc.netSalary,
+      actualBank: fullCalc.actualBankAmount,
+    };
+  }
+
+  /**
    * בדיקת תקינות מהירה
    */
   static validate(state: CalculatorState): ValidationResult {

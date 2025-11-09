@@ -55,24 +55,54 @@ interface IncomeTableProps {
 
 const EMPLOYMENT_ICONS: Record<string, any> = {
   employee: Briefcase,
+  contractor: Briefcase,
+  hybrid: Briefcase,
   self_employed: DollarSign,
+  licensed_business: Building2,
+  exempt_business: DollarSign,
   freelance: Banknote,
   business: Building2,
   rental: Landmark,
   investment: TrendingUp,
+  capital_income: TrendingUp,
+  allowance: PiggyBank,
   pension: PiggyBank,
   other: Plus,
 };
 
 const EMPLOYMENT_LABELS: Record<string, string> = {
   employee: 'שכיר',
-  self_employed: 'עצמאי',
+  contractor: 'קבלן כוח אדם',
+  hybrid: 'היברידי',
+  self_employed: 'עצמאי כללי',
+  licensed_business: 'עוסק מורשה',
+  exempt_business: 'עוסק פטור',
   freelance: 'פרילנסר',
-  business: 'בעל עסק',
+  business: 'עסק קטן',
   rental: 'שכירות',
   investment: 'השקעות',
+  capital_income: 'הכנסה מהון',
+  allowance: 'קצבה',
   pension: 'פנסיה',
   other: 'אחר',
+};
+
+// תיאורים מפורטים
+const EMPLOYMENT_LABELS_DETAILED: Record<string, string> = {
+  employee: 'עובד במשכורת קבועה',
+  contractor: 'קבלן משנה - תלוש משכורת אבל זכויות שונות',
+  hybrid: 'שכיר + עצמאי - הכנסה ממספר מקורות',
+  self_employed: 'עצמאי כללי ללא תיאור רשמי',
+  licensed_business: 'עוסק מורשה - עם מע״ם 18%',
+  exempt_business: 'עוסק פטור - ללא מע״ם',
+  freelance: 'עבודות פרויקטליות',
+  business: 'עסק קטן ללא תיאוריה',
+  rental: 'הכנסה מדמי שכירות',
+  investment: 'דיבידנדים וריבית',
+  capital_income: 'מכירת מניות ורווחי הון',
+  allowance: 'קצבה מביטוח לאומי - אבטלה/נכות',
+  pension: 'קצבת פנסיה',
+  other: 'סוג הכנסה אחר',
 };
 
 const FREQUENCY_LABELS: Record<string, string> = {

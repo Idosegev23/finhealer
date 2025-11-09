@@ -91,6 +91,21 @@ export async function POST(request: NextRequest) {
       is_variable: body.is_variable ?? false,
       min_amount: body.min_amount ?? null,
       max_amount: body.max_amount ?? null,
+      
+      // שדות ישראליים חדשים
+      vat_status: body.vat_status || 'not_applicable',
+      includes_vat: body.includes_vat ?? false,
+      vat_amount: body.vat_amount ?? null,
+      has_withholding_tax: body.has_withholding_tax ?? false,
+      withholding_tax_amount: body.withholding_tax_amount ?? null,
+      is_hybrid: body.is_hybrid ?? false,
+      hybrid_salary_part: body.hybrid_salary_part ?? null,
+      hybrid_freelance_part: body.hybrid_freelance_part ?? null,
+      capital_gain_tax_paid: body.capital_gain_tax_paid ?? false,
+      capital_gain_tax_rate: body.capital_gain_tax_rate ?? null,
+      allowance_type: body.allowance_type || null,
+      is_tax_exempt: body.is_tax_exempt ?? false,
+      detailed_breakdown: body.detailed_breakdown ?? null,
     };
 
     console.log('💾 Saving income data:', incomeData);
