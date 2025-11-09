@@ -10,9 +10,6 @@ import { useToast } from '@/components/ui/toaster';
 import { EditExpenseModal } from '@/components/expenses/EditExpenseModal';
 import TransactionMatchCard from '@/components/dashboard/TransactionMatchCard';
 
-// Force dynamic rendering to avoid SSR issues with toast context
-export const dynamic = 'force-dynamic';
-
 interface PendingTransaction {
   id: string;
   type: 'income' | 'expense';
