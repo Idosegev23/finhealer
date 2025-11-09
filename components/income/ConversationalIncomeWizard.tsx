@@ -283,9 +283,9 @@ export default function ConversationalIncomeWizard({
           <Step3Amount
             employmentType={data.employment_type}
             employerName={data.employer_name}
-            grossAmount={data.gross_amount}
-            netAmount={data.net_amount}
-            actualBankAmount={data.actual_bank_amount}
+            grossAmount={data.gross_amount ?? null}
+            netAmount={data.net_amount ?? null}
+            actualBankAmount={data.actual_bank_amount ?? null}
             isVariable={data.is_variable ?? false}
             minAmount={data.min_amount ?? null}
             maxAmount={data.max_amount ?? null}
