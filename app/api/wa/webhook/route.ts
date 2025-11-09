@@ -354,7 +354,7 @@ export async function POST(request: NextRequest) {
                 content: [
                   {
                     type: 'text',
-                    text: 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע. **שים לב מיוחד לתאריך!**'
+                    text: 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע. **שים לב מיוחד לתאריך!** החזר תשובה בפורמט JSON.'
                   },
                   {
                     type: 'image_url',
@@ -594,7 +594,7 @@ export async function POST(request: NextRequest) {
                 content: [
                   {
                     type: 'text',
-                    text: 'נתח את דוח הבנק/אשראי הזה וחלץ את כל התנועות. שים לב מיוחד לתאריכים!'
+                    text: 'נתח את דוח הבנק/אשראי הזה וחלץ את כל התנועות. שים לב מיוחד לתאריכים! החזר תשובה בפורמט JSON.'
                   },
                   {
                     type: 'image_url',
