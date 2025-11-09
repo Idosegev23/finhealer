@@ -176,10 +176,18 @@ export async function POST(request: NextRequest) {
       const text = payload.messageData?.textMessageData?.textMessage || '';
       console.log('📝 Text message:', text);
 
+      // 🆕 הודעת אישור מיידית - הבוט קיבל את ההודעה
+      const greenAPI = getGreenAPIClient();
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: 'קיבלתי! 📝\n\nרק רגע, אני מעבד...',
+      });
+
       // שליחת ההודעה ל-AI לטיפול חכם
       const aiResult = await handleAIChat(supabase, userData.id, text, phoneNumber);
       
       // אם AI זיהה הוצאה → צור transaction
+      let expenseCreated = false;
       if (aiResult.detected_expense && aiResult.detected_expense.expense_detected) {
         const expense = aiResult.detected_expense;
         
@@ -225,6 +233,7 @@ export async function POST(request: NextRequest) {
               amount: expense.amount,
             category: category || 'other',
             expense_type: expenseType,
+            expense_category: category, // 🆕 קטגוריה מדויקת
             category_group: categoryGroup,
             auto_categorized: autoCategorized,
               vendor: expense.vendor,
@@ -239,6 +248,7 @@ export async function POST(request: NextRequest) {
 
           if (!txError && transaction) {
             console.log('✅ Pending transaction created:', transaction.id);
+            expenseCreated = true; // 🆕 סימון שיצרנו הוצאה
             
             // עדכן chat_message שהוצאה נוצרה
             await supabase
@@ -249,17 +259,24 @@ export async function POST(request: NextRequest) {
               .order('created_at', { ascending: false })
               .limit(1);
             
-            // שלח הודעה עם קישור לדף אישור
-            const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app';
-            await sendWhatsAppMessage(phoneNumber, 
-              `✅ ההוצאה נקלטה במערכת!\n\n💰 ${expense.amount} ₪${expense.vendor ? ` | ${expense.vendor}` : ''}\n\n👉 אשר את ההוצאה כאן:\n${siteUrl}/dashboard/expenses/pending`
-            );
+            // 🆕 שלח הודעה עם כפתורי אישור/עריכה (כמו בתמונה!)
+            const displayCategory = category || 'אחר';
+            const displayVendor = expense.vendor || 'לא צוין';
+            
+            await greenAPI.sendButtons({
+              phoneNumber,
+              message: `✅ הוצאה ממתינה לאישור\n\n💰 ${expense.amount} ₪\n🏪 ${displayVendor}\n📂 ${displayCategory}\n\nזה נכון?`,
+              buttons: [
+                { buttonId: `confirm_${transaction.id}`, buttonText: '✅ אישור' },
+                { buttonId: `edit_${transaction.id}`, buttonText: '✏️ עריכה' },
+              ],
+            });
           }
         }
       }
       
-      // שלח את תשובת ה-AI ב-WhatsApp
-      if (aiResult.response) {
+      // 🆕 שלח את תשובת ה-AI רק אם לא יצרנו הוצאה עם כפתורים
+      if (aiResult.response && !expenseCreated) {
         await sendWhatsAppMessage(phoneNumber, aiResult.response);
       }
     } else if (messageType === 'imageMessage') {
