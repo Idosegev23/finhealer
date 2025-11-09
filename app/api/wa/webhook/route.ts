@@ -280,18 +280,31 @@ export async function POST(request: NextRequest) {
         await sendWhatsAppMessage(phoneNumber, aiResult.response);
       }
     } else if (messageType === 'imageMessage') {
+      // 🔍 Debug: הצג את כל ה-payload
+      console.log('🖼️ Image message received. Full messageData:', JSON.stringify(payload.messageData, null, 2));
+      
       const downloadUrl = payload.messageData?.downloadUrl;
       const caption = payload.messageData?.caption || '';
       
-      console.log('🖼️ Image message:', downloadUrl);
+      console.log('📥 Download URL:', downloadUrl);
+      console.log('📝 Caption:', caption);
 
-      if (downloadUrl) {
+      // 🆕 אם אין downloadUrl, נשלח הודעת שגיאה
+      if (!downloadUrl) {
         const greenAPI = getGreenAPIClient();
-        
         await greenAPI.sendMessage({
           phoneNumber,
-          message: 'קיבלתי את התמונה! 📸\n\nאני מנתח אותה עם AI...',
+          message: '😕 לא הצלחתי לקבל את התמונה.\n\nאפשר לנסות שוב?',
         });
+        return NextResponse.json({ status: 'no_download_url' });
+      }
+
+      const greenAPI = getGreenAPIClient();
+      
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: 'קיבלתי את התמונה! 📸\n\nאני מנתח אותה עם AI...',
+      });
 
         try {
           // הורדת התמונה מ-GreenAPI
@@ -510,6 +523,49 @@ export async function POST(request: NextRequest) {
             message: 'משהו השתבש בניתוח הקבלה 😕\n\nנסה שוב או כתוב את הפרטים ידנית.',
           });
         }
+      }
+    } else if (messageType === 'documentMessage') {
+      // 🆕 טיפול במסמכים (PDF, Excel, וכו')
+      console.log('📄 Document message received. Full messageData:', JSON.stringify(payload.messageData, null, 2));
+      
+      const downloadUrl = payload.messageData?.downloadUrl;
+      const fileName = payload.messageData?.fileName || 'document';
+      const caption = payload.messageData?.caption || '';
+      
+      console.log('📥 Document URL:', downloadUrl);
+      console.log('📝 File name:', fileName);
+      
+      if (!downloadUrl) {
+        const greenAPI = getGreenAPIClient();
+        await greenAPI.sendMessage({
+          phoneNumber,
+          message: '😕 לא הצלחתי לקבל את המסמך.\n\nאפשר לנסות שוב?',
+        });
+        return NextResponse.json({ status: 'no_download_url' });
+      }
+      
+      const greenAPI = getGreenAPIClient();
+      
+      // בדיקה אם זה PDF
+      const isPDF = fileName.toLowerCase().endsWith('.pdf');
+      
+      if (isPDF) {
+        await greenAPI.sendMessage({
+          phoneNumber,
+          message: 'קיבלתי את המסמך! 📄\n\nאני מנתח אותו עם AI...',
+        });
+        
+        // כאן אפשר להוסיף טיפול ב-PDF בעתיד
+        // כרגע נשלח הודעה שזה בפיתוח
+        await greenAPI.sendMessage({
+          phoneNumber,
+          message: '📄 קבלתי את ה-PDF!\n\nכרגע ניתוח PDF בפיתוח 🚧\n\nבינתיים, תוכל לצלם את המסך או לכתוב את הפרטים ידנית.',
+        });
+      } else {
+        await greenAPI.sendMessage({
+          phoneNumber,
+          message: '📎 קבלתי את הקובץ!\n\nכרגע אני תומך רק בתמונות ו-PDF.\n\nאפשר לצלם את המסמך במקום?',
+        });
       }
     }
 
