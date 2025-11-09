@@ -4,6 +4,7 @@ import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { SYSTEM_PROMPT, buildContextMessage, parseExpenseFromAI, type UserContext } from '@/lib/ai/system-prompt';
+import { EXPENSE_CATEGORIES_SYSTEM_PROMPT } from '@/lib/ai/expense-categories-prompt';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -282,7 +283,7 @@ export async function POST(request: NextRequest) {
           const base64Image = Buffer.from(imageBuffer).toString('base64');
           const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
 
-          // ניתוח OCR + AI (GPT-4o Vision)
+          // ניתוח OCR + AI (GPT-4o Vision) עם קטגוריות מדויקות
           console.log('🤖 Starting OCR analysis with GPT-4o Vision...');
           
           const visionResponse = await openai.chat.completions.create({
@@ -290,30 +291,39 @@ export async function POST(request: NextRequest) {
             messages: [
               {
                 role: 'system',
-                content: `אתה מומחה לניתוח קבלות ותדפיסי בנק/אשראי בעברית.
-חלץ את המידע הבא בפורמט JSON:
+                content: `${EXPENSE_CATEGORIES_SYSTEM_PROMPT}
+
+**פורמט החזרה מיוחד לקבלות:**
 {
   "document_type": "receipt | bank_statement | credit_statement",
+  "vendor_name": "שם בית העסק הראשי (אם רלוונטי)",
+  "receipt_date": "YYYY-MM-DD (תאריך הקבלה)",
+  "receipt_total": <סכום כולל של הקבלה>,
   "transactions": [
     {
       "amount": <number>,
-      "vendor": "שם בית העסק",
-      "date": "YYYY-MM-DD",
-      "category": "food | transport | shopping | health | entertainment | education | housing | utilities | other",
-      "detailed_category": "תת-קטגוריה",
-      "expense_frequency": "fixed | temporary | special | one_time",
-      "description": "תיאור",
+      "vendor": "שם בית העסק או תיאור הפריט",
+      "date": "YYYY-MM-DD (תאריך מהקבלה - חשוב מאוד!)",
+      "expense_category": "השם המדויק מרשימת ההוצאות",
+      "expense_type": "fixed | variable | special",
+      "description": "תיאור נוסף",
       "confidence": <0.0-1.0>
     }
   ]
-}`
+}
+
+🎯 **חשוב במיוחד לקבלות:**
+1. חלץ את **התאריך האמיתי מהקבלה** - לא תאריך היום!
+2. אם יש כמה פריטים בקבלה - חלץ את כולם
+3. אם זו קבלה פשוטה (1-2 פריטים) - השתמש בשם בית העסק כ-vendor
+4. סווג לקטגוריה המדויקת ביותר מהרשימה`
               },
               {
                 role: 'user',
                 content: [
                   {
                     type: 'text',
-                    text: 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע.'
+                    text: 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע. **שים לב מיוחד לתאריך!**'
                   },
                   {
                     type: 'image_url',
@@ -324,6 +334,7 @@ export async function POST(request: NextRequest) {
             ],
             temperature: 0.1,
             max_tokens: 4000,
+            response_format: { type: 'json_object' }, // 🔥 Force valid JSON
           });
 
           const aiText = visionResponse.choices[0].message.content || '{}';
@@ -347,6 +358,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ status: 'no_data' });
           }
 
+          // שימוש בתאריך מהקבלה (לא מהיום!)
+          const receiptDate = ocrData.receipt_date || transactions[0]?.date || new Date().toISOString().split('T')[0];
+          const receiptTotal = ocrData.receipt_total || transactions[0]?.amount || null;
+          const receiptVendor = ocrData.vendor_name || transactions[0]?.vendor || null;
+
           // שמירת קבלה + יצירת הוצאות
           const { data: receipt } = await (supabase as any)
             .from('receipts')
@@ -354,15 +370,16 @@ export async function POST(request: NextRequest) {
               user_id: userData.id,
               storage_path: downloadUrl,
               ocr_text: aiText,
-              amount: transactions[0]?.amount || null,
-              vendor: transactions[0]?.vendor || null,
-              tx_date: transactions[0]?.date || new Date().toISOString().split('T')[0],
+              amount: receiptTotal,
+              vendor: receiptVendor,
+              tx_date: receiptDate,
               confidence: transactions[0]?.confidence || 0.5,
               status: 'completed',
               metadata: {
                 document_type: ocrData.document_type,
                 source: 'whatsapp',
                 model: 'gpt-4o',
+                total_items: transactions.length,
               },
             })
             .select()
@@ -375,17 +392,24 @@ export async function POST(request: NextRequest) {
           
           if (transactions.length <= 2) {
             // קבלה רגילה עם 1-2 פריטים
+            const insertedIds: string[] = [];
+            
             for (const tx of transactions) {
-              await (supabase as any)
+              // שימוש בתאריך מהקבלה (לא מהיום!)
+              const txDate = tx.date || receiptDate;
+              
+              const { data: insertedTx } = await (supabase as any)
                 .from('transactions')
                 .insert({
                   user_id: userData.id,
                   type: 'expense',
                   amount: tx.amount,
                   vendor: tx.vendor,
-                  date: tx.date || new Date().toISOString().split('T')[0],
-                  tx_date: tx.date || new Date().toISOString().split('T')[0],
-                  category: tx.category || 'other',
+                  date: txDate,
+                  tx_date: txDate,
+                  category: tx.category || 'other', // תאימות לאחור
+                  expense_category: tx.expense_category || null, // 🆕 הקטגוריה המדויקת!
+                  expense_type: tx.expense_type || 'variable', // 🆕 fixed/variable/special
                   detailed_category: tx.detailed_category,
                   expense_frequency: tx.expense_frequency || 'one_time',
                   payment_method: null,
@@ -395,17 +419,43 @@ export async function POST(request: NextRequest) {
                   original_description: tx.description || '',
                   auto_categorized: true,
                   confidence_score: tx.confidence || 0.5,
-                });
+                })
+                .select('id')
+                .single();
+              
+              if (insertedTx?.id) {
+                insertedIds.push(insertedTx.id);
+              }
             }
 
             const tx = transactions[0];
-            await greenAPI.sendMessage({
-              phoneNumber,
-              message: `✅ קבלה נקלטה במערכת!\n\n💰 ${tx.amount} ₪\n🏪 ${tx.vendor}\n📂 ${tx.category}\n\n👉 אשר את ההוצאה כאן:\n${siteUrl}/dashboard/expenses/pending`,
-            });
+            const displayCategory = tx.expense_category || tx.category || 'אחר';
+            const displayDate = tx.date || receiptDate;
+            const transactionId = insertedIds[0];
+            
+            // 🆕 שליחת הודעה עם כפתורי אישור/עריכה
+            if (transactionId) {
+              await greenAPI.sendButtons({
+                phoneNumber,
+                message: `✅ קבלה נקלטה במערכת!\n\n💰 ${tx.amount} ₪\n🏪 ${tx.vendor}\n📂 ${displayCategory}\n📅 ${displayDate}\n\nזה נכון?`,
+                buttons: [
+                  { buttonId: `confirm_${transactionId}`, buttonText: '✅ אישור' },
+                  { buttonId: `edit_${transactionId}`, buttonText: '✏️ עריכה' },
+                ],
+              });
+            } else {
+              // fallback אם לא הצלחנו לקבל ID
+              await greenAPI.sendMessage({
+                phoneNumber,
+                message: `✅ קבלה נקלטה במערכת!\n\n💰 ${tx.amount} ₪\n🏪 ${tx.vendor}\n📂 ${displayCategory}\n📅 ${displayDate}\n\n👉 אשר את ההוצאה כאן:\n${siteUrl}/dashboard/expenses/pending`,
+              });
+            }
           } else {
             // תדפיס אשראי/בנק עם הרבה תנועות
             for (const tx of transactions) {
+              // שימוש בתאריך מהקבלה (לא מהיום!)
+              const txDate = tx.date || receiptDate;
+              
               await (supabase as any)
                 .from('transactions')
                 .insert({
@@ -413,12 +463,14 @@ export async function POST(request: NextRequest) {
                   type: 'expense',
                   amount: tx.amount,
                   vendor: tx.vendor,
-                  date: tx.date || new Date().toISOString().split('T')[0],
-                  tx_date: tx.date || new Date().toISOString().split('T')[0],
-                  category: tx.category || 'other',
+                  date: txDate,
+                  tx_date: txDate,
+                  category: tx.category || 'other', // תאימות לאחור
+                  expense_category: tx.expense_category || null, // 🆕 הקטגוריה המדויקת!
+                  expense_type: tx.expense_type || 'variable', // 🆕 fixed/variable/special
                   detailed_category: tx.detailed_category,
                   expense_frequency: tx.expense_frequency || 'one_time',
-                  payment_method: ocrData.document_type === 'credit_statement' ? 'credit' : null,
+                  payment_method: ocrData.document_type === 'credit_statement' ? 'credit_card' : 'bank_transfer',
                   source: 'ocr',
                   status: 'pending', // ממתין לאישור
                   notes: tx.description || '',

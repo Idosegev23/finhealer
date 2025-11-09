@@ -609,43 +609,44 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
       .eq('active', true);
 
     const transactionsToInsert = allTransactions.map((tx: any) => {
-      // 🎯 Use statementMonth (user selected) if available, otherwise parse from AI
-      let parsedDate = new Date().toISOString().split('T')[0];
+      // 🎯 עדיפות 1: התאריך המדויק מהדוח (tx.date)
+      // עדיפות 2: statementMonth (אם בחר המשתמש)
+      // עדיפות 3: היום (רק אם אין שום מידע)
+      let parsedDate = null;
       
-      if (statementMonth) {
-        // ✅ statementMonth format: "YYYY-MM"
-        // Keep the day from AI if available, otherwise use day 15 as middle of month
-        if (tx.date) {
-          try {
-            const parts = tx.date.split('/');
-            if (parts.length === 3) {
-              const day = parts[0].padStart(2, '0');
-              parsedDate = `${statementMonth}-${day}`;
-            } else {
-              parsedDate = `${statementMonth}-15`; // Default to 15th
-            }
-          } catch (e) {
-            parsedDate = `${statementMonth}-15`; // Default to 15th
-          }
-        } else {
-          parsedDate = `${statementMonth}-15`; // Default to 15th
-        }
-      } else if (tx.date) {
-        // Fallback: Parse date from DD/MM/YYYY to YYYY-MM-DD (original logic)
+      // קודם כל - ננסה לפרש את התאריך המדויק מהדוח
+      if (tx.date) {
         try {
           const parts = tx.date.split('/');
           if (parts.length === 3) {
             const day = parts[0].padStart(2, '0');
             const month = parts[1].padStart(2, '0');
             let year = parts[2];
+            
+            // טיפול בשנה בת 2 ספרות
             if (year.length === 2) {
               year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
             }
+            
             parsedDate = `${year}-${month}-${day}`;
           }
         } catch (e) {
-          console.warn(`Failed to parse date: ${tx.date}`, e);
+          console.warn(`Failed to parse date from tx.date: ${tx.date}`, e);
         }
+      }
+      
+      // רק אם לא הצלחנו לפרש תאריך מהדוח - נשתמש ב-statementMonth
+      if (!parsedDate && statementMonth) {
+        // statementMonth format: "YYYY-MM"
+        // נשתמש ב-15 כיום ברירת מחדל (אמצע החודש)
+        parsedDate = `${statementMonth}-15`;
+        console.log(`Using statementMonth fallback for transaction: ${tx.vendor}`);
+      }
+      
+      // רק אם אין שום מידע - נשתמש בהיום (אמור להיות נדיר מאוד)
+      if (!parsedDate) {
+        parsedDate = new Date().toISOString().split('T')[0];
+        console.warn(`No date information available, using today for: ${tx.vendor}`);
       }
 
       // Validate and normalize transaction type
