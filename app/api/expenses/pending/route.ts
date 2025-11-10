@@ -33,6 +33,9 @@ export async function GET() {
       );
     }
 
+    console.log(`✅ Found ${transactions?.length || 0} pending transactions for user ${user.id}`);
+    console.log('Statuses:', transactions?.map((t: any) => ({ id: t.id, status: t.status, source: t.source, amount: t.amount })));
+
     // הפרדה לפי סוג
     const income = (transactions as any[] || []).filter((t: any) => t.type === 'income');
     const expenses = (transactions as any[] || []).filter((t: any) => t.type === 'expense');
