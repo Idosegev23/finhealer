@@ -17,12 +17,12 @@ export async function GET() {
 
     // שליפת כל התנועות הממתינות (הכנסות + הוצאות)
     // כולל גם 'pending' (מ-WhatsApp) וגם 'proposed' (מ-OCR אחר)
+    // כולל גם כל ה-sources (ocr, whatsapp, manual)
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
       .in('status', ['pending', 'proposed'])
-      .in('source', ['ocr', 'whatsapp'])
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -34,7 +34,26 @@ export async function GET() {
     }
 
     console.log(`✅ Found ${transactions?.length || 0} pending transactions for user ${user.id}`);
-    console.log('Statuses:', transactions?.map((t: any) => ({ id: t.id, status: t.status, source: t.source, amount: t.amount })));
+    if (transactions && transactions.length > 0) {
+      console.log('Transaction details:', transactions.map((t: any) => ({ 
+        id: t.id, 
+        status: t.status, 
+        source: t.source, 
+        amount: t.amount,
+        vendor: t.vendor,
+        created_at: t.created_at
+      })));
+    } else {
+      console.log('⚠️ No pending transactions found. Checking all transactions...');
+      // Debug: בואו נבדוק אם יש תנועות בכלל
+      const { data: allTransactions } = await supabase
+        .from('transactions')
+        .select('id, status, source, amount, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      console.log('Last 10 transactions:', allTransactions);
+    }
 
     // הפרדה לפי סוג
     const income = (transactions as any[] || []).filter((t: any) => t.type === 'income');

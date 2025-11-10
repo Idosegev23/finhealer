@@ -449,7 +449,7 @@ export async function POST(request: NextRequest) {
               // שימוש בתאריך מהקבלה (לא מהיום!)
               const txDate = tx.date || receiptDate;
               
-              const { data: insertedTx } = await (supabase as any)
+              const { data: insertedTx, error: insertError } = await (supabase as any)
                 .from('transactions')
                 .insert({
                   user_id: userData.id,
@@ -474,7 +474,11 @@ export async function POST(request: NextRequest) {
                 .select('id')
                 .single();
               
-              if (insertedTx?.id) {
+              if (insertError) {
+                console.error('❌ Error inserting transaction:', insertError);
+                console.error('Transaction data:', { user_id: userData.id, amount: tx.amount, status: 'pending', source: 'ocr' });
+              } else if (insertedTx?.id) {
+                console.log('✅ Transaction inserted successfully:', insertedTx.id, { amount: tx.amount, status: 'pending', source: 'ocr' });
                 insertedIds.push(insertedTx.id);
               }
             }
