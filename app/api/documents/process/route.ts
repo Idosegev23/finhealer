@@ -976,7 +976,7 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
       }
 
       // Update parent transactions to mark as having details
-      const parentIds = [...new Set(matchedDetails.map(d => d.parent_transaction_id))];
+      const parentIds = Array.from(new Set(matchedDetails.map(d => d.parent_transaction_id)));
       await supabase
         .from('transactions')
         .update({ 
@@ -1012,13 +1012,13 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
 /**
  * Helper function to calculate string similarity (simple Jaccard similarity)
  */
-function calculateStringSimilarity(str1: string, str2: string): number {
-  const words1 = new Set(str1.split(/\s+/));
-  const words2 = new Set(str2.split(/\s+/));
-  const intersection = new Set([...words1].filter(x => words2.has(x)));
-  const union = new Set([...words1, ...words2]);
-  return intersection.size / union.size;
-}
+  function calculateStringSimilarity(str1: string, str2: string): number {
+    const words1 = new Set(str1.split(/\s+/));
+    const words2 = new Set(str2.split(/\s+/));
+    const intersection = new Set(Array.from(words1).filter(x => words2.has(x)));
+    const union = new Set([...Array.from(words1), ...Array.from(words2)]);
+    return intersection.size / union.size;
+  }
 
 /**
  * Save transactions from credit/bank statements (legacy - use saveBankTransactions or saveCreditDetails instead)

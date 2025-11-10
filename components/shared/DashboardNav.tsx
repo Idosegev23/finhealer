@@ -38,6 +38,7 @@ import { createClient } from "@/lib/supabase/client";
 const navItems = [
   { href: "/dashboard", label: "ראשי", icon: Home },
   { href: "/dashboard/overview", label: "תמונת מצב", icon: BarChart3 },
+  { href: "/dashboard/scan-center", label: "סריקה", icon: Scan },
   { href: "/dashboard/goals", label: "יעדים", icon: Target },
   { href: "/loans-simulator", label: "סימולטור", icon: Calculator },
   { href: "/guide", label: "מדריך", icon: BookOpen },
