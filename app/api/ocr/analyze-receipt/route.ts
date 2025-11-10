@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 עבור כל מסמך, זהה:
 1. **סוג המסמך**: receipt (קבלה), bank_statement (דוח בנק), credit_statement (דוח אשראי), salary_slip (תלוש שכר)
 2. **פרטי העסקה**:
-   - סכום (amount)
+   - סכום (amount) - **חשוב מאוד:** זה הסכום ששולם בפועל, לא מספר הקבלה!
    - ספק/בית עסק (vendor)
    - תאריך (date)
    - קטגוריה (category) - בחר מהרשימה: food, transport, shopping, health, entertainment, education, housing, utilities, other
@@ -59,11 +59,18 @@ export async function POST(request: Request) {
 
 3. **רמת ביטחון** (confidence): 0.0-1.0
 
+**הבדל קריטי בין מספר קבלה לעלות:**
+- מספר קבלה (Receipt Number) - זה מספר סידורי של הקבלה (למשל: 83, 00123, #456)
+- עלות/סכום (Amount/Total) - זה הסכום ששולם בפועל (למשל: 79.00 ₪, 150.50 ש״ח)
+- **תמיד** השתמש בסכום שמופיע ליד המילים: "סה״כ", "לתשלום", "Total", "Sum", "Amount", "₪", "ש״ח"
+- **לעולם אל תשתמש במספר הקבלה כעלות!**
+
 **עבור תדפיסי בנק/אשראי**: חלץ את כל התנועות בטבלה.
 
 החזר JSON בפורמט:
 {
   "document_type": "receipt | bank_statement | credit_statement | salary_slip",
+  "receipt_number": <מספר הקבלה - אם קיים>,
   "transactions": [
     {
       "amount": 123.45,
@@ -85,7 +92,7 @@ export async function POST(request: Request) {
           content: [
             {
               type: 'text',
-              text: 'נתח את המסמך הפיננסי הזה וחלץ את כל המידע הרלוונטי.'
+              text: 'נתח את המסמך הפיננסי הזה וחלץ את כל המידע הרלוונטי.\n\n**חשוב מאוד:**\n- זהה את הסכום ששולם בפועל (ליד "סה״כ", "לתשלום", "Total", "₪")\n- אל תשתמש במספר הקבלה כעלות!\n- מספר קבלה (83, 00123) ≠ סכום כסף (79.00 ₪)'
             },
             {
               type: 'image_url',

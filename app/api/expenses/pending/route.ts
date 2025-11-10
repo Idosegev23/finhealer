@@ -16,12 +16,13 @@ export async function GET() {
     }
 
     // שליפת כל התנועות הממתינות (הכנסות + הוצאות)
+    // כולל גם 'pending' (מ-WhatsApp) וגם 'proposed' (מ-OCR אחר)
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
-      .eq('status', 'proposed')
-      .eq('source', 'ocr')
+      .in('status', ['pending', 'proposed'])
+      .in('source', ['ocr', 'whatsapp'])
       .order('created_at', { ascending: false });
 
     if (error) {
