@@ -36,11 +36,7 @@ export function DocumentUploader({
 }: DocumentUploaderProps) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    // Default to current month (YYYY-MM format)
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [selectedMonth, setSelectedMonth] = useState<string>(''); // ⭐ אין ערך ברירת מחדל - המשתמש חייב לבחור
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'success' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
@@ -67,11 +63,11 @@ export function DocumentUploader({
   const handleUpload = async () => {
     if (!file) return;
 
-    // ✅ Validation: חובה לבחור חודש לדוחות בנק/אשראי
-    if ((documentType === 'bank' || documentType === 'credit') && !selectedMonth) {
-      setErrorMessage('חובה לבחור את חודש הדוח! 📅');
+    // ✅ Validation: חובה לבחור חודש לכל המסמכים
+    if (!selectedMonth) {
+      setErrorMessage('חובה לבחור את חודש המסמך! 📅');
       setStatus('error');
-      onError?.('חובה לבחור חודש הדוח');
+      onError?.('חובה לבחור חודש המסמך');
       return;
     }
 
@@ -195,45 +191,43 @@ export function DocumentUploader({
               </button>
             </div>
 
-            {/* ⭐ Month selector for bank/credit statements - REQUIRED */}
-            {(documentType === 'bank' || documentType === 'credit') && (
-              <div className="space-y-3 p-4 bg-amber-50 border-2 border-amber-300 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                  <label htmlFor="statement-month" className="block text-sm font-bold text-gray-900">
-                    חודש הדוח 📅 <span className="text-red-600">*חובה</span>
-                  </label>
-                </div>
-                <input
-                  id="statement-month"
-                  type="month"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 border-2 border-amber-400 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white text-lg font-semibold"
-                  max={new Date().toISOString().slice(0, 7)} // לא מאפשר חודשים עתידיים
-                />
-                <div className="bg-white p-3 rounded-lg border border-amber-200">
-                  <p className="text-sm text-gray-700 font-medium mb-1">
-                    ℹ️ למה זה חשוב?
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    בחירת החודש הנכון מאפשרת לנו לסווג נכון את ההוצאות שלך ולעקוב אחרי התקציב החודשי.
-                  </p>
-                </div>
+            {/* ⭐ Month selector - REQUIRED for all documents */}
+            <div className="space-y-3 p-4 bg-amber-50 border-2 border-amber-300 rounded-xl">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <label htmlFor="statement-month" className="block text-sm font-bold text-gray-900">
+                  חודש המסמך 📅 <span className="text-red-600">*חובה</span>
+                </label>
               </div>
-            )}
+              <input
+                id="statement-month"
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                required
+                className="w-full px-4 py-3 border-2 border-amber-400 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white text-lg font-semibold"
+                max={new Date().toISOString().slice(0, 7)} // לא מאפשר חודשים עתידיים
+              />
+              <div className="bg-white p-3 rounded-lg border border-amber-200">
+                <p className="text-sm text-gray-700 font-medium mb-1">
+                  ℹ️ למה זה חשוב?
+                </p>
+                <p className="text-xs text-gray-600">
+                  בחירת החודש הנכון מאפשרת לנו לסווג נכון את ההוצאות שלך, להתאים בין מסמכים שונים ולעקוב אחרי התקציב החודשי.
+                </p>
+              </div>
+            </div>
 
             <div className="flex gap-2">
               <Button 
                 onClick={handleUpload} 
                 className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-lg py-6"
-                disabled={!file || ((documentType === 'bank' || documentType === 'credit') && !selectedMonth)}
+                disabled={!file || !selectedMonth}
               >
                 <Upload className="h-5 w-5 mr-2" />
-                {!selectedMonth && (documentType === 'bank' || documentType === 'credit') 
+                {!selectedMonth 
                   ? 'בחר חודש כדי להמשיך ⬆️' 
-                  : 'העלה ועבד את הדוח ✨'}
+                  : 'העלה ועבד את המסמך ✨'}
               </Button>
               <Button onClick={handleReset} variant="outline" className="px-6">
                 בטל

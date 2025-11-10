@@ -25,6 +25,26 @@ export async function GET() {
       .in('status', ['pending', 'proposed'])
       .order('created_at', { ascending: false });
 
+    // ⭐ שליפת receipt_number מ-receipts table עבור תנועות עם receipt_id
+    const receiptIds = (transactions || [])
+      .map((tx: any) => tx.receipt_id)
+      .filter((id: string | null) => id !== null && id !== '');
+
+    let receiptsMap: Record<string, string> = {};
+    if (receiptIds.length > 0) {
+      const { data: receipts } = await supabase
+        .from('receipts')
+        .select('id, receipt_number')
+        .in('id', receiptIds);
+
+      receiptsMap = (receipts || []).reduce((acc: Record<string, string>, r: any) => {
+        if (r.receipt_number) {
+          acc[r.id] = r.receipt_number;
+        }
+        return acc;
+      }, {});
+    }
+
     if (error) {
       console.error('Error fetching pending transactions:', error);
       return NextResponse.json(
@@ -34,37 +54,61 @@ export async function GET() {
     }
 
     console.log(`✅ Found ${transactions?.length || 0} pending transactions for user ${user.id}`);
-    if (transactions && transactions.length > 0) {
-      console.log('Transaction details:', transactions.map((t: any) => ({ 
-        id: t.id, 
-        status: t.status, 
-        source: t.source, 
-        amount: t.amount,
-        vendor: t.vendor,
-        created_at: t.created_at
-      })));
-    } else {
-      console.log('⚠️ No pending transactions found. Checking all transactions...');
-      // Debug: בואו נבדוק אם יש תנועות בכלל
-      const { data: allTransactions } = await supabase
+
+    // ⭐ הוספת receipt_number ובדיקת כפילויות
+    const transactionsWithDuplicates = (transactions || []).map((tx: any) => {
+      // הוסף receipt_number מ-receipts table או מ-transaction עצמו
+      const receiptNumber = tx.receipt_id && receiptsMap[tx.receipt_id] 
+        ? receiptsMap[tx.receipt_id] 
+        : (tx.receipt_number || null);
+
+      return {
+        ...tx,
+        receipt_number: receiptNumber,
+        receipt_id: tx.receipt_id || null,
+        duplicate_warning: false, // יועדכן בהמשך
+      };
+    });
+
+    // ⭐ בדיקת כפילויות - תנועות מאושרות עם אותו receipt_number
+    const receiptNumbers = transactionsWithDuplicates
+      .map((tx: any) => tx.receipt_number)
+      .filter((num: string | null) => num !== null && num !== '');
+
+    if (receiptNumbers.length > 0) {
+      const { data: duplicateTransactions } = await supabase
         .from('transactions')
-        .select('id, status, source, amount, created_at')
+        .select('receipt_number, receipt_id')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      console.log('Last 10 transactions:', allTransactions);
+        .eq('status', 'confirmed')
+        .in('receipt_number', receiptNumbers);
+
+      // הוסף אזהרה על כפילויות
+      const duplicateNumbers = new Set(
+        (duplicateTransactions || []).map((dt: any) => dt.receipt_number || dt.receipt_id)
+      );
+
+      transactionsWithDuplicates.forEach((tx: any) => {
+        if (tx.receipt_number && duplicateNumbers.has(tx.receipt_number)) {
+          tx.duplicate_warning = true;
+        }
+        // גם בדיקה דרך receipt_id
+        if (tx.receipt_id && duplicateNumbers.has(tx.receipt_id)) {
+          tx.duplicate_warning = true;
+        }
+      });
     }
 
     // הפרדה לפי סוג
-    const income = (transactions as any[] || []).filter((t: any) => t.type === 'income');
-    const expenses = (transactions as any[] || []).filter((t: any) => t.type === 'expense');
+    const income = transactionsWithDuplicates.filter((t: any) => t.type === 'income');
+    const expenses = transactionsWithDuplicates.filter((t: any) => t.type === 'expense');
 
     return NextResponse.json({
       success: true,
-      expenses: transactions || [], // Keep 'expenses' for backward compatibility
+      expenses: transactionsWithDuplicates, // כולל receipt_number ו-duplicate_warning
       income,
-      transactions: transactions || [],
-      count: transactions?.length || 0,
+      transactions: transactionsWithDuplicates,
+      count: transactionsWithDuplicates?.length || 0,
       incomeCount: income.length,
       expensesCount: expenses.length,
     });

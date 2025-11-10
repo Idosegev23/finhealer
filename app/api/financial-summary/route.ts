@@ -33,10 +33,10 @@ export async function GET(request: NextRequest) {
       supabase.from("user_financial_profile").select("*").eq("user_id", user.id).single(),
       supabase.from("income_sources").select("*").eq("user_id", user.id).eq("active", true),
       supabase.from("transactions").select("*").eq("user_id", user.id)
-        .in('status', ['confirmed', 'proposed'])
+        .eq('status', 'confirmed') // ⭐ רק תנועות מאושרות - לא ממתינות!
         .gte('date', `${currentMonth}-01`)
         .lte('date', `${currentMonth}-31`)
-        .or('has_details.is.null,has_details.eq.false'),
+        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'), // כולל תנועות parent + מזומן
       supabase.from("bank_accounts").select("*").eq("user_id", user.id).eq("is_current", true).single(),
     ]);
 

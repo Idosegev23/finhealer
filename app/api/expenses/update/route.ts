@@ -26,6 +26,7 @@ export async function PUT(request: Request) {
       expense_type,
       notes,
       payment_method,
+      receipt_number, // ⭐ מספר קבלה/מסמך
     } = body;
 
     if (!expenseId) {
@@ -72,6 +73,7 @@ export async function PUT(request: Request) {
     if (expense_type !== undefined) updateData.expense_type = expense_type;
     if (notes !== undefined) updateData.notes = notes;
     if (payment_method !== undefined) updateData.payment_method = payment_method;
+    if (receipt_number !== undefined) updateData.receipt_number = receipt_number || null; // ⭐ מספר קבלה/מסמך
 
     console.log('Updating expense:', expenseId, 'with data:', updateData);
 

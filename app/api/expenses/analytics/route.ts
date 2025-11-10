@@ -53,7 +53,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // שליפת כל ההוצאות בתקופה (רק parent transactions)
+    // שליפת כל ההוצאות בתקופה (parent transactions + cash expenses)
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select('*')
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
       .eq('type', 'expense')
       .gte('tx_date', fromDate)
       .lte('tx_date', toDate)
-      .or('has_details.is.null,has_details.eq.false')
+      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
       .order('tx_date', { ascending: true });
 
     if (error) {

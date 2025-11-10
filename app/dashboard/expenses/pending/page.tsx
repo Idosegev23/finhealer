@@ -26,6 +26,9 @@ interface PendingTransaction {
   created_at: string;
   is_summary?: boolean;
   document_type?: string;
+  receipt_number?: string; // ⭐ מספר קבלה/מסמך
+  receipt_id?: string; // ⭐ קישור לקבלה
+  duplicate_warning?: boolean; // ⭐ אזהרה על כפילות
 }
 
 interface Match {
@@ -608,7 +611,16 @@ export default function PendingExpensesPage() {
                       </div>
                       <CardDescription className="text-base">
                         📅 {formatDate(expense.date)} • 💳 {expense.payment_method || 'לא צוין'}
+                        {expense.receipt_number && (
+                          <> • 📄 מספר מסמך: {expense.receipt_number}</>
+                        )}
                       </CardDescription>
+                      {/* ⚠️ אזהרה על כפילות */}
+                      {expense.duplicate_warning && (
+                        <div className="mt-2 bg-red-100 border-2 border-red-400 rounded-lg p-2 text-sm text-red-800 font-semibold">
+                          ⚠️ אזהרה: נמצאה תנועה דומה עם אותו מספר מסמך שכבר אושרה!
+                        </div>
+                      )}
                     </div>
                     <div className="text-left">
                       <div className={`text-3xl font-bold ${isIncome ? 'text-green-600' : 'text-blue-600'}`}>
@@ -640,6 +652,30 @@ export default function PendingExpensesPage() {
                           {confidenceBadge.label} ({Math.round(expense.confidence_score * 100)}%)
                         </Badge>
                       )}
+                    </div>
+
+                    {/* פרטי התנועה - פירוט מלא */}
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2 border border-gray-200 dark:border-gray-700">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="font-semibold text-gray-600 dark:text-gray-400">🏪 עסק:</span>
+                          <p className="text-gray-900 dark:text-white font-medium">{expense.vendor || 'לא צוין'}</p>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-gray-600 dark:text-gray-400">💰 סכום:</span>
+                          <p className="text-gray-900 dark:text-white font-medium">{formatCurrency(expense.amount)}</p>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-gray-600 dark:text-gray-400">📅 תאריך:</span>
+                          <p className="text-gray-900 dark:text-white font-medium">{formatDate(expense.date)}</p>
+                        </div>
+                        {expense.receipt_number && (
+                          <div>
+                            <span className="font-semibold text-gray-600 dark:text-gray-400">📄 מספר מסמך:</span>
+                            <p className="text-gray-900 dark:text-white font-medium">{expense.receipt_number}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Notes */}

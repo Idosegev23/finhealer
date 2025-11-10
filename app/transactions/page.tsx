@@ -40,7 +40,7 @@ export default async function TransactionsPage() {
     .select('*')
     .eq('user_id', user.id)
     .gte('tx_date', thirtyDaysAgo.toISOString().split('T')[0])
-    .or('has_details.is.null,has_details.eq.false')
+    .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
     .order('tx_date', { ascending: false })
     .order('created_at', { ascending: false});
 

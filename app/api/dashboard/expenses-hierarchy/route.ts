@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
         .eq('status', 'confirmed')
         .gte('date', `${currentMonth}-01`)
         .lte('date', `${currentMonth}-31`)
-        .or('has_details.is.null,has_details.eq.false');
+        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
       // קיבוץ לפי payment_method
       const grouped = (transactions || []).reduce((acc: any, tx: any) => {
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         .eq('payment_method', paymentMethod)
         .gte('date', `${currentMonth}-01`)
         .lte('date', `${currentMonth}-31`)
-        .or('has_details.is.null,has_details.eq.false');
+        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
       // קיבוץ לפי expense_type
       const grouped = (transactions || []).reduce((acc: any, tx: any) => {
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
         .eq('expense_type', expenseType)
         .gte('date', `${currentMonth}-01`)
         .lte('date', `${currentMonth}-31`)
-        .or('has_details.is.null,has_details.eq.false');
+        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
       // קיבוץ לפי category
       const grouped = (transactions || []).reduce((acc: any, tx: any) => {
@@ -186,6 +186,7 @@ function translateExpenseType(type: string): string {
   };
   return translations[type] || type;
 }
+
 
 
 

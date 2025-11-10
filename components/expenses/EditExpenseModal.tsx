@@ -16,6 +16,7 @@ interface EditExpenseModalProps {
     expense_type: string;
     payment_method: string;
     notes: string;
+    receipt_number?: string; // ⭐ מספר קבלה/מסמך
   };
   onClose: () => void;
   onSave: (updates: any, shouldApprove?: boolean) => void;
@@ -31,6 +32,7 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
     expense_type: expense.expense_type || 'variable',
     payment_method: expense.payment_method || 'credit_card',
     notes: expense.notes || '',
+    receipt_number: expense.receipt_number || '', // ⭐ מספר קבלה/מסמך
   });
 
   const handleSubmit = (e: React.FormEvent, shouldApprove = false) => {
@@ -133,6 +135,21 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
               <option value="digital_wallet">ארנק דיגיטלי</option>
               <option value="other">אחר</option>
             </select>
+          </div>
+
+          {/* Receipt Number */}
+          <div>
+            <label className="block text-sm font-medium mb-2">מספר מסמך/קבלה</label>
+            <input
+              type="text"
+              value={formData.receipt_number}
+              onChange={(e) => setFormData({ ...formData, receipt_number: e.target.value })}
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="מספר הקבלה/מסמך (למניעת כפילויות)"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              מספר הקבלה או המסמך - עוזר למנוע כפילויות
+            </p>
           </div>
 
           {/* Notes */}

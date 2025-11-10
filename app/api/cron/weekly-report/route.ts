@@ -38,23 +38,23 @@ export async function GET(request: NextRequest) {
 
     for (const user of users || []) {
       try {
-        // השבוע הזה (7 ימים אחרונים) - רק parent transactions
+        // השבוע הזה (7 ימים אחרונים) - parent transactions + cash expenses
         const { data: thisWeek } = await supabase
           .from('transactions')
           .select('amount, type, category')
           .eq('user_id', user.id)
           .gte('tx_date', sevenDaysAgo.toISOString().split('T')[0])
           .lte('tx_date', today.toISOString().split('T')[0])
-          .or('has_details.is.null,has_details.eq.false');
+          .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
-        // השבוע שעבר (14-7 ימים אחרונים) - רק parent transactions
+        // השבוע שעבר (14-7 ימים אחרונים) - parent transactions + cash expenses
         const { data: lastWeek } = await supabase
           .from('transactions')
           .select('amount, type')
           .eq('user_id', user.id)
           .gte('tx_date', fourteenDaysAgo.toISOString().split('T')[0])
           .lt('tx_date', sevenDaysAgo.toISOString().split('T')[0])
-          .or('has_details.is.null,has_details.eq.false');
+          .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
         const thisWeekExpenses = thisWeek
           ?.filter((tx) => tx.type === 'expense')

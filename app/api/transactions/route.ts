@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       .from('transactions')
       .select('*', { count: 'exact' })
       .eq('user_id', user.id)
-      .or('has_details.is.null,has_details.eq.false')
+      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
       .order('tx_date', { ascending: false });
 
     // Filters

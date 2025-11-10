@@ -27,7 +27,8 @@ export async function GET() {
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const today = now.toISOString().split('T')[0];
 
-    // הוצאות/הכנסות החודש (רק parent transactions)
+    // הוצאות/הכנסות החודש (parent transactions + cash expenses)
+    // כולל: תנועות מדוח בנק, תנועות מזומן, תנועות אחרות
     const { data: transactions } = await supabase
       .from('transactions')
       .select('type, amount')
@@ -35,7 +36,7 @@ export async function GET() {
       .eq('status', 'confirmed')
       .gte('tx_date', firstDayOfMonth)
       .lte('tx_date', today)
-      .or('has_details.is.null,has_details.eq.false');
+      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
     const txData = (transactions || []) as any[];
     const totalExpenses = txData

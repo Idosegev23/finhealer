@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     const fromDate = threeMonthsAgo.toISOString().split('T')[0];
 
-    // שליפת כל ההוצאות מ-3 חודשים אחרונים (רק parent transactions)
+    // שליפת כל ההוצאות מ-3 חודשים אחרונים (parent transactions + cash expenses)
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select('*')
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
       .eq('type', 'expense')
       .gte('tx_date', fromDate)
       .eq('status', 'confirmed')
-      .or('has_details.is.null,has_details.eq.false');
+      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
     if (error) {
       console.error('Error fetching transactions:', error);

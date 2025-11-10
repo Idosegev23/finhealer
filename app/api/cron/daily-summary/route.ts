@@ -45,14 +45,14 @@ export async function GET(request: NextRequest) {
 
     for (const user of users || []) {
       try {
-        // בדוק הוצאות היום (רק parent transactions)
+        // בדוק הוצאות היום (parent transactions + cash expenses)
         const { data: todayTransactions } = await supabase
           .from('transactions')
           .select('amount, category, vendor')
           .eq('user_id', user.id)
           .eq('type', 'expense')
           .eq('tx_date', today)
-          .or('has_details.is.null,has_details.eq.false');
+          .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
         const totalSpent = todayTransactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
         const transactionCount = todayTransactions?.length || 0;

@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const documentType = formData.get('documentType') as string;
-    const statementMonth = formData.get('statementMonth') as string | null; // ⭐ חודש הדוח (YYYY-MM)
+    const statementMonth = formData.get('statementMonth') as string; // ⭐ חודש המסמך (YYYY-MM) - חובה!
 
     console.log('📤 Upload request:', {
       fileName: file?.name,
@@ -32,6 +32,13 @@ export async function POST(request: NextRequest) {
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    // ✅ Validation: חודש המסמך הוא חובה!
+    if (!statementMonth) {
+      return NextResponse.json({ 
+        error: 'חודש המסמך הוא חובה. אנא בחר את החודש של המסמך.' 
+      }, { status: 400 });
     }
 
     // Validate file type
@@ -99,20 +106,21 @@ export async function POST(request: NextRequest) {
     const fileType = fileTypeMap[documentType] || 'other';
 
     // Calculate period_start and period_end from statementMonth
-    let periodStart: string | null = null;
-    let periodEnd: string | null = null;
+    // statementMonth format: "YYYY-MM"
+    const [year, month] = statementMonth.split('-').map(Number);
+    // First day of month
+    const periodStart = `${year}-${String(month).padStart(2, '0')}-01`;
+    // Last day of month
+    const lastDay = new Date(year, month, 0).getDate(); // month is 1-based, so month+0 gives us last day of previous month+1
+    const periodEnd = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
     
-    if (statementMonth) {
-      // statementMonth format: "YYYY-MM"
-      const [year, month] = statementMonth.split('-').map(Number);
-      // First day of month
-      periodStart = `${year}-${String(month).padStart(2, '0')}-01`;
-      // Last day of month
-      const lastDay = new Date(year, month, 0).getDate(); // month is 1-based, so month+0 gives us last day of previous month+1
-      periodEnd = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
-      
-      console.log('📅 Statement period:', { statementMonth, periodStart, periodEnd });
-    }
+    // Convert statementMonth to DATE format for database (YYYY-MM-DD, first day of month)
+    const statementMonthDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    
+    console.log('📅 Statement period:', { statementMonth, periodStart, periodEnd, statementMonthDate });
+
+    // Determine if this is a source document (only bank statements are source)
+    const isSourceDocument = documentType === 'bank' || documentType === 'bank_statement';
 
     // Create uploaded_statements record
     const { data: statement, error: dbError } = await (supabase as any)
@@ -128,6 +136,8 @@ export async function POST(request: NextRequest) {
         status: 'pending',
         period_start: periodStart, // ⭐ תחילת תקופת הדוח
         period_end: periodEnd,     // ⭐ סוף תקופת הדוח
+        statement_month: statementMonthDate, // ⭐ חודש המסמך (DATE format)
+        is_source_document: isSourceDocument, // ⭐ רק דוח בנק הוא source
       })
       .select()
       .single();

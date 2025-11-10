@@ -420,6 +420,7 @@ export async function POST(request: NextRequest) {
           const receiptDate = ocrData.receipt_date || transactions[0]?.date || new Date().toISOString().split('T')[0];
           const receiptTotal = ocrData.receipt_total || transactions[0]?.amount || null;
           const receiptVendor = ocrData.vendor_name || transactions[0]?.vendor || null;
+          const receiptNumber = ocrData.receipt_number || null; // ⭐ מספר הקבלה
 
           // שמירת קבלה + יצירת הוצאות
           const { data: receipt } = await (supabase as any)
@@ -431,6 +432,7 @@ export async function POST(request: NextRequest) {
               amount: receiptTotal,
               vendor: receiptVendor,
               tx_date: receiptDate,
+              receipt_number: receiptNumber, // ⭐ מספר הקבלה
               confidence: transactions[0]?.confidence || 0.5,
               status: 'completed',
               metadata: {
@@ -477,6 +479,8 @@ export async function POST(request: NextRequest) {
                   original_description: tx.description || '',
                   auto_categorized: true,
                   confidence_score: tx.confidence || 0.5,
+                  receipt_id: receipt?.id || null, // ⭐ קישור לקבלה
+                  receipt_number: receiptNumber, // ⭐ מספר הקבלה
                 })
                 .select('id')
                 .single();

@@ -147,20 +147,18 @@ export async function POST(request: NextRequest) {
     const docType = stmt.file_type?.toLowerCase() || '';
 
     if (docType.includes('credit')) {
-      // Credit statements → transactions table only
-      itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
-      
-      // ✨ Reconciliation: Match credit details with bank summary and delete duplicates
-      await matchCreditTransactions(supabase, stmt.user_id, statementId as string, docType);
+      // Credit statements → transaction_details (לא תנועות חדשות!)
+      // דוח אשראי של חודש X-1 מתחבר לתנועות תשלום אשראי בחודש X
+      itemsProcessed = await saveCreditDetails(supabase, result, stmt.user_id, statementId as string, stmt.statement_month);
     } else if (docType.includes('bank')) {
-      // Bank statements → transactions + bank_accounts + loans
-      const txCount = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
+      // Bank statements → transactions עם is_source_transaction = true
+      const txCount = await saveBankTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
       const accountCount = await saveBankAccounts(supabase, result, stmt.user_id, statementId as string);
       const loanCount = await saveLoanPaymentsAsLoans(supabase, result, stmt.user_id);
       itemsProcessed = txCount + accountCount + loanCount;
     } else if (docType.includes('payslip') || docType.includes('salary') || docType.includes('תלוש')) {
-      // Payslips → payslips table + income transaction
-      itemsProcessed = await savePayslips(supabase, result, stmt.user_id, statementId as string);
+      // Payslips → payslips table + link to income transaction
+      itemsProcessed = await savePayslips(supabase, result, stmt.user_id, statementId as string, stmt.statement_month);
     } else if (docType.includes('loan') || docType.includes('mortgage')) {
       // Loan/Mortgage statements → loans table
       itemsProcessed = await saveLoans(supabase, result, stmt.user_id, statementId as string);
@@ -168,8 +166,8 @@ export async function POST(request: NextRequest) {
       // Insurance statements → insurance table
       itemsProcessed = await saveInsurance(supabase, result, stmt.user_id, statementId as string);
     } else if (docType.includes('pension') || docType.includes('פנסיה') || docType.includes('מסלקה')) {
-      // Pension statements → pensions table
-      itemsProcessed = await savePensions(supabase, result, stmt.user_id, statementId as string);
+      // Pension statements → pension_insurance table + link to payslip and transactions
+      itemsProcessed = await savePensions(supabase, result, stmt.user_id, statementId as string, stmt.statement_month);
     } else {
       console.warn(`Unknown document type: ${docType}, defaulting to transactions`);
       itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
@@ -572,7 +570,458 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
 // ============================================================================
 
 /**
- * Save transactions from credit/bank statements
+ * Save bank transactions - source transactions (is_source_transaction = true)
+ */
+async function saveBankTransactions(supabase: any, result: any, userId: string, documentId: string, documentType: string, statementMonth?: string): Promise<number> {
+  try {
+    console.log(`💾 Saving bank transactions (source) for statement month: ${statementMonth || 'not provided'}`);
+    
+    // Extract transactions from bank statement format
+    let allTransactions: any[] = [];
+    
+    if (result.transactions && typeof result.transactions === 'object') {
+      // Bank statement format: { transactions: { income: [...], expenses: [...], ... } }
+      const { income, expenses, loan_payments, savings_transfers } = result.transactions;
+      
+      if (income) allTransactions.push(...income.map((tx: any) => ({ ...tx, type: 'income' })));
+      if (expenses) allTransactions.push(...expenses.map((tx: any) => ({ ...tx, type: 'expense' })));
+      if (loan_payments) allTransactions.push(...loan_payments.map((tx: any) => ({ ...tx, type: 'expense', category: 'loan_payment' })));
+      if (savings_transfers) allTransactions.push(...savings_transfers.map((tx: any) => ({ ...tx, type: 'expense', category: 'savings' })));
+    }
+
+    if (allTransactions.length === 0) {
+      console.log('No bank transactions to save');
+      return 0;
+    }
+
+    // Convert statementMonth to DATE format (YYYY-MM-DD, first day of month)
+    let statementMonthDate: string | null = null;
+    if (statementMonth) {
+      const [year, month] = statementMonth.split('-').map(Number);
+      statementMonthDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    }
+
+    // Get existing loans for matching
+    const { data: existingLoans } = await supabase
+      .from('loans')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('active', true);
+
+    const transactionsToInsert = allTransactions.map((tx: any) => {
+      // Parse date
+      let parsedDate = null;
+      if (tx.date) {
+        try {
+          const parts = tx.date.split('/');
+          if (parts.length === 3) {
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            let year = parts[2];
+            if (year.length === 2) {
+              year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+            }
+            parsedDate = `${year}-${month}-${day}`;
+          }
+        } catch (e) {
+          console.warn(`Failed to parse date: ${tx.date}`, e);
+        }
+      }
+      
+      if (!parsedDate && statementMonthDate) {
+        parsedDate = statementMonthDate;
+      }
+      
+      if (!parsedDate) {
+        parsedDate = new Date().toISOString().split('T')[0];
+      }
+
+      // Validate transaction type
+      let transactionType = tx.type;
+      if (!transactionType || !['income', 'expense'].includes(transactionType)) {
+        transactionType = 'expense';
+      }
+
+      // Normalize payment method
+      let paymentMethod = tx.payment_method;
+      const paymentMethodMap: Record<string, string> = {
+        'העברה בנקאית': 'bank_transfer',
+        'כרטיס אשראי': 'credit_card',
+        'כרטיס חיוב': 'debit_card',
+        'מזומן': 'cash',
+        'המחאה': 'check',
+        'הוראת קבע': 'standing_order',
+        'חיוב ישיר': 'direct_debit',
+        'ארנק דיגיטלי': 'digital_wallet',
+        'ביט': 'bit',
+        'פייבוקס': 'paybox',
+        'paypal': 'paypal',
+        'אחר': 'other',
+      };
+      
+      if (paymentMethod && paymentMethodMap[paymentMethod]) {
+        paymentMethod = paymentMethodMap[paymentMethod];
+      }
+      
+      if (!paymentMethod || !['cash', 'credit_card', 'debit_card', 'bank_transfer', 'digital_wallet', 'check', 'paypal', 'bit', 'paybox', 'direct_debit', 'standing_order', 'other'].includes(paymentMethod)) {
+        if (transactionType === 'income') {
+          paymentMethod = 'bank_transfer';
+        } else if (tx.category === 'loan_payment') {
+          paymentMethod = 'direct_debit';
+        } else {
+          paymentMethod = 'credit_card';
+        }
+      }
+
+      // Extract card number last 4 digits if credit card payment
+      let cardNumberLast4: string | null = null;
+      if (paymentMethod === 'credit_card' && tx.vendor) {
+        const cardMatch = tx.vendor.match(/(\d{4})/);
+        if (cardMatch) {
+          cardNumberLast4 = cardMatch[1];
+        }
+      }
+
+      // Detect loan payment
+      let linkedLoanId = null;
+      if (tx.category === 'loan_payment' && existingLoans && existingLoans.length > 0) {
+        const txAmount = Math.abs(parseFloat(tx.amount));
+        const matchedLoan = existingLoans.find((loan: any) => {
+          const loanPayment = parseFloat(loan.monthly_payment);
+          const diff = Math.abs(txAmount - loanPayment);
+          const percentDiff = (diff / loanPayment) * 100;
+          return percentDiff <= 2;
+        });
+        if (matchedLoan) {
+          linkedLoanId = matchedLoan.id;
+        }
+      }
+
+      // Mark if needs details (credit card payments need credit statement details)
+      const needsDetails = paymentMethod === 'credit_card';
+
+      return {
+        user_id: userId,
+        type: transactionType,
+        amount: Math.abs(parseFloat(tx.amount)) || 0,
+        category: tx.category || 'other',
+        expense_category: tx.expense_category || null,
+        vendor: tx.vendor || tx.description || 'לא צוין',
+        date: parsedDate,
+        tx_date: parsedDate,
+        source: 'ocr',
+        status: 'proposed',
+        notes: tx.notes || tx.description || null,
+        payment_method: paymentMethod,
+        expense_type: tx.expense_type || 'variable',
+        confidence_score: tx.confidence_score || 0.85,
+        document_id: documentId,
+        original_description: tx.vendor || tx.description,
+        auto_categorized: true,
+        is_recurring: tx.type === 'הוראת קבע',
+        currency: 'ILS',
+        // ⭐ New hierarchy fields
+        is_source_transaction: true, // Bank statements are source of truth
+        statement_month: statementMonthDate, // Month of the statement
+        needs_details: needsDetails, // Credit payments need details
+        card_number_last4: cardNumberLast4,
+        is_immediate_charge: false, // Will be determined later
+        linked_loan_id: linkedLoanId,
+        matching_status: 'not_matched',
+      };
+    });
+
+    const { error } = await supabase
+      .from('transactions')
+      .insert(transactionsToInsert as any);
+
+    if (error) {
+      console.error('Failed to insert bank transactions:', error);
+      throw error;
+    }
+
+    console.log(`💾 Saved ${transactionsToInsert.length} bank transactions (source)`);
+    
+    // Update linked loans
+    const linkedTransactions = transactionsToInsert.filter((tx: any) => tx.linked_loan_id);
+    if (linkedTransactions.length > 0) {
+      for (const tx of linkedTransactions) {
+        const { data: loan } = await supabase
+          .from('loans')
+          .select('current_balance, remaining_payments')
+          .eq('id', tx.linked_loan_id)
+          .single();
+        
+        if (loan) {
+          const newBalance = parseFloat(loan.current_balance) - parseFloat(String(tx.amount));
+          const newRemaining = loan.remaining_payments ? loan.remaining_payments - 1 : null;
+          
+          await supabase
+            .from('loans')
+            .update({
+              current_balance: Math.max(0, newBalance),
+              remaining_payments: newRemaining,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tx.linked_loan_id);
+        }
+      }
+    }
+    
+    return transactionsToInsert.length;
+  } catch (error) {
+    console.error('Error in saveBankTransactions:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save credit statement details - creates transaction_details and matches to bank transactions
+ * דוח אשראי של חודש X-1 מתחבר לתנועות תשלום אשראי בחודש X
+ */
+async function saveCreditDetails(supabase: any, result: any, userId: string, documentId: string, statementMonth?: string): Promise<number> {
+  try {
+    console.log(`💾 Saving credit details for statement month: ${statementMonth || 'not provided'}`);
+    
+    // Extract transactions from credit statement
+    let allTransactions: any[] = [];
+    if (result.transactions && Array.isArray(result.transactions)) {
+      allTransactions = result.transactions;
+    }
+
+    if (allTransactions.length === 0) {
+      console.log('No credit transactions to save');
+      return 0;
+    }
+
+    // Calculate detail period month (the month of the credit statement - X-1)
+    let detailPeriodMonth: string | null = null;
+    if (statementMonth) {
+      const [year, month] = statementMonth.split('-').map(Number);
+      detailPeriodMonth = `${year}-${String(month).padStart(2, '0')}-01`;
+    }
+
+    // Calculate payment month (credit statement of month X-1 matches bank transactions of month X)
+    // דוח אשראי של אוגוסט → תנועות תשלום אשראי בספטמבר
+    let paymentMonthDate: string | null = null;
+    if (statementMonth) {
+      const [year, month] = statementMonth.split('-').map(Number);
+      const paymentMonth = month === 12 ? 1 : month + 1;
+      const paymentYear = month === 12 ? year + 1 : year;
+      paymentMonthDate = `${paymentYear}-${String(paymentMonth).padStart(2, '0')}-01`;
+    }
+
+    // Find matching bank transactions (credit card payments in payment month)
+    // דוח אשראי של חודש X-1 מחפש תנועות תשלום אשראי בחודש X
+    const { data: bankTransactions } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_source_transaction', true)
+      .eq('payment_method', 'credit_card')
+      .eq('needs_details', true);
+    
+    // Filter by statement_month if we have paymentMonthDate
+    let filteredBankTransactions = bankTransactions || [];
+    if (paymentMonthDate) {
+      // Get transactions from the payment month (X)
+      filteredBankTransactions = filteredBankTransactions.filter((tx: any) => {
+        if (!tx.statement_month) return false;
+        const txMonth = new Date(tx.statement_month).toISOString().slice(0, 7);
+        const paymentMonth = paymentMonthDate.slice(0, 7);
+        return txMonth === paymentMonth;
+      });
+    }
+    
+    filteredBankTransactions.sort((a: any, b: any) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateA - dateB;
+    });
+
+    console.log(`🔍 Found ${filteredBankTransactions.length} potential bank transactions to match (payment month: ${paymentMonthDate || 'any'})`);
+
+    // Group credit transactions by card (if available) or by amount
+    const creditDetails: any[] = [];
+    let unmatchedCreditTotal = 0;
+
+    for (const tx of allTransactions) {
+      // Parse date
+      let parsedDate = null;
+      if (tx.date) {
+        try {
+          const parts = tx.date.split('/');
+          if (parts.length === 3) {
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            let year = parts[2];
+            if (year.length === 2) {
+              year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+            }
+            parsedDate = `${year}-${month}-${day}`;
+          }
+        } catch (e) {
+          console.warn(`Failed to parse date: ${tx.date}`, e);
+        }
+      }
+      
+      if (!parsedDate && detailPeriodMonth) {
+        parsedDate = detailPeriodMonth;
+      }
+      
+      if (!parsedDate) {
+        parsedDate = new Date().toISOString().split('T')[0];
+      }
+
+      const amount = Math.abs(parseFloat(tx.amount)) || 0;
+      unmatchedCreditTotal += amount;
+
+      // Extract card number if available
+      const cardNumberLast4 = tx.card_number_last4 || null;
+
+      creditDetails.push({
+        user_id: userId,
+        amount: amount,
+        vendor: tx.vendor || tx.description || 'לא צוין',
+        date: parsedDate,
+        notes: tx.notes || tx.description || null,
+        category: tx.category || 'other',
+        expense_category: tx.expense_category || null,
+        expense_type: tx.expense_type || 'variable',
+        payment_method: 'credit_card',
+        confidence_score: tx.confidence_score || 0.85,
+        // ⭐ New fields for detailed breakdown
+        detailed_category: tx.detailed_category || null,
+        sub_category: tx.sub_category || null,
+        tags: tx.tags || null,
+        detailed_notes: tx.detailed_notes || null,
+        item_count: tx.item_count || null,
+        items: tx.items || null,
+        // ⭐ Matching fields
+        card_number_last4: cardNumberLast4,
+        detail_period_month: detailPeriodMonth,
+        credit_statement_id: documentId,
+        // parent_transaction_id will be set after matching
+        parent_transaction_id: null,
+      });
+    }
+
+    // Match credit details to bank transactions
+    // Strategy: Match by card number first, then by amount and date
+    const matchedDetails: any[] = [];
+    const unmatchedDetails: any[] = [];
+
+    for (const detail of creditDetails) {
+      let bestMatch: any = null;
+      let bestScore = 0;
+
+      for (const bankTx of filteredBankTransactions) {
+        let score = 0;
+
+        // Card number match (20% weight)
+        if (detail.card_number_last4 && bankTx.card_number_last4) {
+          if (detail.card_number_last4 === bankTx.card_number_last4) {
+            score += 0.2;
+          }
+        }
+
+        // Amount match (40% weight) - within 5% tolerance
+        const amountDiff = Math.abs(detail.amount - bankTx.amount);
+        const amountPercentDiff = (amountDiff / bankTx.amount) * 100;
+        if (amountPercentDiff <= 5) {
+          score += 0.4 * (1 - amountPercentDiff / 5);
+        }
+
+        // Date match (30% weight) - within 7 days
+        const detailDate = new Date(detail.date);
+        const bankDate = new Date(bankTx.date);
+        const daysDiff = Math.abs((detailDate.getTime() - bankDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff <= 7) {
+          score += 0.3 * (1 - daysDiff / 7);
+        }
+
+        // Vendor match (10% weight) - fuzzy matching
+        if (detail.vendor && bankTx.vendor) {
+          const vendorSimilarity = calculateStringSimilarity(detail.vendor.toLowerCase(), bankTx.vendor.toLowerCase());
+          score += 0.1 * vendorSimilarity;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = bankTx;
+        }
+      }
+
+      if (bestMatch && bestScore >= 0.5) {
+        // Match found - link detail to bank transaction
+        detail.parent_transaction_id = bestMatch.id;
+        matchedDetails.push(detail);
+        console.log(`✅ Matched credit detail ${detail.vendor} (${detail.amount} ₪) to bank transaction ${bestMatch.id} (score: ${bestScore.toFixed(2)})`);
+      } else {
+        // No match - will be created as pending
+        unmatchedDetails.push(detail);
+        console.log(`⚠️  No match found for credit detail ${detail.vendor} (${detail.amount} ₪)`);
+      }
+    }
+
+    // Insert matched details
+    if (matchedDetails.length > 0) {
+      const { error: insertError } = await supabase
+        .from('transaction_details')
+        .insert(matchedDetails);
+
+      if (insertError) {
+        console.error('Failed to insert matched credit details:', insertError);
+        throw insertError;
+      }
+
+      // Update parent transactions to mark as having details
+      const parentIds = [...new Set(matchedDetails.map(d => d.parent_transaction_id))];
+      await supabase
+        .from('transactions')
+        .update({ 
+          has_details: true,
+          matching_status: 'matched',
+        })
+        .in('id', parentIds);
+
+      console.log(`💾 Saved ${matchedDetails.length} matched credit details`);
+    }
+
+    // Insert unmatched details (will be matched manually later)
+    if (unmatchedDetails.length > 0) {
+      const { error: insertError } = await supabase
+        .from('transaction_details')
+        .insert(unmatchedDetails);
+
+      if (insertError) {
+        console.error('Failed to insert unmatched credit details:', insertError);
+        throw insertError;
+      }
+
+      console.log(`💾 Saved ${unmatchedDetails.length} unmatched credit details (pending manual match)`);
+    }
+
+    return creditDetails.length;
+  } catch (error) {
+    console.error('Error in saveCreditDetails:', error);
+    throw error;
+  }
+}
+
+/**
+ * Helper function to calculate string similarity (simple Jaccard similarity)
+ */
+function calculateStringSimilarity(str1: string, str2: string): number {
+  const words1 = new Set(str1.split(/\s+/));
+  const words2 = new Set(str2.split(/\s+/));
+  const intersection = new Set([...words1].filter(x => words2.has(x)));
+  const union = new Set([...words1, ...words2]);
+  return intersection.size / union.size;
+}
+
+/**
+ * Save transactions from credit/bank statements (legacy - use saveBankTransactions or saveCreditDetails instead)
  */
 async function saveTransactions(supabase: any, result: any, userId: string, documentId: string, documentType: string, statementMonth?: string): Promise<number> {
   try {
@@ -951,61 +1400,138 @@ async function saveInsurance(supabase: any, result: any, userId: string, documen
 
 /**
  * Save pension plans from pension clearinghouse reports
+ * מתחבר לתלוש משכורת (הניכוי) ולתנועות בנק (ההפקדה) - אם יש
  */
-async function savePensions(supabase: any, result: any, userId: string, documentId: string): Promise<number> {
+async function savePensions(supabase: any, result: any, userId: string, documentId: string, statementMonth?: string): Promise<number> {
   try {
     if (!result.pension_plans || result.pension_plans.length === 0) {
       console.log('No pension plans to save');
       return 0;
     }
 
+    // Calculate statement month date
+    let statementMonthDate: string | null = null;
+    if (statementMonth) {
+      const [year, month] = statementMonth.split('-').map(Number);
+      statementMonthDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    }
+
+    // Find matching payslip for this month (pension deductions are in payslip)
+    // תשלומי פנסיה נראים רק בתלוש, לא בדוח בנק
+    let linkedPayslipId: string | null = null;
+    if (statementMonthDate) {
+      const payslipMonth = statementMonthDate.slice(0, 7); // YYYY-MM
+      const { data: payslips } = await supabase
+        .from('payslips')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      // Filter by month_year (compare YYYY-MM part)
+      const matchingPayslip = payslips?.find((p: any) => {
+        if (!p.month_year) return false;
+        const payslipMonthYear = new Date(p.month_year).toISOString().slice(0, 7);
+        return payslipMonthYear === payslipMonth;
+      });
+
+      if (matchingPayslip) {
+        linkedPayslipId = matchingPayslip.id;
+        console.log(`🔗 Linked pension report to payslip: ${linkedPayslipId} (month: ${payslipMonth})`);
+      } else {
+        console.log(`⚠️  No matching payslip found for month: ${payslipMonth}`);
+      }
+    }
+
+    // Find matching bank transactions (pension deposits) - if any
+    // תנועות פנסיה בדוח בנק (אם יש) - יכול להיות NULL אם אין תנועה בנק
+    let linkedTransactionId: string | null = null;
+    if (statementMonthDate) {
+      const { data: pensionTransactions } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_source_transaction', true)
+        .eq('linked_pension_id', null) // Not already linked
+        .gte('statement_month', statementMonthDate)
+        .lte('statement_month', statementMonthDate);
+
+      // Try to find pension deposit transaction
+      // Look for transactions that might be pension deposits
+      const pensionTx = pensionTransactions?.find((tx: any) => {
+        const vendor = (tx.vendor || '').toLowerCase();
+        return vendor.includes('פנסיה') || 
+               vendor.includes('pension') || 
+               vendor.includes('קרן') ||
+               tx.category === 'pension' ||
+               tx.category === 'savings';
+      });
+
+      if (pensionTx) {
+        linkedTransactionId = pensionTx.id;
+        console.log(`🔗 Linked pension report to bank transaction: ${linkedTransactionId}`);
+      }
+    }
+
     const pensionsToInsert = result.pension_plans.map((plan: any) => {
       // Parse start_date
       const startDate = parseDateToISO(plan.start_date);
 
-      // Map plan_type to pension_type
+      // Map plan_type to fund_type
       const typeMap: Record<string, string> = {
         'pension_fund': 'pension_fund',
         'provident_fund': 'provident_fund',
         'study_fund': 'study_fund',
         'insurance_policy': 'insurance',
       };
-      const pensionType = typeMap[plan.plan_type] || 'other';
+      const fundType = typeMap[plan.plan_type] || 'other';
 
       return {
         user_id: userId,
-        pension_type: pensionType,
-        provider: plan.provider,
+        fund_name: plan.plan_name || plan.provider || 'לא צוין',
+        fund_type: fundType,
+        provider: plan.provider || 'לא צוין',
         policy_number: plan.policy_number || null,
-        current_balance: parseFloat(plan.current_balance) || 0,
-        monthly_deposit: parseFloat(plan.monthly_deposit) || 0,
-        employer_deposit: parseFloat(plan.employer_deposit) || 0,
-        management_fees: parseFloat(plan.management_fees) || null,
-        annual_return: null, // Not in clearinghouse report
+        employee_type: plan.employee_type || null,
+        current_balance: parseFloat(plan.current_balance || plan.pension_savings || '0') || 0,
+        monthly_deposit: parseFloat(plan.monthly_deposit || plan.employee_deposit || '0') || 0,
+        employer_contribution: parseFloat(plan.employer_deposit || plan.employer_contribution || '0') || 0,
+        employee_contribution: parseFloat(plan.employee_deposit || plan.monthly_deposit || '0') || 0,
+        management_fee_percentage: parseFloat(plan.management_fees || '0') || null,
+        deposit_fee_percentage: null,
+        annual_return: parseFloat(plan.annual_return || '0') || null,
         start_date: startDate,
-        metadata: {
-          plan_name: plan.plan_name,
-          status: plan.status,
+        seniority_date: parseDateToISO(plan.seniority_date) || startDate,
+        active: plan.status !== 'closed',
+        notes: JSON.stringify({
           retirement_age: plan.retirement_age,
-          pension_savings: plan.pension_savings,
           capital_savings: plan.capital_savings,
           retirement_forecast: plan.retirement_forecast,
           investment_track: plan.investment_track,
           insurance_coverage: plan.insurance_coverage,
-          employee_deposit: plan.employee_deposit,
           document_id: documentId,
           report_info: result.report_info,
-        },
+        }),
+        // ⭐ Linking fields
+        linked_payslip_id: linkedPayslipId, // תשלומי פנסיה נראים רק בתלוש, לא בדוח בנק
+        linked_transaction_id: linkedTransactionId, // תנועת הפקדה פנסיה בדוח הבנק (אם יש)
       };
     });
 
     const { error } = await supabase
-      .from('pensions')
+      .from('pension_insurance')
       .insert(pensionsToInsert);
 
     if (error) {
       console.error('Failed to insert pensions:', error);
       throw error;
+    }
+
+    // Update linked transaction if found
+    if (linkedTransactionId) {
+      await supabase
+        .from('transactions')
+        .update({ linked_pension_id: pensionsToInsert[0]?.id || null })
+        .eq('id', linkedTransactionId);
     }
 
     console.log(`💾 Saved ${pensionsToInsert.length} pension plans`);
@@ -1199,7 +1725,7 @@ async function saveLoanPaymentsAsLoans(supabase: any, result: any, userId: strin
 /**
  * Save payslip data from salary slips
  */
-async function savePayslips(supabase: any, result: any, userId: string, documentId: string): Promise<number> {
+async function savePayslips(supabase: any, result: any, userId: string, documentId: string, statementMonth?: string): Promise<number> {
   try {
     // Extract payslip info
     if (!result.payslip_info && !result.salary_info) {
@@ -1259,36 +1785,90 @@ async function savePayslips(supabase: any, result: any, userId: string, document
       throw error;
     }
 
-    // Create income transaction linked to this payslip
+    // Find matching income transaction from bank statement (same month)
+    // תלוש משכורת של חודש X מתחבר לתנועת הכנסה של חודש X בדוח הבנק
+    let linkedTransactionId: string | null = null;
     const netSalary = parseFloat(info.net_salary || '0');
+    
     if (netSalary > 0) {
-      const incomeTransaction = {
-        user_id: userId,
-        type: 'income',
-        amount: netSalary,
-        category: 'salary',
-        vendor: info.employer_name || 'משכורת',
-        date: payDate || monthYear,
-        tx_date: payDate || monthYear,
-        source: 'ocr',
-        status: 'proposed',
-        notes: `תלוש שכר ${monthYear}`,
-        payment_method: 'bank_transfer',
-        confidence_score: 0.9,
-        document_id: documentId,
-        auto_categorized: true,
-        currency: 'ILS',
-      };
-
-      const { error: txError } = await supabase
-        .from('transactions')
-        .insert([incomeTransaction]);
-
-      if (txError) {
-        console.warn('Failed to create income transaction from payslip:', txError);
-      } else {
-        console.log(`💸 Created income transaction for ${netSalary} ₪`);
+      // Calculate statement month date
+      let statementMonthDate: string | null = null;
+      if (statementMonth) {
+        const [year, month] = statementMonth.split('-').map(Number);
+        statementMonthDate = `${year}-${String(month).padStart(2, '0')}-01`;
       }
+
+      // Search for matching income transaction in bank statement
+      const { data: incomeTransactions } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('type', 'income')
+        .eq('is_source_transaction', true)
+        .gte('amount', netSalary * 0.95) // Within 5% tolerance
+        .lte('amount', netSalary * 1.05);
+
+      // Filter by statement_month if available
+      let matchingTransaction: any = null;
+      if (statementMonthDate && incomeTransactions) {
+        matchingTransaction = incomeTransactions.find((tx: any) => {
+          if (!tx.statement_month) return false;
+          const txMonth = new Date(tx.statement_month).toISOString().slice(0, 7);
+          const payslipMonth = statementMonthDate!.slice(0, 7);
+          return txMonth === payslipMonth;
+        });
+      } else if (incomeTransactions && incomeTransactions.length > 0) {
+        // Fallback: match by amount and date proximity
+        matchingTransaction = incomeTransactions[0];
+      }
+
+      if (matchingTransaction) {
+        linkedTransactionId = matchingTransaction.id;
+        console.log(`🔗 Linked payslip to existing income transaction: ${matchingTransaction.id} (${matchingTransaction.amount} ₪)`);
+      } else {
+        // No matching transaction found - create one
+        // This can happen if bank statement wasn't uploaded yet
+        const incomeTransaction = {
+          user_id: userId,
+          type: 'income',
+          amount: netSalary,
+          category: 'salary',
+          vendor: info.employer_name || 'משכורת',
+          date: payDate || monthYear,
+          tx_date: payDate || monthYear,
+          source: 'ocr',
+          status: 'proposed',
+          notes: `תלוש שכר ${monthYear}`,
+          payment_method: 'bank_transfer',
+          confidence_score: 0.9,
+          document_id: documentId,
+          auto_categorized: true,
+          currency: 'ILS',
+          is_source_transaction: false, // Not from bank statement
+          statement_month: statementMonthDate,
+        };
+
+        const { data: newTx, error: txError } = await supabase
+          .from('transactions')
+          .insert([incomeTransaction])
+          .select()
+          .single();
+
+        if (txError) {
+          console.warn('Failed to create income transaction from payslip:', txError);
+        } else {
+          linkedTransactionId = newTx.id;
+          console.log(`💸 Created income transaction for ${netSalary} ₪ (no bank statement match found)`);
+        }
+      }
+    }
+
+    // Update payslip with transaction_id
+    if (linkedTransactionId) {
+      await supabase
+        .from('payslips')
+        .update({ transaction_id: linkedTransactionId })
+        .eq('id', insertedPayslip.id);
     }
 
     // Update linked pension funds if we have pension data

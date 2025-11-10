@@ -23,14 +23,15 @@ export async function GET(request: Request) {
     startDate.setMonth(startDate.getMonth() - months);
     const startDateStr = startDate.toISOString().split('T')[0];
 
-    // שליפת כל ההוצאות מתאריך ההתחלה (רק parent transactions)
+    // שליפת כל ההוצאות מתאריך ההתחלה (רק parent transactions + cash expenses)
+    // ⭐ רק תנועות מאושרות (confirmed) - לא ממתינות לאישור!
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'expense')
-      .in('status', ['confirmed', 'proposed']) // מאושרות (confirmed) וממתינות (proposed)
-      .or('has_details.is.null,has_details.eq.false')
+      .eq('status', 'confirmed') // ⭐ רק תנועות מאושרות - לא ממתינות!
+      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
       .gte('date', startDateStr)
       .order('date', { ascending: false });
 
