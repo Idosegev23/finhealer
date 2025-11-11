@@ -250,7 +250,7 @@ export default async function DashboardPage() {
         <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-8 mb-8 shadow-xl hover:shadow-2xl transition-all duration-300">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">ציון φ (Phi)</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">ציון ϕ (Phi)</h2>
               <InfoTooltip
                 content="הציון מחושב על בסיס הכנסות, הוצאות, חובות, חיסכון והתנהלות פיננסית כללית. ציון גבוה = מצב פיננסי טוב יותר"
                 type="info"

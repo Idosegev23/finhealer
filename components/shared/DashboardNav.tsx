@@ -172,7 +172,7 @@ export function DashboardNav() {
           <PhiLogo size="sm" showText animated={false} />
         </Link>
         <div className="flex items-center gap-1 text-white text-sm font-medium">
-          <span className="text-xl" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>φ</span>
+          <span className="text-xl" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>ϕ</span>
           <span className="hidden sm:inline">האיזון המושלם שלך</span>
         </div>
       </div>

@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { matchCreditTransactions } from '@/lib/reconciliation/credit-matcher';
+import { parseDate, parseDateWithFallback } from '@/lib/utils/date-parser';
 
 // ⚡️ Vercel Background Function Configuration
 export const runtime = 'nodejs'; // Force Node.js runtime
@@ -846,38 +847,49 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
     let unmatchedCreditTotal = 0;
 
     for (const tx of allTransactions) {
-      // Parse date
-      let parsedDate = null;
-      if (tx.date) {
-        try {
-          const parts = tx.date.split('/');
-          if (parts.length === 3) {
-            const day = parts[0].padStart(2, '0');
-            const month = parts[1].padStart(2, '0');
-            let year = parts[2];
-            if (year.length === 2) {
-              year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
-            }
-            parsedDate = `${year}-${month}-${day}`;
-          }
-        } catch (e) {
-          console.warn(`Failed to parse date: ${tx.date}`, e);
-        }
-      }
-      
-      if (!parsedDate && detailPeriodMonth) {
-        parsedDate = detailPeriodMonth;
-      }
-      
+      // Parse date using improved date parser
+      const statementMonthStr = statementMonth ? `${statementMonth}-01` : null;
+      const parsedDate = parseDateWithFallback(tx.date, statementMonthStr);
+
       if (!parsedDate) {
-        parsedDate = new Date().toISOString().split('T')[0];
+        console.warn(`⚠️  Skipping transaction - could not parse date: ${tx.date}`);
+        continue;
       }
 
       const amount = Math.abs(parseFloat(tx.amount)) || 0;
-      unmatchedCreditTotal += amount;
+      if (amount === 0) {
+        console.warn(`⚠️  Skipping transaction - invalid amount: ${tx.amount}`);
+        continue;
+      }
+
+      // 🔥 CRITICAL: Validate category exists in database
+      let expenseCategory = tx.expense_category || null;
+      let expenseType = tx.expense_type || null;
+      
+      // If category is provided, verify it exists in database
+      if (expenseCategory) {
+        const { data: categoryData } = await supabase
+          .from('expense_categories')
+          .select('name, expense_type')
+          .eq('name', expenseCategory)
+          .eq('is_active', true)
+          .single();
+        
+        if (!categoryData) {
+          // Category doesn't exist - mark as pending for user review
+          console.warn(`⚠️  Category "${expenseCategory}" not found in database - marking as pending`);
+          expenseCategory = null;
+          expenseType = null;
+        } else {
+          // Use the expense_type from database
+          expenseType = categoryData.expense_type;
+        }
+      }
 
       // Extract card number if available
       const cardNumberLast4 = tx.card_number_last4 || null;
+
+      unmatchedCreditTotal += amount;
 
       creditDetails.push({
         user_id: userId,
@@ -886,8 +898,8 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
         date: parsedDate,
         notes: tx.notes || tx.description || null,
         category: tx.category || 'other',
-        expense_category: tx.expense_category || null,
-        expense_type: tx.expense_type || 'variable',
+        expense_category: expenseCategory, // null if not found or not provided
+        expense_type: expenseType, // null if category not found
         payment_method: 'credit_card',
         confidence_score: tx.confidence_score || 0.85,
         // ⭐ New fields for detailed breakdown
@@ -897,12 +909,23 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
         detailed_notes: tx.detailed_notes || null,
         item_count: tx.item_count || null,
         items: tx.items || null,
+        // ⭐ New fields: recurring payments
+        is_recurring: tx.is_recurring || false,
+        recurring_type: tx.recurring_type || null,
+        // ⭐ New fields: foreign currency transactions
+        original_amount: tx.original_amount || null,
+        original_currency: tx.original_currency || null,
+        exchange_rate: tx.exchange_rate || null,
+        forex_fee: tx.forex_fee || null,
         // ⭐ Matching fields
         card_number_last4: cardNumberLast4,
         detail_period_month: detailPeriodMonth,
         credit_statement_id: documentId,
         // parent_transaction_id will be set after matching
         parent_transaction_id: null,
+        // ⭐ Status: pending if no category, confirmed if category exists
+        status: expenseCategory ? 'confirmed' : 'pending',
+        needs_review: !expenseCategory, // true if no category
       });
     }
 
@@ -1061,41 +1084,12 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
       // 🎯 עדיפות 1: התאריך המדויק מהדוח (tx.date)
       // עדיפות 2: statementMonth (אם בחר המשתמש)
       // עדיפות 3: היום (רק אם אין שום מידע)
-      let parsedDate = null;
-      
-      // קודם כל - ננסה לפרש את התאריך המדויק מהדוח
-      if (tx.date) {
-        try {
-          const parts = tx.date.split('/');
-          if (parts.length === 3) {
-            const day = parts[0].padStart(2, '0');
-            const month = parts[1].padStart(2, '0');
-            let year = parts[2];
-            
-            // טיפול בשנה בת 2 ספרות
-            if (year.length === 2) {
-              year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
-            }
-            
-            parsedDate = `${year}-${month}-${day}`;
-          }
-        } catch (e) {
-          console.warn(`Failed to parse date from tx.date: ${tx.date}`, e);
-        }
-      }
-      
-      // רק אם לא הצלחנו לפרש תאריך מהדוח - נשתמש ב-statementMonth
-      if (!parsedDate && statementMonth) {
-        // statementMonth format: "YYYY-MM"
-        // נשתמש ב-15 כיום ברירת מחדל (אמצע החודש)
-        parsedDate = `${statementMonth}-15`;
-        console.log(`Using statementMonth fallback for transaction: ${tx.vendor}`);
-      }
-      
-      // רק אם אין שום מידע - נשתמש בהיום (אמור להיות נדיר מאוד)
+      const statementMonthStr = statementMonth ? `${statementMonth}-01` : null;
+      const parsedDate = parseDateWithFallback(tx.date, statementMonthStr);
+
       if (!parsedDate) {
-        parsedDate = new Date().toISOString().split('T')[0];
-        console.warn(`No date information available, using today for: ${tx.vendor}`);
+        console.warn(`⚠️  Skipping transaction - could not parse date: ${tx.date}`);
+        return null; // Will be filtered out
       }
 
       // Validate and normalize transaction type
@@ -1142,6 +1136,16 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         }
       }
 
+      // 🔥 CRITICAL: Validate category exists in database (only for expenses)
+      let expenseCategory = tx.expense_category || null;
+      let expenseType = tx.expense_type || null;
+      
+      // Only validate categories for expenses (income transactions don't need categories)
+      if (transactionType === 'expense' && expenseCategory) {
+        // Category validation will be done in a batch query below for performance
+        // For now, we'll mark it as pending if category is null
+      }
+
       // Detect loan payment and try to match with existing loan
       let linkedLoanId = null;
       if (tx.category === 'loan_payment' && existingLoans && existingLoans.length > 0) {
@@ -1166,28 +1170,72 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         type: transactionType,
         amount: Math.abs(parseFloat(tx.amount)) || 0,
         category: tx.category || 'other',
-        expense_category: tx.expense_category || null, // ⭐ חשוב! הקטגוריה מהמסד נתונים
+        expense_category: expenseCategory, // Will be validated below
         vendor: tx.vendor || tx.description || 'לא צוין',
         date: parsedDate,
         tx_date: parsedDate,
         source: 'ocr',
-        status: 'proposed', // Pending user approval
+        status: transactionType === 'expense' && !expenseCategory ? 'pending' : 'confirmed',
+        needs_review: transactionType === 'expense' && !expenseCategory,
         notes: tx.installment 
           ? `${tx.notes || tx.description || ''} ${tx.installment}`.trim() 
           : (tx.notes || tx.description || null),
         payment_method: paymentMethod,
-        expense_type: tx.expense_type || 'variable', // ⭐ משתמש ב-expense_type מה-AI!
+        expense_type: expenseType, // Will be set from database validation
         confidence_score: tx.confidence_score || 0.85,
         document_id: documentId,
         original_description: tx.vendor || tx.description,
         auto_categorized: true,
-        is_recurring: tx.type === 'הוראת קבע',
+        // ⭐ New fields: recurring payments
+        is_recurring: tx.is_recurring || false,
+        recurring_type: tx.recurring_type || null,
+        // ⭐ New fields: foreign currency transactions
+        original_amount: tx.original_amount || null,
+        original_currency: tx.original_currency || null,
+        exchange_rate: tx.exchange_rate || null,
+        forex_fee: tx.forex_fee || null,
         currency: 'ILS',
         // Linking fields
         is_summary: false, // ✨ לא מסמנים כ-summary בשלב זה - רק ה-matcher יעשה זאת!
         linked_loan_id: linkedLoanId,
       };
-    });
+    }).filter((tx: any) => tx !== null); // Filter out null transactions (invalid dates)
+
+    // 🔥 CRITICAL: Batch validate all categories for expenses
+    const expenseTransactions = transactionsToInsert.filter((tx: any) => tx.type === 'expense' && tx.expense_category);
+    const categoryNames = [...new Set(expenseTransactions.map((tx: any) => tx.expense_category))];
+    
+    if (categoryNames.length > 0) {
+      const { data: validCategories } = await supabase
+        .from('expense_categories')
+        .select('name, expense_type')
+        .in('name', categoryNames)
+        .eq('is_active', true);
+      
+      const categoryMap = new Map(
+        (validCategories || []).map((cat: any) => [cat.name, cat.expense_type])
+      );
+      
+      // Update transactions with validated categories
+      transactionsToInsert = transactionsToInsert.map((tx: any) => {
+        if (tx.type === 'expense' && tx.expense_category) {
+          if (categoryMap.has(tx.expense_category)) {
+            // Category is valid - use expense_type from database
+            tx.expense_type = categoryMap.get(tx.expense_category);
+            tx.status = 'confirmed';
+            tx.needs_review = false;
+          } else {
+            // Category not found - mark as pending
+            console.warn(`⚠️  Category "${tx.expense_category}" not found - marking as pending`);
+            tx.expense_category = null;
+            tx.expense_type = null;
+            tx.status = 'pending';
+            tx.needs_review = true;
+          }
+        }
+        return tx;
+      });
+    }
 
     const { error } = await supabase
       .from('transactions')

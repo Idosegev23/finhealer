@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 
 interface PhiAnimationProps {
   className?: string
@@ -9,9 +10,9 @@ interface PhiAnimationProps {
 export default function PhiAnimation({ className = '' }: PhiAnimationProps) {
   return (
     <div className={`relative ${className}`}>
-      {/* Main Phi Symbol */}
+      {/* Main Phi Logo */}
       <motion.div
-        className="relative z-10"
+        className="relative z-10 flex items-center justify-center"
         initial={{ opacity: 0, scale: 0.5 }}
         animate={{ 
           opacity: 1, 
@@ -23,13 +24,12 @@ export default function PhiAnimation({ className = '' }: PhiAnimationProps) {
         }}
       >
         <motion.div
-          className="text-[120px] md:text-[180px] font-bold text-phi-gold"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+          className="relative"
           animate={{
-            textShadow: [
-              '0 0 20px rgba(169, 107, 72, 0.3)',
-              '0 0 40px rgba(169, 107, 72, 0.6)',
-              '0 0 20px rgba(169, 107, 72, 0.3)',
+            filter: [
+              'drop-shadow(0 0 20px rgba(242, 193, 102, 0.3))',
+              'drop-shadow(0 0 40px rgba(242, 193, 102, 0.6))',
+              'drop-shadow(0 0 20px rgba(242, 193, 102, 0.3))',
             ]
           }}
           transition={{
@@ -38,7 +38,14 @@ export default function PhiAnimation({ className = '' }: PhiAnimationProps) {
             ease: "easeInOut"
           }}
         >
-          φ
+          <Image
+            src="/logo.png"
+            alt="Phi Logo"
+            width={180}
+            height={180}
+            className="w-[120px] md:w-[180px] h-auto object-contain"
+            priority
+          />
         </motion.div>
       </motion.div>
 
@@ -56,7 +63,7 @@ export default function PhiAnimation({ className = '' }: PhiAnimationProps) {
         {/* Golden Ratio Fibonacci Spiral */}
         <path
           d="M 250 250 Q 250 150, 350 150 Q 450 150, 450 250 Q 450 400, 300 400 Q 100 400, 100 200 Q 100 50, 250 50"
-          stroke="rgba(169, 107, 72, 0.5)"
+          stroke="rgba(242, 193, 102, 0.5)"
           strokeWidth="2"
           fill="none"
         />

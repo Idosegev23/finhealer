@@ -108,7 +108,7 @@ export default function PhiScore({
           >
             {displayScore}
           </motion.div>
-          <div className="text-sm text-phi-slate font-medium">φ Score</div>
+          <div className="text-sm text-phi-slate font-medium">ϕ Score</div>
         </div>
       </div>
 

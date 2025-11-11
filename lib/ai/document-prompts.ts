@@ -37,15 +37,16 @@ ${special.map(c => `  • ${c.name}`).join('\n')}
 🚨 **קריטי - קטלוג הוצאות!** 🚨
 1. השתמש **רק** בקטגוריות מהרשימה למעלה
 2. העתק את השם **המדויק** (כולל רווחים ואותיות)
-3. אם לא בטוח - בחר **"לא מסווג"**
-4. אל תמציא קטגוריות חדשות!
+3. **אם לא בטוח בקטגוריה - השאר null! אל תמציא קטגוריות!**
+4. **אל תשתמש ב"לא מסווג" - אם אין קטגוריה ברורה, השאר expense_category: null**
+5. המשתמש ימלא את הקטגוריה ידנית
 
 דוגמאות נכונות:
 ✅ "קניות סופר" → expense_category: "קניות סופר"
 ✅ "ארנונה למגורים" → expense_category: "ארנונה למגורים"
 ✅ "מסעדות" → expense_category: "מסעדות"
-❌ "קניות מזון" (אין בטבלה - השתמש ב"לא מסווג")
-❌ "ארנונה" (צריך "ארנונה למגורים" או "ארנונה לעסק")
+✅ "קניות מזון" (אין בטבלה - לא בטוח) → expense_category: null
+✅ "ארנונה" (לא ברור איזה סוג) → expense_category: null
 `;
   }
   return `אתה מומחה בניתוח פירוטי ויזה ישראליים (כאל/מקס/ישראכרט/לאומי קארד).
@@ -54,10 +55,10 @@ ${special.map(c => `  • ${c.name}`).join('\n')}
 
 🎯 **חשוב במיוחד:**
 - חלץ **כל עסקה** - עברית ואנגלית
-- זהה הוראות קבע (recurring)
+- זהה הוראות קבע (recurring) עם שדות is_recurring ו-recurring_type
 - זהה תשלומים (X מ-Y)
-- זהה עסקאות במט"ח (דולר/יורו) + עמלות
-- סווג לקטגוריות **מדויקות** מהרשימה
+- זהה עסקאות במט"ח (דולר/יורו) + עמלות + שער המרה
+- סווג לקטגוריות **מדויקות** מהרשימה - אם לא בטוח, השאר null
 
 🚨 **כללי פורמט JSON - חובה!** 🚨
 1. החזר **רק JSON תקין** - לא markdown, לא הסברים, לא טקסט נוסף
@@ -76,7 +77,20 @@ ${special.map(c => `  • ${c.name}`).join('\n')}
 ## **1. מידע כללי (report_info)**
 - report_date (תאריך הפקת הדוח - YYYY-MM-DD)
 - period_start, period_end (תקופת הדוח - YYYY-MM-DD)
-- card_issuer (כאל / מקס / ישראכרט)
+- card_issuer (כאל / מקס / ישראכרט / לאומי קארד)
+
+### **🔥 זיהוי תאריכים - קריטי!** 🔥
+**בדוחות כאל יש פורמט תאריכים מיוחד:**
+- 52/80/11 = 11/08/2025 (DD/MM/YY)
+- 52/80/01 = 01/08/2025
+- 52/80/41 = 14/08/2025
+- 52/01/01 = 01/10/2025
+
+**כלל שנה בת 2 ספרות:**
+- אם השנה > 50 → 19XX (52 → 2025, 99 → 1999)
+- אם השנה <= 50 → 20XX (25 → 2025, 50 → 2050)
+
+**חשוב:** הבחן בין "תאריך העסקה" (כאשר בוצעה העסקה) ל"תאריך חיוב" (מתי יחוייב בבנק)
 
 ## **2. מידע על החשבון (account_info)**
 - account_number (מספר חשבון)
@@ -115,7 +129,10 @@ ${special.map(c => `  • ${c.name}`).join('\n')}
 
 **ד. הוראת קבע** - חיוב חוזר:
 - קרן מכבי, פרי טיוי, Netflix, Spotify
-- **זיהוי:** כתוב "הוראת קבע" בפירוט
+- **זיהוי:** כתוב "הוראת קבע" או "לא הוראת קבע" בפירוט
+- **חובה להוסיף:**
+  - is_recurring: true (אם "הוראת קבע") או false (אם "לא הוראת קבע")
+  - recurring_type: "monthly" (חודשי), "quarterly" (רבעוני), "yearly" (שנתי), או "other"
 
 ### **🔥 שדות לכל עסקה - הכרחי!**
 
@@ -136,18 +153,22 @@ ${special.map(c => `  • ${c.name}`).join('\n')}
 
 **🌍 אם עסקה במט"ח (דולר/יורו/וכו'):**
 חפש בפירוט את המידע הזה:
-- original_amount: 49.31 (הסכום המקורי במט"ח)
-- original_currency: "USD" או "EUR" או "GBP"
-- exchange_rate: 3.435 (שער החליפין)
-- forex_fee: 5.08 (עמלת המרה 3% בדרך כלל)
+- original_amount: הסכום המקורי במט"ח (מספר בלבד, ללא סימן $)
+- original_currency: "USD" או "EUR" או "GBP" או "HKD" (הונג קונג) וכו'
+- exchange_rate: שער החליפין המדויק (מספר עשרוני)
+- forex_fee: עמלת המרה בשקלים (בדרך כלל 3% מהסכום המקורי)
 
-**דוגמה לעסקה במט"ח:**
-CURSOR USAGE JUL 09/08/2025  $25.16
-הוראת קבע ארצות הברית. ב-10/08/25 הומר לש"ח בשער יציג 3.4350
-ומסכום זה נגבתה עמלת עסקה במט"ח 3.00% בסך 5.08 ש"ח
-סכום חיוב: ₪89.02
+**דוגמאות מפורטות מבדוח כאל אמיתי:**
 
-→ original_amount: 25.16, original_currency: "USD", exchange_rate: 3.435, forex_fee: 5.08, amount: 89.02
+**דוגמה 1:**
+"$19.00 לא הוראת קבע הונג קונג. ב-52/80/9 הומר לש"ח בשער יציג 3.534. ומסכום זה נגבתה עמלת עסקה במט"ח 3.00% בסך 1.69 ש"ח. סכום חיוב: ₪67.22"
+→ original_amount: 19.00, original_currency: "USD", exchange_rate: 3.534, forex_fee: 1.69, amount: 67.22
+
+**דוגמה 2:**
+"$49.31 לא הוראת קבע ארצות הברית. ב-52/80/01 הומר לש"ח בשער יציג 3.534. ומסכום זה נגבתה עמלת עסקה במט"ח 3.00% בסך 5.80 ש"ח. סכום חיוב: ₪174.46"
+→ original_amount: 49.31, original_currency: "USD", exchange_rate: 3.534, forex_fee: 5.80, amount: 174.46
+
+**חשוב:** חלץ את כל הפרטים - גם אם חלקם לא מופיעים בפירוש, נסה לחשב אותם
 
 ${categoriesGuide}
 
@@ -162,21 +183,30 @@ ${categoriesGuide}
 - בחרת "מסעדות" (מרשימת משתנות) → expense_type: "variable"
 - בחרת "רהיטים" (מרשימת מיוחדות) → expense_type: "special"
 
-### **🔴 קריטי - חלץ הכל! דוגמאות מפירוט אמיתי:**
+### **🔴 קריטי - חלץ הכל! דוגמאות מפירוט אמיתי מבדוח כאל:**
+
+**✅ מיפוי ענף → קטגוריה (מבדוח כאל אמיתי):**
+- **ענף "מחשבים"** → OPENAI, CURSOR, VERCEL → category: "תוכנה ומנויים דיגיטליים", expense_type: "fixed"
+- **ענף "אנרגיה"** → פז אפליקציית יילו → category: "דלק", expense_type: "variable"
+- **ענף "תיירות"** → נאייקס ישראל חניונים → category: "תיירות ונסיעות", expense_type: "variable"
+- **ענף "מזון ומשקא"** → המתוקיה בע"מ → category: "מסעדות" או "קניות סופר", expense_type: "variable"
+- **ענף "פנאי ובילוי"** → חילזון בטבע בע"מ → category: "בידור", expense_type: "variable"
+- **ענף "רפואה ובריאות"** → קרן מכבי → category: "קופת חולים", expense_type: "fixed"
+- **ענף "תקשורת ומח"** → פריטיוי → category: "טלפון נייד" או "אינטרנט", expense_type: "fixed"
 
 **✅ עסקאות עברית:**
 - "סופר דוידי" → category: "קניות סופר", expense_type: "variable"
 - "שופרסל דיל ברנע אשקלון" → category: "קניות סופר", expense_type: "variable"
 - "פז אפליקציית יילו" → category: "דלק", expense_type: "variable"
-- "קרן מכבי" (הוראת קבע) → category: "קופת חולים", expense_type: "fixed"
-- "פרי טיוי" (הוראת קבע) → category: "אינטרנט", expense_type: "fixed"
-- "פלאפון חשבון תקופתי" (הוראת קבע) → category: "טלפון נייד", expense_type: "fixed"
+- "קרן מכבי" (הוראת קבע) → category: "קופת חולים", expense_type: "fixed", is_recurring: true, recurring_type: "monthly"
+- "פרי טיוי" (הוראת קבע) → category: "אינטרנט", expense_type: "fixed", is_recurring: true, recurring_type: "monthly"
+- "פלאפון חשבון תקופתי" (הוראת קבע) → category: "טלפון נייד", expense_type: "fixed", is_recurring: true, recurring_type: "monthly"
 
 **✅ עסקאות אנגלית:**
 - "CURSOR USAGE JUL" → category: "תוכנה ומנויים דיגיטליים", expense_type: "fixed"
 - "OPENAI" → category: "תוכנה ומנויים דיגיטליים", expense_type: "fixed"
 - "VERCEL INC." → category: "תוכנה ומנויים דיגיטליים", expense_type: "fixed"
-- "Netflix.com" (הוראת קבע) → category: "בידור (נטפליקס, ספוטיפיי)", expense_type: "variable"
+- "Netflix.com" (הוראת קבע) → category: "בידור (נטפליקס, ספוטיפיי)", expense_type: "variable", is_recurring: true, recurring_type: "monthly"
 
 **✅ תשלומים:**
 - "שפירא גז בע'מ - תשלום 1 מ-2" → installment: "תשלום 1 מ-2", payment_number: 1, total_payments: 2
@@ -227,7 +257,9 @@ ${categoriesGuide}
       "installment": "תשלום 1 מ-2",
       "payment_number": 1,
       "total_payments": 2,
-      "payment_method": "credit_card"
+      "payment_method": "credit_card",
+      "is_recurring": false,
+      "recurring_type": null
     }
   ]
 }

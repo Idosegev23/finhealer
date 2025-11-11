@@ -17,14 +17,14 @@ interface PhiPieChartProps {
 }
 
 const PHI_COLORS = [
-  '#A96B48', // phi-gold
-  '#8FBCBB', // phi-mint
-  '#D08770', // phi-coral
+  '#F2C166', // phi-gold (צהוב/זהב)
+  '#1C8C63', // phi-mint (ירוק)
+  '#A66C26', // phi-coral (חום/נחושת)
+  '#074259', // phi-dark (כחול כהה)
   '#4C566A', // phi-slate
   '#88C0D0', // light blue
   '#B48EAD', // purple
   '#EBCB8B', // yellow
-  '#A3BE8C', // green
 ]
 
 export default function PhiPieChart({
@@ -98,7 +98,7 @@ export default function PhiPieChart({
       {title && (
         <h3 className="text-xl font-bold text-phi-dark mb-4 flex items-center gap-2">
           <span className="text-2xl" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
-            φ
+            ϕ
           </span>
           {title}
         </h3>

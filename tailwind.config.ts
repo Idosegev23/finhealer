@@ -33,18 +33,19 @@ const config: Config = {
   			},
   			// Phi Brand Colors
   			phi: {
-  				dark: '#2E3440',      // Primary dark (אפור-כחול רך)
-  				gold: '#A96B48',      // Accent gold (נחושת/ברונזה)
-  				mint: '#8FBCBB',      // Success mint (ירוק-מנטה)
+  				dark: '#074259',      // Primary dark (כחול כהה)
+  				gold: '#F2C166',      // Accent gold (צהוב/זהב)
+  				mint: '#1C8C63',      // Success mint (ירוק)
   				bg: '#ECEFF4',        // Background (אפור בהיר)
-  				coral: '#D08770',     // Highlight coral (כתום-אדמדם)
+  				coral: '#A66C26',     // Highlight coral (חום/נחושת)
   				slate: '#4C566A',     // Secondary slate
   				frost: '#D8DEE9',     // Frost (גוון בהיר)
+  				black: '#0D0D0D',     // Black (שחור כהה מאוד)
   			},
   			// Legacy colors (for backward compatibility)
-  			dark: '#2E3440',
-  			success: '#8FBCBB',
-  			warning: '#D08770',
+  			dark: '#074259',
+  			success: '#1C8C63',
+  			warning: '#A66C26',
   			destructive: {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'

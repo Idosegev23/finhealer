@@ -97,7 +97,7 @@ export default function HomePage() {
             </motion.div>
             
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-phi-dark mb-6 leading-tight">
-              φ
+              ϕ
               <br />
               האיזון המושלם
               <br />
@@ -124,7 +124,7 @@ export default function HomePage() {
                 href="#how-it-works"
                 className="border-2 border-phi-dark text-phi-dark px-8 py-4 rounded-xl text-lg font-bold hover:bg-phi-dark hover:text-white transition-all text-center"
               >
-                גלה את ה-φ שלך
+                גלה את ה-ϕ שלך
               </a>
             </div>
 
@@ -165,10 +165,10 @@ export default function HomePage() {
             className="text-center mb-16"
           >
             <h2 className="text-4xl md:text-5xl font-black text-phi-dark mb-4">
-              מה זה φ (Phi)?
+              מה זה ϕ (Phi)?
             </h2>
             <p className="text-xl text-phi-slate max-w-2xl mx-auto">
-              φ (פאי) הוא היחס הזהב - הנוסחה המתמטית לאיזון מושלם
+              ϕ (פאי) הוא היחס הזהב - הנוסחה המתמטית לאיזון מושלם
             </p>
           </motion.div>
 
@@ -176,19 +176,19 @@ export default function HomePage() {
             {[
               {
                 icon: '🌀',
-                title: 'φ = איזון',
+                title: 'ϕ = איזון',
                 desc: 'היחס הזהב בין הכנסות להוצאות - כמו בטבע, באמנות, ובכסף שלך',
                 color: 'phi-gold'
               },
               {
                 icon: '📊',
-                title: 'φ = הנוסחה שלך',
+                title: 'ϕ = הנוסחה שלך',
                 desc: 'ציון בריאות פיננסית 0-100 שמחושב מתוך 12 פרמטרים חכמים',
                 color: 'phi-mint'
               },
               {
                 icon: '🎯',
-                title: 'φ = תכנון חכם',
+                title: 'ϕ = תכנון חכם',
                 desc: 'מעקב אוטומטי, תובנות AI, והשגת יעדים פיננסיים בצורה מדויקת',
                 color: 'phi-coral'
               }
@@ -220,7 +220,7 @@ export default function HomePage() {
             className="text-center mb-16"
           >
             <h2 className="text-4xl md:text-5xl font-black text-phi-dark mb-4">
-              המסע שלך ל-φ המושלם
+              המסע שלך ל-ϕ המושלם
             </h2>
             <p className="text-xl text-phi-slate max-w-2xl mx-auto">
               5 שלבים מובנים שמתאימים לך אישית
@@ -364,10 +364,10 @@ export default function HomePage() {
               viewport={{ once: true }}
             >
               <h2 className="text-4xl md:text-5xl font-black text-phi-dark mb-6">
-                מה זה ציון φ?
+                מה זה ציון ϕ?
               </h2>
               <p className="text-xl text-phi-slate mb-6 leading-relaxed">
-                ציון φ הוא מדד מתמטי (0-100) שמחושב מתוך <strong>12 פרמטרים</strong> של הבריאות הפיננסית שלך:
+                ציון ϕ הוא מדד מתמטי (0-100) שמחושב מתוך <strong>12 פרמטרים</strong> של הבריאות הפיננסית שלך:
               </p>
               <ul className="space-y-3 mb-6">
                 {[
@@ -385,7 +385,7 @@ export default function HomePage() {
                 ))}
               </ul>
               <p className="text-lg text-phi-slate">
-                ככל שה-φ שלך גבוה יותר - הבריאות הפיננסית שלך טובה יותר! 🎯
+                ככל שה-ϕ שלך גבוה יותר - הבריאות הפיננסית שלך טובה יותר! 🎯
               </p>
             </motion.div>
 
@@ -421,7 +421,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
             {/* Basic Phi */}
             <PricingCard
-              name="Basic φ"
+              name="Basic ϕ"
               price="₪49"
               badge="פופולרי"
               badgeColor="phi-mint"
@@ -434,13 +434,13 @@ export default function HomePage() {
                 'יעדי חיסכון',
                 'דוחות וגרפים',
                 'התראות חכמות',
-                'ציון φ בזמן אמת'
+                'ציון ϕ בזמן אמת'
               ]}
             />
 
             {/* VIP Phi */}
             <PricingCard
-              name="φ VIP"
+              name="ϕ VIP"
               price="₪119"
               badge="ליווי אישי"
               badgeColor="phi-coral"
@@ -498,10 +498,10 @@ export default function HomePage() {
                 </p>
                 <p className="text-lg text-phi-slate mb-6">
                   &quot;יצרתי את Phi כי ראיתי שאנשים צריכים מערכת שלא רק עוקבת - אלא גם <strong>מבינה, מלווה ומעודדת</strong>. 
-                  φ הוא היחס הזהב - וזה בדיוק מה שמגיע לכם עם הכסף שלכם.&quot; 💪
+                  ϕ הוא היחס הזהב - וזה בדיוק מה שמגיע לכם עם הכסף שלכם.&quot; 💪
                 </p>
                 <div className="flex items-center gap-3">
-                  <span className="text-phi-gold text-2xl">φ</span>
+                  <span className="text-phi-gold text-2xl">ϕ</span>
                   <span className="text-phi-slate">גדי, מייסד Phi</span>
                 </div>
               </motion.div>
@@ -525,7 +525,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {[
               {
-                quote: "תוך חודש הצלחתי לחסוך 800 ₪ שלא ידעתי שיש לי. הבוט פשוט עזר לי לראות איפה הכסף נעלם. ה-φ שלי עלה מ-42 ל-68!",
+                quote: "תוך חודש הצלחתי לחסוך 800 ₪ שלא ידעתי שיש לי. הבוט פשוט עזר לי לראות איפה הכסף נעלם. ה-ϕ שלי עלה מ-42 ל-68!",
                 name: "רועי, 32",
                 role: "עצמאי"
               },
@@ -560,7 +560,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-4xl md:text-6xl font-black mb-6"
           >
-            מוכן למצוא את ה-φ שלך?
+            מוכן למצוא את ה-ϕ שלך?
           </motion.h2>
           <motion.p
             initial={{ opacity: 0 }}
@@ -634,7 +634,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="border-t border-phi-slate/30 pt-8 text-center text-phi-frost">
-            <p>© 2025 Phi (φ). כל הזכויות שמורות. | עם ❤️ מגדי</p>
+            <p>© 2025 Phi (ϕ). כל הזכויות שמורות. | עם ❤️ מגדי</p>
           </div>
         </div>
       </footer>

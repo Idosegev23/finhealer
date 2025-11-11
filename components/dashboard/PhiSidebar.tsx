@@ -105,7 +105,7 @@ export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProp
               <div className="flex flex-col">
                 <span className="text-2xl font-bold text-phi-gold">
                   <span style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
-                    φ
+                    ϕ
                   </span>{" "}
                   Phi
                 </span>
@@ -247,7 +247,7 @@ export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProp
           <div className="p-4 border-t border-phi-slate/30">
             <div className="flex items-center justify-center gap-2 text-phi-mint text-xs">
               <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '16px' }}>
-                φ
+                ϕ
               </span>
               <span>גרסה 1.0.0</span>
             </div>
@@ -280,7 +280,7 @@ export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProp
                       <span
                         style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
                       >
-                        φ
+                        ϕ
                       </span>{" "}
                       Phi
                     </span>
