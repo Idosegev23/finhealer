@@ -206,10 +206,11 @@ export function SunburstChart({
         }
       })
 
-      const t = svg.transition().duration(event.altKey ? 7500 : 750)
+      const duration = event.altKey ? 7500 : 750
 
       // Transition arcs
-      path.transition(t)
+      path.transition()
+        .duration(duration)
         .tween('data', (d: any) => {
           const i = d3.interpolate(d.current, d.target)
           return (t: number) => {
@@ -217,18 +218,23 @@ export function SunburstChart({
           }
         })
         .filter(function(d: any) {
-          return +this.getAttribute('fill-opacity') || arcVisible(d.target)
+          const element = this as SVGPathElement
+          const opacity = element.getAttribute('fill-opacity')
+          return opacity !== null ? +opacity > 0 : arcVisible(d.target)
         })
         .attr('fill-opacity', (d: any) => arcVisible(d.target) ? (d.children ? 0.6 : 0.4) : 0)
         .attr('pointer-events', (d: any) => arcVisible(d.target) ? 'auto' : 'none')
-        .attrTween('d', (d: any) => () => arc(d.current))
+        .attrTween('d', (d: any) => () => arc(d.current) || '')
 
       // Transition labels
       label.filter(function(d: any) {
-        return +this.getAttribute('fill-opacity') || labelVisible(d.target)
-      }).transition(t)
+        const element = this as SVGTextElement
+        const opacity = element.getAttribute('fill-opacity')
+        return opacity !== null ? +opacity > 0 : labelVisible(d.target)
+      }).transition()
+        .duration(duration)
         .attr('fill-opacity', (d: any) => +labelVisible(d.target))
-        .attrTween('transform', (d: any) => () => labelTransform(d.current))
+        .attrTween('transform', (d: any) => () => labelTransform(d.current) || '')
     }
 
     function arcVisible(d: any) {
