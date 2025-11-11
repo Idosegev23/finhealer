@@ -444,7 +444,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* גרפים אינטראקטיביים */}
+        {/* גרפים אינטראקטיביים - פאי להכנסות ולהוצאות */}
         <div className="mb-8 space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ExpensesDrilldownChart />

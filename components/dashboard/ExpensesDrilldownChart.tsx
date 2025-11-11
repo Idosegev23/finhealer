@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DrilldownPieChart } from './DrilldownPieChart';
+import { SunburstChart } from '@/components/charts/SunburstChart';
 import { TrendingDown } from 'lucide-react';
 
 interface ChartDataItem {
@@ -54,7 +54,7 @@ export function ExpensesDrilldownChart() {
       // העברת מטא-דאטה מהרמה הקודמת
       if (item.metadata) {
         Object.entries(item.metadata).forEach(([key, value]) => {
-          params.append(key, value);
+          params.append(key, String(value));
         });
       }
 
@@ -75,15 +75,15 @@ export function ExpensesDrilldownChart() {
 
   if (isLoading) {
     return (
-      <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">
+      <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-6 shadow-lg">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
             <TrendingDown className="w-5 h-5 text-orange-600 dark:text-orange-400" />
           </div>
-          <h3 className="text-lg font-bold text-theme-primary">ניתוח הוצאות אינטראקטיבי</h3>
+          <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הוצאות אינטראקטיבי</h3>
         </div>
-        <div className="h-[400px] flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="h-[500px] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-phi-gold"></div>
         </div>
       </div>
     );
@@ -91,14 +91,14 @@ export function ExpensesDrilldownChart() {
 
   if (error) {
     return (
-      <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">
+      <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-6 shadow-lg">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
             <TrendingDown className="w-5 h-5 text-orange-600 dark:text-orange-400" />
           </div>
-          <h3 className="text-lg font-bold text-theme-primary">ניתוח הוצאות אינטראקטיבי</h3>
+          <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הוצאות אינטראקטיבי</h3>
         </div>
-        <div className="h-[400px] flex flex-col items-center justify-center text-center p-8">
+        <div className="h-[500px] flex flex-col items-center justify-center text-center p-8">
           <p className="text-red-600 dark:text-red-400">{error}</p>
         </div>
       </div>
@@ -107,19 +107,19 @@ export function ExpensesDrilldownChart() {
 
   if (initialData.length === 0) {
     return (
-      <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-sm">
+      <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-6 shadow-lg">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
             <TrendingDown className="w-5 h-5 text-orange-600 dark:text-orange-400" />
           </div>
-          <h3 className="text-lg font-bold text-theme-primary">ניתוח הוצאות אינטראקטיבי</h3>
+          <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הוצאות אינטראקטיבי</h3>
         </div>
-        <div className="h-[400px] flex flex-col items-center justify-center text-center p-8">
+        <div className="h-[500px] flex flex-col items-center justify-center text-center p-8">
           <TrendingDown className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-          <h4 className="text-lg font-semibold text-theme-primary mb-2">
+          <h4 className="text-lg font-semibold text-phi-dark dark:text-white mb-2">
             אין עדיין נתוני הוצאות
           </h4>
-          <p className="text-sm text-theme-secondary">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             התחל לרשום הוצאות כדי לראות ניתוח מפורט
           </p>
         </div>
@@ -128,21 +128,12 @@ export function ExpensesDrilldownChart() {
   }
 
   return (
-    <div className="relative">
-      {/* Icon Header */}
-      <div className="absolute top-6 right-6 z-10">
-        <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
-          <TrendingDown className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-        </div>
-      </div>
-      
-      <DrilldownPieChart
-        title="ניתוח הוצאות אינטראקטיבי"
-        description="לחץ על כל פרוסה כדי לצלול לעומק הנתונים 🔍"
-        initialData={initialData}
-        onSliceClick={handleSliceClick}
-      />
-    </div>
+    <SunburstChart
+      title="ניתוח הוצאות אינטראקטיבי"
+      description="לחץ על כל פרוסה כדי לצלול לעומק הנתונים 🔍"
+      initialData={initialData}
+      onSliceClick={handleSliceClick}
+    />
   );
 }
 

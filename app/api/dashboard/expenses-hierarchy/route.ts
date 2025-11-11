@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const level = searchParams.get('level') || '1'; // רמה נוכחית
     const paymentMethod = searchParams.get('payment_method'); // לרמה 2
     const expenseType = searchParams.get('expense_type'); // לרמה 3 (fixed/variable)
-    const category = searchParams.get('category'); // לרמה 4
+    const expenseCategory = searchParams.get('expense_category'); // לרמה 4
 
     // החודש הנוכחי
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
@@ -87,11 +87,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result);
     }
 
-    // רמה 3: פילוח לפי קטגוריות
+    // רמה 3: פילוח לפי קטגוריות הוצאות (expense_category)
     if (level === '3' && paymentMethod && expenseType) {
       const { data: transactions } = await supabase
         .from('transactions')
-        .select('category, amount')
+        .select('expense_category, amount, vendor')
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')
@@ -101,9 +101,9 @@ export async function GET(request: NextRequest) {
         .lte('date', `${currentMonth}-31`)
         .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
-      // קיבוץ לפי category
+      // קיבוץ לפי expense_category
       const grouped = (transactions || []).reduce((acc: any, tx: any) => {
-        const cat = tx.category || 'לא מוגדר';
+        const cat = tx.expense_category || 'לא מסווג';
         if (!acc[cat]) {
           acc[cat] = 0;
         }
@@ -112,29 +112,29 @@ export async function GET(request: NextRequest) {
       }, {});
 
       const result = Object.entries(grouped).map(([name, value]) => ({
-        name,
+        name: name === 'לא מסווג' ? 'לא מסווג' : name,
         value: Math.round(value as number),
         metadata: { 
           payment_method: paymentMethod, 
           expense_type: expenseType,
-          category: name 
+          expense_category: name  // שינוי מ-category ל-expense_category
         }
       }));
 
       return NextResponse.json(result);
     }
 
-    // רמה 4: תנועות ספציפיות
-    if (level === '4' && paymentMethod && expenseType && category) {
+    // רמה 4: תנועות ספציפיות לפי קטגוריית הוצאה
+    if (level === '4' && paymentMethod && expenseType && expenseCategory) {
       const { data: transactions } = await supabase
         .from('transactions')
-        .select('description, amount, date, merchant')
+        .select('vendor, amount, date, notes, expense_category')
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')
         .eq('payment_method', paymentMethod)
         .eq('expense_type', expenseType)
-        .eq('category', category)
+        .eq('expense_category', expenseCategory)
         .gte('date', `${currentMonth}-01`)
         .lte('date', `${currentMonth}-31`)
         .or('has_details.is.null,has_details.eq.false')
@@ -142,11 +142,11 @@ export async function GET(request: NextRequest) {
 
       const result = (transactions || []).map((tx: any, index: number) => {
         const date = new Date(tx.date).toLocaleDateString('he-IL');
-        const desc = tx.merchant || tx.description || `תנועה ${index + 1}`;
+        const desc = tx.vendor || tx.notes || `תנועה ${index + 1}`;
         return {
           name: `${desc} (${date})`,
           value: Math.round(Number(tx.amount) || 0),
-          description: tx.description
+          description: tx.notes || null
         };
       });
 
