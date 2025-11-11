@@ -1080,7 +1080,7 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
       .eq('user_id', userId)
       .eq('active', true);
 
-    const transactionsToInsert = allTransactions.map((tx: any) => {
+    let transactionsToInsert = allTransactions.map((tx: any) => {
       // 🎯 עדיפות 1: התאריך המדויק מהדוח (tx.date)
       // עדיפות 2: statementMonth (אם בחר המשתמש)
       // עדיפות 3: היום (רק אם אין שום מידע)
