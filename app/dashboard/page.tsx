@@ -283,8 +283,20 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* סיכום פיננסי - 4 כרטיסים עם כפתורים חכמים */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* גרפים אינטראקטיביים - פאי להכנסות ולהוצאות */}
+        <div className="mb-8 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ExpensesDrilldownChart />
+            <IncomeDrilldownChart />
+          </div>
+          
+          <div className="w-full">
+            <AssetsLiabilitiesDrilldownChart />
+          </div>
+        </div>
+
+        {/* סיכום פיננסי - 5 כרטיסים עם כפתורים חכמים */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           {/* מצב חשבון */}
           <div className="bg-white dark:bg-phi-dark border border-phi-gold/20 rounded-xl p-6 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 group">
             <div className="flex items-center justify-between mb-4">
@@ -443,20 +455,6 @@ export default async function DashboardPage() {
             </Link>
           </div>
         </div>
-
-        {/* גרפים אינטראקטיביים - פאי להכנסות ולהוצאות */}
-        <div className="mb-8 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ExpensesDrilldownChart />
-            <IncomeDrilldownChart />
-          </div>
-          
-          <div className="w-full">
-            <AssetsLiabilitiesDrilldownChart />
-          </div>
-        </div>
-
-        {/* פעולות מהירות חכמות - 4-6 כפתורים בלבד */}
         <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-xl p-6 shadow-lg">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">פעולות נוספות</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

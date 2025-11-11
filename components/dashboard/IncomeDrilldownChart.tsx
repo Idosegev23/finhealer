@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { SunburstChart } from '@/components/charts/SunburstChart';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Calendar } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ChartDataItem {
   name: string;
@@ -13,24 +14,43 @@ interface ChartDataItem {
   metadata?: Record<string, any>;
 }
 
+interface PeriodInfo {
+  startDate: string;
+  endDate: string;
+  periodLabel: string;
+  period: string;
+}
+
 export function IncomeDrilldownChart() {
   const [initialData, setInitialData] = useState<ChartDataItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<string>('last_3_months');
+  const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
+  const [currentPeriod, setCurrentPeriod] = useState<string>('last_3_months');
 
   useEffect(() => {
     fetchLevel1Data();
-  }, []);
+  }, [period]);
 
   const fetchLevel1Data = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/dashboard/income-hierarchy?level=1');
+      const response = await fetch(`/api/dashboard/income-hierarchy?level=1&period=${period}`);
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
-      const data = await response.json();
-      setInitialData(data);
+      const result = await response.json();
+      
+      // התאמה לפורמט החדש של ה-API
+      if (result.data) {
+        setInitialData(result.data);
+        setPeriodInfo(result.period);
+        setCurrentPeriod(period);
+      } else {
+        // תאימות לאחור
+        setInitialData(Array.isArray(result) ? result : []);
+      }
       setError(null);
     } catch (err) {
       console.error('Error fetching income data:', err);
@@ -47,6 +67,7 @@ export function IncomeDrilldownChart() {
 
       const nextLevel = currentLevel + 1;
       params.append('level', nextLevel.toString());
+      params.append('period', currentPeriod); // שמירת תקופה נוכחית
 
       if (item.metadata) {
         Object.entries(item.metadata).forEach(([key, value]) => {
@@ -61,8 +82,15 @@ export function IncomeDrilldownChart() {
         throw new Error('Failed to fetch drill-down data');
       }
 
-      const data = await response.json();
-      return data;
+      const result = await response.json();
+      
+      // התאמה לפורמט החדש של ה-API
+      if (result.data) {
+        return result.data;
+      } else {
+        // תאימות לאחור
+        return Array.isArray(result) ? result : [];
+      }
     } catch (err) {
       console.error('Error fetching drill-down data:', err);
       return [];
@@ -72,11 +100,13 @@ export function IncomeDrilldownChart() {
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-6 shadow-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הכנסות</h3>
           </div>
-          <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הכנסות</h3>
         </div>
         <div className="h-[500px] flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-phi-gold"></div>
@@ -88,11 +118,13 @@ export function IncomeDrilldownChart() {
   if (error) {
     return (
       <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-6 shadow-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הכנסות</h3>
           </div>
-          <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הכנסות</h3>
         </div>
         <div className="h-[500px] flex flex-col items-center justify-center text-center p-8">
           <p className="text-red-600 dark:text-red-400">{error}</p>
@@ -104,11 +136,13 @@ export function IncomeDrilldownChart() {
   if (initialData.length === 0) {
     return (
       <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-6 shadow-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הכנסות</h3>
           </div>
-          <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הכנסות</h3>
         </div>
         <div className="h-[500px] flex flex-col items-center justify-center text-center p-8">
           <TrendingUp className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
@@ -124,12 +158,41 @@ export function IncomeDrilldownChart() {
   }
 
   return (
-    <SunburstChart
-      title="ניתוח הכנסות"
-      description="לחץ על כל פרוסה לפירוט מקורות ההכנסה 💰"
-      initialData={initialData}
-      onSliceClick={handleSliceClick}
-    />
+    <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-6 shadow-lg">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+            <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-phi-dark dark:text-white">ניתוח הכנסות</h3>
+            {periodInfo && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
+                <Calendar className="w-3 h-3" />
+                תקופה: {periodInfo.periodLabel}
+              </p>
+            )}
+          </div>
+        </div>
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="בחר תקופה" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="current_month">חודש נוכחי</SelectItem>
+            <SelectItem value="last_3_months">3 חודשים אחרונים</SelectItem>
+            <SelectItem value="last_year">שנה אחרונה</SelectItem>
+            <SelectItem value="all_time">כל הזמן</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <SunburstChart
+        title=""
+        description="לחץ על כל פרוסה לפירוט מקורות ההכנסה 💰"
+        initialData={initialData}
+        onSliceClick={handleSliceClick}
+      />
+    </div>
   );
 }
 

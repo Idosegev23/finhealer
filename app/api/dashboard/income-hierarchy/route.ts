@@ -1,6 +1,68 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Helper function to calculate date range based on period (same as expenses)
+function getDateRange(period: string): { startDate: string; endDate: string; periodLabel: string } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  let startDate: Date;
+  let endDate: Date = new Date(today);
+  let periodLabel: string;
+
+  switch (period) {
+    case 'current_month':
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const monthNames = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+      periodLabel = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+      break;
+    
+    case 'last_3_months':
+      startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const startMonth = startDate.getMonth();
+      const endMonth = endDate.getMonth();
+      const monthNamesShort = ['ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳'];
+      if (startDate.getFullYear() === endDate.getFullYear()) {
+        periodLabel = `${monthNamesShort[startMonth]}-${monthNamesShort[endMonth]} ${endDate.getFullYear()}`;
+      } else {
+        periodLabel = `${monthNamesShort[startMonth]} ${startDate.getFullYear()}-${monthNamesShort[endMonth]} ${endDate.getFullYear()}`;
+      }
+      break;
+    
+    case 'last_year':
+      startDate = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      periodLabel = `שנה אחרונה (${now.getFullYear() - 1}-${now.getFullYear()})`;
+      break;
+    
+    case 'all_time':
+      startDate = new Date(2000, 0, 1);
+      endDate = new Date(today);
+      periodLabel = 'כל הזמן';
+      break;
+    
+    default:
+      startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const startMonthDefault = startDate.getMonth();
+      const endMonthDefault = endDate.getMonth();
+      const monthNamesShortDefault = ['ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳'];
+      if (startDate.getFullYear() === endDate.getFullYear()) {
+        periodLabel = `${monthNamesShortDefault[startMonthDefault]}-${monthNamesShortDefault[endMonthDefault]} ${endDate.getFullYear()}`;
+      } else {
+        periodLabel = `${monthNamesShortDefault[startMonthDefault]} ${startDate.getFullYear()}-${monthNamesShortDefault[endMonthDefault]} ${endDate.getFullYear()}`;
+      }
+  }
+
+  return {
+    startDate: startDate.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0],
+    periodLabel
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -17,27 +79,72 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const level = searchParams.get('level') || '1';
     const sourceType = searchParams.get('source_type');
+    const period = searchParams.get('period') || 'last_3_months'; // ברירת מחדל: 3 חודשים אחרונים
 
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    // חישוב טווח תאריכים לפי תקופה
+    const { startDate, endDate, periodLabel } = getDateRange(period);
+    
+    console.log(`📊 Income hierarchy API called:`, {
+      userId: user.id,
+      level,
+      period,
+      startDate,
+      endDate,
+      periodLabel,
+      sourceType
+    });
 
     // רמה 1: פילוח לפי סוג מקור הכנסה
     if (level === '1') {
-      const { data: incomeSources } = await supabase
+      // קבלת מקורות הכנסה קבועים
+      const { data: incomeSources, error: sourcesError } = await supabase
         .from('income_sources')
         .select('source_type, net_amount, name')
         .eq('user_id', user.id)
         .eq('active', true);
 
-      // קיבוץ לפי source_type
-      const grouped = (incomeSources || []).reduce((acc: any, source: any) => {
+      // קבלת תנועות הכנסה מהתקופה הנבחרת
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('amount, category, vendor, source_type')
+        .eq('user_id', user.id)
+        .eq('type', 'income')
+        .eq('status', 'confirmed')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true');
+
+      if (sourcesError) {
+        console.error('❌ Error fetching income sources:', sourcesError);
+      }
+      if (transactionsError) {
+        console.error('❌ Error fetching income transactions:', transactionsError);
+      }
+
+      // קיבוץ לפי source_type - מתחיל עם מקורות קבועים
+      const grouped: Record<string, { total: number; sources: any[] }> = {};
+      
+      // הוספת מקורות הכנסה קבועים
+      (incomeSources || []).forEach((source: any) => {
         const type = source.source_type || 'other';
-        if (!acc[type]) {
-          acc[type] = { total: 0, sources: [] };
+        if (!grouped[type]) {
+          grouped[type] = { total: 0, sources: [] };
         }
-        acc[type].total += Number(source.net_amount) || 0;
-        acc[type].sources.push(source);
-        return acc;
-      }, {});
+        // הכפלת הכנסה חודשית לפי מספר חודשים בתקופה
+        const monthsInPeriod = period === 'current_month' ? 1 : period === 'last_3_months' ? 3 : period === 'last_year' ? 12 : 1;
+        grouped[type].total += (Number(source.net_amount) || 0) * monthsInPeriod;
+        grouped[type].sources.push(source);
+      });
+
+      // הוספת תנועות הכנסה בפועל
+      (transactions || []).forEach((tx: any) => {
+        const type = tx.source_type || 'other';
+        if (!grouped[type]) {
+          grouped[type] = { total: 0, sources: [] };
+        }
+        grouped[type].total += Number(tx.amount) || 0;
+        grouped[type].sources.push(tx);
+      });
 
       const result = Object.entries(grouped).map(([type, data]: [string, any]) => ({
         name: translateSourceType(type),
@@ -45,28 +152,83 @@ export async function GET(request: NextRequest) {
         metadata: { source_type: type }
       }));
 
-      return NextResponse.json(result);
+      console.log(`✅ Found ${incomeSources?.length || 0} income sources and ${transactions?.length || 0} income transactions`);
+
+      return NextResponse.json({
+        data: result,
+        period: {
+          startDate,
+          endDate,
+          periodLabel,
+          period
+        }
+      });
     }
 
     // רמה 2: פירוט מקורות ספציפיים בתוך הסוג
     if (level === '2' && sourceType) {
-      const { data: incomeSources } = await supabase
+      // מקורות הכנסה קבועים
+      const { data: incomeSources, error: sourcesError } = await supabase
         .from('income_sources')
         .select('name, net_amount, employer_name, description')
         .eq('user_id', user.id)
         .eq('active', true)
         .eq('source_type', sourceType);
 
-      const result = (incomeSources || []).map((source: any) => {
+      // תנועות הכנסה מהתקופה
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('amount, vendor, notes, date')
+        .eq('user_id', user.id)
+        .eq('type', 'income')
+        .eq('status', 'confirmed')
+        .eq('source_type', sourceType)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .or('has_details.is.null,has_details.eq.false');
+
+      if (sourcesError) {
+        console.error('❌ Error fetching income sources:', sourcesError);
+      }
+      if (transactionsError) {
+        console.error('❌ Error fetching income transactions:', transactionsError);
+      }
+
+      const result: any[] = [];
+
+      // הוספת מקורות הכנסה קבועים
+      (incomeSources || []).forEach((source: any) => {
         const name = source.name || source.employer_name || 'מקור הכנסה';
-        return {
+        const monthsInPeriod = period === 'current_month' ? 1 : period === 'last_3_months' ? 3 : period === 'last_year' ? 12 : 1;
+        result.push({
           name,
-          value: Math.round(Number(source.net_amount) || 0),
+          value: Math.round((Number(source.net_amount) || 0) * monthsInPeriod),
           description: source.description
-        };
+        });
       });
 
-      return NextResponse.json(result);
+      // הוספת תנועות הכנסה בפועל
+      (transactions || []).forEach((tx: any) => {
+        const date = new Date(tx.date).toLocaleDateString('he-IL');
+        const name = tx.vendor || `הכנסה (${date})`;
+        result.push({
+          name,
+          value: Math.round(Number(tx.amount) || 0),
+          description: tx.notes || null
+        });
+      });
+
+      console.log(`✅ Found ${incomeSources?.length || 0} income sources and ${transactions?.length || 0} transactions for ${sourceType}`);
+
+      return NextResponse.json({
+        data: result,
+        period: {
+          startDate,
+          endDate,
+          periodLabel,
+          period
+        }
+      });
     }
 
     return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
