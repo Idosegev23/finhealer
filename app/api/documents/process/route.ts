@@ -1249,9 +1249,11 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
     console.log(`💾 Saved ${transactionsToInsert.length} transactions`);
     
     // Update linked loans with new payment info
-    const linkedTransactions = transactionsToInsert.filter((tx: any) => tx.linked_loan_id);
+    const linkedTransactions = transactionsToInsert.filter((tx: any) => tx && tx.linked_loan_id);
     if (linkedTransactions.length > 0) {
       for (const tx of linkedTransactions) {
+        if (!tx || !tx.linked_loan_id) continue;
+        
         // Update loan's current_balance (deduct payment amount)
         const { data: loan } = await supabase
           .from('loans')

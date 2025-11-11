@@ -17,53 +17,20 @@ export async function GET(request: NextRequest) {
     // קבלת פרמטרים מה-query string
     const searchParams = request.nextUrl.searchParams;
     const level = searchParams.get('level') || '1'; // רמה נוכחית
-    const paymentMethod = searchParams.get('payment_method'); // לרמה 2
-    const expenseType = searchParams.get('expense_type'); // לרמה 3 (fixed/variable)
-    const expenseCategory = searchParams.get('expense_category'); // לרמה 4
+    const expenseType = searchParams.get('expense_type'); // לרמה 2 (fixed/variable)
+    const expenseCategory = searchParams.get('expense_category'); // לרמה 3
 
     // החודש הנוכחי
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 
-    // רמה 1: פילוח לפי אמצעי תשלום
+    // רמה 1: פילוח לפי קבועות/משתנות
     if (level === '1') {
-      const { data: transactions } = await supabase
-        .from('transactions')
-        .select('payment_method, amount')
-        .eq('user_id', user.id)
-        .eq('type', 'expense')
-        .eq('status', 'confirmed')
-        .gte('date', `${currentMonth}-01`)
-        .lte('date', `${currentMonth}-31`)
-        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
-
-      // קיבוץ לפי payment_method
-      const grouped = (transactions || []).reduce((acc: any, tx: any) => {
-        const method = tx.payment_method || 'לא מוגדר';
-        if (!acc[method]) {
-          acc[method] = 0;
-        }
-        acc[method] += Number(tx.amount) || 0;
-        return acc;
-      }, {});
-
-      const result = Object.entries(grouped).map(([name, value]) => ({
-        name: translatePaymentMethod(name as string),
-        value: Math.round(value as number),
-        metadata: { payment_method: name }
-      }));
-
-      return NextResponse.json(result);
-    }
-
-    // רמה 2: פילוח לפי קבועות/משתנות
-    if (level === '2' && paymentMethod) {
       const { data: transactions } = await supabase
         .from('transactions')
         .select('expense_type, amount')
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')
-        .eq('payment_method', paymentMethod)
         .gte('date', `${currentMonth}-01`)
         .lte('date', `${currentMonth}-31`)
         .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
@@ -81,21 +48,20 @@ export async function GET(request: NextRequest) {
       const result = Object.entries(grouped).map(([name, value]) => ({
         name: translateExpenseType(name as string),
         value: Math.round(value as number),
-        metadata: { payment_method: paymentMethod, expense_type: name }
+        metadata: { expense_type: name }
       }));
 
       return NextResponse.json(result);
     }
 
-    // רמה 3: פילוח לפי קטגוריות הוצאות (expense_category)
-    if (level === '3' && paymentMethod && expenseType) {
+    // רמה 2: פילוח לפי קטגוריות הוצאות (expense_category)
+    if (level === '2' && expenseType) {
       const { data: transactions } = await supabase
         .from('transactions')
         .select('expense_category, amount, vendor')
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')
-        .eq('payment_method', paymentMethod)
         .eq('expense_type', expenseType)
         .gte('date', `${currentMonth}-01`)
         .lte('date', `${currentMonth}-31`)
@@ -115,24 +81,22 @@ export async function GET(request: NextRequest) {
         name: name === 'לא מסווג' ? 'לא מסווג' : name,
         value: Math.round(value as number),
         metadata: { 
-          payment_method: paymentMethod, 
           expense_type: expenseType,
-          expense_category: name  // שינוי מ-category ל-expense_category
+          expense_category: name
         }
       }));
 
       return NextResponse.json(result);
     }
 
-    // רמה 4: תנועות ספציפיות לפי קטגוריית הוצאה
-    if (level === '4' && paymentMethod && expenseType && expenseCategory) {
+    // רמה 3: תנועות ספציפיות לפי קטגוריית הוצאה
+    if (level === '3' && expenseType && expenseCategory) {
       const { data: transactions } = await supabase
         .from('transactions')
         .select('vendor, amount, date, notes, expense_category')
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')
-        .eq('payment_method', paymentMethod)
         .eq('expense_type', expenseType)
         .eq('expense_category', expenseCategory)
         .gte('date', `${currentMonth}-01`)
@@ -165,19 +129,6 @@ export async function GET(request: NextRequest) {
 }
 
 // פונקציות עזר לתרגום
-function translatePaymentMethod(method: string): string {
-  const translations: Record<string, string> = {
-    'credit_card': 'אשראי',
-    'debit_card': 'חיוב מיידי',
-    'bank_transfer': 'העברה בנקאית',
-    'cash': 'מזומן',
-    'check': 'צ׳ק',
-    'digital_wallet': 'ארנק דיגיטלי',
-    'לא מוגדר': 'לא מוגדר'
-  };
-  return translations[method] || method;
-}
-
 function translateExpenseType(type: string): string {
   const translations: Record<string, string> = {
     'fixed': 'הוצאות קבועות',
