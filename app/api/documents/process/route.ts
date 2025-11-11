@@ -1203,7 +1203,7 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
 
     // 🔥 CRITICAL: Batch validate all categories for expenses
     const expenseTransactions = transactionsToInsert.filter((tx: any) => tx.type === 'expense' && tx.expense_category);
-    const categoryNames = [...new Set(expenseTransactions.map((tx: any) => tx.expense_category))];
+    const categoryNames = Array.from(new Set(expenseTransactions.map((tx: any) => tx.expense_category)));
     
     if (categoryNames.length > 0) {
       const { data: validCategories } = await supabase
