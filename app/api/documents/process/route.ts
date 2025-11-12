@@ -656,7 +656,7 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
         },
       ],
       temperature: 0.1,
-      max_tokens: 4000,
+      max_tokens: 8000, // הגדלה ל-8K למניעת חיתוך באמצע JSON
       response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
     });
 
@@ -664,26 +664,57 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
     
     const content = response.choices[0].message.content || '{}';
     
-    // Parse JSON response
+    // Parse JSON response with improved error handling
     try {
       const result = JSON.parse(content);
       return result;
     } catch (parseError: any) {
       console.error('❌ JSON Parse Error:', parseError.message);
       console.error('JSON String (first 500 chars):', content.substring(0, 500));
+      console.error('JSON String (last 200 chars):', content.substring(content.length - 200));
       
-      // Try to extract JSON if it's wrapped in markdown
-      let jsonStr = content;
-      if (content.includes('```')) {
-        const match = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      // Try to fix incomplete JSON by adding missing closing brackets
+      let jsonStr = content.trim();
+      
+      // Remove markdown code blocks if present
+      if (jsonStr.includes('```')) {
+        const match = jsonStr.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
         if (match) jsonStr = match[1];
       }
       
-      // Last resort
+      // Count brackets to see what's missing
+      const openBraces = (jsonStr.match(/\{/g) || []).length;
+      const closeBraces = (jsonStr.match(/\}/g) || []).length;
+      const openBrackets = (jsonStr.match(/\[/g) || []).length;
+      const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+      
+      console.log(`🔍 Bracket analysis: { ${openBraces}/${closeBraces} } [ ${openBrackets}/${closeBrackets} ]`);
+      
+      // Try to close unterminated strings first
+      if (jsonStr.match(/"[^"]*$/)) {
+        console.log('🔧 Attempting to close unterminated string...');
+        jsonStr += '"';
+      }
+      
+      // Add missing closing brackets
+      if (closeBrackets < openBrackets) {
+        console.log(`🔧 Adding ${openBrackets - closeBrackets} missing ]`);
+        jsonStr += ']'.repeat(openBrackets - closeBrackets);
+      }
+      
+      // Add missing closing braces
+      if (closeBraces < openBraces) {
+        console.log(`🔧 Adding ${openBraces - closeBraces} missing }`);
+        jsonStr += '}'.repeat(openBraces - closeBraces);
+      }
+      
+      // Try parsing the fixed JSON
       try {
         const result = JSON.parse(jsonStr);
+        console.log('✅ Successfully parsed JSON after repair');
         return result;
       } catch (secondError) {
+        console.error('❌ Still failed after repair:', (secondError as Error).message);
         throw new Error(`Invalid JSON response from AI: ${parseError.message}`);
       }
     }
