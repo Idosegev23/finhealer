@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { SunburstChart } from '@/components/charts/SunburstChart';
 import { TrendingUp, Calendar } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useRealtimeTransactions } from '@/lib/hooks/useRealtimeTransactions';
+import { usePathname } from 'next/navigation';
 
 interface ChartDataItem {
   name: string;
@@ -28,12 +30,9 @@ export function IncomeDrilldownChart() {
   const [period, setPeriod] = useState<string>('last_3_months');
   const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
   const [currentPeriod, setCurrentPeriod] = useState<string>('last_3_months');
+  const pathname = usePathname();
 
-  useEffect(() => {
-    fetchLevel1Data();
-  }, [period]);
-
-  const fetchLevel1Data = async () => {
+  const fetchLevel1Data = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/dashboard/income-hierarchy?level=1&period=${period}`);
@@ -58,7 +57,44 @@ export function IncomeDrilldownChart() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [period]);
+
+  useEffect(() => {
+    fetchLevel1Data();
+  }, [fetchLevel1Data, pathname]); // pathname גורם ל-refresh כשמגיעים לדשבורד
+
+  // Callbacks ל-Realtime
+  const handleInsert = useCallback((payload: any) => {
+    // בדוק אם זו הכנסה
+    if (payload.new?.type === 'income') {
+      console.log('🔄 Refreshing income chart due to new income transaction');
+      fetchLevel1Data();
+    }
+  }, [fetchLevel1Data]);
+
+  const handleUpdate = useCallback((payload: any) => {
+    // בדוק אם זו הכנסה
+    if (payload.new?.type === 'income' || payload.old?.type === 'income') {
+      console.log('🔄 Refreshing income chart due to income transaction update');
+      fetchLevel1Data();
+    }
+  }, [fetchLevel1Data]);
+
+  const handleDelete = useCallback((payload: any) => {
+    // בדוק אם זו הכנסה
+    if (payload.old?.type === 'income') {
+      console.log('🔄 Refreshing income chart due to income transaction deletion');
+      fetchLevel1Data();
+    }
+  }, [fetchLevel1Data]);
+
+  // האזנה לשינויים בזמן אמת ב-transactions (רק הכנסות)
+  useRealtimeTransactions({
+    onInsert: handleInsert,
+    onUpdate: handleUpdate,
+    onDelete: handleDelete,
+    enabled: pathname === '/dashboard', // רק כשנמצאים בדשבורד
+  });
 
   const handleSliceClick = async (item: ChartDataItem, currentLevel: number): Promise<ChartDataItem[]> => {
     try {

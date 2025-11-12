@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
   TrendingUp, TrendingDown, DollarSign, 
@@ -48,14 +49,38 @@ const FREQUENCY_LABELS: Record<string, { label: string; color: string; icon: str
 };
 
 export default function ExpensesOverviewPage() {
+  const searchParams = useSearchParams();
+  const transactionId = searchParams.get('transaction');
   const [period, setPeriod] = useState<string>('month');
   const [stats, setStats] = useState<Stats | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
 
   useEffect(() => {
     loadAnalytics();
   }, [period]);
+
+  useEffect(() => {
+    // אם יש transaction ID ב-URL, נחפש את התנועה ונציג אותה
+    if (transactionId && transactions.length > 0) {
+      const transaction = transactions.find(tx => tx.id === transactionId);
+      if (transaction) {
+        setSelectedTransaction(transaction);
+        // Scroll to transaction
+        setTimeout(() => {
+          const element = document.getElementById(`transaction-${transactionId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.classList.add('ring-2', 'ring-phi-gold', 'ring-offset-2');
+            setTimeout(() => {
+              element.classList.remove('ring-2', 'ring-phi-gold', 'ring-offset-2');
+            }, 3000);
+          }
+        }, 500);
+      }
+    }
+  }, [transactionId, transactions]);
 
   const loadAnalytics = async () => {
     setLoading(true);
@@ -456,10 +481,13 @@ export default function ExpensesOverviewPage() {
                 {transactions.slice(0, 10).map((transaction, index) => (
                   <motion.div
                     key={transaction.id}
+                    id={`transaction-${transaction.id}`}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 1.1 + index * 0.05 }}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:shadow-md transition-shadow"
+                    className={`flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:shadow-md transition-shadow ${
+                      selectedTransaction?.id === transaction.id ? 'ring-2 ring-phi-gold ring-offset-2' : ''
+                    }`}
                   >
                     <div className="flex-1">
                       <p className="font-semibold text-gray-900 dark:text-white">

@@ -13,6 +13,7 @@ interface ChartDataItem {
   color?: string
   description?: string
   metadata?: Record<string, any>
+  transactionId?: string // ID של התנועה אם זה פריט אחרון
 }
 
 interface SunburstChartProps {
@@ -21,6 +22,7 @@ interface SunburstChartProps {
   initialData: ChartDataItem[]
   onSliceClick?: (item: ChartDataItem, level: number) => Promise<ChartDataItem[]>
   colors?: string[]
+  showTransactionLink?: boolean // האם להציג קישור לפריט האחרון
 }
 
 // Phi color palette
@@ -40,7 +42,8 @@ export function SunburstChart({
   description,
   initialData,
   onSliceClick,
-  colors = PHI_COLORS
+  colors = PHI_COLORS,
+  showTransactionLink = false
 }: SunburstChartProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [drilldownStack, setDrilldownStack] = useState<Array<{ name: string; data: ChartDataItem[] }>>([
@@ -57,7 +60,9 @@ export function SunburstChart({
         value: item.value,
         children: item.children,
         color: item.color,
-        metadata: item.metadata
+        metadata: item.metadata,
+        transactionId: item.transactionId, // העברת transactionId
+        description: item.description
       }))
     }
   }
@@ -136,12 +141,19 @@ export function SunburstChart({
         .style('cursor', (d: any) => d.children ? 'pointer' : 'default')
         .on('click', async (event: MouseEvent, p: any) => {
           if (!p.children) {
+            // אם זה פריט אחרון (ללא children) - נבדוק אם יש transactionId
+            if (p.data.transactionId && showTransactionLink) {
+              // נפתח את הקישור להוצאה בדף ההוצאות
+              window.location.href = `/dashboard/expenses-overview?transaction=${p.data.transactionId}`
+              return
+            }
+            
             // Try to load children if callback exists
             if (onSliceClick) {
               setIsLoading(true)
               try {
                 const children = await onSliceClick(
-                  { name: p.data.name, value: p.value || 0, metadata: p.data.metadata },
+                  { name: p.data.name, value: p.value || 0, metadata: p.data.metadata, transactionId: p.data.transactionId },
                   drilldownStack.length
                 )
                 if (children && children.length > 0) {
@@ -162,11 +174,75 @@ export function SunburstChart({
           clicked(event, root, p)
         })
 
+    // Compute total for percentage calculation
+    const total = root.value || 0
     const format = d3.format(',d')
 
-    // Add tooltips
-    path.append('title')
-      .text((d: any) => `${d.ancestors().map((d: any) => d.data.name).reverse().join('/')}\n₪${format(d.value || 0)}`)
+    // Cleanup old tooltips
+    d3.selectAll('.sunburst-tooltip').remove()
+
+    // Add tooltips עם hover
+    const tooltipDiv = d3.select('body').append('div')
+      .attr('class', 'sunburst-tooltip')
+      .style('position', 'absolute')
+      .style('opacity', 0)
+      .style('background', 'rgba(0, 0, 0, 0.9)')
+      .style('color', 'white')
+      .style('padding', '12px 16px')
+      .style('border-radius', '8px')
+      .style('pointer-events', 'none')
+      .style('z-index', 1000)
+      .style('font-size', '14px')
+      .style('font-family', 'Heebo, sans-serif')
+      .style('box-shadow', '0 4px 12px rgba(0, 0, 0, 0.3)')
+      .style('max-width', '300px')
+      .style('direction', 'rtl')
+      .style('transition', 'opacity 0.2s ease')
+
+    path
+      .on('mouseover', function(event: MouseEvent, d: any) {
+        const ancestors = d.ancestors().map((a: any) => a.data.name).reverse()
+        const pathString = ancestors.join(' → ')
+        const value = format(d.value || 0)
+        const percentage = total > 0 ? ((d.value || 0) / total) * 100 : 0
+        
+        tooltipDiv
+          .html(`
+            <div style="font-weight: 600; margin-bottom: 4px;">${pathString}</div>
+            <div style="font-size: 16px; color: #F2C166; margin: 4px 0;">₪${value}</div>
+            <div style="font-size: 12px; color: #ccc;">${percentage.toFixed(1)}% מהסה״כ</div>
+            ${d.data.description ? `<div style="font-size: 12px; color: #aaa; margin-top: 4px;">${d.data.description}</div>` : ''}
+            ${d.data.transactionId && showTransactionLink ? `<div style="font-size: 11px; color: #F2C166; margin-top: 6px;">👆 לחץ כדי לראות פרטים</div>` : ''}
+          `)
+          .style('opacity', 1)
+          .style('left', (event.pageX + 10) + 'px')
+          .style('top', (event.pageY - 10) + 'px')
+      })
+      .on('mousemove', function(event: MouseEvent) {
+        tooltipDiv
+          .style('left', (event.pageX + 10) + 'px')
+          .style('top', (event.pageY - 10) + 'px')
+      })
+      .on('mouseout', function() {
+        tooltipDiv.style('opacity', 0)
+      })
+      .style('transition', 'all 0.2s ease')
+      .on('mouseenter', function() {
+        d3.select(this)
+          .attr('stroke', '#F2C166')
+          .attr('stroke-width', '2px')
+          .style('filter', 'brightness(1.1)')
+          .style('cursor', 'pointer')
+      })
+      .on('mouseleave', function() {
+        d3.select(this)
+          .attr('stroke', null)
+          .attr('stroke-width', null)
+          .style('filter', null)
+      })
+
+    // Remove old title tooltips
+    path.selectAll('title').remove()
 
     // Add labels
     const label = svg.append('g')
@@ -206,11 +282,13 @@ export function SunburstChart({
         }
       })
 
-      const duration = event.altKey ? 7500 : 750
+      const duration = event.altKey ? 7500 : 1200 // הגדלתי את הזמן לאנימציה חלקה יותר
+      const ease = d3.easeCubicInOut // easing חלק יותר
 
-      // Transition arcs
+      // Transition arcs עם אנימציה חלקה יותר
       path.transition()
         .duration(duration)
+        .ease(ease)
         .tween('data', (d: any) => {
           const i = d3.interpolate(d.current, d.target)
           return (t: number) => {
@@ -226,13 +304,14 @@ export function SunburstChart({
         .attr('pointer-events', (d: any) => arcVisible(d.target) ? 'auto' : 'none')
         .attrTween('d', (d: any) => () => arc(d.current) || '')
 
-      // Transition labels
+      // Transition labels עם אנימציה חלקה יותר
       label.filter(function(d: any) {
         const element = this as SVGTextElement
         const opacity = element.getAttribute('fill-opacity')
         return opacity !== null ? +opacity > 0 : labelVisible(d.target)
       }).transition()
         .duration(duration)
+        .ease(ease)
         .attr('fill-opacity', (d: any) => +labelVisible(d.target))
         .attrTween('transform', (d: any) => () => labelTransform(d.current) || '')
     }
@@ -251,10 +330,18 @@ export function SunburstChart({
       return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`
     }
 
-  }, [drilldownStack, colors, title, onSliceClick, initialData, goBack])
+    // Cleanup function
+    return () => {
+      d3.selectAll('.sunburst-tooltip').remove()
+    }
+
+  }, [drilldownStack, colors, title, onSliceClick, initialData, goBack, showTransactionLink])
 
   const currentLevel = drilldownStack[drilldownStack.length - 1]
   const total = currentLevel.data.reduce((sum, item) => sum + item.value, 0)
+  
+  // בדיקה אם זה הרמה האחרונה (רק פריטים בודדים ללא children)
+  const isLastLevel = currentLevel.data.every(item => !item.children && item.transactionId)
 
   return (
     <motion.div
@@ -336,7 +423,10 @@ export function SunburstChart({
           {/* Instruction */}
           <div className="mt-4 p-3 bg-phi-gold/10 dark:bg-phi-gold/5 rounded-lg w-full">
             <p className="text-sm text-phi-dark dark:text-white text-center">
-              💡 לחץ על פרוסה בגרף כדי לראות פירוט מפורט יותר
+              {isLastLevel && showTransactionLink 
+                ? '💡 לחץ על פרוסה כדי לראות את ההוצאה בדוח פירוט'
+                : '💡 לחץ על פרוסה בגרף כדי לראות פירוט מפורט יותר'
+              }
             </p>
           </div>
         </div>

@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
     if (level === '3' && expenseType && expenseCategory) {
       const { data: transactions, error: queryError } = await supabase
         .from('transactions')
-        .select('vendor, amount, date, notes, expense_category')
+        .select('vendor, amount, date, notes, expense_category, id') // הוספת id
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')
@@ -222,7 +222,8 @@ export async function GET(request: NextRequest) {
         return {
           name: `${desc} (${date})`,
           value: Math.round(Number(tx.amount) || 0),
-          description: tx.notes || null
+          description: tx.notes || null,
+          transactionId: tx.id || null // הוספת ID של התנועה
         };
       });
 

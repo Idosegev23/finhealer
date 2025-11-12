@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { SunburstChart } from '@/components/charts/SunburstChart';
 import { TrendingDown, Calendar } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useRealtimeTransactions } from '@/lib/hooks/useRealtimeTransactions';
+import { usePathname } from 'next/navigation';
 
 interface ChartDataItem {
   name: string;
@@ -28,13 +30,9 @@ export function ExpensesDrilldownChart() {
   const [period, setPeriod] = useState<string>('last_3_months');
   const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
   const [currentPeriod, setCurrentPeriod] = useState<string>('last_3_months'); // לשמירת תקופה נוכחית ל-drill-down
+  const pathname = usePathname();
 
-  // טעינת נתונים ראשוניים (רמה 1)
-  useEffect(() => {
-    fetchLevel1Data();
-  }, [period]);
-
-  const fetchLevel1Data = async () => {
+  const fetchLevel1Data = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/dashboard/expenses-hierarchy?level=1&period=${period}`);
@@ -59,7 +57,36 @@ export function ExpensesDrilldownChart() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [period]);
+
+  // טעינת נתונים ראשוניים (רמה 1) - גם כשמגיעים לדשבורד
+  useEffect(() => {
+    fetchLevel1Data();
+  }, [fetchLevel1Data, pathname]); // pathname גורם ל-refresh כשמגיעים לדשבורד
+
+  // Callbacks ל-Realtime
+  const handleInsert = useCallback(() => {
+    console.log('🔄 Refreshing expenses chart due to new transaction');
+    fetchLevel1Data();
+  }, [fetchLevel1Data]);
+
+  const handleUpdate = useCallback(() => {
+    console.log('🔄 Refreshing expenses chart due to transaction update');
+    fetchLevel1Data();
+  }, [fetchLevel1Data]);
+
+  const handleDelete = useCallback(() => {
+    console.log('🔄 Refreshing expenses chart due to transaction deletion');
+    fetchLevel1Data();
+  }, [fetchLevel1Data]);
+
+  // האזנה לשינויים בזמן אמת ב-transactions
+  useRealtimeTransactions({
+    onInsert: handleInsert,
+    onUpdate: handleUpdate,
+    onDelete: handleDelete,
+    enabled: pathname === '/dashboard', // רק כשנמצאים בדשבורד
+  });
 
   // פונקציה לטעינת נתונים ברמות נוספות
   const handleSliceClick = async (item: ChartDataItem, currentLevel: number): Promise<ChartDataItem[]> => {
@@ -195,6 +222,7 @@ export function ExpensesDrilldownChart() {
         description="לחץ על כל פרוסה כדי לצלול לעומק הנתונים 🔍"
         initialData={initialData}
         onSliceClick={handleSliceClick}
+        showTransactionLink={true} // הפעלת קישור לפריט האחרון
       />
     </div>
   );

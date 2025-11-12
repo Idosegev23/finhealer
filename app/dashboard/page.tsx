@@ -285,11 +285,17 @@ export default async function DashboardPage() {
 
         {/* גרפים אינטראקטיביים - פאי להכנסות ולהוצאות */}
         <div className="mb-8 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* גרף הוצאות - גרף אחד בשורה */}
+          <div className="w-full">
             <ExpensesDrilldownChart />
+          </div>
+          
+          {/* גרף הכנסות - גרף אחד בשורה */}
+          <div className="w-full">
             <IncomeDrilldownChart />
           </div>
           
+          {/* גרף נכסים והתחייבויות */}
           <div className="w-full">
             <AssetsLiabilitiesDrilldownChart />
           </div>
