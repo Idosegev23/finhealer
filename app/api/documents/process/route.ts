@@ -1127,18 +1127,45 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
       console.log(`💾 Saved ${matchedDetails.length} matched credit details`);
     }
 
-    // Insert unmatched details (will be matched manually later)
+    // Insert unmatched details as regular transactions (not details)
+    // These will appear as standalone credit card transactions waiting for bank statement
     if (unmatchedDetails.length > 0) {
+      const unmatchedTransactions = unmatchedDetails.map((detail: any) => ({
+        user_id: detail.user_id,
+        type: 'expense',
+        amount: detail.amount,
+        vendor: detail.vendor,
+        date: detail.date,
+        tx_date: detail.date,
+        notes: detail.notes,
+        category: detail.category,
+        expense_category: detail.expense_category,
+        expense_type: detail.expense_type,
+        payment_method: 'credit_card',
+        confidence_score: detail.confidence_score,
+        source: 'ocr',
+        status: detail.expense_category ? 'confirmed' : 'pending',
+        needs_review: !detail.expense_category,
+        document_id: documentId,
+        original_description: detail.vendor,
+        auto_categorized: true,
+        // Hierarchy fields
+        is_source_transaction: false, // Credit details are NOT source
+        statement_month: detail.detail_period_month, // Month they belong to
+        card_number_last4: detail.card_number_last4,
+        matching_status: 'pending_matching', // Waiting for bank statement
+      }));
+
       const { error: insertError } = await supabase
-        .from('transaction_details')
-        .insert(unmatchedDetails);
+        .from('transactions')
+        .insert(unmatchedTransactions);
 
       if (insertError) {
-        console.error('Failed to insert unmatched credit details:', insertError);
+        console.error('Failed to insert unmatched credit transactions:', insertError);
         throw insertError;
       }
 
-      console.log(`💾 Saved ${unmatchedDetails.length} unmatched credit details (pending manual match)`);
+      console.log(`💾 Saved ${unmatchedDetails.length} unmatched credit transactions (waiting for bank statement)`);
     }
 
     return creditDetails.length;

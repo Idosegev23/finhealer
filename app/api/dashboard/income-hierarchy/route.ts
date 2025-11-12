@@ -99,14 +99,14 @@ export async function GET(request: NextRequest) {
       // קבלת מקורות הכנסה קבועים
       const { data: incomeSources, error: sourcesError } = await supabase
         .from('income_sources')
-        .select('source_type, net_amount, name')
+        .select('type, net_salary, amount, name')
         .eq('user_id', user.id)
         .eq('active', true);
 
       // קבלת תנועות הכנסה מהתקופה הנבחרת
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
-        .select('amount, category, vendor, source_type')
+        .select('amount, category, vendor')
         .eq('user_id', user.id)
         .eq('type', 'income')
         .eq('status', 'confirmed')
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
       const result = Object.entries(grouped).map(([type, data]: [string, any]) => ({
         name: translateSourceType(type),
         value: Math.round(data.total),
-        metadata: { source_type: type }
+        metadata: { type: type }
       }));
 
       console.log(`✅ Found ${incomeSources?.length || 0} income sources and ${transactions?.length || 0} income transactions`);
