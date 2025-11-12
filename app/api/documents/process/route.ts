@@ -5,6 +5,7 @@ import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { matchCreditTransactions } from '@/lib/reconciliation/credit-matcher';
 import { parseDate, parseDateWithFallback } from '@/lib/utils/date-parser';
+import * as XLSX from 'xlsx';
 
 // ⚡️ Vercel Background Function Configuration
 export const runtime = 'nodejs'; // Force Node.js runtime
@@ -13,8 +14,8 @@ export const dynamic = 'force-dynamic';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 240000, // 4 minutes timeout for OpenAI (leave 1 min buffer)
-  maxRetries: 2, // Retry twice on failure
+  timeout: 180000, // 3 minutes timeout for OpenAI (leave 2 min buffer for retries)
+  maxRetries: 1, // Retry once on failure (total 6 min max)
 });
 
 /**
@@ -112,10 +113,9 @@ export async function POST(request: NextRequest) {
     } else if (stmt.mime_type?.includes('image')) {
       console.log('🤖 Analyzing image with GPT-4o Vision...');
       result = await analyzeImageWithAI(buffer, stmt.mime_type, stmt.file_type);
-    } else if (stmt.mime_type?.includes('spreadsheet') || stmt.mime_type?.includes('excel')) {
+    } else if (stmt.mime_type?.includes('spreadsheet') || stmt.mime_type?.includes('excel') || stmt.file_name?.match(/\.(xlsx|xls)$/i)) {
       console.log('📊 Analyzing Excel...');
-      // TODO: Excel parsing
-      result = { transactions: [] };
+      result = await analyzeExcelWithAI(buffer, stmt.file_type, stmt.file_name);
     }
 
     console.log(`✅ AI analysis complete:`, result);
@@ -416,9 +416,16 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     const { totalPages, text: rawText } = await extractText(pdf, { mergePages: true });
 
     // 🔧 Fix RTL text reversal issues from unpdf
-    const extractedText = fixRTLTextFromPDF(rawText);
+    let extractedText = fixRTLTextFromPDF(rawText);
 
     console.log(`✅ Text extracted: ${extractedText.length} characters, ${totalPages} pages`);
+    
+    // 🔥 הגבלת אורך טקסט למניעת timeouts
+    const MAX_TEXT_LENGTH = 15000; // ~15K תווים = ~4K tokens
+    if (extractedText.length > MAX_TEXT_LENGTH) {
+      console.log(`⚠️  Text too long (${extractedText.length} chars), truncating to ${MAX_TEXT_LENGTH} chars`);
+      extractedText = extractedText.substring(0, MAX_TEXT_LENGTH) + '\n\n[... המסמך נחתך כי הוא ארוך מדי. המידע המרכזי נמצא בחלק הראשון]';
+    }
 
     // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
@@ -444,16 +451,19 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     
     // Analyze with GPT-4o (with JSON mode for guaranteed valid JSON)
     console.log(`🤖 Analyzing with GPT-4o (JSON mode)...`);
+    console.log(`📊 Prompt length: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
     
+    const startAI = Date.now();
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
-      max_tokens: 16000,
+      max_tokens: 8000, // הורדה ל-8K כדי להאיץ את התגובה
       response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
     });
+    const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
 
-    console.log(`✅ GPT-4o analysis complete`);
+    console.log(`✅ GPT-4o analysis complete (${aiDuration}s)`);
     
     const content = response.choices[0]?.message?.content || '{}';
     
@@ -563,6 +573,123 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
   } catch (error: any) {
     console.error('❌ Image analysis error:', error);
     throw new Error(`Failed to analyze image: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Analyze Excel/Spreadsheet files
+ * קורא את הנתונים מה-Excel ושולח ל-GPT-4o (text, not vision)
+ */
+async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName: string) {
+  try {
+    console.log(`📊 Analyzing Excel/Spreadsheet (${documentType})...`);
+    
+    // 1. Read Excel file using xlsx library
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    
+    // 2. Convert all sheets to structured data
+    const sheetsData: any = {};
+    let totalRows = 0;
+    
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      
+      // Convert to JSON with header row
+      const jsonData = XLSX.utils.sheet_to_json(sheet, { 
+        header: 1, // Use first row as headers
+        defval: '', // Default value for empty cells
+        blankrows: false // Skip blank rows
+      });
+      
+      if (jsonData.length > 0) {
+        sheetsData[sheetName] = jsonData;
+        totalRows += jsonData.length;
+        console.log(`  📄 Sheet "${sheetName}": ${jsonData.length} rows`);
+      }
+    }
+    
+    console.log(`✅ Excel parsed: ${workbook.SheetNames.length} sheets, ${totalRows} total rows`);
+    
+    // 3. Convert to text format for GPT-4o
+    let excelText = `File: ${fileName}\n\n`;
+    
+    for (const [sheetName, rows] of Object.entries(sheetsData)) {
+      excelText += `Sheet: ${sheetName}\n`;
+      excelText += `${'='.repeat(50)}\n\n`;
+      
+      const rowsArray = rows as any[];
+      
+      // If too many rows, limit to first 500 (to avoid token limits)
+      const limitedRows = rowsArray.slice(0, 500);
+      if (rowsArray.length > 500) {
+        console.log(`  ⚠️  Limiting sheet "${sheetName}" from ${rowsArray.length} to 500 rows`);
+      }
+      
+      // Format as table
+      for (const row of limitedRows) {
+        if (Array.isArray(row)) {
+          excelText += row.join(' | ') + '\n';
+        }
+      }
+      
+      excelText += '\n\n';
+    }
+    
+    console.log(`📝 Excel text generated: ${excelText.length} characters`);
+    
+    // 4. Get appropriate prompt
+    const prompt = getPromptForDocumentType(documentType, excelText);
+    
+    // 5. Send to GPT-4o (text only, not vision)
+    console.log(`🤖 Analyzing with GPT-4o (text mode, JSON output)...`);
+    
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'אתה מומחה בניתוח מסמכים פיננסיים. החזר תמיד JSON תקין בלבד, ללא טקסט נוסף.'
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.1,
+      max_tokens: 4000,
+      response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
+    });
+
+    console.log(`✅ GPT-4o analysis complete`);
+    
+    const content = response.choices[0].message.content || '{}';
+    
+    // Parse JSON response
+    try {
+      const result = JSON.parse(content);
+      return result;
+    } catch (parseError: any) {
+      console.error('❌ JSON Parse Error:', parseError.message);
+      console.error('JSON String (first 500 chars):', content.substring(0, 500));
+      
+      // Try to extract JSON if it's wrapped in markdown
+      let jsonStr = content;
+      if (content.includes('```')) {
+        const match = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (match) jsonStr = match[1];
+      }
+      
+      // Last resort
+      try {
+        const result = JSON.parse(jsonStr);
+        return result;
+      } catch (secondError) {
+        throw new Error(`Invalid JSON response from AI: ${parseError.message}`);
+      }
+    }
+  } catch (error: any) {
+    console.error('❌ Excel analysis error:', error);
+    throw new Error(`Failed to analyze Excel: ${error?.message || 'Unknown error'}`);
   }
 }
 
@@ -902,30 +1029,19 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
         expense_type: expenseType, // null if category not found
         payment_method: 'credit_card',
         confidence_score: tx.confidence_score || 0.85,
-        // ⭐ New fields for detailed breakdown
+        // ⭐ New fields for detailed breakdown (from migration 20251110)
         detailed_category: tx.detailed_category || null,
         sub_category: tx.sub_category || null,
         tags: tx.tags || null,
         detailed_notes: tx.detailed_notes || null,
         item_count: tx.item_count || null,
         items: tx.items || null,
-        // ⭐ New fields: recurring payments
-        is_recurring: tx.is_recurring || false,
-        recurring_type: tx.recurring_type || null,
-        // ⭐ New fields: foreign currency transactions
-        original_amount: tx.original_amount || null,
-        original_currency: tx.original_currency || null,
-        exchange_rate: tx.exchange_rate || null,
-        forex_fee: tx.forex_fee || null,
-        // ⭐ Matching fields
+        // ⭐ Matching fields (from migration 20251110)
         card_number_last4: cardNumberLast4,
         detail_period_month: detailPeriodMonth,
         credit_statement_id: documentId,
         // parent_transaction_id will be set after matching
         parent_transaction_id: null,
-        // ⭐ Status: pending if no category, confirmed if category exists
-        status: expenseCategory ? 'confirmed' : 'pending',
-        needs_review: !expenseCategory, // true if no category
       });
     }
 

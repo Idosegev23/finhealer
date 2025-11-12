@@ -210,7 +210,7 @@ export default function ExpensesDataPage() {
                 onError={(error) => {
                   alert(`❌ שגיאה: ${error}`);
                 }}
-                acceptedFormats=".pdf,.jpg,.jpeg,.png"
+                acceptedFormats=".pdf,.jpg,.jpeg,.png,.xlsx,.xls"
                 maxSizeMB={20}
               />
             </TabsContent>

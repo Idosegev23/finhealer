@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -48,7 +48,7 @@ const FREQUENCY_LABELS: Record<string, { label: string; color: string; icon: str
   one_time: { label: 'חד פעמיות', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200', icon: '1️⃣' },
 };
 
-export default function ExpensesOverviewPage() {
+function ExpensesOverviewContent() {
   const searchParams = useSearchParams();
   const transactionId = searchParams.get('transaction');
   const [period, setPeriod] = useState<string>('month');
@@ -520,6 +520,21 @@ export default function ExpensesOverviewPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function ExpensesOverviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-phi-gold border-r-transparent mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">טוען נתונים...</p>
+        </div>
+      </div>
+    }>
+      <ExpensesOverviewContent />
+    </Suspense>
   );
 }
 
