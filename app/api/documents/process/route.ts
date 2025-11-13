@@ -287,13 +287,13 @@ async function validateAndNormalizeCategories(
     return transactions.map((tx: any) => {
       const expenseCategory = tx.expense_category?.trim();
       
-      // No category provided
+      // No category provided - keep null
       if (!expenseCategory) {
         return {
           ...tx,
-          expense_category: 'לא מסווג',
-          expense_type: 'variable',
-          category_group: 'other'
+          expense_category: null,
+          expense_type: null,
+          category_group: null
         };
       }
       
@@ -310,13 +310,13 @@ async function validateAndNormalizeCategories(
         };
       }
       
-      // No match found - mark as uncategorized with lower confidence
-      console.warn(`⚠️ Unknown category: "${expenseCategory}" → marking as "לא מסווג"`);
+      // No match found - keep null, let user categorize manually
+      console.warn(`⚠️ Unknown category: "${expenseCategory}" → keeping null for manual categorization`);
       return {
         ...tx,
-        expense_category: 'לא מסווג',
-        expense_type: 'variable',
-        category_group: 'other',
+        expense_category: null,
+        expense_type: null,
+        category_group: null,
         confidence_score: (tx.confidence_score || 0.8) * 0.5 // Reduce confidence
       };
     });
@@ -1167,7 +1167,7 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
         expense_type: detail.expense_type,
         payment_method: 'credit_card',
         source: 'ocr',
-        status: 'pending', // ✅ תמיד pending כדי להופיע ברשימה לאישור
+        status: 'proposed', // ✅ תמיד proposed כדי להופיע ברשימה לאישור
         document_id: documentId,
         // Hierarchy fields
         is_source_transaction: false, // Credit details are NOT source
@@ -1338,7 +1338,7 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         date: parsedDate,
         tx_date: parsedDate,
         source: 'ocr',
-        status: 'pending', // 🔥 תמיד pending - המשתמש חייב לאשר ידנית!
+        status: 'proposed', // 🔥 תמיד proposed - המשתמש חייב לאשר ידנית!
         needs_review: true,
         notes: tx.installment 
           ? `${tx.notes || tx.description || ''} ${tx.installment}`.trim() 
@@ -1385,15 +1385,15 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
           if (categoryMap.has(tx.expense_category)) {
             // Category is valid - use expense_type from database
             tx.expense_type = categoryMap.get(tx.expense_category);
-            // 🔥 גם אם יש קטגוריה - תמיד pending לאישור משתמש!
-            tx.status = 'pending';
+            // 🔥 גם אם יש קטגוריה - תמיד proposed לאישור משתמש!
+            tx.status = 'proposed';
             tx.needs_review = true;
           } else {
             // Category not found - mark as pending
             console.warn(`⚠️  Category "${tx.expense_category}" not found - marking as pending`);
             tx.expense_category = null;
             tx.expense_type = null;
-            tx.status = 'pending';
+            tx.status = 'proposed';
             tx.needs_review = true;
           }
         }
