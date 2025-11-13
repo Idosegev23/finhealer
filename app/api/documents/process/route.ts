@@ -420,12 +420,9 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
     console.log(`✅ Text extracted: ${extractedText.length} characters, ${totalPages} pages`);
     
-    // 🔥 הגבלת אורך טקסט למניעת timeouts
-    const MAX_TEXT_LENGTH = 15000; // ~15K תווים = ~4K tokens
-    if (extractedText.length > MAX_TEXT_LENGTH) {
-      console.log(`⚠️  Text too long (${extractedText.length} chars), truncating to ${MAX_TEXT_LENGTH} chars`);
-      extractedText = extractedText.substring(0, MAX_TEXT_LENGTH) + '\n\n[... המסמך נחתך כי הוא ארוך מדי. המידע המרכזי נמצא בחלק הראשון]';
-    }
+    // ✅ שליחת הטקסט המלא ל-GPT-4o (תומך ב-128K tokens = ~512K תווים)
+    // המיתמול מתוקן ב-fixRTLTextFromPDF() - תומך בעברית ובהיפוך RTL
+    console.log(`📄 Sending full text to GPT-4o: ${extractedText.length} chars (~${Math.ceil(extractedText.length / 4)} tokens)`);
 
     // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
