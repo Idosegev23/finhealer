@@ -1173,13 +1173,9 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
         expense_category: detail.expense_category,
         expense_type: detail.expense_type,
         payment_method: 'credit_card',
-        confidence_score: detail.confidence_score,
         source: 'ocr',
         status: detail.expense_category ? 'confirmed' : 'pending',
-        needs_review: !detail.expense_category,
         document_id: documentId,
-        original_description: detail.vendor,
-        auto_categorized: true,
         // Hierarchy fields
         is_source_transaction: false, // Credit details are NOT source
         statement_month: detail.detail_period_month, // Month they belong to
