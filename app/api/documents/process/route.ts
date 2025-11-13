@@ -369,6 +369,136 @@ function fixRTLTextFromPDF(text: string): string {
   }
 }
 
+// Special handling for large PDFs that GPT-4o can't process directly
+async function analyzeLargePDF(buffer: Buffer, fileType: string, fileName: string) {
+  try {
+    console.log('🔄 Analyzing large PDF with text extraction + GPT-4o...');
+
+    // Extract text using unpdf
+    const { getDocumentProxy, extractText } = await import('unpdf');
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { totalPages, text: rawText } = await extractText(pdf, { mergePages: true });
+
+    console.log(`✅ Extracted ${rawText.length} characters from ${totalPages} pages`);
+
+    // Process the text with our enhanced RTL fixing
+    const processedText = fixRTLTextFromPDF(rawText);
+    console.log(`🔧 After RTL processing: ${processedText.length} characters`);
+
+    // For large texts, we'll split into smaller chunks and analyze each chunk
+    const MAX_CHUNK_SIZE = 100000; // 100K characters per chunk
+    const chunks = [];
+
+    if (processedText.length <= MAX_CHUNK_SIZE) {
+      chunks.push(processedText);
+    } else {
+      // Split into chunks at logical break points
+      let remaining = processedText;
+      while (remaining.length > 0) {
+        if (remaining.length <= MAX_CHUNK_SIZE) {
+          chunks.push(remaining);
+          break;
+        }
+
+        // Find a good break point (end of transaction line)
+        let breakPoint = MAX_CHUNK_SIZE;
+        const lastNewline = remaining.lastIndexOf('\n', MAX_CHUNK_SIZE - 1000);
+        if (lastNewline > MAX_CHUNK_SIZE * 0.8) {
+          breakPoint = lastNewline;
+        }
+
+        chunks.push(remaining.substring(0, breakPoint));
+        remaining = remaining.substring(breakPoint);
+      }
+    }
+
+    console.log(`📦 Split into ${chunks.length} chunks for analysis`);
+
+    // Load expense categories
+    let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
+    if (fileType === 'bank_statement' || fileType === 'credit_statement') {
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const supabaseClient = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: categories } = await supabaseClient
+        .from('expense_categories')
+        .select('name, expense_type, category_group')
+        .eq('is_active', true)
+        .order('expense_type, category_group, display_order, name');
+
+      expenseCategories = categories || [];
+      console.log(`📋 Loaded ${expenseCategories.length} expense categories`);
+    }
+
+    // Analyze each chunk
+    const allResults = [];
+    for (let i = 0; i < chunks.length; i++) {
+      console.log(`\n🔍 Analyzing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
+
+      const chunkPrompt = getPromptForDocumentType(fileType, chunks[i], expenseCategories);
+
+      const startChunk = Date.now();
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{
+          role: 'user',
+          content: chunkPrompt
+        }],
+        temperature: 0.1,
+        max_tokens: 8000,
+        response_format: { type: 'json_object' }
+      });
+
+      const chunkDuration = ((Date.now() - startChunk) / 1000).toFixed(1);
+      console.log(`✅ Chunk ${i + 1} analyzed in ${chunkDuration}s`);
+
+      const content = response.choices[0]?.message?.content || '{}';
+      try {
+        const chunkResult = JSON.parse(content);
+        if (chunkResult.transactions) {
+          allResults.push(chunkResult);
+        }
+      } catch (e) {
+        console.error(`❌ Failed to parse chunk ${i + 1} JSON:`, e.message);
+      }
+
+      // Small delay between chunks
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    // Merge all results
+    console.log('\n🔀 Merging results from all chunks...');
+    const mergedResult = {
+      report_info: allResults[0]?.report_info || {},
+      transactions: {
+        income: [],
+        expenses: []
+      }
+    };
+
+    // Combine all transactions
+    allResults.forEach(result => {
+      if (result.transactions?.income) {
+        mergedResult.transactions.income.push(...result.transactions.income);
+      }
+      if (result.transactions?.expenses) {
+        mergedResult.transactions.expenses.push(...result.transactions.expenses);
+      }
+    });
+
+    console.log(`🎯 Final result: ${mergedResult.transactions.income.length} income, ${mergedResult.transactions.expenses.length} expenses`);
+    return mergedResult;
+
+  } catch (error) {
+    console.error('❌ Error in analyzeLargePDF:', error);
+    throw error;
+  }
+}
+
 function fixRTLChunk(text: string): string {
   // Split into lines for processing
   const lines = text.split('\n');
@@ -466,32 +596,31 @@ function fixRTLChunk(text: string): string {
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
-    console.log('📝 Analyzing PDF with hybrid approach: extract + analyze...');
+    console.log('📝 Analyzing PDF directly with GPT-4o using Files API...');
 
-    // Extract text using unpdf for better control over large PDFs
-    const { getDocumentProxy, extractText } = await import('unpdf');
-    const pdf = await getDocumentProxy(new Uint8Array(buffer));
-    const { totalPages, text: rawText } = await extractText(pdf, { mergePages: true });
+    // Check file size - for very large PDFs, we might need to split
+    const fileSizeMB = buffer.length / (1024 * 1024);
+    console.log(`📄 PDF size: ${fileSizeMB.toFixed(2)} MB`);
 
-    console.log(`✅ unpdf extracted: ${rawText.length} characters, ${totalPages} pages`);
-
-    // Enhanced RTL text processing for large PDFs
-    let processedText = fixRTLTextFromPDF(rawText);
-    console.log(`🔧 After RTL processing: ${processedText.length} characters`);
-
-    // For very large PDFs, truncate intelligently but keep more content
-    const MAX_TEXT_LENGTH = 50000; // Increased from 15K to 50K
-    if (processedText.length > MAX_TEXT_LENGTH) {
-      console.log(`📏 Truncating text from ${processedText.length} to ${MAX_TEXT_LENGTH} chars`);
-      // Try to truncate at a logical break point (end of transaction line)
-      const lastTransactionIndex = processedText.lastIndexOf('\n', MAX_TEXT_LENGTH - 1000);
-      if (lastTransactionIndex > MAX_TEXT_LENGTH * 0.8) {
-        processedText = processedText.substring(0, lastTransactionIndex);
-      } else {
-        processedText = processedText.substring(0, MAX_TEXT_LENGTH);
-      }
-      console.log(`📏 Final text length: ${processedText.length} chars`);
+    // For very large PDFs (> 5MB), try a different approach
+    if (fileSizeMB > 5) {
+      console.log('📏 Large PDF detected, trying split approach...');
+      return await analyzeLargePDF(buffer, fileType, fileName);
     }
+
+    // Upload PDF directly to OpenAI Files API for analysis
+    const tempFilePath = `/tmp/${Date.now()}-${fileName}`;
+    await require('fs').promises.writeFile(tempFilePath, buffer);
+
+    const fileUpload = await openai.files.create({
+      file: require('fs').createReadStream(tempFilePath),
+      purpose: 'assistants'
+    });
+
+    console.log(`✅ PDF uploaded to OpenAI Files API: ${fileUpload.id}`);
+
+    // Clean up temp file
+    await require('fs').promises.unlink(tempFilePath);
 
     // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
@@ -511,26 +640,67 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       console.log(`📋 Loaded ${expenseCategories.length} expense categories from database`);
     }
 
-    // Get appropriate prompt for document type with extracted text
-    const prompt = getPromptForDocumentType(fileType, processedText, expenseCategories);
+    // Get appropriate prompt for document type (direct PDF analysis - no text content needed)
+    const prompt = getPromptForDocumentType(fileType, null, expenseCategories);
 
-    // Use GPT-5-mini for text analysis (faster and more reliable for large text)
-    console.log(`🤖 Analyzing with GPT-5-mini (hybrid approach)...`);
+    // Analyze with GPT-4o using direct PDF upload (Chat Completions API)
+    console.log(`🤖 Analyzing with GPT-4o (direct PDF upload)...`);
     console.log(`📊 Prompt length: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
 
     const startAI = Date.now();
-    const response = await openai.responses.create({
-      model: 'gpt-5-mini-2025-08-07',
-      input: prompt,
-      reasoning: { effort: 'minimal' },
-      text: { verbosity: 'low' },
-      max_output_tokens: 16000
-    });
+
+    // Try different models in order of preference for handling large outputs
+    const modelsToTry = [
+      'gpt-4o-128k', // If available, supports much larger outputs
+      'gpt-4o',      // Standard GPT-4o with max tokens
+      'gpt-4-turbo'  // Fallback
+    ];
+
+    let response;
+    let usedModel = '';
+
+    for (const model of modelsToTry) {
+      try {
+        console.log(`🔄 Trying model: ${model}`);
+        response = await openai.chat.completions.create({
+          model: model,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'file',
+                file: { file_id: fileUpload.id }
+              },
+              {
+                type: 'text',
+                text: prompt
+              }
+            ]
+          }],
+          temperature: 0.1,
+          max_tokens: model === 'gpt-4o-128k' ? 32000 : 16384,
+          response_format: { type: 'json_object' }
+        });
+        usedModel = model;
+        console.log(`✅ Successfully used model: ${model}`);
+        break;
+      } catch (modelError: any) {
+        console.log(`❌ Model ${model} failed: ${modelError.message}`);
+        if (!modelError.message.includes('does not have access') &&
+            !modelError.message.includes('not found')) {
+          throw modelError; // Re-throw if it's not an access issue
+        }
+      }
+    }
+
+    if (!response) {
+      throw new Error('All models failed to analyze the PDF');
+    }
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
 
-    console.log(`✅ GPT-5-mini analysis complete (${aiDuration}s)`);
+    console.log(`✅ ${usedModel} analysis complete (${aiDuration}s)`);
 
-    const content = response.output_text || '{}';
+    const content = response.choices[0]?.message?.content || '{}';
 
     // Parse JSON with improved error handling
     try {
