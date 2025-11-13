@@ -461,7 +461,7 @@ async function analyzeLargePDF(buffer: Buffer, fileType: string, fileName: strin
           allResults.push(chunkResult);
         }
       } catch (e) {
-        console.error(`❌ Failed to parse chunk ${i + 1} JSON:`, e.message);
+        console.error(`❌ Failed to parse chunk ${i + 1} JSON:`, e instanceof Error ? e.message : String(e));
       }
 
       // Small delay between chunks
