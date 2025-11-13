@@ -348,108 +348,150 @@ async function validateAndNormalizeCategories(
  */
 function fixRTLTextFromPDF(text: string): string {
   try {
-    // Split into lines
-    const lines = text.split('\n');
+    console.log('🔧 Starting enhanced RTL processing...');
 
-    const fixedLines = lines.map(line => {
-      // If line looks completely reversed (common in PDFs), reverse the entire line
-      if (line.match(/^\d{4}\//)) { // Lines starting with reversed dates like "5202/11/21"
-        line = line.split('').reverse().join('');
+    // For very large texts, process in chunks to avoid memory issues
+    if (text.length > 100000) {
+      console.log('📏 Processing large text in chunks...');
+      const chunks = [];
+      const chunkSize = 50000;
+      for (let i = 0; i < text.length; i += chunkSize) {
+        const chunk = text.slice(i, i + chunkSize);
+        chunks.push(fixRTLChunk(chunk));
       }
+      return chunks.join('\n');
+    }
 
-      // 1. Fix reversed English/Latin text - be more aggressive with reversal
-      let fixedLine = line.replace(/[A-Za-z0-9._\-@\/]+/g, (match) => {
-        // Always try reversing to see if it makes more sense
-        const reversed = match.split('').reverse().join('');
-
-        // Strong indicators that reversal is correct:
-        if (
-          // Domain names
-          reversed.match(/\.(com|net|org|il|co\.il|gov|edu|app|io|ai)$/i) ||
-          // URLs
-          reversed.match(/^(www|http|https|ftp)/i) ||
-          // Email
-          reversed.includes('@') ||
-          // File extensions
-          reversed.match(/\.(pdf|jpg|png|docx?)$/i) ||
-          // Common tech/brand names (must start with capital)
-          reversed.match(/^(CURSOR|OPENAI|VERCEL|ANTHROPIC|GOOGLE|MICROSOFT|ADOBE|NETFLIX|ZOOM|APPLE|PAYPAL|AMAZON|STRIPE|GITHUB|GITLAB|SLACK|DISCORD|TELEGRAM|WHATSAPP|FACEBOOK|INSTAGRAM|TWITTER|LINKEDIN|YOUTUBE|SPOTIFY|DROPBOX|NOTION|FIGMA|CANVA|PAYBOX|PAYPAL|BIT|MASTERCARD|VISA|AMERICAN|EXPRESS|DISCOVER)/i) ||
-          // Common English words that indicate proper direction
-          reversed.match(/^(usage|subscription|payment|invoice|receipt|statement|report|summary|total|balance|credit|debit|account|customer|vendor|service|product|order|transaction|fee|charge|refund|discount|tax|vat|net|gross|atm|cash|check|transfer|deposit|withdrawal)/i) ||
-          // Common business names
-          reversed.match(/^(supermarket|pharmacy|restaurant|gas|fuel|electricity|water|internet|phone|mobile|telecom|insurance|bank|credit|card|loan|mortgage)/i) ||
-          // Numbers that should be reversed (like dates, amounts)
-          reversed.match(/^\d{1,4}\/\d{1,2}\/\d{1,4}$/) || // dates like 2025/11/12
-          reversed.match(/^\d{1,3}(,\d{3})*(\.\d{1,2})?$/) // amounts like 000,549
-        ) {
-          return reversed;
-        }
-
-        // If original looks like gibberish but reversed looks like real words, reverse it
-        // Check if reversed version has more common letter patterns
-        const reversedScore = (reversed.match(/[aeiou]/gi) || []).length; // vowel count
-        const originalScore = (match.match(/[aeiou]/gi) || []).length;
-
-        // More aggressive reversal - if it looks like a business name or contains numbers
-        if (reversedScore > originalScore || match.match(/\d/) || reversed.match(/^[A-Z]/)) {
-          return reversed;
-        }
-
-        return match; // Keep original if unsure
-      });
-
-      // 2. Fix Hebrew text - add spaces between concatenated words and fix common RTL issues
-      fixedLine = fixedLine
-        // Fix common Hebrew business name concatenations
-        .replace(/(סופרפארם)(ברנע[^\s]*)/g, '$1 $2') // סופרפארם ברנעאשקלון → סופר פארם ברנע אשקלון
-        .replace(/(שופרסל)([^\s]+)/g, '$1 $2') // שופרסלדיל → שופרסל דיל
-        .replace(/(פז)([^\s]*אפליקצ[^\s]*)/g, '$1 $2') // פזאפליקצייתיילו → פז אפליקציית יילו
-        .replace(/(בנק)([^\s]*)/g, '$1 $2') // בנקדיסקונט → בנק דיסקונט
-        .replace(/(מגדל)([^\s]*)/g, '$1 $2') // מגדלחיים → מגדל חיים
-        .replace(/(הראל)([^\s]*)/g, '$1 $2') // הראלביטוח → הראל ביטוח
-        .replace(/(קרן)([^\s]*מכבי[^\s]*)/g, '$1 $2') // קרןמכבי → קרן מכבי
-        .replace(/(ויזה|מסטרקארד|אמריקן|אקספרס)/g, ' $1 ') // Add spaces around card names
-        // Fix amounts with shekel sign
-        .replace(/(\d+[,.]?\d*)\s*₪/g, '$1 ₪') // 500₪ → 500 ₪
-        // Fix dates
-        .replace(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/g, '$1/$2/$3') // Ensure consistent date format
-        // סופר + דוידי/פארם → סופר דוידי/פארם
-        .replace(/(סופר)(דוידי|פארם|דיל)/g, '$1 $2')
-        // בזק/פלאפון + חשבון → בזק חשבון
-        .replace(/(בזק|פלאפון|הוט|סלקום)(חשבון[^\s]*)/g, '$1 $2')
-        // קרן + מכבי/כללית → קרן מכבי
-        .replace(/(קרן|ביטוח)(מכבי|כללית|לאומי|הראל|מגדל)/g, '$1 $2')
-        // מקדונלד'ס, ארקפה, etc - city names stuck to brand
-        .replace(/(מקדונלד'ס|ארקפה|בורגר[^\s]+|קפה[^\s]+)(תל[^\s]+|ירושל[^\s]+|חיפה|אשקלון|אשדוד|רחובות|פתח[^\s]+)/g, '$1 $2');
-      
-      return fixedLine;
-    });
-    
-    return fixedLines.join('\n');
+    return fixRTLChunk(text);
   } catch (error) {
     console.error('Error in fixRTLTextFromPDF:', error);
     return text; // Return original on error
   }
 }
 
-async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
-  try {
-    // 📝 Extract text from PDF using pdf-parse (better for Hebrew/RTL)
-    console.log('📝 Extracting text from PDF using pdf-parse...');
+function fixRTLChunk(text: string): string {
+  // Split into lines for processing
+  const lines = text.split('\n');
+  console.log(`🔧 Processing ${lines.length} lines...`);
 
-    // Upload PDF directly to OpenAI Files API for analysis
-    const tempFilePath = `/tmp/${Date.now()}-${fileName}`;
-    await require('fs').promises.writeFile(tempFilePath, buffer);
+  const fixedLines = lines.map((line, index) => {
+    // Progress indicator for large files
+    if (index > 0 && index % 1000 === 0) {
+      console.log(`🔧 Processed ${index}/${lines.length} lines...`);
+    }
 
-    const fileUpload = await openai.files.create({
-      file: require('fs').createReadStream(tempFilePath),
-      purpose: 'assistants'
+    // Ultra-aggressive reversal for lines that look completely reversed
+    if (line.match(/^\d{4}\//) || line.match(/\d{2}\/\d{2}\/\d{4}/) || line.match(/\d{1,3}(,\d{3})*\.\d{2}/)) {
+      // This looks like a reversed transaction line - reverse the entire line
+      line = line.split('').reverse().join('');
+    }
+
+    // Enhanced reversal logic - more aggressive for PDF text
+    let fixedLine = line.replace(/[A-Za-z0-9._\-@\/]+/g, (match) => {
+      const reversed = match.split('').reverse().join('');
+
+      // Strong reversal indicators (expanded list)
+      if (
+        // Financial terms (Hebrew reversed)
+        reversed.match(/^(תשלום|חיוב|זיכוי|יתרה|סכום|סה"כ|מע"מ|מס|עמלה|ריבית)/) ||
+        // Bank names reversed
+        reversed.match(/^(כאל|מקס|ישראכרט|לאומי|דיסקונט|פועלים|בנק|בנקאי)/) ||
+        // Domain names
+        reversed.match(/\.(com|net|org|il|co\.il|gov|edu|app|io|ai)$/i) ||
+        // URLs
+        reversed.match(/^(www|http|https|ftp)/i) ||
+        // Email
+        reversed.includes('@') ||
+        // Tech companies
+        reversed.match(/^(CURSOR|OPENAI|VERCEL|ANTHROPIC|GOOGLE|MICROSOFT|ADOBE|NETFLIX|ZOOM|APPLE|PAYPAL|AMAZON|STRIPE|GITHUB|GITLAB|SLACK|DISCORD|TELEGRAM|WHATSAPP|FACEBOOK|INSTAGRAM|TWITTER|LINKEDIN|YOUTUBE|SPOTIFY|DROPBOX|NOTION|FIGMA|CANVA)/i) ||
+        // Financial terms
+        reversed.match(/^(usage|subscription|payment|invoice|receipt|statement|report|summary|total|balance|credit|debit|account|customer|vendor|service|product|order|transaction|fee|charge|refund|discount|tax|vat|net|gross|atm|cash|check|transfer|deposit|withdrawal)/i) ||
+        // Business categories
+        reversed.match(/^(supermarket|pharmacy|restaurant|gas|fuel|electricity|water|internet|phone|mobile|telecom|insurance|bank|credit|card|loan|mortgage|shopping|grocery|food|dining|transport|travel|entertainment|health|medical|education|home|utilities|services)/i) ||
+        // Date formats
+        reversed.match(/^\d{1,4}\/\d{1,2}\/\d{1,4}$/) ||
+        // Amount formats
+        reversed.match(/^\d{1,3}(,\d{3})*(\.\d{1,2})?$/) ||
+        // Card names
+        reversed.match(/^(ויזה|מסטרקארד|אמריקן|אקספרס|ויזה|מאסטר|אמריקן)/)
+      ) {
+        return reversed;
+      }
+
+      // Vowel-based heuristic - if reversed has more vowels, it's probably correct
+      const reversedVowels = (reversed.match(/[aeiou]/gi) || []).length;
+      const originalVowels = (match.match(/[aeiou]/gi) || []).length;
+
+      // Additional heuristics for reversal
+      if (reversedVowels > originalVowels ||
+          match.match(/^\d/) || // Numbers at start
+          reversed.match(/^\d/) || // Numbers after reversal
+          match.match(/^\d{2,}/) || // Multi-digit numbers
+          reversed.match(/^[A-Z]{2,}/)) { // Capital words
+        return reversed;
+      }
+
+      return match;
     });
 
-    console.log(`✅ PDF uploaded to OpenAI Files API: ${fileUpload.id}`);
+    // Enhanced Hebrew text processing
+    fixedLine = fixedLine
+      // Fix concatenated Hebrew business names (expanded)
+      .replace(/(סופרפארם)(ברנע[^\s]*)/g, '$1 $2')
+      .replace(/(שופרסל)([^\s]*)/g, '$1 $2')
+      .replace(/(פז)([^\s]*)/g, '$1 $2')
+      .replace(/(בנק)([^\s]*)/g, '$1 $2')
+      .replace(/(מגדל)([^\s]*)/g, '$1 $2')
+      .replace(/(הראל)([^\s]*)/g, '$1 $2')
+      .replace(/(כלל)([^\s]*)/g, '$1 $2')
+      .replace(/(פניקס)([^\s]*)/g, '$1 $2')
+      .replace(/(קרן)([^\s]*מכבי[^\s]*)/g, '$1 $2')
+      .replace(/(קרן)([^\s]*כלל[^\s]*)/g, '$1 $2')
+      .replace(/(ויזה|מסטרקארד|אמריקן|אקספרס)/g, ' $1 ')
+      // Fix amounts and dates
+      .replace(/(\d+[,.]?\d*)\s*₪/g, '$1 ₪')
+      .replace(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/g, '$1/$2/$3')
+      // Additional spacing fixes
+      .replace(/(סופר)(דוידי|פארם|דיל)/g, '$1 $2')
+      .replace(/(בזק|פלאפון|הוט|סלקום)(חשבון[^\s]*)/g, '$1 $2')
+      .replace(/(קרן|ביטוח)(מכבי|כללית|לאומי|הראל|מגדל|פניקס)/g, '$1 $2')
+      // Fix stuck city names
+      .replace(/(מקדונלד'ס|ארקפה|בורגר[^\s]+|קפה[^\s]+)(תל[^\s]+|ירושל[^\s]+|חיפה|אשקלון|אשדוד|רחובות|פתח[^\s]+)/g, '$1 $2');
 
-    // Clean up temp file
-    await require('fs').promises.unlink(tempFilePath);
+    return fixedLine;
+  });
+
+  return fixedLines.join('\n');
+}
+
+async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
+  try {
+    console.log('📝 Analyzing PDF with hybrid approach: extract + analyze...');
+
+    // Extract text using unpdf for better control over large PDFs
+    const { getDocumentProxy, extractText } = await import('unpdf');
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { totalPages, text: rawText } = await extractText(pdf, { mergePages: true });
+
+    console.log(`✅ unpdf extracted: ${rawText.length} characters, ${totalPages} pages`);
+
+    // Enhanced RTL text processing for large PDFs
+    let processedText = fixRTLTextFromPDF(rawText);
+    console.log(`🔧 After RTL processing: ${processedText.length} characters`);
+
+    // For very large PDFs, truncate intelligently but keep more content
+    const MAX_TEXT_LENGTH = 50000; // Increased from 15K to 50K
+    if (processedText.length > MAX_TEXT_LENGTH) {
+      console.log(`📏 Truncating text from ${processedText.length} to ${MAX_TEXT_LENGTH} chars`);
+      // Try to truncate at a logical break point (end of transaction line)
+      const lastTransactionIndex = processedText.lastIndexOf('\n', MAX_TEXT_LENGTH - 1000);
+      if (lastTransactionIndex > MAX_TEXT_LENGTH * 0.8) {
+        processedText = processedText.substring(0, lastTransactionIndex);
+      } else {
+        processedText = processedText.substring(0, MAX_TEXT_LENGTH);
+      }
+      console.log(`📏 Final text length: ${processedText.length} chars`);
+    }
 
     // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
@@ -469,39 +511,27 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       console.log(`📋 Loaded ${expenseCategories.length} expense categories from database`);
     }
 
-    // Get appropriate prompt for document type (direct PDF analysis - no text content needed)
-    const prompt = getPromptForDocumentType(fileType, null, expenseCategories);
+    // Get appropriate prompt for document type with extracted text
+    const prompt = getPromptForDocumentType(fileType, processedText, expenseCategories);
 
-    // Analyze with GPT-4o using direct PDF upload (Chat Completions API)
-    console.log(`🤖 Analyzing with GPT-4o (direct PDF upload)...`);
+    // Use GPT-5-mini for text analysis (faster and more reliable for large text)
+    console.log(`🤖 Analyzing with GPT-5-mini (hybrid approach)...`);
     console.log(`📊 Prompt length: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
 
     const startAI = Date.now();
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'file',
-            file: { file_id: fileUpload.id }
-          },
-          {
-            type: 'text',
-            text: prompt
-          }
-        ]
-      }],
-      temperature: 0.1,
-      max_tokens: 8000,
-      response_format: { type: 'json_object' }
+    const response = await openai.responses.create({
+      model: 'gpt-5-mini-2025-08-07',
+      input: prompt,
+      reasoning: { effort: 'minimal' },
+      text: { verbosity: 'low' },
+      max_output_tokens: 16000
     });
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
 
-    console.log(`✅ GPT-4o analysis complete (${aiDuration}s)`);
+    console.log(`✅ GPT-5-mini analysis complete (${aiDuration}s)`);
 
-    const content = response.choices[0]?.message?.content || '{}';
-    
+    const content = response.output_text || '{}';
+
     // Parse JSON with improved error handling
     try {
       // First, try direct parsing

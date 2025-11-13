@@ -13,7 +13,7 @@ async function testPDFUploadAndAnalyze() {
   try {
     console.log('🎯 Testing PDF upload to OpenAI Files API and then analysis...');
 
-    const pdfPath = '/Users/idosegev/Downloads/גדי ברקאי דוח עוש וכ.א.pdf';
+    const pdfPath = '/Users/idosegev/Downloads/דף פירוט דיגיטלי כאל 09-25.pdf';
     console.log(`📁 Reading PDF: ${pdfPath}`);
 
     if (!fs.existsSync(pdfPath)) {
@@ -83,7 +83,7 @@ async function testPDFUploadAndAnalyze() {
         ]
       }],
       temperature: 0.1,
-      max_tokens: 3000,
+      max_tokens: 16384,
       response_format: { type: 'json_object' }
     });
 
