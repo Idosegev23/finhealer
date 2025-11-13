@@ -104,10 +104,8 @@ export function DocumentUploader({
       setStatus('success');
       onSuccess?.(data);
 
-      // Redirect to dashboard immediately - processing will continue in background
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1500);
+      // Stay in scan center - user can upload more documents
+      // Processing continues in background, user gets WhatsApp notification when done
     } catch (error) {
       console.error('Upload error:', error);
       const message = error instanceof Error ? error.message : 'שגיאה בהעלאת הקובץ';
@@ -274,9 +272,14 @@ export function DocumentUploader({
                 העיבוד מתבצע ברקע. נודיע לך כשיסתיים 🔔
               </p>
             </div>
-            <Button onClick={handleReset} variant="outline">
-              העלה קובץ נוסף
-            </Button>
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500">
+                📱 תקבל הודעת WhatsApp כשהעיבוד יסתיים
+              </p>
+              <Button onClick={handleReset} variant="outline" className="w-full">
+                📄 העלה מסמך נוסף
+              </Button>
+            </div>
           </div>
         )}
 

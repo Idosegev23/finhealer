@@ -171,6 +171,9 @@ export default function ScanCenterPage() {
         <p className="text-gray-600">
           העלה דוחות בנק ופירוט אשראי - נזהה ונסווג את ההוצאות אוטומטית עם AI
         </p>
+        <p className="text-sm text-blue-600 mt-2">
+          💡 <strong>טיפ:</strong> אחרי העלאה מוצלחת תישאר כאן - תוכל להעלות מסמכים נוספים ברציפות!
+        </p>
         <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start gap-3">
             <div className="text-2xl">💡</div>
@@ -273,8 +276,8 @@ export default function ScanCenterPage() {
                 console.log('✅ Document uploaded:', data);
                 // Refresh history to show new document
                 loadScannedHistory();
-                // Reset selection after successful upload
-                setTimeout(() => setActiveType(null), 2000);
+                // Keep selection active so user can upload more documents
+                // Don't reset activeType - let user continue scanning
               }}
               onError={(error) => {
                 alert(`❌ שגיאה: ${error}`);
