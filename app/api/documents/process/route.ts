@@ -437,31 +437,18 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // 📝 Extract text from PDF using pdf-parse (better for Hebrew/RTL)
     console.log('📝 Extracting text from PDF using pdf-parse...');
 
-    // Try pdf-parse first (better for Hebrew/RTL text)
+    // Extract text using unpdf (optimized for Hebrew/RTL text)
     let extractedText: string;
     let totalPages: number;
 
-    try {
-      const pdfParse = await import('pdf-parse');
-      const pdfData = await pdfParse(Buffer.from(buffer));
+    const { getDocumentProxy, extractText } = await import('unpdf');
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { totalPages: pages, text: rawText } = await extractText(pdf, { mergePages: true });
 
-      extractedText = pdfData.text;
-      totalPages = pdfData.numpages;
+    extractedText = rawText;
+    totalPages = pages;
 
-      console.log(`✅ pdf-parse extracted: ${extractedText.length} characters, ${totalPages} pages`);
-    } catch (pdfParseError) {
-      console.warn('pdf-parse failed, falling back to unpdf:', pdfParseError);
-
-      // Fallback to unpdf
-      const { getDocumentProxy, extractText } = await import('unpdf');
-      const pdf = await getDocumentProxy(new Uint8Array(buffer));
-      const { totalPages: pages, text: rawText } = await extractText(pdf, { mergePages: true });
-
-      extractedText = rawText;
-      totalPages = pages;
-
-      console.log(`✅ unpdf fallback extracted: ${extractedText.length} characters, ${totalPages} pages`);
-    }
+    console.log(`✅ unpdf extracted: ${extractedText.length} characters, ${totalPages} pages`);
 
     // 🔧 Fix RTL text reversal issues
     extractedText = fixRTLTextFromPDF(extractedText);
