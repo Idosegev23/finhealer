@@ -105,10 +105,10 @@ async function testPDFDirect() {
         console.log(`\n🔄 Trying approach: ${approach.name}`);
 
         const response = await openai.chat.completions.create({
-          model: 'gpt-5.1',
+          model: 'gpt-4o',
           messages: approach.messages,
           temperature: 0.1,
-          max_completion_tokens: 2000,
+          max_tokens: 2000,
           response_format: { type: 'json_object' }
         });
 

@@ -8,7 +8,7 @@
 // ============================================================================
 
 export function getCreditStatementPrompt(
-  text: string,
+  text: string | null,
   categories?: Array<{name: string; expense_type: string; category_group: string}>
 ): string {
   // Build categories guide from database
@@ -283,7 +283,7 @@ ${text}
 // ============================================================================
 
 export function getBankStatementPrompt(
-  text: string, 
+  text: string | null,
   categories?: Array<{name: string; expense_type: string; category_group: string}>
 ): string {
   // Build categories guide from database
@@ -586,7 +586,7 @@ ${text}`;
 // 3️⃣ דוח הלוואות רגיל (Loan Statement)
 // ============================================================================
 
-export function getLoanStatementPrompt(text: string): string {
+export function getLoanStatementPrompt(text: string | null): string {
   return `אתה מומחה בניתוח דוחות הלוואות ישראליים.
 
 נתח את דוח ההלוואות הבא וחלץ את כל המידע הרלוונטי בפורמט JSON.
@@ -646,7 +646,7 @@ ${text}`;
 // 4️⃣ דוח משכנתא (Mortgage Statement)
 // ============================================================================
 
-export function getMortgageStatementPrompt(text: string): string {
+export function getMortgageStatementPrompt(text: string | null): string {
   return `אתה מומחה בניתוח דוחות משכנתאות ישראליות.
 
 נתח את דוח המשכנתא הבא וחלץ את כל המידע הרלוונטי בפורמט JSON.
@@ -718,7 +718,7 @@ ${text}`;
 // 5️⃣ דוח ביטוחים (Insurance Statement - "הר הביטוח")
 // ============================================================================
 
-export function getInsuranceStatementPrompt(text: string): string {
+export function getInsuranceStatementPrompt(text: string | null): string {
   return `אתה מומחה בניתוח דוחות "הר הביטוח" - מרשם הביטוחים הלאומי של משרד האוצר.
 
 נתח את דוח הביטוחים הבא וחלץ את **כל הפוליסות**.
@@ -787,7 +787,7 @@ ${text}
 // 6️⃣ תלוש שכר (Payslip / Salary Slip)
 // ============================================================================
 
-export function getPayslipPrompt(text: string): string {
+export function getPayslipPrompt(text: string | null): string {
   return `אתה מומחה בניתוח תלושי שכר ישראליים.
 
 נתח את תלוש השכר הבא וחלץ את **כל המידע הרלוונטי**.
@@ -883,7 +883,7 @@ ${text}
 // 7️⃣ דוח מסלקה פנסיונית (Pension Clearinghouse Report)
 // ============================================================================
 
-export function getPensionStatementPrompt(text: string): string {
+export function getPensionStatementPrompt(text: string | null): string {
   return `אתה מומחה בניתוח דוחות מסלקה פנסיונית ישראלית.
 
 נתח את דוח המסלקה הבא וחלץ את **כל התוכניות והנתונים הפנסיוניים**.
@@ -995,7 +995,7 @@ ${text}
 
 export function getPromptForDocumentType(
   documentType: string,
-  extractedText: string,
+  extractedText: string | null,
   categories?: Array<{name: string; expense_type: string; category_group: string}>
 ): string {
   const normalizedType = documentType.toLowerCase();

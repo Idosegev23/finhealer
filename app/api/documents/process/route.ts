@@ -437,28 +437,23 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // 📝 Extract text from PDF using pdf-parse (better for Hebrew/RTL)
     console.log('📝 Extracting text from PDF using pdf-parse...');
 
-    // Extract text using unpdf (optimized for Hebrew/RTL text)
-    let extractedText: string;
-    let totalPages: number;
+    // Upload PDF directly to OpenAI Files API for analysis
+    const tempFilePath = `/tmp/${Date.now()}-${fileName}`;
+    await require('fs').promises.writeFile(tempFilePath, buffer);
 
-    const { getDocumentProxy, extractText } = await import('unpdf');
-    const pdf = await getDocumentProxy(new Uint8Array(buffer));
-    const { totalPages: pages, text: rawText } = await extractText(pdf, { mergePages: true });
+    const fileUpload = await openai.files.create({
+      file: require('fs').createReadStream(tempFilePath),
+      purpose: 'assistants'
+    });
 
-    extractedText = rawText;
-    totalPages = pages;
+    console.log(`✅ PDF uploaded to OpenAI Files API: ${fileUpload.id}`);
 
-    console.log(`✅ unpdf extracted: ${extractedText.length} characters, ${totalPages} pages`);
-
-    // 🔧 Fix RTL text reversal issues
-    extractedText = fixRTLTextFromPDF(extractedText);
-
-    console.log(`📄 Sending processed text to GPT-5-mini: ${extractedText.length} chars (~${Math.ceil(extractedText.length / 4)} tokens)`);
+    // Clean up temp file
+    await require('fs').promises.unlink(tempFilePath);
 
     // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
     if (fileType === 'bank_statement' || fileType === 'credit_statement') {
-      // Use the supabase client created at the top of the function
       const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
       const supabaseClient = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -469,32 +464,43 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
         .select('name, expense_type, category_group')
         .eq('is_active', true)
         .order('expense_type, category_group, display_order, name');
-      
+
       expenseCategories = categories || [];
       console.log(`📋 Loaded ${expenseCategories.length} expense categories from database`);
     }
 
-    // Get appropriate prompt for document type
-    const prompt = getPromptForDocumentType(fileType, extractedText, expenseCategories);
-    
-    // Analyze with GPT-5-mini using Responses API (faster, smarter)
-    console.log(`🤖 Analyzing with GPT-5-mini (Responses API)...`);
+    // Get appropriate prompt for document type (direct PDF analysis - no text content needed)
+    const prompt = getPromptForDocumentType(fileType, null, expenseCategories);
+
+    // Analyze with GPT-4o using direct PDF upload (Chat Completions API)
+    console.log(`🤖 Analyzing with GPT-4o (direct PDF upload)...`);
     console.log(`📊 Prompt length: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
-    
+
     const startAI = Date.now();
-    const response = await openai.responses.create({
-      model: 'gpt-5-mini-2025-08-07',
-      input: prompt,
-      reasoning: { effort: 'minimal' }, // Fast processing for structured data
-      text: { verbosity: 'low' }, // Concise JSON output
-      max_output_tokens: 16000,
-      // response_format not supported in Responses API - rely on prompt
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'file',
+            file: { file_id: fileUpload.id }
+          },
+          {
+            type: 'text',
+            text: prompt
+          }
+        ]
+      }],
+      temperature: 0.1,
+      max_tokens: 8000,
+      response_format: { type: 'json_object' }
     });
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
 
-    console.log(`✅ GPT-5-mini analysis complete (${aiDuration}s)`);
-    
-    const content = response.output_text || '{}';
+    console.log(`✅ GPT-4o analysis complete (${aiDuration}s)`);
+
+    const content = response.choices[0]?.message?.content || '{}';
     
     // Parse JSON with improved error handling
     try {
@@ -553,7 +559,7 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
     
     // Get appropriate prompt (images are usually credit/bank/receipt)
-    const prompt = getPromptForDocumentType(documentType, '');
+    const prompt = getPromptForDocumentType(documentType, null);
     
     // GPT-4o Vision with JSON mode
     const response = await openai.chat.completions.create({
