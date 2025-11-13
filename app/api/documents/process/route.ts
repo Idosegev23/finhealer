@@ -457,7 +457,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       reasoning: { effort: 'minimal' }, // Fast processing for structured data
       text: { verbosity: 'low' }, // Concise JSON output
       max_output_tokens: 16000,
-      response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
+      // response_format not supported in Responses API - rely on prompt
     });
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
 
@@ -650,7 +650,7 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
       reasoning: { effort: 'minimal' }, // Fast processing for structured data
       text: { verbosity: 'low' }, // Concise JSON output
       max_output_tokens: 16000,
-      response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
+      // response_format not supported in Responses API - rely on prompt
     });
 
     console.log(`✅ GPT-5-mini analysis complete`);
