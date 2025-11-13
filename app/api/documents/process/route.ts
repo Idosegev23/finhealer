@@ -472,7 +472,13 @@ async function analyzeLargePDF(buffer: Buffer, fileType: string, fileName: strin
 
     // Merge all results
     console.log('\n🔀 Merging results from all chunks...');
-    const mergedResult = {
+    const mergedResult: {
+      report_info: any;
+      transactions: {
+        income: any[];
+        expenses: any[];
+      };
+    } = {
       report_info: allResults[0]?.report_info || {},
       transactions: {
         income: [],
