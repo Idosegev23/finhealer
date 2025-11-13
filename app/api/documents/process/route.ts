@@ -1174,7 +1174,7 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
         expense_type: detail.expense_type,
         payment_method: 'credit_card',
         source: 'ocr',
-        status: detail.expense_category ? 'confirmed' : 'pending',
+        status: 'pending', // ✅ תמיד pending כדי להופיע ברשימה לאישור
         document_id: documentId,
         // Hierarchy fields
         is_source_transaction: false, // Credit details are NOT source
