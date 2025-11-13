@@ -446,22 +446,24 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Get appropriate prompt for document type
     const prompt = getPromptForDocumentType(fileType, extractedText, expenseCategories);
     
-    // Analyze with GPT-5-mini (smarter than nano, faster than gpt-4o)
-    console.log(`🤖 Analyzing with GPT-5-mini (JSON mode)...`);
+    // Analyze with GPT-5-mini using Responses API (faster, smarter)
+    console.log(`🤖 Analyzing with GPT-5-mini (Responses API)...`);
     console.log(`📊 Prompt length: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
     
     const startAI = Date.now();
-    const response = await openai.chat.completions.create({
+    const response = await openai.responses.create({
       model: 'gpt-5-mini-2025-08-07',
-      messages: [{ role: 'user', content: prompt }],
-      max_completion_tokens: 16000,
+      input: prompt,
+      reasoning: { effort: 'minimal' }, // Fast processing for structured data
+      text: { verbosity: 'low' }, // Concise JSON output
+      max_output_tokens: 16000,
       response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
     });
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
 
     console.log(`✅ GPT-5-mini analysis complete (${aiDuration}s)`);
     
-    const content = response.choices[0]?.message?.content || '{}';
+    const content = response.output_text || '{}';
     
     // Parse JSON with improved error handling
     try {
@@ -636,28 +638,24 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
     // 4. Get appropriate prompt
     const prompt = getPromptForDocumentType(documentType, excelText);
     
-    // 5. Send to GPT-5-mini (text only, smarter than nano)
-    console.log(`🤖 Analyzing with GPT-5-mini (text mode, JSON output)...`);
+    // 5. Send to GPT-5-mini using Responses API (faster, smarter)
+    console.log(`🤖 Analyzing with GPT-5-mini (Responses API)...`);
     
-    const response = await openai.chat.completions.create({
+    // Combine system message with user prompt for Responses API
+    const fullPrompt = `אתה מומחה בניתוח מסמכים פיננסיים. החזר תמיד JSON תקין בלבד, ללא טקסט נוסף.\n\n${prompt}`;
+    
+    const response = await openai.responses.create({
       model: 'gpt-5-mini-2025-08-07',
-      messages: [
-        {
-          role: 'system',
-          content: 'אתה מומחה בניתוח מסמכים פיננסיים. החזר תמיד JSON תקין בלבד, ללא טקסט נוסף.'
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      max_completion_tokens: 16000,
+      input: fullPrompt,
+      reasoning: { effort: 'minimal' }, // Fast processing for structured data
+      text: { verbosity: 'low' }, // Concise JSON output
+      max_output_tokens: 16000,
       response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
     });
 
     console.log(`✅ GPT-5-mini analysis complete`);
     
-    const content = response.choices[0].message.content || '{}';
+    const content = response.output_text || '{}';
     
     // Parse JSON response with improved error handling
     try {
