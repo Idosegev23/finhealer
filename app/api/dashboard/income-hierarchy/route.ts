@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       // קבלת מקורות הכנסה קבועים
       const { data: incomeSources, error: sourcesError } = await supabase
         .from('income_sources')
-        .select('type, net_salary, amount, name')
+        .select('employment_type, net_amount, source_name')
         .eq('user_id', user.id)
         .eq('active', true);
 
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
       
       // הוספת מקורות הכנסה קבועים
       (incomeSources || []).forEach((source: any) => {
-        const type = source.source_type || 'other';
+        const type = source.employment_type || 'other';
         if (!grouped[type]) {
           grouped[type] = { total: 0, sources: [] };
         }
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
 
       // הוספת תנועות הכנסה בפועל
       (transactions || []).forEach((tx: any) => {
-        const type = tx.source_type || 'other';
+        const type = tx.category || 'other'; // transactions don't have employment_type
         if (!grouped[type]) {
           grouped[type] = { total: 0, sources: [] };
         }
@@ -170,19 +170,18 @@ export async function GET(request: NextRequest) {
       // מקורות הכנסה קבועים
       const { data: incomeSources, error: sourcesError } = await supabase
         .from('income_sources')
-        .select('name, net_amount, employer_name, description')
+        .select('source_name, net_amount, employer_name, notes')
         .eq('user_id', user.id)
         .eq('active', true)
-        .eq('source_type', sourceType);
+        .eq('employment_type', sourceType);
 
       // תנועות הכנסה מהתקופה
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
-        .select('amount, vendor, notes, date')
+        .select('amount, vendor, notes, date, category')
         .eq('user_id', user.id)
         .eq('type', 'income')
         .eq('status', 'confirmed')
-        .eq('source_type', sourceType)
         .gte('date', startDate)
         .lte('date', endDate)
         .or('has_details.is.null,has_details.eq.false');
@@ -198,12 +197,12 @@ export async function GET(request: NextRequest) {
 
       // הוספת מקורות הכנסה קבועים
       (incomeSources || []).forEach((source: any) => {
-        const name = source.name || source.employer_name || 'מקור הכנסה';
+        const name = source.source_name || source.employer_name || 'מקור הכנסה';
         const monthsInPeriod = period === 'current_month' ? 1 : period === 'last_3_months' ? 3 : period === 'last_year' ? 12 : 1;
         result.push({
           name,
           value: Math.round((Number(source.net_amount) || 0) * monthsInPeriod),
-          description: source.description
+          description: source.notes
         });
       });
 
