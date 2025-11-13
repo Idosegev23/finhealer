@@ -426,26 +426,39 @@ function fixRTLTextFromPDF(text: string): string {
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
   try {
-    // Extract text from PDF using unpdf (serverless-optimized)
-    console.log('📝 Extracting text from PDF...');
+    // 📝 Extract text from PDF using pdf-parse (better for Hebrew/RTL)
+    console.log('📝 Extracting text from PDF using pdf-parse...');
 
-    // Import unpdf - optimized for serverless/edge environments
-    const { getDocumentProxy, extractText } = await import('unpdf');
+    // Try pdf-parse first (better for Hebrew/RTL text)
+    let extractedText: string;
+    let totalPages: number;
 
-    // Create document proxy from buffer
-    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    try {
+      const pdfParse = (await import('pdf-parse')).default;
+      const pdfData = await pdfParse(Buffer.from(buffer));
 
-    // Extract text with merged pages
-    const { totalPages, text: rawText } = await extractText(pdf, { mergePages: true });
+      extractedText = pdfData.text;
+      totalPages = pdfData.numpages;
 
-    // 🔧 Fix RTL text reversal issues from unpdf
-    let extractedText = fixRTLTextFromPDF(rawText);
+      console.log(`✅ pdf-parse extracted: ${extractedText.length} characters, ${totalPages} pages`);
+    } catch (pdfParseError) {
+      console.warn('pdf-parse failed, falling back to unpdf:', pdfParseError);
 
-    console.log(`✅ Text extracted: ${extractedText.length} characters, ${totalPages} pages`);
-    
-    // ✅ שליחת הטקסט המלא ל-GPT-4o (תומך ב-128K tokens = ~512K תווים)
-    // המיתמול מתוקן ב-fixRTLTextFromPDF() - תומך בעברית ובהיפוך RTL
-    console.log(`📄 Sending full text to GPT-4o: ${extractedText.length} chars (~${Math.ceil(extractedText.length / 4)} tokens)`);
+      // Fallback to unpdf
+      const { getDocumentProxy, extractText } = await import('unpdf');
+      const pdf = await getDocumentProxy(new Uint8Array(buffer));
+      const { totalPages: pages, text: rawText } = await extractText(pdf, { mergePages: true });
+
+      extractedText = rawText;
+      totalPages = pages;
+
+      console.log(`✅ unpdf fallback extracted: ${extractedText.length} characters, ${totalPages} pages`);
+    }
+
+    // 🔧 Fix RTL text reversal issues
+    extractedText = fixRTLTextFromPDF(extractedText);
+
+    console.log(`📄 Sending processed text to GPT-5-mini: ${extractedText.length} chars (~${Math.ceil(extractedText.length / 4)} tokens)`);
 
     // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
