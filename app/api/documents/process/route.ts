@@ -352,6 +352,11 @@ function fixRTLTextFromPDF(text: string): string {
     const lines = text.split('\n');
 
     const fixedLines = lines.map(line => {
+      // If line looks completely reversed (common in PDFs), reverse the entire line
+      if (line.match(/^\d{4}\//)) { // Lines starting with reversed dates like "5202/11/21"
+        line = line.split('').reverse().join('');
+      }
+
       // 1. Fix reversed English/Latin text - be more aggressive with reversal
       let fixedLine = line.replace(/[A-Za-z0-9._\-@\/]+/g, (match) => {
         // Always try reversing to see if it makes more sense
@@ -372,7 +377,10 @@ function fixRTLTextFromPDF(text: string): string {
           // Common English words that indicate proper direction
           reversed.match(/^(usage|subscription|payment|invoice|receipt|statement|report|summary|total|balance|credit|debit|account|customer|vendor|service|product|order|transaction|fee|charge|refund|discount|tax|vat|net|gross|atm|cash|check|transfer|deposit|withdrawal)/i) ||
           // Common business names
-          reversed.match(/^(supermarket|pharmacy|restaurant|gas|fuel|electricity|water|internet|phone|mobile|telecom|insurance|bank|credit|card|loan|mortgage)/i)
+          reversed.match(/^(supermarket|pharmacy|restaurant|gas|fuel|electricity|water|internet|phone|mobile|telecom|insurance|bank|credit|card|loan|mortgage)/i) ||
+          // Numbers that should be reversed (like dates, amounts)
+          reversed.match(/^\d{1,4}\/\d{1,2}\/\d{1,4}$/) || // dates like 2025/11/12
+          reversed.match(/^\d{1,3}(,\d{3})*(\.\d{1,2})?$/) // amounts like 000,549
         ) {
           return reversed;
         }
@@ -434,7 +442,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     let totalPages: number;
 
     try {
-      const pdfParse = (await import('pdf-parse')).default;
+      const pdfParse = await import('pdf-parse');
       const pdfData = await pdfParse(Buffer.from(buffer));
 
       extractedText = pdfData.text;
