@@ -9,6 +9,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+console.log('🔍 Testing GPT-5.1 with Responses API...');
+
 async function testPDFUploadAndAnalyze() {
   try {
     console.log('🎯 Testing PDF upload to OpenAI Files API and then analysis...');
@@ -34,69 +36,87 @@ async function testPDFUploadAndAnalyze() {
 
     console.log('✅ File uploaded, ID:', fileUpload.id);
 
-    console.log('🤖 Analyzing with GPT-4o using file ID...');
+    console.log('🤖 Analyzing with GPT-5.1 using Responses API...');
 
     const startTime = Date.now();
 
-    // Now use the file ID in chat completions
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'file',
-            file: { file_id: fileUpload.id }
-          },
-          {
-            type: 'text',
-            text: `חלץ את כל התנועות הבנקאיות מהדוח הזה בפורמט JSON.
+    // Use GPT-5.1 with Responses API
+    console.log('🔄 Using GPT-5.1...');
 
-            החזר רק JSON תקין עם המבנה הבא:
+    const inputText = `Analyze this PDF document and extract all financial transactions in JSON format.
+
+Return only valid JSON with this structure:
+{
+  "report_info": {
+    "bank_name": "Bank name",
+    "account_number": "Account number",
+    "period_start": "YYYY-MM-DD",
+    "period_end": "YYYY-MM-DD"
+  },
+  "transactions": {
+    "income": [
+      {
+        "date": "YYYY-MM-DD",
+        "vendor": "Vendor name",
+        "amount": 123.45,
+        "category": "Category"
+      }
+    ],
+    "expenses": [
+      {
+        "date": "YYYY-MM-DD",
+        "vendor": "Vendor name",
+        "amount": 123.45,
+        "category": "Category"
+      }
+    ]
+  }
+}`;
+
+    console.log('📤 Sending to GPT-5.1 via Responses API...');
+
+    const response = await openai.responses.create({
+      model: 'gpt-5.1',
+      input: [
+        {
+          role: 'user',
+          content: [
             {
-              "report_info": {
-                "bank_name": "שם הבנק",
-                "account_number": "מספר חשבון",
-                "period_start": "YYYY-MM-DD",
-                "period_end": "YYYY-MM-DD"
-              },
-              "transactions": {
-                "income": [
-                  {
-                    "date": "YYYY-MM-DD",
-                    "vendor": "שם הספק",
-                    "amount": 123.45,
-                    "category": "קטגוריה"
-                  }
-                ],
-                "expenses": [
-                  {
-                    "date": "YYYY-MM-DD",
-                    "vendor": "שם הספק",
-                    "amount": 123.45,
-                    "category": "קטגוריה"
-                  }
-                ]
-              }
-            }`
-          }
-        ]
-      }],
-      temperature: 0.1,
-      max_tokens: 16384,
-      response_format: { type: 'json_object' }
+              type: 'input_file',
+              file_id: fileUpload.id
+            },
+            {
+              type: 'input_text',
+              text: inputText
+            }
+          ]
+        }
+      ],
+      reasoning: { effort: 'none' },
+      text: { verbosity: 'low' },
+      max_output_tokens: 32000
     });
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`✅ GPT-4o response received in ${duration}s`);
+    console.log(`✅ GPT-5.1 response received in ${duration}s`);
 
-    const content = response.choices[0]?.message?.content;
+    const content = response.output_text;
     console.log('📄 Raw Response:');
     console.log(content);
 
     if (content) {
+      // Try to extract JSON from the response
+      let jsonContent = content;
+
+      // Check if response is wrapped in markdown code blocks
+      const jsonMatch = content.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        jsonContent = jsonMatch[1];
+        console.log('📦 Extracted JSON from markdown code block');
+      }
+
       try {
-        const result = JSON.parse(content);
+        const result = JSON.parse(jsonContent);
         console.log('🎉 Success! JSON parsed correctly');
         console.log('📊 Extracted transactions:');
 
@@ -120,6 +140,8 @@ async function testPDFUploadAndAnalyze() {
 
       } catch (parseError) {
         console.error('❌ JSON parsing failed:', parseError.message);
+        console.log('🔍 Full response content:');
+        console.log(content);
       }
     }
 

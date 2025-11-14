@@ -649,64 +649,95 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Get appropriate prompt for document type (direct PDF analysis - no text content needed)
     const prompt = getPromptForDocumentType(fileType, null, expenseCategories);
 
-    // Analyze with GPT-4o using direct PDF upload (Chat Completions API)
-    console.log(`🤖 Analyzing with GPT-4o (direct PDF upload)...`);
+    // Analyze with AI using direct PDF upload (GPT-5.1 Responses API or GPT-4o Chat Completions)
+    console.log(`🤖 Analyzing PDF with AI (trying GPT-5.1 first, then GPT-4o)...`);
     console.log(`📊 Prompt length: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
 
     const startAI = Date.now();
 
-    // Try different models in order of preference for handling large outputs
-    const modelsToTry = [
-      'gpt-4o-128k', // If available, supports much larger outputs
-      'gpt-4o',      // Standard GPT-4o with max tokens
-      'gpt-4-turbo'  // Fallback
-    ];
-
-    let response;
+    // Try GPT-5.1 first with Responses API, then fallback to GPT-4o with Chat Completions
+    let response: any;
     let usedModel = '';
+    let content = '';
 
-    for (const model of modelsToTry) {
-      try {
-        console.log(`🔄 Trying model: ${model}`);
-        response = await openai.chat.completions.create({
-          model: model,
-          messages: [{
+    // Try GPT-5.1 first (Responses API)
+    try {
+      console.log(`🔄 Trying GPT-5.1 with Responses API...`);
+      const gpt51Response = await openai.responses.create({
+        model: 'gpt-5.1',
+        input: [
+          {
             role: 'user',
             content: [
               {
-                type: 'file',
-                file: { file_id: fileUpload.id }
+                type: 'input_file',
+                file_id: fileUpload.id
               },
               {
-                type: 'text',
+                type: 'input_text',
                 text: prompt
               }
             ]
-          }],
-          temperature: 0.1,
-          max_tokens: model === 'gpt-4o-128k' ? 32000 : 16384,
-          response_format: { type: 'json_object' }
-        });
-        usedModel = model;
-        console.log(`✅ Successfully used model: ${model}`);
-        break;
-      } catch (modelError: any) {
-        console.log(`❌ Model ${model} failed: ${modelError.message}`);
-        if (!modelError.message.includes('does not have access') &&
-            !modelError.message.includes('not found')) {
-          throw modelError; // Re-throw if it's not an access issue
+          }
+        ],
+        reasoning: { effort: 'none' },  // Fast mode
+        text: { verbosity: 'low' },     // Concise output
+        max_output_tokens: 32000
+      });
+      usedModel = 'gpt-5.1';
+      content = gpt51Response.output_text || '{}';
+      console.log(`✅ GPT-5.1 succeeded`);
+    } catch (gpt51Error: any) {
+      console.log(`❌ GPT-5.1 failed: ${gpt51Error.message}`);
+      
+      // Fallback to GPT-4o with Chat Completions API
+      const modelsToTry = [
+        'gpt-4o',      // Standard GPT-4o with max tokens
+        'gpt-4-turbo'  // Fallback
+      ];
+
+      for (const model of modelsToTry) {
+        try {
+          console.log(`🔄 Trying model: ${model}`);
+          response = await openai.chat.completions.create({
+            model: model,
+            messages: [{
+              role: 'user',
+              content: [
+                {
+                  type: 'file',
+                  file: { file_id: fileUpload.id }
+                },
+                {
+                  type: 'text',
+                  text: prompt
+                }
+              ]
+            }],
+            temperature: 0.1,
+            max_tokens: 16384,
+            response_format: { type: 'json_object' }
+          });
+          usedModel = model;
+          content = response.choices[0]?.message?.content || '{}';
+          console.log(`✅ Successfully used model: ${model}`);
+          break;
+        } catch (modelError: any) {
+          console.log(`❌ Model ${model} failed: ${modelError.message}`);
+          if (!modelError.message.includes('does not have access') &&
+              !modelError.message.includes('not found')) {
+            throw modelError; // Re-throw if it's not an access issue
+          }
         }
+      }
+
+      if (!content) {
+        throw new Error('All models failed to analyze the PDF');
       }
     }
 
-    if (!response) {
-      throw new Error('All models failed to analyze the PDF');
-    }
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
-
     console.log(`✅ ${usedModel} analysis complete (${aiDuration}s)`);
-
-    const content = response.choices[0]?.message?.content || '{}';
 
     // Parse JSON with improved error handling
     try {
