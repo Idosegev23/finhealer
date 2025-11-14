@@ -92,7 +92,7 @@ Return only valid JSON with this structure:
           ]
         }
       ],
-      reasoning: { effort: 'none' },
+      reasoning: { effort: 'low' },
       text: { verbosity: 'low' },
       max_output_tokens: 32000
     });
