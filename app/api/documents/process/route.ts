@@ -14,8 +14,8 @@ export const dynamic = 'force-dynamic';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 180000, // 3 minutes timeout for OpenAI (leave 2 min buffer for retries)
-  maxRetries: 1, // Retry once on failure (total 6 min max)
+  timeout: 480000, // 8 minutes timeout for GPT-5.1 (which can take 3-4 min for large PDFs)
+  maxRetries: 0, // No retries - let it complete on first try
 });
 
 /**
@@ -689,8 +689,22 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       console.log(`✅ GPT-5.1 succeeded`);
     } catch (gpt51Error: any) {
       console.log(`❌ GPT-5.1 failed: ${gpt51Error.message}`);
+      console.error('GPT-5.1 error details:', gpt51Error);
       
-      // Fallback to GPT-4o with Chat Completions API
+      // Only fallback to GPT-4o if GPT-5.1 is not available (403/404)
+      // Don't fallback on timeout - let it fail and retry
+      const isAccessError = gpt51Error.message?.includes('does not have access') || 
+                           gpt51Error.message?.includes('not found') ||
+                           gpt51Error.status === 403 ||
+                           gpt51Error.status === 404;
+      
+      if (!isAccessError) {
+        // If it's a timeout or other error, re-throw it
+        throw new Error(`GPT-5.1 failed: ${gpt51Error.message}`);
+      }
+      
+      // Fallback to GPT-4o only if access denied
+      console.log('⚠️ GPT-5.1 not available, falling back to GPT-4o...');
       const modelsToTry = [
         'gpt-4o',      // Standard GPT-4o with max tokens
         'gpt-4-turbo'  // Fallback
