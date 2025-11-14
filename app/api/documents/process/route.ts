@@ -680,7 +680,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
             ]
           }
         ],
-        reasoning: { effort: 'none' },  // Fast mode
+        reasoning: { effort: 'low' },   // Fast mode (minimal reasoning)
         text: { verbosity: 'low' },     // Concise output
         max_output_tokens: 32000
       });
