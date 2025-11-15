@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, XCircle, Edit2, Package, Link2, CheckCheck } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Edit2, Package, Link2, CheckCheck, Filter, X, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
 import { EditExpenseModal } from '@/components/expenses/EditExpenseModal';
 import TransactionMatchCard from '@/components/dashboard/TransactionMatchCard';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface PendingTransaction {
   id: string;
@@ -48,6 +50,13 @@ export default function PendingExpensesPage() {
   const [loadingMatches, setLoadingMatches] = useState<Set<string>>(new Set());
   const [showingMatchesFor, setShowingMatchesFor] = useState<string | null>(null);
   const [approvingAll, setApprovingAll] = useState(false);
+  
+  // 🎯 Filter States
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'categorized' | 'uncategorized'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadExpenses();
@@ -186,15 +195,15 @@ export default function PendingExpensesPage() {
   };
 
   const handleApproveAll = async () => {
-    if (expenses.length === 0) return;
+    if (filteredExpenses.length === 0) return;
 
-    // ✅ סנן רק תנועות שמסווגות (או שהן הכנסות)
+    // ✅ סנן רק תנועות שמסווגות (או שהן הכנסות) מתוך התנועות המסוננות
     // 🚨 חובה: לא לאשר "לא מסווג" או ללא קטגוריה בכלל!
-    const approvableExpenses = expenses.filter(
+    const approvableExpenses = filteredExpenses.filter(
       (e) => e.type === 'income' || (e.expense_category && e.expense_category !== 'לא מסווג')
     );
 
-    const uncategorizedCount = expenses.length - approvableExpenses.length;
+    const uncategorizedCount = filteredExpenses.length - approvableExpenses.length;
 
     if (uncategorizedCount > 0) {
       addToast({
@@ -290,12 +299,12 @@ export default function PendingExpensesPage() {
   };
 
   const handleRejectAll = async () => {
-    if (expenses.length === 0) {
+    if (filteredExpenses.length === 0) {
       return;
     }
 
     const confirmReject = confirm(
-      `האם אתה בטוח שברצונך לדחות את כל ${expenses.length} התנועות?\n\nלא ניתן לבטל פעולה זו.`
+      `האם אתה בטוח שברצונך לדחות את כל ${filteredExpenses.length} התנועות המסוננות?\n\nלא ניתן לבטל פעולה זו.`
     );
 
     if (!confirmReject) {
@@ -305,7 +314,7 @@ export default function PendingExpensesPage() {
     setApprovingAll(true);
 
     try {
-      const rejectPromises = expenses.map((expense) =>
+      const rejectPromises = filteredExpenses.map((expense) =>
         fetch('/api/expenses/reject', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -441,7 +450,48 @@ export default function PendingExpensesPage() {
     );
   }
 
+  // 🎯 Filter Logic
+  const filteredExpenses = expenses.filter((expense) => {
+    // Filter by type
+    if (filterType !== 'all' && expense.type !== filterType) return false;
+    
+    // Filter by status (categorized/uncategorized)
+    const isUncategorized = !expense.expense_category || expense.expense_category === 'לא מסווג';
+    if (filterStatus === 'uncategorized' && !isUncategorized) return false;
+    if (filterStatus === 'categorized' && isUncategorized) return false;
+    
+    // Filter by category
+    if (filterCategory !== 'all' && expense.expense_category !== filterCategory) return false;
+    
+    // Filter by search query (vendor name)
+    if (searchQuery && !expense.vendor?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    
+    return true;
+  });
+
+  // Get unique categories for filter dropdown
+  const uniqueCategories = Array.from(new Set(
+    expenses
+      .map(e => e.expense_category)
+      .filter(c => c && c !== 'לא מסווג')
+  )).sort();
+
   const uncategorizedCount = expenses.filter(e => !e.expense_category || e.expense_category === 'לא מסווג').length;
+  
+  // Active filters count
+  const activeFiltersCount = [
+    filterType !== 'all',
+    filterCategory !== 'all',
+    filterStatus !== 'all',
+    searchQuery !== ''
+  ].filter(Boolean).length;
+
+  const clearAllFilters = () => {
+    setFilterType('all');
+    setFilterCategory('all');
+    setFilterStatus('all');
+    setSearchQuery('');
+  };
 
   return (
     <div className="container mx-auto p-6" dir="rtl">
@@ -517,9 +567,150 @@ export default function PendingExpensesPage() {
         )}
       </div>
 
+      {/* 🎯 Filter Bar */}
+      <Card className="mb-6 border-2 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setShowFilters(!showFilters)}
+                variant={showFilters ? "default" : "outline"}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                סינון
+                {activeFiltersCount > 0 && (
+                  <Badge className="bg-blue-600 text-white mr-2">
+                    {activeFiltersCount}
+                  </Badge>
+                )}
+              </Button>
+              
+              {activeFiltersCount > 0 && (
+                <Button
+                  onClick={clearAllFilters}
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <X className="w-4 h-4 ml-1" />
+                  נקה הכל
+                </Button>
+              )}
+              
+              <div className="text-sm text-gray-600">
+                מציג <span className="font-bold text-blue-600">{filteredExpenses.length}</span> מתוך {expenses.length} תנועות
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Controls */}
+          {showFilters && (
+            <div className="space-y-4 pt-4 border-t">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="חפש לפי שם עסק..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-10"
+                />
+              </div>
+
+              {/* Filter Row */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Type Filter */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    סוג תנועה
+                  </label>
+                  <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      <SelectItem value="income">💰 הכנסות בלבד</SelectItem>
+                      <SelectItem value="expense">💳 הוצאות בלבד</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Status Filter */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    סטטוס סיווג
+                  </label>
+                  <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      <SelectItem value="uncategorized">⚠️ לא מסווג בלבד</SelectItem>
+                      <SelectItem value="categorized">✅ מסווג בלבד</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Category Filter */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    קטגוריה
+                  </label>
+                  <Select value={filterCategory} onValueChange={setFilterCategory}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">כל הקטגוריות</SelectItem>
+                      {uniqueCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Quick Filters */}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  onClick={() => setFilterStatus('uncategorized')}
+                  variant={filterStatus === 'uncategorized' ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs"
+                >
+                  ⚠️ רק לא מסווג
+                </Button>
+                <Button
+                  onClick={() => setFilterType('expense')}
+                  variant={filterType === 'expense' ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs"
+                >
+                  💳 רק הוצאות
+                </Button>
+                <Button
+                  onClick={() => setFilterType('income')}
+                  variant={filterType === 'income' ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs"
+                >
+                  💰 רק הכנסות
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* כפתורי פעולה המונית */}
       <div className="mb-6 flex items-center gap-4">
-        {expenses.length > 0 && (
+        {filteredExpenses.length > 0 && (
           <>
             <Button
               onClick={handleApproveAll}
@@ -535,7 +726,7 @@ export default function PendingExpensesPage() {
               ) : (
                 <>
                   <CheckCheck className="w-4 h-4 ml-2" />
-                  אשר הכל ({expenses.length})
+                  אשר הכל ({filteredExpenses.length})
                 </>
               )}
             </Button>
@@ -555,7 +746,7 @@ export default function PendingExpensesPage() {
               ) : (
                 <>
                   <XCircle className="w-4 h-4 ml-2" />
-                  דחה הכל ({expenses.length})
+                  דחה הכל ({filteredExpenses.length})
                 </>
               )}
             </Button>
@@ -563,22 +754,32 @@ export default function PendingExpensesPage() {
         )}
       </div>
 
-      {expenses.length === 0 ? (
+      {filteredExpenses.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center p-12">
             <Package className="w-16 h-16 text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">אין תנועות ממתינות</h3>
+            <h3 className="text-xl font-semibold mb-2">
+              {expenses.length === 0 ? 'אין תנועות ממתינות' : 'אין תנועות מתאימות לסינון'}
+            </h3>
             <p className="text-gray-600 mb-4 text-center">
-              כל התנועות שלך אושרו! העלה דוח חדש כדי לראות תנועות נוספות.
+              {expenses.length === 0 
+                ? 'כל התנועות שלך אושרו! העלה דוח חדש כדי לראות תנועות נוספות.'
+                : 'נסה לשנות את הסינון או לנקות את כל הפילטרים.'}
             </p>
-            <Button onClick={() => router.push('/dashboard/scan-center')}>
-              העלאת דוח חדש
-            </Button>
+            {expenses.length === 0 ? (
+              <Button onClick={() => router.push('/dashboard/scan-center')}>
+                העלאת דוח חדש
+              </Button>
+            ) : (
+              <Button onClick={clearAllFilters} variant="outline">
+                נקה סינון
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
-          {expenses.map((expense) => {
+          {filteredExpenses.map((expense) => {
             const confidenceBadge = getConfidenceBadge(expense.confidence_score || 0);
             const isProcessing = processingIds.has(expense.id);
             const isIncome = expense.type === 'income';
