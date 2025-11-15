@@ -473,7 +473,7 @@ export default function PendingExpensesPage() {
   const uniqueCategories = Array.from(new Set(
     expenses
       .map(e => e.expense_category)
-      .filter(c => c && c !== 'לא מסווג')
+      .filter((c): c is string => !!c && c !== 'לא מסווג')
   )).sort();
 
   const uncategorizedCount = expenses.filter(e => !e.expense_category || e.expense_category === 'לא מסווג').length;
