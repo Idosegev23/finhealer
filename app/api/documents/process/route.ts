@@ -621,32 +621,22 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
     console.log(`📤 Uploading PDF to OpenAI Files API (${fileSizeMB.toFixed(2)} MB)...`);
     
-    let fileUpload: any = null;
-    let useTextFallback = false;
-    let extractedText = '';
-    
+    let fileUpload: any;
     try {
       fileUpload = await openai.files.create({
         file: require('fs').createReadStream(tempFilePath),
         purpose: 'assistants'
       });
       console.log(`✅ PDF uploaded to OpenAI Files API: ${fileUpload.id}`);
-      // Clean up temp file
-      await require('fs').promises.unlink(tempFilePath);
     } catch (uploadError: any) {
       console.error(`❌ Files API upload failed: ${uploadError.message}`);
-      console.log(`⚠️ Falling back to text extraction...`);
-      
       // Clean up temp file
       await require('fs').promises.unlink(tempFilePath).catch(() => {});
-      
-      // Fallback: Extract text from PDF
-      useTextFallback = true;
-      const { extractText } = await import('unpdf');
-      const { text: rawText, totalPages } = await extractText(buffer, { mergePages: true });
-      extractedText = fixRTLTextFromPDF(rawText);
-      console.log(`✅ Text extracted as fallback: ${extractedText.length} characters, ${totalPages} pages`);
+      throw new Error(`Failed to upload PDF to OpenAI Files API: ${uploadError.message}. Please try again.`);
     }
+    
+    // Clean up temp file
+    await require('fs').promises.unlink(tempFilePath);
 
     // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
@@ -666,11 +656,11 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       console.log(`📋 Loaded ${expenseCategories.length} expense categories from database`);
     }
 
-    // Get appropriate prompt for document type
-    const prompt = getPromptForDocumentType(fileType, useTextFallback ? extractedText : null, expenseCategories);
+    // Get appropriate prompt for document type (direct PDF analysis - no text)
+    const prompt = getPromptForDocumentType(fileType, null, expenseCategories);
 
     // Analyze with AI using direct PDF upload (GPT-5.1 Responses API or GPT-4o Chat Completions)
-    console.log(`🤖 Analyzing ${useTextFallback ? 'extracted text' : 'PDF'} with AI (trying GPT-5.1 first, then GPT-4o)...`);
+    console.log(`🤖 Analyzing PDF directly with AI (trying GPT-5.1 first, then GPT-4o)...`);
     console.log(`📊 Prompt length: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
 
     const startAI = Date.now();
@@ -680,33 +670,25 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     let usedModel = '';
     let content = '';
 
-    // Try GPT-5.1 first (Responses API)
+    // Try GPT-5.1 first (Responses API) - Direct PDF file analysis
     try {
-      console.log(`🔄 Trying GPT-5.1 with Responses API (${useTextFallback ? 'text mode' : 'file mode'})...`);
-      
-      // Build content array based on whether we have file or text
-      const contentArray: any[] = [];
-      
-      if (!useTextFallback && fileUpload) {
-        // Use file upload
-        contentArray.push({
-          type: 'input_file',
-          file_id: fileUpload.id
-        });
-      }
-      
-      // Always add the prompt text
-      contentArray.push({
-        type: 'input_text',
-        text: prompt
-      });
+      console.log(`🔄 Trying GPT-5.1 with Responses API (direct PDF file)...`);
       
       const gpt51Response = await openai.responses.create({
         model: 'gpt-5.1',
         input: [
           {
             role: 'user',
-            content: contentArray
+            content: [
+              {
+                type: 'input_file',
+                file_id: fileUpload.id
+              },
+              {
+                type: 'input_text',
+                text: prompt
+              }
+            ]
           }
         ],
         reasoning: { effort: 'low' },   // Fast mode (minimal reasoning)
@@ -741,30 +723,22 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
       for (const model of modelsToTry) {
         try {
-          console.log(`🔄 Trying model: ${model} (${useTextFallback ? 'text mode' : 'file mode'})`);
-          
-          // Build content for GPT-4o
-          const gpt4oContent: any[] = [];
-          
-          if (!useTextFallback && fileUpload) {
-            // Use file upload
-            gpt4oContent.push({
-              type: 'file',
-              file: { file_id: fileUpload.id }
-            });
-          }
-          
-          // Always add the prompt text
-          gpt4oContent.push({
-            type: 'text',
-            text: prompt
-          });
+          console.log(`🔄 Trying model: ${model} (direct PDF file)...`);
           
           response = await openai.chat.completions.create({
             model: model,
             messages: [{
               role: 'user',
-              content: gpt4oContent
+              content: [
+                {
+                  type: 'file',
+                  file: { file_id: fileUpload.id }
+                },
+                {
+                  type: 'text',
+                  text: prompt
+                }
+              ]
             }],
             temperature: 0.1,
             max_tokens: 16384,
