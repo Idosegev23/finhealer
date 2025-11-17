@@ -494,26 +494,26 @@ export default function PendingExpensesPage() {
   };
 
   return (
-    <div className="container mx-auto p-6" dir="rtl">
+    <div className="container mx-auto p-8" dir="rtl">
       {/* 🎯 Header עם הסבר */}
-      <div className="mb-6">
-        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          בדוק ואשר את ההוצאות שלך 💳
+      <div className="mb-8">
+        <h1 className="text-6xl font-extrabold mb-5 bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent drop-shadow-lg">
+          💳 בדוק ואשר את התנועות שלך
         </h1>
-        <p className="text-lg text-gray-700 mb-4">
+        <p className="text-3xl text-gray-800 mb-6 font-bold">
           {expenses.length === 0
-            ? 'אין תנועות ממתינות כרגע ✅'
-            : `${expenses.length} תנועות ממתינות לבדיקה`}
+            ? '✅ אין תנועות ממתינות כרגע'
+            : `📊 ${expenses.length} תנועות ממתינות לבדיקה`}
         </p>
         
         {/* ℹ️ Info Box */}
         {expenses.length > 0 && (
-          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
-            <div className="flex items-start gap-3">
-              <div className="text-3xl">📊</div>
+          <div className="bg-gradient-to-r from-blue-100 to-blue-200 border-4 border-blue-400 rounded-2xl p-6 mb-6 shadow-xl">
+            <div className="flex items-start gap-5">
+              <div className="text-5xl">📊</div>
               <div className="flex-1">
-                <h3 className="font-bold text-blue-900 mb-1">למה חשוב לבדוק?</h3>
-                <ul className="text-sm text-blue-800 space-y-1 list-disc mr-4">
+                <h3 className="text-2xl font-extrabold text-blue-900 mb-3">למה חשוב לבדוק?</h3>
+                <ul className="text-xl text-blue-900 space-y-2 list-disc mr-6 font-semibold">
                   <li>וודא שכל העסקאות נכונות ושייכות לך</li>
                   <li>ודא שהסיווג לקטגוריות מדויק (קבועות/משתנות/מיוחדות)</li>
                   <li>עדכן פרטים לפני אישור סופי</li>
@@ -525,14 +525,14 @@ export default function PendingExpensesPage() {
 
         {/* ⚠️ Warning Box - אם יש לא מסווגות */}
         {uncategorizedCount > 0 && (
-          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-4">
-            <div className="flex items-start gap-3">
-              <div className="text-3xl">⚠️</div>
+          <div className="bg-gradient-to-r from-amber-100 to-orange-100 border-4 border-amber-500 rounded-2xl p-6 mb-6 shadow-xl animate-pulse">
+            <div className="flex items-start gap-5">
+              <div className="text-6xl">⚠️</div>
               <div className="flex-1">
-                <h3 className="font-bold text-amber-900 mb-1">
+                <h3 className="text-3xl font-extrabold text-amber-900 mb-3">
                   {uncategorizedCount} תנועות ללא קטגוריה!
                 </h3>
-                <p className="text-sm text-amber-800">
+                <p className="text-xl font-bold text-amber-900">
                   לחץ על &quot;ערוך&quot; כדי לבחור קטגוריה מתאימה. בלי קטגוריה לא ניתן לאשר.
                 </p>
               </div>
@@ -542,25 +542,25 @@ export default function PendingExpensesPage() {
 
         {/* 📈 סטטיסטיקה */}
         {expenses.length > 0 && (
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div className="text-2xl font-bold text-green-700">
+          <div className="grid grid-cols-3 gap-6 mb-8">
+            <div className="bg-gradient-to-br from-green-100 to-emerald-200 border-4 border-green-400 rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+              <div className="text-5xl font-extrabold text-green-800 mb-2">
                 {expenses.filter(e => e.type === 'income').length}
               </div>
-              <div className="text-xs text-green-600">הכנסות 💰</div>
+              <div className="text-xl font-bold text-green-700">💰 הכנסות</div>
             </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="text-2xl font-bold text-blue-700">
+            <div className="bg-gradient-to-br from-blue-100 to-indigo-200 border-4 border-blue-400 rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
+              <div className="text-5xl font-extrabold text-blue-800 mb-2">
                 {expenses.filter(e => e.type === 'expense').length}
               </div>
-              <div className="text-xs text-blue-600">הוצאות 💳</div>
+              <div className="text-xl font-bold text-blue-700">💳 הוצאות</div>
             </div>
-            <div className={`${uncategorizedCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'} border rounded-lg p-3`}>
-              <div className={`text-2xl font-bold ${uncategorizedCount > 0 ? 'text-amber-700' : 'text-gray-700'}`}>
+            <div className={`${uncategorizedCount > 0 ? 'bg-gradient-to-br from-amber-100 to-orange-200 border-amber-500' : 'bg-gradient-to-br from-gray-100 to-gray-200 border-gray-400'} border-4 rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform`}>
+              <div className={`text-5xl font-extrabold mb-2 ${uncategorizedCount > 0 ? 'text-amber-800' : 'text-gray-800'}`}>
                 {uncategorizedCount}
               </div>
-              <div className={`text-xs ${uncategorizedCount > 0 ? 'text-amber-600' : 'text-gray-600'}`}>
-                לא מסווג {uncategorizedCount > 0 ? '⚠️' : '✅'}
+              <div className={`text-xl font-bold ${uncategorizedCount > 0 ? 'text-amber-700' : 'text-gray-700'}`}>
+                {uncategorizedCount > 0 ? '⚠️ לא מסווג' : '✅ מסווג'}
               </div>
             </div>
           </div>
@@ -568,19 +568,19 @@ export default function PendingExpensesPage() {
       </div>
 
       {/* 🎯 Filter Bar */}
-      <Card className="mb-6 border-2 border-blue-200">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
+      <Card className="mb-8 border-4 border-blue-400 shadow-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-5">
               <Button
                 onClick={() => setShowFilters(!showFilters)}
                 variant={showFilters ? "default" : "outline"}
-                className="gap-2"
+                className="gap-3 text-xl font-bold py-6 px-8 rounded-xl border-3 hover:scale-105 transition-transform"
               >
-                <Filter className="w-4 h-4" />
-                סינון
+                <Filter className="w-7 h-7" />
+                🔍 סינון
                 {activeFiltersCount > 0 && (
-                  <Badge className="bg-blue-600 text-white mr-2">
+                  <Badge className="bg-red-600 text-white text-lg px-3 py-1 mr-2">
                     {activeFiltersCount}
                   </Badge>
                 )}
@@ -590,84 +590,84 @@ export default function PendingExpensesPage() {
                 <Button
                   onClick={clearAllFilters}
                   variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  size="lg"
+                  className="text-red-700 hover:text-red-800 hover:bg-red-100 text-xl font-bold py-6 px-6 rounded-xl border-3 border-red-300 hover:scale-105 transition-transform"
                 >
-                  <X className="w-4 h-4 ml-1" />
-                  נקה הכל
+                  <X className="w-7 h-7 ml-2" />
+                  ❌ נקה הכל
                 </Button>
               )}
               
-              <div className="text-sm text-gray-600">
-                מציג <span className="font-bold text-blue-600">{filteredExpenses.length}</span> מתוך {expenses.length} תנועות
+              <div className="text-2xl text-gray-800 font-bold bg-gray-100 px-6 py-4 rounded-xl border-3 border-gray-300">
+                מציג <span className="text-blue-700">{filteredExpenses.length}</span> מתוך {expenses.length} תנועות
               </div>
             </div>
           </div>
 
           {/* Filter Controls */}
           {showFilters && (
-            <div className="space-y-4 pt-4 border-t">
+            <div className="space-y-6 pt-6 border-t-4 border-blue-300">
               {/* Search */}
               <div className="relative">
-                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute right-5 top-1/2 transform -translate-y-1/2 w-7 h-7 text-gray-500" />
                 <Input
                   type="text"
-                  placeholder="חפש לפי שם עסק..."
+                  placeholder="🔎 חפש לפי שם עסק..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pr-10"
+                  className="pr-16 text-xl font-bold py-6 border-3 border-gray-400 rounded-xl focus:ring-4 focus:ring-blue-300"
                 />
               </div>
 
               {/* Filter Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Type Filter */}
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    סוג תנועה
+                  <label className="text-xl font-extrabold text-gray-800 mb-3 block">
+                    📊 סוג תנועה
                   </label>
                   <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="text-xl font-bold py-6 border-3 border-gray-400 rounded-xl">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      <SelectItem value="income">💰 הכנסות בלבד</SelectItem>
-                      <SelectItem value="expense">💳 הוצאות בלבד</SelectItem>
+                    <SelectContent className="text-xl">
+                      <SelectItem value="all" className="text-xl py-4 font-bold">הכל</SelectItem>
+                      <SelectItem value="income" className="text-xl py-4 font-bold">💰 הכנסות בלבד</SelectItem>
+                      <SelectItem value="expense" className="text-xl py-4 font-bold">💳 הוצאות בלבד</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Status Filter */}
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    סטטוס סיווג
+                  <label className="text-xl font-extrabold text-gray-800 mb-3 block">
+                    ✅ סטטוס סיווג
                   </label>
                   <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="text-xl font-bold py-6 border-3 border-gray-400 rounded-xl">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      <SelectItem value="uncategorized">⚠️ לא מסווג בלבד</SelectItem>
-                      <SelectItem value="categorized">✅ מסווג בלבד</SelectItem>
+                    <SelectContent className="text-xl">
+                      <SelectItem value="all" className="text-xl py-4 font-bold">הכל</SelectItem>
+                      <SelectItem value="uncategorized" className="text-xl py-4 font-bold">⚠️ לא מסווג בלבד</SelectItem>
+                      <SelectItem value="categorized" className="text-xl py-4 font-bold">✅ מסווג בלבד</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Category Filter */}
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    קטגוריה
+                  <label className="text-xl font-extrabold text-gray-800 mb-3 block">
+                    📁 קטגוריה
                   </label>
                   <Select value={filterCategory} onValueChange={setFilterCategory}>
-                    <SelectTrigger>
+                    <SelectTrigger className="text-xl font-bold py-6 border-3 border-gray-400 rounded-xl">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">כל הקטגוריות</SelectItem>
+                    <SelectContent className="text-xl max-h-[400px]">
+                      <SelectItem value="all" className="text-xl py-4 font-bold">כל הקטגוריות</SelectItem>
                       {uniqueCategories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
+                        <SelectItem key={cat} value={cat} className="text-xl py-4 font-bold">
                           {cat}
                         </SelectItem>
                       ))}
@@ -677,28 +677,28 @@ export default function PendingExpensesPage() {
               </div>
 
               {/* Quick Filters */}
-              <div className="flex flex-wrap gap-2 pt-2">
+              <div className="flex flex-wrap gap-4 pt-4">
                 <Button
                   onClick={() => setFilterStatus('uncategorized')}
                   variant={filterStatus === 'uncategorized' ? 'default' : 'outline'}
-                  size="sm"
-                  className="text-xs"
+                  size="lg"
+                  className="text-lg font-bold py-5 px-6 rounded-xl border-3 hover:scale-105 transition-transform"
                 >
                   ⚠️ רק לא מסווג
                 </Button>
                 <Button
                   onClick={() => setFilterType('expense')}
                   variant={filterType === 'expense' ? 'default' : 'outline'}
-                  size="sm"
-                  className="text-xs"
+                  size="lg"
+                  className="text-lg font-bold py-5 px-6 rounded-xl border-3 hover:scale-105 transition-transform"
                 >
                   💳 רק הוצאות
                 </Button>
                 <Button
                   onClick={() => setFilterType('income')}
                   variant={filterType === 'income' ? 'default' : 'outline'}
-                  size="sm"
-                  className="text-xs"
+                  size="lg"
+                  className="text-lg font-bold py-5 px-6 rounded-xl border-3 hover:scale-105 transition-transform"
                 >
                   💰 רק הכנסות
                 </Button>
@@ -709,24 +709,24 @@ export default function PendingExpensesPage() {
       </Card>
 
       {/* כפתורי פעולה המונית */}
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-8 flex items-center gap-6">
         {filteredExpenses.length > 0 && (
           <>
             <Button
               onClick={handleApproveAll}
               disabled={approvingAll}
               size="lg"
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-2xl font-extrabold py-8 px-10 rounded-2xl border-4 border-green-500 shadow-2xl hover:scale-110 transition-all"
             >
               {approvingAll ? (
                 <>
-                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                  מעבד...
+                  <Loader2 className="w-8 h-8 ml-3 animate-spin" />
+                  ⏳ מעבד...
                 </>
               ) : (
                 <>
-                  <CheckCheck className="w-4 h-4 ml-2" />
-                  אשר הכל ({filteredExpenses.length})
+                  <CheckCheck className="w-8 h-8 ml-3" />
+                  ✅ אשר הכל ({filteredExpenses.length})
                 </>
               )}
             </Button>
@@ -736,17 +736,17 @@ export default function PendingExpensesPage() {
               disabled={approvingAll}
               size="lg"
               variant="destructive"
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-2xl font-extrabold py-8 px-10 rounded-2xl border-4 border-red-500 shadow-2xl hover:scale-110 transition-all"
             >
               {approvingAll ? (
                 <>
-                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                  מעבד...
+                  <Loader2 className="w-8 h-8 ml-3 animate-spin" />
+                  ⏳ מעבד...
                 </>
               ) : (
                 <>
-                  <XCircle className="w-4 h-4 ml-2" />
-                  דחה הכל ({filteredExpenses.length})
+                  <XCircle className="w-8 h-8 ml-3" />
+                  ❌ דחה הכל ({filteredExpenses.length})
                 </>
               )}
             </Button>
@@ -778,7 +778,7 @@ export default function PendingExpensesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-8">
           {filteredExpenses.map((expense) => {
             const confidenceBadge = getConfidenceBadge(expense.confidence_score || 0);
             const isProcessing = processingIds.has(expense.id);
@@ -788,29 +788,29 @@ export default function PendingExpensesPage() {
             return (
               <Card 
                 key={expense.id} 
-                className={`hover:shadow-lg transition-all ${needsCategory ? 'border-4 border-amber-400 bg-amber-50' : 'border-2 border-gray-200'}`}
+                className={`hover:shadow-2xl transition-all hover:scale-[1.02] ${needsCategory ? 'border-6 border-amber-500 bg-gradient-to-r from-amber-50 to-orange-50 animate-pulse' : 'border-4 border-gray-300 bg-white'}`}
               >
                 {/* ⚠️ אזהרה אם חסרה קטגוריה */}
                 {needsCategory && (
-                  <div className="bg-amber-400 text-amber-900 font-bold text-center py-2 text-sm">
+                  <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-extrabold text-center py-4 text-2xl shadow-lg">
                     ⚠️ חובה לבחור קטגוריה לפני אישור! לחץ על &quot;ערוך&quot; ↓
                   </div>
                 )}
 
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b-4 border-gray-300">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CardTitle className="text-2xl font-bold">
-                          {expense.vendor || 'לא צוין'}
+                      <div className="flex items-center gap-4 mb-3">
+                        <CardTitle className="text-4xl font-extrabold text-gray-900">
+                          🏪 {expense.vendor || 'לא צוין'}
                         </CardTitle>
                         {needsCategory && (
-                          <Badge className="bg-amber-500 text-white animate-pulse">
-                            דורש תשומת לב!
+                          <Badge className="bg-amber-600 text-white text-xl px-4 py-2 animate-pulse shadow-lg">
+                            ⚠️ דורש תשומת לב!
                           </Badge>
                         )}
                       </div>
-                      <CardDescription className="text-base">
+                      <CardDescription className="text-2xl font-bold text-gray-700">
                         📅 {formatDate(expense.date)} • 💳 {expense.payment_method || 'לא צוין'}
                         {expense.receipt_number && (
                           <> • 📄 מספר מסמך: {expense.receipt_number}</>
@@ -818,38 +818,38 @@ export default function PendingExpensesPage() {
                       </CardDescription>
                       {/* ⚠️ אזהרה על כפילות */}
                       {expense.duplicate_warning && (
-                        <div className="mt-2 bg-red-100 border-2 border-red-400 rounded-lg p-2 text-sm text-red-800 font-semibold">
+                        <div className="mt-4 bg-gradient-to-r from-red-100 to-rose-100 border-4 border-red-500 rounded-xl p-4 text-xl text-red-900 font-extrabold shadow-lg animate-pulse">
                           ⚠️ אזהרה: נמצאה תנועה דומה עם אותו מספר מסמך שכבר אושרה!
                         </div>
                       )}
                     </div>
                     <div className="text-left">
-                      <div className={`text-3xl font-bold ${isIncome ? 'text-green-600' : 'text-blue-600'}`}>
+                      <div className={`text-6xl font-extrabold ${isIncome ? 'text-green-700' : 'text-blue-700'} drop-shadow-lg`}>
                         {isIncome ? '+' : ''}{formatCurrency(expense.amount)}
                       </div>
                     </div>
                   </div>
                 </CardHeader>
 
-                <CardContent>
-                  <div className="space-y-3">
+                <CardContent className="p-8">
+                  <div className="space-y-6">
                     {/* Tags */}
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-4">
                       {/* Type Badge */}
-                      <Badge variant={isIncome ? "default" : "outline"} className={isIncome ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}>
+                      <Badge variant={isIncome ? "default" : "outline"} className={`text-2xl px-6 py-3 font-extrabold border-3 shadow-lg ${isIncome ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white" : "bg-gradient-to-r from-blue-500 to-indigo-500 text-white"}`}>
                         {isIncome ? '💰 הכנסה' : '💳 הוצאה'}
                       </Badge>
                       {expense.expense_category && (
-                        <Badge variant="outline">{expense.expense_category}</Badge>
+                        <Badge variant="outline" className="text-xl px-5 py-2 font-bold border-3 border-purple-400 text-purple-700 bg-purple-50">{expense.expense_category}</Badge>
                       )}
                       {expense.category && expense.category !== expense.expense_category && (
-                        <Badge variant="outline">{expense.category}</Badge>
+                        <Badge variant="outline" className="text-xl px-5 py-2 font-bold border-3 border-indigo-400 text-indigo-700 bg-indigo-50">{expense.category}</Badge>
                       )}
                       {expense.expense_type && (
-                        <Badge variant="secondary">{expense.expense_type}</Badge>
+                        <Badge variant="secondary" className="text-xl px-5 py-2 font-bold border-3 border-gray-400 text-gray-700 bg-gray-200">{expense.expense_type}</Badge>
                       )}
                       {expense.confidence_score !== undefined && (
-                        <Badge className={confidenceBadge.color}>
+                        <Badge className={`${confidenceBadge.color} text-xl px-5 py-2 font-bold border-3 shadow-md`}>
                           {confidenceBadge.label} ({Math.round(expense.confidence_score * 100)}%)
                         </Badge>
                       )}
@@ -909,33 +909,33 @@ export default function PendingExpensesPage() {
                     )}
 
                     {/* Actions */}
-                    <div className="space-y-2 pt-2">
+                    <div className="space-y-4 pt-4">
                       {/* כפתור ערוך - בולט אם חסרה קטגוריה */}
                       <Button
                         onClick={() => setEditingExpense(expense)}
                         disabled={isProcessing}
-                        className={`w-full text-lg py-6 ${
+                        className={`w-full text-2xl py-8 rounded-2xl border-4 shadow-2xl font-extrabold hover:scale-105 transition-all ${
                           needsCategory 
-                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold animate-pulse' 
-                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-amber-600 animate-pulse' 
+                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-blue-500'
                         }`}
                       >
-                        <Edit2 className="w-5 h-5 ml-2" />
-                        {needsCategory ? 'ערוך וסווג קטגוריה ⚠️' : 'ערוך פרטים'}
+                        <Edit2 className="w-8 h-8 ml-3" />
+                        {needsCategory ? '⚠️ ערוך וסווג קטגוריה' : '✏️ ערוך פרטים'}
                       </Button>
 
                       {/* שורת כפתורי פעולה */}
-                      <div className="flex gap-2">
+                      <div className="flex gap-4">
                         <Button
                           onClick={() => handleApprove(expense.id)}
                           disabled={isProcessing || needsCategory}
-                          className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-2xl py-8 rounded-2xl border-4 border-green-500 shadow-2xl font-extrabold disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-all"
                           title={needsCategory ? 'יש לבחור קטגוריה לפני אישור' : ''}
                         >
                           {isProcessing ? (
-                            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                            <Loader2 className="w-8 h-8 ml-3 animate-spin" />
                           ) : (
-                            <CheckCircle2 className="w-4 h-4 ml-2" />
+                            <CheckCircle2 className="w-8 h-8 ml-3" />
                           )}
                           {needsCategory ? '🔒 אשר' : '✅ אשר'}
                         </Button>
@@ -944,12 +944,12 @@ export default function PendingExpensesPage() {
                           onClick={() => handleReject(expense.id)}
                           disabled={isProcessing}
                           variant="destructive"
-                          className="flex-1"
+                          className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-2xl py-8 rounded-2xl border-4 border-red-500 shadow-2xl font-extrabold hover:scale-105 transition-all"
                         >
                           {isProcessing ? (
-                            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                            <Loader2 className="w-8 h-8 ml-3 animate-spin" />
                           ) : (
-                            <XCircle className="w-4 h-4 ml-2" />
+                            <XCircle className="w-8 h-8 ml-3" />
                           )}
                           ❌ דחה
                         </Button>

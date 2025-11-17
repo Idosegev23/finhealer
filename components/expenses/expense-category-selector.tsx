@@ -153,7 +153,7 @@ export default function ExpenseCategorySelector({
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Input עם חיפוש */}
       <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-500" />
         <input
           ref={inputRef}
           type="text"
@@ -165,11 +165,11 @@ export default function ExpenseCategorySelector({
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
+          className="w-full pr-14 pl-14 py-5 text-xl font-bold border-2 border-gray-400 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-300 focus:border-blue-500 text-right bg-white"
           disabled={loading}
         />
         <ChevronDown
-          className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 transition-transform ${
+          className={`absolute left-4 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-500 transition-transform ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -177,16 +177,16 @@ export default function ExpenseCategorySelector({
 
       {/* Dropdown עם תוצאות */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-2 bg-white border-3 border-gray-300 rounded-xl shadow-2xl max-h-[500px] overflow-y-auto">
           {loading ? (
-            <div className="p-4 text-center text-gray-500">
-              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-              <p className="mt-2 text-sm">טוען קטגוריות...</p>
+            <div className="p-6 text-center text-gray-600">
+              <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-4 border-blue-600"></div>
+              <p className="mt-3 text-xl font-bold">טוען קטגוריות...</p>
             </div>
           ) : filteredCategories.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
-              <p>לא נמצאו תוצאות</p>
-              <p className="text-sm mt-1">נסה חיפוש אחר</p>
+            <div className="p-6 text-center text-gray-600">
+              <p className="text-2xl font-bold">לא נמצאו תוצאות</p>
+              <p className="text-lg mt-2">נסה חיפוש אחר</p>
             </div>
           ) : (
             <div className="py-2">
@@ -195,8 +195,8 @@ export default function ExpenseCategorySelector({
                   cats.length > 0 && (
                     <div key={type} className="mb-2">
                       {/* כותרת קבוצה */}
-                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
-                        הוצאות {EXPENSE_TYPE_LABELS[type as keyof typeof EXPENSE_TYPE_LABELS]}
+                      <div className="px-5 py-4 text-lg font-extrabold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-200 sticky top-0 border-b-2 border-gray-300">
+                        📊 הוצאות {EXPENSE_TYPE_LABELS[type as keyof typeof EXPENSE_TYPE_LABELS]}
                       </div>
 
                       {/* רשימת הוצאות */}
@@ -209,15 +209,15 @@ export default function ExpenseCategorySelector({
                             key={category.id}
                             type="button"
                             onClick={() => handleSelect(category)}
-                            className={`w-full text-right px-4 py-2.5 hover:bg-blue-50 transition-colors flex items-center justify-between ${
-                              isSelected ? 'bg-blue-100' : ''
+                            className={`w-full text-right px-5 py-4 hover:bg-orange-100 transition-all flex items-center justify-between border-b border-gray-100 ${
+                              isSelected ? 'bg-orange-200 font-extrabold' : ''
                             }`}
                             onMouseEnter={() => setSelectedIndex(globalIdx)}
                           >
-                            <span className="font-medium">{category.name}</span>
+                            <span className="text-xl font-bold">{category.name}</span>
                             {category.applicable_to !== 'both' && (
-                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                {category.applicable_to === 'employee' ? 'שכיר' : 'עצמאי'}
+                              <span className="text-base font-bold text-gray-600 bg-gray-200 px-3 py-1.5 rounded-lg">
+                                {category.applicable_to === 'employee' ? '👔 שכיר' : '💼 עצמאי'}
                               </span>
                             )}
                           </button>

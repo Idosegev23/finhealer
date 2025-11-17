@@ -19,6 +19,7 @@ interface EditExpenseModalProps {
     payment_method: string;
     notes: string;
     receipt_number?: string; // ⭐ מספר קבלה/מסמך
+    source?: string; // ⭐ מקור התנועה (דוח אשראי, דוח בנק, וכו')
     income_category?: string; // ⭐ קטגוריית הכנסה
     employment_type?: string; // ⭐ סוג תעסוקה
     allowance_type?: string; // ⭐ סוג קצבה
@@ -41,6 +42,7 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
     payment_method: expense.payment_method || 'credit_card',
     notes: expense.notes || '',
     receipt_number: expense.receipt_number || '',
+    source: expense.source || '',
     // ⭐ שדות הכנסה
     income_category: expense.income_category || '',
     employment_type: expense.employment_type || '',

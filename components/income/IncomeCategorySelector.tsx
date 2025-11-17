@@ -90,15 +90,16 @@ const INCOME_CATEGORIES = [
 ];
 
 export default function IncomeCategorySelector({ value, onChange }: IncomeCategorySelectorProps) {
-  const [selectedId, setSelectedId] = useState<string>(value || '');
+  // value מכיל את השם (name), לא את ה-id
+  const [selectedName, setSelectedName] = useState<string>(value || '');
 
   useEffect(() => {
-    setSelectedId(value || '');
+    setSelectedName(value || '');
   }, [value]);
 
-  const handleChange = (categoryId: string) => {
-    setSelectedId(categoryId);
-    const category = INCOME_CATEGORIES.find(c => c.id === categoryId);
+  const handleChange = (categoryName: string) => {
+    setSelectedName(categoryName);
+    const category = INCOME_CATEGORIES.find(c => c.name === categoryName);
     if (category) {
       onChange({
         id: category.id,
@@ -110,40 +111,40 @@ export default function IncomeCategorySelector({ value, onChange }: IncomeCatego
   };
 
   return (
-    <Select value={selectedId} onValueChange={handleChange}>
-      <SelectTrigger className="w-full">
+    <Select value={selectedName} onValueChange={handleChange}>
+      <SelectTrigger className="w-full text-xl font-bold py-6">
         <SelectValue placeholder="בחר קטגוריית הכנסה..." />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="max-h-[400px]">
         {/* קבוצת עבודה */}
-        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">💼 הכנסות מעבודה</div>
+        <div className="px-4 py-3 text-lg font-extrabold text-gray-700 bg-gray-100">💼 הכנסות מעבודה</div>
         {INCOME_CATEGORIES.filter(c => c.employment_type).map((category) => (
-          <SelectItem key={category.id} value={category.id}>
-            <span className="flex items-center gap-2">
-              <span>{category.icon}</span>
-              <span>{category.name}</span>
+          <SelectItem key={category.id} value={category.name} className="text-xl py-4 cursor-pointer hover:bg-green-100">
+            <span className="flex items-center gap-3">
+              <span className="text-2xl">{category.icon}</span>
+              <span className="font-bold">{category.name}</span>
             </span>
           </SelectItem>
         ))}
 
         {/* קבוצת קצבאות */}
-        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 mt-2">🏛️ קצבאות וגמלאות</div>
+        <div className="px-4 py-3 text-lg font-extrabold text-gray-700 bg-gray-100 mt-2">🏛️ קצבאות וגמלאות</div>
         {INCOME_CATEGORIES.filter(c => c.allowance_type).map((category) => (
-          <SelectItem key={category.id} value={category.id}>
-            <span className="flex items-center gap-2">
-              <span>{category.icon}</span>
-              <span>{category.name}</span>
+          <SelectItem key={category.id} value={category.name} className="text-xl py-4 cursor-pointer hover:bg-green-100">
+            <span className="flex items-center gap-3">
+              <span className="text-2xl">{category.icon}</span>
+              <span className="font-bold">{category.name}</span>
             </span>
           </SelectItem>
         ))}
 
         {/* קבוצת אחרות */}
-        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 mt-2">💰 הכנסות אחרות</div>
+        <div className="px-4 py-3 text-lg font-extrabold text-gray-700 bg-gray-100 mt-2">💰 הכנסות אחרות</div>
         {INCOME_CATEGORIES.filter(c => !c.employment_type && !c.allowance_type).map((category) => (
-          <SelectItem key={category.id} value={category.id}>
-            <span className="flex items-center gap-2">
-              <span>{category.icon}</span>
-              <span>{category.name}</span>
+          <SelectItem key={category.id} value={category.name} className="text-xl py-4 cursor-pointer hover:bg-green-100">
+            <span className="flex items-center gap-3">
+              <span className="text-2xl">{category.icon}</span>
+              <span className="font-bold">{category.name}</span>
             </span>
           </SelectItem>
         ))}
