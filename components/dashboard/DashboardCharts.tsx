@@ -19,7 +19,21 @@ import {
 import { TrendingUp, PieChart as PieIcon, DollarSign } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 
-const COLORS = ["#3A7BD5", "#7ED957", "#F6A623", "#E74C3C", "#9B59B6", "#3498DB", "#E67E22", "#1ABC9C"];
+// פלטת צבעים בולטת ומודרנית - Phi Colors Enhanced
+const COLORS = [
+  '#FF6B6B', // אדום תוסס
+  '#4ECDC4', // טורקיז בהיר
+  '#FFD93D', // צהוב זהב
+  '#6BCF7F', // ירוק עז
+  '#A17FE0', // סגול רך
+  '#FF8C42', // כתום חם
+  '#45B7D1', // כחול שמיים
+  '#F78CA2', // ורוד
+  '#95E1D3', // מנטה
+  '#F3A683', // אפרסק
+  '#786FA6', // סגול עמוק
+  '#F8B500', // צהוב זהוב
+];
 
 interface ExpensesByMonthData {
   month: string;
@@ -190,12 +204,22 @@ export function DashboardCharts({ loans }: { loans: Loan[] }) {
                   cy="50%"
                   labelLine={false}
                   label={(entry) => `${entry.name}: ₪${entry.value.toLocaleString("he-IL")}`}
-                  outerRadius={80}
+                  outerRadius={90}
+                  innerRadius={50}
                   fill="#8884d8"
                   dataKey="value"
+                  animationBegin={0}
+                  animationDuration={800}
+                  animationEasing="ease-in-out"
                 >
                   {expensesByCategory.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={COLORS[index % COLORS.length]}
+                      style={{
+                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                      }}
+                    />
                   ))}
                 </Pie>
                 <RechartsTooltip

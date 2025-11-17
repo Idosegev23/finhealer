@@ -16,15 +16,20 @@ interface PhiPieChartProps {
   animated?: boolean
 }
 
+// פלטת צבעים בולטת ומודרנית - Phi Colors Enhanced
 const PHI_COLORS = [
-  '#F2C166', // phi-gold (צהוב/זהב)
-  '#1C8C63', // phi-mint (ירוק)
-  '#A66C26', // phi-coral (חום/נחושת)
-  '#074259', // phi-dark (כחול כהה)
-  '#4C566A', // phi-slate
-  '#88C0D0', // light blue
-  '#B48EAD', // purple
-  '#EBCB8B', // yellow
+  '#FF6B6B', // אדום תוסס
+  '#4ECDC4', // טורקיז בהיר
+  '#FFD93D', // צהוב זהב
+  '#6BCF7F', // ירוק עז
+  '#A17FE0', // סגול רך
+  '#FF8C42', // כתום חם
+  '#45B7D1', // כחול שמיים
+  '#F78CA2', // ורוד
+  '#95E1D3', // מנטה
+  '#F3A683', // אפרסק
+  '#786FA6', // סגול עמוק
+  '#F8B500', // צהוב זהוב
 ]
 
 export default function PhiPieChart({
@@ -123,7 +128,10 @@ export default function PhiPieChart({
               <Cell 
                 key={`cell-${index}`} 
                 fill={entry.color}
-                className="hover:opacity-80 transition-opacity cursor-pointer"
+                className="hover:opacity-90 transition-all duration-300 cursor-pointer"
+                style={{
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                }}
               />
             ))}
           </Pie>
