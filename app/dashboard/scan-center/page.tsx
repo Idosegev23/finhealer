@@ -231,7 +231,7 @@ export default function ScanCenterPage() {
                 </h3>
                 <p className="text-base text-amber-800 leading-relaxed mb-3">
                   כדי לקבל תמונה פיננסית מלאה, עליך להתחיל בהעלאת <strong>דוח תנועות בנק</strong>.
-                  לאחר מכן, המערכת תזהה אוטומטית אילו מסמכים נוספים נדרשים (כמו דוחות אשראי, תלושי משכורת וכו').
+                  לאחר מכן, המערכת תזהה אוטומטית אילו מסמכים נוספים נדרשים (כמו דוחות אשראי, תלושי משכורת וכו&apos;).
                 </p>
                 <p className="text-sm text-amber-700 font-bold">
                   📋 דוחות אחרים יהיו זמינים רק לאחר העלאת דוח בנק
