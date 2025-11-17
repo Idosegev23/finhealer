@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import ExpenseCategorySelector from '@/components/expenses/expense-category-selector';
+import IncomeCategorySelector from '@/components/income/IncomeCategorySelector';
 
 interface EditExpenseModalProps {
   expense: {
     id: string;
+    type?: 'income' | 'expense'; // ⭐ סוג התנועה
     amount: number;
     vendor: string;
     date: string;
@@ -17,13 +19,19 @@ interface EditExpenseModalProps {
     payment_method: string;
     notes: string;
     receipt_number?: string; // ⭐ מספר קבלה/מסמך
+    income_category?: string; // ⭐ קטגוריית הכנסה
+    employment_type?: string; // ⭐ סוג תעסוקה
+    allowance_type?: string; // ⭐ סוג קצבה
   };
   onClose: () => void;
   onSave: (updates: any, shouldApprove?: boolean) => void;
 }
 
 export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalProps) {
+  const isIncome = expense.type === 'income';
+  
   const [formData, setFormData] = useState({
+    type: expense.type || 'expense',
     amount: expense.amount,
     vendor: expense.vendor || '',
     date: expense.date || new Date().toISOString().split('T')[0],
@@ -32,22 +40,32 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
     expense_type: expense.expense_type || 'variable',
     payment_method: expense.payment_method || 'credit_card',
     notes: expense.notes || '',
-    receipt_number: expense.receipt_number || '', // ⭐ מספר קבלה/מסמך
+    receipt_number: expense.receipt_number || '',
+    // ⭐ שדות הכנסה
+    income_category: expense.income_category || '',
+    employment_type: expense.employment_type || '',
+    allowance_type: expense.allowance_type || '',
   });
 
   const handleSubmit = (e: React.FormEvent, shouldApprove = false) => {
     e.preventDefault();
     
     // ✅ Validation: אי אפשר לאשר ללא קטגוריה
-    if (shouldApprove && !formData.expense_category_id) {
-      alert('יש לבחור קטגוריה לפני אישור התנועה');
-      return;
+    if (shouldApprove) {
+      if (isIncome && !formData.income_category) {
+        alert('יש לבחור קטגוריית הכנסה לפני אישור התנועה');
+        return;
+      }
+      if (!isIncome && !formData.expense_category_id) {
+        alert('יש לבחור קטגוריה לפני אישור התנועה');
+        return;
+      }
     }
     
     onSave(formData, shouldApprove);
   };
 
-  const handleCategoryChange = (category: any) => {
+  const handleExpenseCategoryChange = (category: any) => {
     setFormData((prev) => ({
       ...prev,
       expense_category_id: category.id,
@@ -56,12 +74,23 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
     }));
   };
 
+  const handleIncomeCategoryChange = (category: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      income_category: category.name,
+      employment_type: category.employment_type || '',
+      allowance_type: category.allowance_type || '',
+    }));
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" dir="rtl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-bold">עריכת הוצאה</h2>
+          <h2 className="text-2xl font-bold">
+            {isIncome ? '💰 עריכת הכנסה' : '💳 עריכת הוצאה'}
+          </h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -112,11 +141,32 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
 
           {/* Category */}
           <div>
-            <label className="block text-sm font-medium mb-2">קטגוריה</label>
-            <ExpenseCategorySelector
-              value={formData.expense_category_id}
-              onChange={handleCategoryChange}
-            />
+            <label className="block text-sm font-medium mb-2">
+              {isIncome ? 'קטגוריית הכנסה *' : 'קטגוריית הוצאה'}
+            </label>
+            {isIncome ? (
+              <IncomeCategorySelector
+                value={formData.income_category}
+                onChange={handleIncomeCategoryChange}
+              />
+            ) : (
+              <ExpenseCategorySelector
+                value={formData.expense_category_id}
+                onChange={handleExpenseCategoryChange}
+              />
+            )}
+            {isIncome && formData.income_category && (
+              <div className="mt-2 p-3 bg-blue-50 rounded-lg text-sm">
+                <p className="font-medium text-blue-900">📊 פרטי הכנסה:</p>
+                <p className="text-blue-700">קטגוריה: {formData.income_category}</p>
+                {formData.employment_type && (
+                  <p className="text-blue-700">סוג תעסוקה: {formData.employment_type}</p>
+                )}
+                {formData.allowance_type && (
+                  <p className="text-blue-700">סוג קצבה: {formData.allowance_type}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Payment Method */}
@@ -171,7 +221,7 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
               type="button"
               onClick={(e: any) => handleSubmit(e, true)}
               className="w-full bg-green-600 hover:bg-green-700"
-              disabled={!formData.expense_category_id}
+              disabled={isIncome ? !formData.income_category : !formData.expense_category_id}
             >
               ✓ שמור ואשר
             </Button>
@@ -187,9 +237,9 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
             </div>
             
             {/* הודעת עזרה */}
-            {!formData.expense_category_id && (
+            {((isIncome && !formData.income_category) || (!isIncome && !formData.expense_category_id)) && (
               <p className="text-sm text-amber-600 text-center">
-                ⚠️ יש לבחור קטגוריה כדי לאשר את התנועה
+                ⚠️ יש לבחור {isIncome ? 'קטגוריית הכנסה' : 'קטגוריה'} כדי לאשר את התנועה
               </p>
             )}
           </div>
