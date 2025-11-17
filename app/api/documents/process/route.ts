@@ -168,7 +168,26 @@ export async function POST(request: NextRequest) {
       const txCount = await saveBankTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
       const accountCount = await saveBankAccounts(supabase, result, stmt.user_id, statementId as string);
       const loanCount = await saveLoanPaymentsAsLoans(supabase, result, stmt.user_id);
-      itemsProcessed = txCount + accountCount + loanCount;
+      
+      // 🎯 NEW: Detect missing documents and save account snapshot
+      await saveAccountSnapshot(supabase, result, stmt.user_id, statementId as string);
+      
+      // Get inserted transactions for missing documents detection
+      const { data: insertedTxs } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('document_id', statementId)
+        .eq('user_id', stmt.user_id);
+      
+      const missingDocsCount = await detectAndSaveMissingDocuments(
+        supabase, 
+        result, 
+        stmt.user_id, 
+        statementId as string,
+        insertedTxs || []
+      );
+      
+      itemsProcessed = txCount + accountCount + loanCount + missingDocsCount;
     } else if (docType.includes('payslip') || docType.includes('salary') || docType.includes('תלוש')) {
       // Payslips → payslips table + link to income transaction
       itemsProcessed = await savePayslips(supabase, result, stmt.user_id, statementId as string, stmt.statement_month);
@@ -507,7 +526,7 @@ async function analyzeLargePDF(buffer: Buffer, fileType: string, fileName: strin
 
 function fixRTLChunk(text: string): string {
   // Split into lines for processing
-  const lines = text.split('\n');
+    const lines = text.split('\n');
   console.log(`🔧 Processing ${lines.length} lines...`);
 
   const fixedLines = lines.map((line, index) => {
@@ -523,23 +542,23 @@ function fixRTLChunk(text: string): string {
     }
 
     // Enhanced reversal logic - more aggressive for PDF text
-    let fixedLine = line.replace(/[A-Za-z0-9._\-@\/]+/g, (match) => {
-      const reversed = match.split('').reverse().join('');
-
+      let fixedLine = line.replace(/[A-Za-z0-9._\-@\/]+/g, (match) => {
+        const reversed = match.split('').reverse().join('');
+        
       // Strong reversal indicators (expanded list)
-      if (
+        if (
         // Financial terms (Hebrew reversed)
         reversed.match(/^(תשלום|חיוב|זיכוי|יתרה|סכום|סה"כ|מע"מ|מס|עמלה|ריבית)/) ||
         // Bank names reversed
         reversed.match(/^(כאל|מקס|ישראכרט|לאומי|דיסקונט|פועלים|בנק|בנקאי)/) ||
-        // Domain names
-        reversed.match(/\.(com|net|org|il|co\.il|gov|edu|app|io|ai)$/i) ||
-        // URLs
-        reversed.match(/^(www|http|https|ftp)/i) ||
-        // Email
-        reversed.includes('@') ||
+          // Domain names
+          reversed.match(/\.(com|net|org|il|co\.il|gov|edu|app|io|ai)$/i) ||
+          // URLs
+          reversed.match(/^(www|http|https|ftp)/i) ||
+          // Email
+          reversed.includes('@') ||
         // Tech companies
-        reversed.match(/^(CURSOR|OPENAI|VERCEL|ANTHROPIC|GOOGLE|MICROSOFT|ADOBE|NETFLIX|ZOOM|APPLE|PAYPAL|AMAZON|STRIPE|GITHUB|GITLAB|SLACK|DISCORD|TELEGRAM|WHATSAPP|FACEBOOK|INSTAGRAM|TWITTER|LINKEDIN|YOUTUBE|SPOTIFY|DROPBOX|NOTION|FIGMA|CANVA)/i) ||
+          reversed.match(/^(CURSOR|OPENAI|VERCEL|ANTHROPIC|GOOGLE|MICROSOFT|ADOBE|NETFLIX|ZOOM|APPLE|PAYPAL|AMAZON|STRIPE|GITHUB|GITLAB|SLACK|DISCORD|TELEGRAM|WHATSAPP|FACEBOOK|INSTAGRAM|TWITTER|LINKEDIN|YOUTUBE|SPOTIFY|DROPBOX|NOTION|FIGMA|CANVA)/i) ||
         // Financial terms
         reversed.match(/^(usage|subscription|payment|invoice|receipt|statement|report|summary|total|balance|credit|debit|account|customer|vendor|service|product|order|transaction|fee|charge|refund|discount|tax|vat|net|gross|atm|cash|check|transfer|deposit|withdrawal)/i) ||
         // Business categories
@@ -550,10 +569,10 @@ function fixRTLChunk(text: string): string {
         reversed.match(/^\d{1,3}(,\d{3})*(\.\d{1,2})?$/) ||
         // Card names
         reversed.match(/^(ויזה|מסטרקארד|אמריקן|אקספרס|ויזה|מאסטר|אמריקן)/)
-      ) {
-        return reversed;
-      }
-
+        ) {
+          return reversed;
+        }
+        
       // Vowel-based heuristic - if reversed has more vowels, it's probably correct
       const reversedVowels = (reversed.match(/[aeiou]/gi) || []).length;
       const originalVowels = (match.match(/[aeiou]/gi) || []).length;
@@ -564,14 +583,14 @@ function fixRTLChunk(text: string): string {
           reversed.match(/^\d/) || // Numbers after reversal
           match.match(/^\d{2,}/) || // Multi-digit numbers
           reversed.match(/^[A-Z]{2,}/)) { // Capital words
-        return reversed;
-      }
-
+          return reversed;
+        }
+        
       return match;
-    });
-
+      });
+      
     // Enhanced Hebrew text processing
-    fixedLine = fixedLine
+      fixedLine = fixedLine
       // Fix concatenated Hebrew business names (expanded)
       .replace(/(סופרפארם)(ברנע[^\s]*)/g, '$1 $2')
       .replace(/(שופרסל)([^\s]*)/g, '$1 $2')
@@ -588,16 +607,16 @@ function fixRTLChunk(text: string): string {
       .replace(/(\d+[,.]?\d*)\s*₪/g, '$1 ₪')
       .replace(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/g, '$1/$2/$3')
       // Additional spacing fixes
-      .replace(/(סופר)(דוידי|פארם|דיל)/g, '$1 $2')
-      .replace(/(בזק|פלאפון|הוט|סלקום)(חשבון[^\s]*)/g, '$1 $2')
+        .replace(/(סופר)(דוידי|פארם|דיל)/g, '$1 $2')
+        .replace(/(בזק|פלאפון|הוט|סלקום)(חשבון[^\s]*)/g, '$1 $2')
       .replace(/(קרן|ביטוח)(מכבי|כללית|לאומי|הראל|מגדל|פניקס)/g, '$1 $2')
       // Fix stuck city names
-      .replace(/(מקדונלד'ס|ארקפה|בורגר[^\s]+|קפה[^\s]+)(תל[^\s]+|ירושל[^\s]+|חיפה|אשקלון|אשדוד|רחובות|פתח[^\s]+)/g, '$1 $2');
-
-    return fixedLine;
-  });
-
-  return fixedLines.join('\n');
+        .replace(/(מקדונלד'ס|ארקפה|בורגר[^\s]+|קפה[^\s]+)(תל[^\s]+|ירושל[^\s]+|חיפה|אשקלון|אשדוד|רחובות|פתח[^\s]+)/g, '$1 $2');
+      
+      return fixedLine;
+    });
+    
+    return fixedLines.join('\n');
 }
 
 async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: string) {
@@ -651,7 +670,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
         .select('name, expense_type, category_group')
         .eq('is_active', true)
         .order('expense_type, category_group, display_order, name');
-
+      
       expenseCategories = categories || [];
       console.log(`📋 Loaded ${expenseCategories.length} expense categories from database`);
     }
@@ -740,7 +759,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
                 }
               ]
             }],
-            temperature: 0.1,
+      temperature: 0.1,
             max_tokens: 16384,
             response_format: { type: 'json_object' }
           });
@@ -764,7 +783,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
     console.log(`✅ ${usedModel} analysis complete (${aiDuration}s)`);
-
+    
     // Parse JSON with improved error handling
     try {
       // First, try direct parsing
@@ -1224,6 +1243,186 @@ async function saveBankTransactions(supabase: any, result: any, userId: string, 
   } catch (error) {
     console.error('Error in saveBankTransactions:', error);
     throw error;
+  }
+}
+
+/**
+ * Detect and save missing documents based on bank statement analysis
+ * זיהוי מסמכים חסרים על בסיס ניתוח דוח בנק
+ */
+async function detectAndSaveMissingDocuments(
+  supabase: any, 
+  result: any, 
+  userId: string, 
+  documentId: string,
+  insertedTransactions: any[]
+): Promise<number> {
+  try {
+    if (!result.missing_documents || !Array.isArray(result.missing_documents)) {
+      console.log('ℹ️  No missing documents detected by AI');
+      return 0;
+    }
+
+    console.log(`🔍 Detected ${result.missing_documents.length} missing documents`);
+
+    const missingDocsToInsert = [];
+    let priority = 1000; // Start with high priority, decrement for older items
+
+    for (const doc of result.missing_documents) {
+      // Find related transaction if exists
+      let relatedTransactionId = null;
+      if (doc.charge_date || doc.salary_date || doc.payment_date) {
+        const searchDate = doc.charge_date || doc.salary_date || doc.payment_date;
+        const searchAmount = doc.charge_amount || doc.salary_amount || doc.payment_amount;
+        
+        const relatedTx = insertedTransactions.find((tx: any) => 
+          tx.date === searchDate && Math.abs(tx.amount - searchAmount) < 1
+        );
+        
+        if (relatedTx) {
+          // Get the transaction ID from database
+          const { data: txData } = await supabase
+            .from('transactions')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('date', searchDate)
+            .eq('amount', searchAmount)
+            .limit(1)
+            .single();
+          
+          if (txData) {
+            relatedTransactionId = txData.id;
+          }
+        }
+      }
+
+      // Build description and instructions
+      let description = doc.description || '';
+      let instructions = '';
+      
+      switch (doc.type) {
+        case 'credit':
+          description = description || `דוח אשראי ****${doc.card_last_4}`;
+          instructions = `העלה את דוח כרטיס האשראי המלא לתקופה ${doc.period_start} עד ${doc.period_end}. הדוח צריך להכיל את כל העסקאות שבוצעו בכרטיס.`;
+          break;
+        case 'payslip':
+          description = description || `תלוש משכורת ${doc.month}`;
+          instructions = `העלה את תלוש המשכורת המלא לחודש ${doc.month}. התלוש צריך להכיל פירוט מלא של המשכורת ברוטו, ניכויים והמשכורת נטו.`;
+          break;
+        case 'mortgage':
+          description = description || `דוח משכנתא ${doc.lender}`;
+          instructions = `העלה את הדוח העדכני ביותר של המשכנתא מ${doc.lender}. הדוח צריך להכיל את יתרת ההלוואה, הריבית והתשלום החודשי.`;
+          break;
+      }
+
+      missingDocsToInsert.push({
+        user_id: userId,
+        document_type: doc.type,
+        status: 'pending',
+        period_start: doc.period_start || null,
+        period_end: doc.period_end || null,
+        card_last_4: doc.card_last_4 || null,
+        account_number: doc.account_number || null,
+        related_transaction_id: relatedTransactionId,
+        expected_amount: doc.charge_amount || doc.salary_amount || doc.payment_amount || null,
+        priority: priority--,
+        description,
+        instructions,
+      });
+    }
+
+    if (missingDocsToInsert.length === 0) {
+      return 0;
+    }
+
+    // Insert missing documents
+    const { error } = await supabase
+      .from('missing_documents')
+      .insert(missingDocsToInsert);
+
+    if (error) {
+      console.error('Failed to insert missing documents:', error);
+      throw error;
+    }
+
+    console.log(`✅ Saved ${missingDocsToInsert.length} missing document requests`);
+    return missingDocsToInsert.length;
+  } catch (error) {
+    console.error('Error in detectAndSaveMissingDocuments:', error);
+    // Don't throw - missing documents detection is not critical
+    return 0;
+  }
+}
+
+/**
+ * Save account balance snapshot from bank statement
+ * שמירת snapshot של יתרת חשבון מדוח בנק
+ */
+async function saveAccountSnapshot(
+  supabase: any,
+  result: any,
+  userId: string,
+  documentId: string
+): Promise<void> {
+  try {
+    if (!result.account_info || !result.report_info) {
+      console.log('ℹ️  No account info for snapshot');
+      return;
+    }
+
+    const accountInfo = result.account_info;
+    const reportInfo = result.report_info;
+
+    // Get balance and snapshot date
+    const balance = accountInfo.current_balance || accountInfo.closing_balance || null;
+    const snapshotDate = reportInfo.period_end || reportInfo.report_date || null;
+
+    if (!balance || !snapshotDate) {
+      console.log('ℹ️  Missing balance or date for snapshot');
+      return;
+    }
+
+    // Parse snapshot date
+    let parsedDate = snapshotDate;
+    if (snapshotDate.includes('/')) {
+      const parts = snapshotDate.split('/');
+      if (parts.length === 3) {
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        let year = parts[2];
+        if (year.length === 2) {
+          year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+        }
+        parsedDate = `${year}-${month}-${day}`;
+      }
+    }
+
+    const snapshot = {
+      user_id: userId,
+      account_number: accountInfo.account_number || null,
+      account_name: accountInfo.account_name || null,
+      bank_name: reportInfo.bank_name || null,
+      balance: parseFloat(balance),
+      snapshot_date: parsedDate,
+      source_document_id: documentId,
+    };
+
+    // Upsert (insert or update if exists)
+    const { error } = await supabase
+      .from('account_snapshots')
+      .upsert(snapshot, {
+        onConflict: 'user_id,account_number,snapshot_date',
+      });
+
+    if (error) {
+      console.error('Failed to save account snapshot:', error);
+      // Don't throw - snapshot is not critical
+    } else {
+      console.log(`💰 Saved bank account snapshot: ${balance} ₪`);
+    }
+  } catch (error) {
+    console.error('Error in saveAccountSnapshot:', error);
+    // Don't throw - snapshot is not critical
   }
 }
 

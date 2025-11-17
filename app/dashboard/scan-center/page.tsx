@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DocumentUploader } from '@/components/shared/DocumentUploader';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Banknote,
   CreditCard,
@@ -23,6 +25,8 @@ import {
   ExternalLink,
   Calendar,
   FileCheck,
+  AlertCircle,
+  Lock,
 } from 'lucide-react';
 
 type DocumentType = 
@@ -132,13 +136,52 @@ interface ScannedDocument {
 }
 
 export default function ScanCenterPage() {
-  const [activeType, setActiveType] = useState<DocumentType | null>(null);
+  const searchParams = useSearchParams();
+  const requiredDocId = searchParams?.get('required');
+  const preselectedType = searchParams?.get('type') as DocumentType | null;
+  
+  const [activeType, setActiveType] = useState<DocumentType | null>(preselectedType);
   const [scannedDocs, setScannedDocs] = useState<ScannedDocument[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [hasBankStatement, setHasBankStatement] = useState(false);
+  const [checkingBankStatement, setCheckingBankStatement] = useState(true);
 
   useEffect(() => {
     loadScannedHistory();
+    checkForBankStatement();
   }, []);
+  
+  useEffect(() => {
+    if (preselectedType) {
+      setActiveType(preselectedType);
+    }
+  }, [preselectedType]);
+
+  const checkForBankStatement = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+
+      // Check if user has uploaded any bank statement
+      const { data, error } = await supabase
+        .from('uploaded_statements')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('file_type', 'bank_statement')
+        .eq('status', 'completed')
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        setHasBankStatement(true);
+      }
+    } catch (error) {
+      console.error('Error checking for bank statement:', error);
+    } finally {
+      setCheckingBankStatement(false);
+    }
+  };
 
   const loadScannedHistory = async () => {
     try {
@@ -174,6 +217,50 @@ export default function ScanCenterPage() {
         <p className="text-sm text-blue-600 mt-2">
           💡 <strong>טיפ:</strong> אחרי העלאה מוצלחת תישאר כאן - תוכל להעלות מסמכים נוספים ברציפות!
         </p>
+
+        {/* Warning if no bank statement */}
+        {!checkingBankStatement && !hasBankStatement && (
+          <div className="mt-4 p-6 bg-amber-50 border-2 border-amber-300 rounded-xl">
+            <div className="flex items-start gap-4">
+              <div className="bg-amber-100 p-3 rounded-full">
+                <AlertCircle className="w-8 h-8 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-extrabold text-amber-900 mb-2">
+                  ⚠️ התחל עם דוח בנק
+                </h3>
+                <p className="text-base text-amber-800 leading-relaxed mb-3">
+                  כדי לקבל תמונה פיננסית מלאה, עליך להתחיל בהעלאת <strong>דוח תנועות בנק</strong>.
+                  לאחר מכן, המערכת תזהה אוטומטית אילו מסמכים נוספים נדרשים (כמו דוחות אשראי, תלושי משכורת וכו').
+                </p>
+                <p className="text-sm text-amber-700 font-bold">
+                  📋 דוחות אחרים יהיו זמינים רק לאחר העלאת דוח בנק
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success message if has bank statement */}
+        {!checkingBankStatement && hasBankStatement && (
+          <div className="mt-4 p-6 bg-green-50 border-2 border-green-300 rounded-xl">
+            <div className="flex items-start gap-4">
+              <div className="bg-green-100 p-3 rounded-full">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-extrabold text-green-900 mb-2">
+                  ✅ מעולה! דוח הבנק הועלה
+                </h3>
+                <p className="text-base text-green-800 leading-relaxed">
+                  כעת תוכל להעלות מסמכים נוספים. המערכת תקשר אוטומטית בין דוחות האשראי לחיובים בבנק,
+                  ותלושי משכורת להכנסות.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start gap-3">
             <div className="text-2xl">💡</div>
@@ -182,10 +269,10 @@ export default function ScanCenterPage() {
                 איך זה עובד?
               </p>
               <ol className="text-sm text-blue-800 space-y-1 mr-4">
-                <li>1. בחר סוג דוח (בנק או אשראי)</li>
-                <li>2. העלה קובץ PDF</li>
-                <li>3. המערכת תזהה ותסווג את ההוצאות לקטגוריות</li>
-                <li>4. אשר או ערוך לפני השמירה</li>
+                <li>1. התחל עם דוח בנק (חובה)</li>
+                <li>2. המערכת תזהה מסמכים חסרים</li>
+                <li>3. העלה את המסמכים הנדרשים</li>
+                <li>4. קבל תמונה פיננסית מלאה ומדויקת</li>
               </ol>
             </div>
           </div>
@@ -197,7 +284,13 @@ export default function ScanCenterPage() {
         {documentTypes.map((docType) => {
           const Icon = docType.icon;
           const isActive = activeType === docType.type;
-          const isEnabled = docType.type === 'bank' || docType.type === 'credit';
+          
+          // Enable bank always, others only if bank statement exists OR if coming from required doc
+          const isEnabled = docType.type === 'bank' || 
+                           hasBankStatement || 
+                           (requiredDocId && preselectedType === docType.type);
+          
+          const isLocked = !isEnabled && docType.type !== 'bank';
 
           return (
             <Card
@@ -205,7 +298,7 @@ export default function ScanCenterPage() {
               className={`transition-all ${
                 isEnabled 
                   ? `cursor-pointer hover:shadow-lg ${isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''}` 
-                  : 'cursor-not-allowed opacity-40'
+                  : 'cursor-not-allowed opacity-50'
               }`}
               onClick={() => {
                 if (isEnabled) {
@@ -216,20 +309,28 @@ export default function ScanCenterPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
                   <div
-                    className={`p-3 rounded-lg ${docType.color} flex-shrink-0`}
+                    className={`p-3 rounded-lg ${docType.color} flex-shrink-0 relative`}
                   >
                     <Icon className="w-6 h-6" />
+                    {isLocked && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-lg">
+                        <Lock className="w-5 h-5 text-white" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <CardTitle className="text-lg">
                         {docType.title}
                       </CardTitle>
-                      {isEnabled && (
+                      {isEnabled && !isLocked && (
                         <Badge className="bg-green-100 text-green-700 text-xs">✓ פעיל</Badge>
                       )}
-                      {!isEnabled && (
-                        <Badge className="bg-gray-100 text-gray-500 text-xs">בקרוב</Badge>
+                      {isLocked && (
+                        <Badge className="bg-amber-100 text-amber-700 text-xs flex items-center gap-1">
+                          <Lock className="w-3 h-3" />
+                          נעול
+                        </Badge>
                       )}
                     </div>
                     <CardDescription className="text-sm">
@@ -245,7 +346,13 @@ export default function ScanCenterPage() {
                 <div className="text-sm text-gray-700">
                   {docType.dataExtracted}
                 </div>
-                {isActive && isEnabled && (
+                {isLocked && (
+                  <div className="mt-4 text-xs text-amber-600 font-medium flex items-center gap-2">
+                    <Lock className="w-4 h-4" />
+                    יפתח לאחר העלאת דוח בנק
+                  </div>
+                )}
+                {isActive && isEnabled && !isLocked && (
                   <div className="mt-4 text-xs text-blue-600 font-medium flex items-center gap-2">
                     <CheckCircle className="w-4 h-4" />
                     נבחר - העלה את הדוח למטה

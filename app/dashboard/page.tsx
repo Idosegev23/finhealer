@@ -9,6 +9,7 @@ import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PendingTransactionsBanner } from '@/components/dashboard/PendingTransactionsBanner'
+import MissingDocumentsWidget from '@/components/dashboard/MissingDocumentsWidget'
 
 // Phase-specific dashboards
 import { OnboardingDashboard } from '@/components/dashboard/phases/OnboardingDashboard'
@@ -245,6 +246,11 @@ export default async function DashboardPage() {
           currentPhase={userDataInfo.phase}
           sections={sections}
         />
+
+        {/* Missing Documents Widget */}
+        <div className="mb-8">
+          <MissingDocumentsWidget />
+        </div>
 
         {/* ציון בריאות פיננסית */}
         <div className="bg-white dark:bg-phi-dark border border-phi-gold/30 rounded-2xl p-8 mb-8 shadow-xl hover:shadow-2xl transition-all duration-300">
