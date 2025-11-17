@@ -63,7 +63,7 @@ export default function MissingDocumentsPage() {
       const supabase = createClient();
       const { error } = await supabase
         .from('missing_documents')
-        .update({ status: 'skipped' })
+        .update({ status: 'skipped' } as any)
         .eq('id', docId);
 
       if (error) {
