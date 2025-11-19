@@ -1,9 +1,10 @@
 -- ============================================================================
--- Migration: Add "חיוב כרטיס אשראי" & "משיכת מזומן" Categories
+-- Migration: Add Special Categories
 -- תאריך: 2025-11-19
--- תיאור: הוספת קטגוריות מיוחדות לתנועות בדוח בנק שאינן הוצאות אמיתיות:
+-- תיאור: הוספת קטגוריות מיוחדות:
 --         1. חיוב כרטיס אשראי - העברה שמצריכה סריקת דוח אשראי
 --         2. משיכת מזומן - המרה של כסף דיגיטלי למזומן
+--         3. שכר טרחה - שירותים מקצועיים (עו"ד, רו"ח, יועצים)
 -- ============================================================================
 
 -- הוספת קטגוריה "חיוב כרטיס אשראי"
@@ -50,7 +51,27 @@ VALUES (
 ON CONFLICT (name) DO UPDATE SET
   search_keywords = EXCLUDED.search_keywords;
 
+-- הוספת קטגוריה "שכר טרחה"
+INSERT INTO expense_categories (
+  name, 
+  expense_type, 
+  category_group, 
+  applicable_to, 
+  search_keywords, 
+  is_active
+)
+VALUES (
+  'שכר טרחה',
+  'variable',
+  'professional_services',
+  'both',
+  ARRAY['שכר טרחה', 'שכ"ט', 'שכט', 'עורך דין', 'עו"ד', 'עוד', 'משפטי', 'יועץ משפטי', 'רואה חשבון', 'רו"ח', 'רוח', 'חשב', 'הנהלת חשבונות', 'יועץ מס', 'ייעוץ מס', 'יועץ עסקי', 'שמאי', 'שמאות', 'שמאי מקרקעין', 'מהנדס', 'אדריכל', 'יועץ', 'שירותים מקצועיים', 'מקצועי', 'legal fees', 'attorney', 'lawyer', 'accountant', 'consultant', 'professional fee', 'professional service'],
+  true
+)
+ON CONFLICT (name) DO UPDATE SET
+  search_keywords = EXCLUDED.search_keywords;
+
 -- הוספת הערה
-COMMENT ON TABLE expense_categories IS 'Expense categories including credit card charge and cash withdrawal tracking categories added on 2025-11-19';
+COMMENT ON TABLE expense_categories IS 'Expense categories including credit card charge, cash withdrawal, and professional fees tracking categories added on 2025-11-19';
 
 

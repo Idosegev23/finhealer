@@ -38,8 +38,8 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
     date: expense.date || new Date().toISOString().split('T')[0],
     expense_category: expense.expense_category || '',
     expense_category_id: expense.expense_category_id || '',
-    expense_type: expense.expense_type || 'variable',
-    payment_method: expense.payment_method || 'credit_card',
+    expense_type: expense.expense_type || '',
+    payment_method: expense.payment_method || '',
     notes: expense.notes || '',
     receipt_number: expense.receipt_number || '',
     source: expense.source || '',
@@ -222,12 +222,15 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
               onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
               className="w-full px-6 py-4 text-xl border-2 rounded-xl focus:ring-4 focus:ring-blue-300 focus:border-blue-500 focus:outline-none bg-white"
             >
+              <option value="">בחר אמצעי תשלום...</option>
               <option value="credit_card">💳 כרטיס אשראי</option>
               <option value="debit_card">💳 כרטיס חיוב</option>
               <option value="cash">💵 מזומן</option>
               <option value="bank_transfer">🏦 העברה בנקאית</option>
               <option value="check">📝 שיק</option>
               <option value="digital_wallet">📱 ארנק דיגיטלי</option>
+              <option value="bit">💰 ביט</option>
+              <option value="paybox">📦 פייבוקס</option>
               <option value="other">❓ אחר</option>
             </select>
           </div>
