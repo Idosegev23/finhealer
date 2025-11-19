@@ -525,7 +525,7 @@ export default function PendingExpensesPage() {
 
         {/* ⚠️ Warning Box - אם יש לא מסווגות */}
         {uncategorizedCount > 0 && (
-          <div className="bg-gradient-to-r from-amber-100 to-orange-100 border-4 border-amber-500 rounded-2xl p-6 mb-6 shadow-xl animate-pulse">
+          <div className="bg-gradient-to-r from-amber-100 to-orange-100 border-4 border-amber-500 rounded-2xl p-6 mb-6 shadow-xl">
             <div className="flex items-start gap-5">
               <div className="text-6xl">⚠️</div>
               <div className="flex-1">
@@ -788,7 +788,7 @@ export default function PendingExpensesPage() {
             return (
               <Card 
                 key={expense.id} 
-                className={`hover:shadow-2xl transition-all hover:scale-[1.02] ${needsCategory ? 'border-6 border-amber-500 bg-gradient-to-r from-amber-50 to-orange-50 animate-pulse' : 'border-4 border-gray-300 bg-white'}`}
+                className={`hover:shadow-2xl transition-all hover:scale-[1.02] ${needsCategory ? 'border-6 border-amber-500 bg-gradient-to-r from-amber-50 to-orange-50' : 'border-4 border-gray-300 bg-white'}`}
               >
                 {/* ⚠️ אזהרה אם חסרה קטגוריה */}
                 {needsCategory && (
@@ -805,7 +805,7 @@ export default function PendingExpensesPage() {
                           🏪 {expense.vendor || 'לא צוין'}
                         </CardTitle>
                         {needsCategory && (
-                          <Badge className="bg-amber-600 text-white text-xl px-4 py-2 animate-pulse shadow-lg">
+                          <Badge className="bg-amber-600 text-white text-xl px-4 py-2 shadow-lg">
                             ⚠️ דורש תשומת לב!
                           </Badge>
                         )}
@@ -818,7 +818,7 @@ export default function PendingExpensesPage() {
                       </CardDescription>
                       {/* ⚠️ אזהרה על כפילות */}
                       {expense.duplicate_warning && (
-                        <div className="mt-4 bg-gradient-to-r from-red-100 to-rose-100 border-4 border-red-500 rounded-xl p-4 text-xl text-red-900 font-extrabold shadow-lg animate-pulse">
+                        <div className="mt-4 bg-gradient-to-r from-red-100 to-rose-100 border-4 border-red-500 rounded-xl p-4 text-xl text-red-900 font-extrabold shadow-lg">
                           ⚠️ אזהרה: נמצאה תנועה דומה עם אותו מספר מסמך שכבר אושרה!
                         </div>
                       )}
@@ -916,7 +916,7 @@ export default function PendingExpensesPage() {
                         disabled={isProcessing}
                         className={`w-full text-2xl py-8 rounded-2xl border-4 shadow-2xl font-extrabold hover:scale-105 transition-all ${
                           needsCategory 
-                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-amber-600 animate-pulse' 
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-amber-600' 
                             : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-blue-500'
                         }`}
                       >

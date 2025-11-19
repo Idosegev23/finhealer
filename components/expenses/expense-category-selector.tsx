@@ -209,7 +209,7 @@ export default function ExpenseCategorySelector({
                             key={category.id}
                             type="button"
                             onClick={() => handleSelect(category)}
-                            className={`w-full text-right px-5 py-4 hover:bg-orange-100 transition-all flex items-center justify-between border-b border-gray-100 ${
+                            className={`w-full text-right px-5 py-4 hover:bg-orange-100 transition-colors flex items-center justify-between border-b border-gray-100 ${
                               isSelected ? 'bg-orange-200 font-extrabold' : ''
                             }`}
                             onMouseEnter={() => setSelectedIndex(globalIdx)}
