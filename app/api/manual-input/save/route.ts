@@ -44,9 +44,10 @@ export async function POST(request: NextRequest) {
     if (incomeSources && incomeSources.length > 0) {
       const incomeData = incomeSources.map((income: IncomeSource) => ({
         user_id: userId,
-        source_name: income.source_name,
-        employment_type: 'salary', // Default
-        net_amount: income.net_amount,
+        name: income.source_name, // Fixed: changed from source_name to name
+        type: 'salary', // Fixed: changed from employment_type to type
+        amount: income.net_amount, // Fixed: changed from net_amount to amount
+        net_salary: income.net_amount, // Store as net_salary for detailed data
         frequency: income.frequency,
         active: true,
       }));
@@ -115,10 +116,11 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         loan_type: loan.loan_type,
         lender: 'Unknown', // Default
+        original_amount: loan.current_balance, // Fixed: added required original_amount field
         current_balance: loan.current_balance,
         monthly_payment: loan.monthly_payment,
         interest_rate: loan.interest_rate,
-        active: true,
+        status: 'active', // Fixed: changed from active: true to status: 'active'
       }));
 
       const { error: loansError } = await supabase
@@ -131,17 +133,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Mark user as having completed manual input
+    // 4. Update user's phase to 'active_tracking' after manual input
     const { error: userError } = await supabase
       .from('users')
       .update({ 
-        manual_input_completed: true,
-        manual_input_completed_at: new Date().toISOString(),
+        phase: 'active_tracking', // Move to next phase after data collection
       })
       .eq('id', userId);
 
     if (userError) {
-      console.error('Error updating user:', userError);
+      console.error('Error updating user phase:', userError);
+      // Don't throw - not critical if this fails
     }
 
     return NextResponse.json({ 
