@@ -5,6 +5,7 @@
 --         1. חיוב כרטיס אשראי - העברה שמצריכה סריקת דוח אשראי
 --         2. משיכת מזומן - המרה של כסף דיגיטלי למזומן
 --         3. שכר טרחה - שירותים מקצועיים (עו"ד, רו"ח, יועצים)
+--         4. השתלמות מקצועית - קורסים, סדנאות, כנסים, הדרכות
 -- ============================================================================
 
 -- הוספת קטגוריה "חיוב כרטיס אשראי"
@@ -71,7 +72,27 @@ VALUES (
 ON CONFLICT (name) DO UPDATE SET
   search_keywords = EXCLUDED.search_keywords;
 
+-- הוספת קטגוריה "השתלמות מקצועית"
+INSERT INTO expense_categories (
+  name, 
+  expense_type, 
+  category_group, 
+  applicable_to, 
+  search_keywords, 
+  is_active
+)
+VALUES (
+  'השתלמות מקצועית',
+  'variable',
+  'education',
+  'both',
+  ARRAY['השתלמות מקצועית', 'השתלמות', 'פיתוח מקצועי', 'קורס', 'קורסים', 'סדנה', 'סדנאות', 'הדרכה', 'כנס', 'כנסים', 'סמינר', 'סמינרים', 'הכשרה', 'הכשרה מקצועית', 'הכשרה עסקית', 'למידה', 'לימודים', 'לימוד מקצועי', 'הסמכה', 'הסמכה מקצועית', 'תעודה', 'ספרים מקצועיים', 'חומרי לימוד', 'אוניברסיטה', 'מכללה', 'לימודים גבוהים', 'קורס אונליין', 'קורס מקוון', 'למידה מרחוק', 'professional development', 'training', 'course', 'workshop', 'seminar', 'conference', 'certification', 'education', 'online course', 'e-learning', 'professional training'],
+  true
+)
+ON CONFLICT (name) DO UPDATE SET
+  search_keywords = EXCLUDED.search_keywords;
+
 -- הוספת הערה
-COMMENT ON TABLE expense_categories IS 'Expense categories including credit card charge, cash withdrawal, and professional fees tracking categories added on 2025-11-19';
+COMMENT ON TABLE expense_categories IS 'Expense categories including credit card charge, cash withdrawal, professional fees, and professional development tracking categories added on 2025-11-19';
 
 

@@ -206,6 +206,10 @@ ${categoriesGuide}
 - "קרן מכבי" (הוראת קבע) → category: "קופת חולים", expense_type: "fixed", is_recurring: true, recurring_type: "monthly"
 - "פרי טיוי" (הוראת קבע) → category: "אינטרנט", expense_type: "fixed", is_recurring: true, recurring_type: "monthly"
 - "פלאפון חשבון תקופתי" (הוראת קבע) → category: "טלפון נייד", expense_type: "fixed", is_recurring: true, recurring_type: "monthly"
+- "קורס פייתון" → category: "השתלמות מקצועית", expense_type: "variable"
+- "כנס אקזיט" → category: "השתלמות מקצועית", expense_type: "variable"
+- "עורך דין כהן" → category: "שכר טרחה", expense_type: "variable"
+- "רו\"ח לוי משרד חשבות" → category: "שכר טרחה", expense_type: "variable"
 
 **✅ עסקאות אנגלית:**
 - "CURSOR USAGE JUL" → category: "תוכנה ומנויים דיגיטליים", expense_type: "fixed"

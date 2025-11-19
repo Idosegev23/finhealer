@@ -157,7 +157,7 @@ export default function ExpenseCategorySelector({
         <input
           ref={inputRef}
           type="text"
-          value={value || search}
+          value={search || value || ''}
           onChange={(e) => {
             setSearch(e.target.value);
             setIsOpen(true);
