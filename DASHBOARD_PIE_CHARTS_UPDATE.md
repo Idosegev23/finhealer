@@ -310,3 +310,4 @@ animationDuration={800} // שנו ל-600 למשל
 **גרסה:** 2.0  
 **סטטוס:** ✅ Live in Production
 
+

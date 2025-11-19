@@ -12,10 +12,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import DataCollectionDashboard from './DataCollectionDashboard';
+import { DataCollectionDashboard } from './DataCollectionDashboard';
 
 interface DataCollectionBannerProps {
   userName?: string;
+  daysOfData: number;
+  hasBankStatement: boolean;
   sections: {
     income: boolean;
     expenses: boolean;
@@ -27,7 +29,7 @@ interface DataCollectionBannerProps {
   };
 }
 
-export default function DataCollectionBanner({ userName, sections }: DataCollectionBannerProps) {
+export default function DataCollectionBanner({ userName, daysOfData, hasBankStatement, sections }: DataCollectionBannerProps) {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
@@ -101,7 +103,7 @@ export default function DataCollectionBanner({ userName, sections }: DataCollect
                           מלא את הרובריקות בקצב שלך - הן יעלמו אחרי שתשלים אותן
                         </SheetDescription>
                       </SheetHeader>
-                      <DataCollectionDashboard userName={userName} sections={sections} />
+                      <DataCollectionDashboard daysOfData={daysOfData} hasBankStatement={hasBankStatement} />
                     </SheetContent>
                   </Sheet>
 

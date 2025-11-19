@@ -9,9 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Loader2, FileText, Upload, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
 import { getRequiredDocuments, calculateCompletionPercentage, getMissingDocuments, DocumentRequirement } from "@/lib/loanDocuments";
-import type { Database } from "@/types/database.types";
 
-type LoanApplication = Database["public"]["Tables"]["loan_applications"]["Row"];
+type LoanApplication = any;
 
 interface LoanApplicationWizardProps {
   open: boolean;

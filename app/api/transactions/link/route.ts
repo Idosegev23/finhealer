@@ -103,7 +103,6 @@ export async function POST(request: NextRequest) {
     // 5. עדכן את התנועה הראשית
     const { error: updateParentError } = await supabase
       .from('transactions')
-      // @ts-expect-error - New fields from migration not yet in types
       .update({
         has_details: true,
         is_summary: true,
@@ -237,7 +236,6 @@ export async function DELETE(request: NextRequest) {
     // 4. עדכן את התנועה הראשית
     const { error: updateError } = await supabase
       .from('transactions')
-      // @ts-expect-error - New fields from migration not yet in types
       .update({
         has_details: false,
         linked_document_id: null,

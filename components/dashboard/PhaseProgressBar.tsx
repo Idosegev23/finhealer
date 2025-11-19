@@ -25,33 +25,33 @@ interface PhaseProgressBarProps {
 
 const phases: Phase[] = [
   {
-    id: 'reflection',
-    name: 'שיקוף',
-    description: 'הבנת העבר והווה',
+    id: 'data_collection',
+    name: 'איסוף נתונים',
+    description: 'בניית התמונה המלאה',
     order: 1,
   },
   {
     id: 'behavior',
-    name: 'שינוי הרגלים',
-    description: 'בניית הרגלים חדשים',
+    name: 'ניתוח הרגלים',
+    description: 'הבנת ההתנהלות הפיננסית',
     order: 2,
   },
   {
     id: 'budget',
-    name: 'תקציב',
-    description: 'ניהול תקציב חכם',
+    name: 'תקציב חכם',
+    description: 'בניית תקציב מותאם',
     order: 3,
   },
   {
     id: 'goals',
-    name: 'יעדים',
-    description: 'הגדרת מטרות',
+    name: 'הגדרת יעדים',
+    description: 'קביעת מטרות פיננסיות',
     order: 4,
   },
   {
     id: 'monitoring',
-    name: 'מעקב',
-    description: 'ניטור והתאמות',
+    name: 'מעקב רציף',
+    description: 'ניטור והתאמות שוטפות',
     order: 5,
   },
 ];
@@ -59,8 +59,8 @@ const phases: Phase[] = [
 export function PhaseProgressBar({ currentPhase, sections }: PhaseProgressBarProps) {
   const currentPhaseIndex = phases.findIndex(p => p.id === currentPhase);
 
-  // חישוב התקדמות לשלב data_collection (reflection)
-  const getReflectionProgress = () => {
+  // חישוב התקדמות לשלב data_collection
+  const getDataCollectionProgress = () => {
     if (!sections) return 0;
     const completed = Object.values(sections).filter(Boolean).length;
     const total = Object.values(sections).length;
@@ -86,27 +86,27 @@ export function PhaseProgressBar({ currentPhase, sections }: PhaseProgressBarPro
     if (status === 'locked') return 0;
     
     // עבור שלב נוכחי
-    if (phase.id === 'reflection' && sections) {
-      return getReflectionProgress();
+    if (phase.id === 'data_collection' && sections) {
+      return getDataCollectionProgress();
     }
     
     // ברירת מחדל לשלבים אחרים
-    return 0;
+    return 50; // Show 50% progress for current phase by default
   };
 
   return (
     <div className="bg-card-dark border border-theme rounded-2xl p-6 mb-8 shadow-lg">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-xl font-bold text-theme-primary">מסלול ההבראה הפיננסית</h3>
+          <h3 className="text-xl font-bold text-theme-primary">המסלול שלך ל-φ (Phi) מושלם</h3>
           <p className="text-theme-secondary text-sm mt-1">
-            5 שלבים להשגת בריאות פיננסית מלאה
+            5 שלבים להשגת איזון פיננסי מושלם
           </p>
         </div>
         {currentPhaseIndex >= 0 && (
           <div className="text-left">
             <span className="text-sm text-theme-tertiary">שלב נוכחי:</span>
-            <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+            <p className="text-lg font-bold text-phi-gold">
               {phases[currentPhaseIndex]?.name}
             </p>
           </div>

@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // אם המשתמש לא מחובר ומנסה לגשת לדפים מוגנים
-  const protectedPaths = ['/dashboard', '/onboarding', '/payment', '/reflection', '/transactions', '/goals', '/budget', '/reports', '/settings', '/loans-simulator', '/guide']
+  const protectedPaths = ['/dashboard', '/onboarding', '/payment', '/transactions', '/goals', '/budget', '/reports', '/settings', '/loans-simulator', '/guide']
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
   
   if (!user && isProtectedPath) {
@@ -111,7 +111,6 @@ export async function middleware(request: NextRequest) {
     // 2. משתמש קיים ב-DB אבל טרם השלים onboarding
     if (userExistsInDB && !hasCompletedOnboarding) {
       if (!currentPath.startsWith('/onboarding') && 
-          !currentPath.startsWith('/reflection') &&
           currentPath !== '/payment') {
         console.log('📝 Redirecting incomplete user to onboarding from:', currentPath)
         return NextResponse.redirect(new URL('/onboarding', request.url))

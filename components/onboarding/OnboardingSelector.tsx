@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Stepper, { Step } from '@/components/ui/stepper';
-import { UserCircle, Users, Sparkles, CheckCircle, CreditCard, Smartphone, Zap, Crown } from 'lucide-react';
+import { UserCircle, Smartphone, Zap, Crown, CheckCircle } from 'lucide-react';
 
 type Plan = 'basic' | 'premium';
 
@@ -17,19 +17,14 @@ export function OnboardingSelector() {
   // Step 1: Plan selection
   const [selectedPlan, setSelectedPlan] = useState<Plan>('basic');
 
-  // Step 2: Payment (handled by GreenInvoice redirect)
-  const [paymentComplete, setPaymentComplete] = useState(false);
-
-  // Step 3: Phone & WhatsApp
+  // Step 2: Phone & WhatsApp
   const [phone, setPhone] = useState('');
   const [waOptIn, setWaOptIn] = useState(true);
 
-  // Step 4: Personal Info
+  // Step 3: Personal Info
   const [birthDate, setBirthDate] = useState('');
   const [maritalStatus, setMaritalStatus] = useState('');
   const [city, setCity] = useState('');
-
-  // Step 5: Family
   const [childrenCount, setChildrenCount] = useState(0);
 
   useEffect(() => {
@@ -48,11 +43,11 @@ export function OnboardingSelector() {
     checkAuth();
   }, [router]);
 
-  const handlePayment = async () => {
+  const handlePlanSelection = async () => {
     try {
       setIsLoading(true);
 
-      // For now, we'll use demo payment until GreenInvoice is integrated
+      // Create subscription
       const response = await fetch('/api/subscription/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,10 +65,9 @@ export function OnboardingSelector() {
         throw new Error(data.error || 'שגיאה ביצירת מנוי');
       }
 
-      setPaymentComplete(true);
       return true;
     } catch (error) {
-      console.error('Payment error:', error);
+      console.error('Plan selection error:', error);
       alert('אירעה שגיאה. נסה שוב.');
       return false;
     } finally {
@@ -125,6 +119,29 @@ export function OnboardingSelector() {
       setIsLoading(true);
       const supabase = createClient();
 
+      // Calculate age from birth date
+      let age = null;
+      if (birthDate) {
+        const today = new Date();
+        const birth = new Date(birthDate);
+        age = today.getFullYear() - birth.getFullYear();
+      }
+
+      // Save to users table
+      const { error: userError } = await supabase
+        .from('users')
+        .update({ 
+          age: age,
+          marital_status: maritalStatus || null,
+          city: city || null,
+          phase: 'data_collection' // Set initial phase
+        })
+        .eq('id', userId);
+
+      if (userError) {
+        console.error('Error updating user:', userError);
+      }
+
       // Save to user_financial_profile
       const { error: profileError } = await supabase
         .from('user_financial_profile')
@@ -140,18 +157,6 @@ export function OnboardingSelector() {
 
       if (profileError) {
         console.error('Error saving profile:', profileError);
-        alert('שגיאה בשמירת הפרטים. נסה שוב.');
-        return;
-      }
-
-      // Update user phase
-      const { error: userError } = await supabase
-        .from('users')
-        .update({ phase: 'data_collection' })
-        .eq('id', userId);
-
-      if (userError) {
-        console.error('Error updating phase:', userError);
       }
 
       // Redirect to dashboard
@@ -189,20 +194,20 @@ export function OnboardingSelector() {
         'ניתוח AI מתקדם',
         'המלצות מותאמות אישית',
         'סימולטור הלוואות',
-        'ייעוץ עם גדי (1 פעם בחודש)',
+        'ייעוץ עם גדי (2 פעמים בחודש)',
         'תמיכה עדיפות',
       ],
     },
   ];
 
   const handleStepTransition = async (fromStep: number, toStep: number) => {
-    // Step 2 -> 3: Process payment
-    if (fromStep === 2 && toStep === 3) {
-      return await handlePayment();
+    // Step 1 -> 2: Process plan selection
+    if (fromStep === 1 && toStep === 2) {
+      return await handlePlanSelection();
     }
     
-    // Step 3 -> 4: Save phone
-    if (fromStep === 3 && toStep === 4) {
+    // Step 2 -> 3: Save phone
+    if (fromStep === 2 && toStep === 3) {
       return await handlePhoneStep();
     }
     
@@ -238,7 +243,7 @@ export function OnboardingSelector() {
                   const isSelected = selectedPlan === plan.id;
 
                   return (
-          <button
+                    <button
                       key={plan.id}
                       onClick={() => setSelectedPlan(plan.id)}
                       className={`
@@ -292,62 +297,7 @@ export function OnboardingSelector() {
             </div>
           </Step>
 
-          {/* Step 2: Payment Confirmation */}
-          <Step>
-            <div className="py-8 text-center" dir="rtl">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-6">
-                <CreditCard className="w-12 h-12 text-primary" />
-              </div>
-
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                אישור מנוי 🎯
-              </h2>
-
-              <div className="max-w-md mx-auto mb-8">
-                <div className="bg-gradient-to-br from-primary/5 to-success/5 border-2 border-primary/20 rounded-2xl p-8 mb-6">
-                  <div className="mb-6">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                      {React.createElement(plans.find(p => p.id === selectedPlan)?.icon || Zap, { className: 'w-10 h-10 text-primary' })}
-                    </div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                      {plans.find(p => p.id === selectedPlan)?.name}
-                    </h3>
-                    <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-4xl font-bold text-primary">
-                        ₪{plans.find(p => p.id === selectedPlan)?.price}
-                      </span>
-                      <span className="text-gray-600">/חודש</span>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-4">
-                    <p className="text-sm text-gray-600 mb-3">המנוי כולל:</p>
-                    <ul className="space-y-2 text-sm text-right">
-                      {plans.find(p => p.id === selectedPlan)?.features.slice(0, 3).map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-success">✓</span>
-                          <span className="text-gray-700">{feature}</span>
-                </li>
-                      ))}
-                      <li className="text-gray-500">ועוד...</li>
-              </ul>
-                  </div>
-                </div>
-
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-gray-700">
-                    ✅ <strong>לתשומת ליבך:</strong> זהו מנוי הדגמה. בפרודקשן יהיה תשלום אמיתי דרך GreenInvoice
-                  </p>
-                </div>
-
-                <p className="text-xs text-gray-500">
-                  🔒 ניתן לבטל את המנוי בכל עת ללא התחייבות
-                </p>
-              </div>
-            </div>
-          </Step>
-
-          {/* Step 3: Phone & WhatsApp */}
+          {/* Step 2: Phone & WhatsApp */}
           <Step>
             <div className="py-8" dir="rtl">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
@@ -417,7 +367,7 @@ export function OnboardingSelector() {
             </div>
           </Step>
 
-          {/* Step 4: Personal Info */}
+          {/* Step 3: Personal Info */}
           <Step>
             <div className="py-8" dir="rtl">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
@@ -431,7 +381,7 @@ export function OnboardingSelector() {
               <div className="space-y-4 max-w-md mx-auto">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    תאריך לידה
+                    תאריך לידה (אופציונלי)
                   </label>
                   <input
                     type="date"
@@ -443,7 +393,7 @@ export function OnboardingSelector() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    מצב משפחתי
+                    מצב משפחתי (אופציונלי)
                   </label>
                   <select
                     value={maritalStatus}
@@ -460,7 +410,7 @@ export function OnboardingSelector() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    עיר מגורים
+                    עיר מגורים (אופציונלי)
                   </label>
                   <input
                     type="text"
@@ -470,25 +420,10 @@ export function OnboardingSelector() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
-              </div>
-            </div>
-          </Step>
 
-          {/* Step 5: Family */}
-          <Step>
-            <div className="py-8" dir="rtl">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                <Users className="w-10 h-10 text-primary" />
-              </div>
-
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                משפחה
-              </h2>
-
-              <div className="space-y-4 max-w-md mx-auto">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    מספר ילדים
+                    מספר ילדים (אופציונלי)
                   </label>
                   <input
                     type="number"
@@ -500,43 +435,10 @@ export function OnboardingSelector() {
                   />
                 </div>
 
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-right">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-right">
                   <p className="text-sm text-gray-700">
-                    <strong>💡 טיפ:</strong> פרטים נוספים על ילדים (שמות, תאריכי לידה, הערות) תוכל למלא בהגדרות &gt; פרופיל אישי
+                    <strong>💡 כמעט סיימנו!</strong> הפרטים האלה עוזרים לנו להתאים את ההמלצות שלנו במיוחד בשבילך.
                   </p>
-                </div>
-              </div>
-            </div>
-          </Step>
-
-          {/* Step 6: Complete */}
-          <Step>
-            <div className="text-center py-8" dir="rtl">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-success/10 mb-6">
-                <CheckCircle className="w-12 h-12 text-success" />
-              </div>
-
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                הכל מוכן! 🎊
-              </h2>
-
-              <p className="text-lg text-gray-600 mb-6">
-                סיימת את תהליך ההצטרפות בהצלחה!
-              </p>
-
-              <div className="bg-gradient-to-r from-primary/10 to-success/10 border border-primary/20 rounded-lg p-6 max-w-md mx-auto">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900 mb-2">מה הלאה?</p>
-                    <ul className="space-y-2 text-sm text-gray-700">
-                      <li>• תגיע לדשבורד האישי שלך</li>
-                      <li>• תוכל למלא מידע נוסף על הכנסות והוצאות</li>
-                      <li>• תקבל תובנות והמלצות מותאמות אישית</li>
-                      <li>• תוכל ליצור תקציב ויעדים פיננסיים</li>
-                      {waOptIn && <li>• פיני יתחיל לשלוח לך הודעות ב-WhatsApp 🤖</li>}
-                    </ul>
-                  </div>
                 </div>
               </div>
             </div>
