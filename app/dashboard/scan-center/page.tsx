@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -135,7 +135,7 @@ interface ScannedDocument {
   error_message?: string;
 }
 
-export default function ScanCenterPage() {
+function ScanCenterContent() {
   const searchParams = useSearchParams();
   const requiredDocId = searchParams?.get('required');
   const preselectedType = searchParams?.get('type') as DocumentType | null;
@@ -607,6 +607,27 @@ function DocumentHistoryCard({ document }: DocumentHistoryCardProps) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ============================================================================
+// Main Page with Suspense Boundary
+// ============================================================================
+
+export default function ScanCenterPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto p-6 max-w-7xl" dir="rtl">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+            <p className="text-gray-600">טוען...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <ScanCenterContent />
+    </Suspense>
   );
 }
 
