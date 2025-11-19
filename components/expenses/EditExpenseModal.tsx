@@ -188,7 +188,7 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
               />
             ) : (
               <ExpenseCategorySelector
-                value={formData.expense_category_id}
+                value={formData.expense_category}
                 onChange={handleExpenseCategoryChange}
               />
             )}

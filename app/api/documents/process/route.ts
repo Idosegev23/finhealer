@@ -187,7 +187,14 @@ export async function POST(request: NextRequest) {
         insertedTxs || []
       );
       
-      itemsProcessed = txCount + accountCount + loanCount + missingDocsCount;
+      // 🎯 NEW: Auto-detect credit card charges and create missing documents
+      const creditCardMissingDocs = await autoDetectCreditCardCharges(
+        supabase,
+        stmt.user_id,
+        insertedTxs || []
+      );
+      
+      itemsProcessed = txCount + accountCount + loanCount + missingDocsCount + creditCardMissingDocs;
     } else if (docType.includes('payslip') || docType.includes('salary') || docType.includes('תלוש')) {
       // Payslips → payslips table + link to income transaction
       itemsProcessed = await savePayslips(supabase, result, stmt.user_id, statementId as string, stmt.statement_month);
@@ -1350,6 +1357,135 @@ async function detectAndSaveMissingDocuments(
   } catch (error) {
     console.error('Error in detectAndSaveMissingDocuments:', error);
     // Don't throw - missing documents detection is not critical
+    return 0;
+  }
+}
+
+/**
+ * Auto-detect credit card charges and create missing document requests
+ * זיהוי אוטומטי של חיובי כרטיס אשראי ויצירת בקשות למסמכים חסרים
+ */
+async function autoDetectCreditCardCharges(
+  supabase: any,
+  userId: string,
+  insertedTransactions: any[]
+): Promise<number> {
+  try {
+    // Filter transactions with "חיוב כרטיס אשראי" category
+    const creditCardCharges = insertedTransactions.filter((tx: any) => 
+      tx.expense_category === 'חיוב כרטיס אשראי' || 
+      (tx.needs_details === true && tx.payment_method === 'credit_card')
+    );
+
+    if (creditCardCharges.length === 0) {
+      console.log('ℹ️  No credit card charges detected');
+      return 0;
+    }
+
+    console.log(`💳 Found ${creditCardCharges.length} credit card charge(s) - creating missing document requests`);
+
+    const missingDocsToInsert = [];
+
+    for (const charge of creditCardCharges) {
+      // Extract card last 4 digits from vendor or notes
+      let cardLast4 = charge.card_number_last4;
+      if (!cardLast4) {
+        const cardMatch = (charge.vendor || charge.notes || '').match(/(\d{4})/);
+        if (cardMatch) {
+          cardLast4 = cardMatch[1];
+        }
+      }
+
+      // Calculate statement period (credit statement is usually for previous month)
+      let periodStart = null;
+      let periodEnd = null;
+      if (charge.date) {
+        const chargeDate = new Date(charge.date);
+        // Credit statement period is usually the month BEFORE the charge
+        const statementMonth = new Date(chargeDate.getFullYear(), chargeDate.getMonth() - 1, 1);
+        const statementEndMonth = new Date(chargeDate.getFullYear(), chargeDate.getMonth(), 0);
+        
+        periodStart = statementMonth.toISOString().split('T')[0];
+        periodEnd = statementEndMonth.toISOString().split('T')[0];
+      }
+
+      // Build description
+      let description = `דוח אשראי`;
+      if (cardLast4) {
+        description += ` כרטיס ****${cardLast4}`;
+      }
+      description += ` - ${charge.amount} ₪`;
+      if (charge.date) {
+        const chargeDate = new Date(charge.date);
+        description += ` (חיוב ${chargeDate.toLocaleDateString('he-IL')})`;
+      }
+
+      // Check if already exists
+      const { data: existing } = await supabase
+        .from('missing_documents')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('document_type', 'credit')
+        .eq('status', 'pending');
+
+      if (cardLast4) {
+        const { data: existingCard } = await supabase
+          .from('missing_documents')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('document_type', 'credit')
+          .eq('card_last_4', cardLast4)
+          .eq('period_start', periodStart)
+          .eq('status', 'pending')
+          .single();
+        
+        if (existingCard) {
+          console.log(`ℹ️  Missing document already exists for card ${cardLast4} period ${periodStart}`);
+          continue;
+        }
+      }
+
+      // Calculate priority based on date (more recent = higher priority)
+      let priority = 1000;
+      if (charge.date) {
+        const daysSinceCharge = Math.floor((Date.now() - new Date(charge.date).getTime()) / (1000 * 60 * 60 * 24));
+        priority = Math.max(500, 1000 - daysSinceCharge);
+      }
+
+      missingDocsToInsert.push({
+        user_id: userId,
+        document_type: 'credit',
+        status: 'pending',
+        period_start: periodStart,
+        period_end: periodEnd,
+        card_last_4: cardLast4,
+        related_transaction_id: charge.id,
+        expected_amount: charge.amount,
+        priority: priority,
+        description: description,
+        instructions: `העלה את דוח האשראי לתקופה ${periodStart ? new Date(periodStart).toLocaleDateString('he-IL') : ''} - ${periodEnd ? new Date(periodEnd).toLocaleDateString('he-IL') : ''}. זה יעזור לנו לפרט את כל ההוצאות שביצעת באשראי החודש.`,
+      });
+    }
+
+    if (missingDocsToInsert.length === 0) {
+      return 0;
+    }
+
+    // Insert missing documents
+    const { error } = await supabase
+      .from('missing_documents')
+      .insert(missingDocsToInsert);
+
+    if (error) {
+      console.error('Failed to insert credit card missing documents:', error);
+      // Don't throw - this is not critical
+      return 0;
+    }
+
+    console.log(`✅ Created ${missingDocsToInsert.length} missing credit statement request(s)`);
+    return missingDocsToInsert.length;
+  } catch (error) {
+    console.error('Error in autoDetectCreditCardCharges:', error);
     return 0;
   }
 }
