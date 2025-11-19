@@ -366,7 +366,7 @@ export default function PendingExpensesPage() {
         const approveResponse = await fetch('/api/expenses/approve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ expenseIds: [expenseId] }),
+          body: JSON.stringify({ expenseId: expenseId }), // ✅ תיקון: שליחת expenseId במקום expenseIds
         });
 
         if (!approveResponse.ok) {
@@ -983,7 +983,7 @@ export default function PendingExpensesPage() {
             expense_category: editingExpense.expense_category || editingExpense.category || '',
           }}
           onClose={() => setEditingExpense(null)}
-          onSave={(updates) => handleUpdate(editingExpense.id, updates)}
+          onSave={(updates, shouldApprove) => handleUpdate(editingExpense.id, updates, shouldApprove)}
         />
       )}
     </div>
