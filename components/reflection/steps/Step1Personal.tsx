@@ -156,6 +156,16 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">ספר/י לנו קצת על עצמך 👋</h2>
         <p className="text-[#555555] mb-2">נכיר אותך טוב יותר כדי להתאים לך את החוויה המושלמת</p>
+        
+        {/* אם יש נתונים מהאונבורדינג */}
+        {(data.age || data.marital_status || data.city) && (
+          <div className="inline-block bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-3 rounded-full mt-2 border-2 border-green-300 mb-4">
+            <p className="text-sm text-green-700 font-semibold flex items-center gap-2 justify-center">
+              ✅ חלק מהפרטים מולאו אוטומטית מהרישום - תוכל לעדכן אם צריך
+            </p>
+          </div>
+        )}
+
         <div className="inline-block bg-gradient-to-r from-blue-50 to-purple-50 px-6 py-3 rounded-full mt-2 border border-blue-200">
           <p className="text-sm text-[#3A7BD5] font-medium">
             💡 הפרטים שלך בטוחים איתנו ומאובטחים לחלוטין
@@ -324,14 +334,21 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
           label="🎂 בן/בת כמה את/ה?"
           tooltip="הגיל עוזר לנו להבין באיזה שלב חיים את/ה נמצא/ת ולתת עצות מתאימות. למשל, צעירים יכולים להרשות לעצמם יותר סיכון בהשקעות"
         >
-          <Input
-            id="age"
-            type="number"
-            value={data.age || ''}
-            onChange={(e) => onChange('age', parseInt(e.target.value) || null)}
-            placeholder="לדוגמה: 32"
-            className="mt-1"
-          />
+          <div className="relative">
+            <Input
+              id="age"
+              type="number"
+              value={data.age || ''}
+              onChange={(e) => onChange('age', parseInt(e.target.value) || null)}
+              placeholder="לדוגמה: 32"
+              className={`mt-1 ${data.age ? 'border-green-400 bg-green-50/30' : ''}`}
+            />
+            {data.age && (
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold pointer-events-none">
+                ✓ מולא מהרישום
+              </span>
+            )}
+          </div>
         </FieldTooltip>
 
         {/* מצב משפחתי */}
@@ -339,17 +356,24 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
           label="💍 מה המצב המשפחתי שלך?"
           tooltip="המצב המשפחתי משפיע על הוצאות, הכנסות והתכנון הפיננסי שלך"
         >
-          <Select value={data.marital_status || ''} onValueChange={(val) => onChange('marital_status', val)}>
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="בחר/י..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="single">רווק/ה</SelectItem>
-              <SelectItem value="married">נשוי/אה</SelectItem>
-              <SelectItem value="divorced">גרוש/ה</SelectItem>
-              <SelectItem value="widowed">אלמן/ה</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="relative">
+            <Select value={data.marital_status || ''} onValueChange={(val) => onChange('marital_status', val)}>
+              <SelectTrigger className={`mt-1 ${data.marital_status ? 'border-green-400 bg-green-50/30' : ''}`}>
+                <SelectValue placeholder="בחר/י..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="single">רווק/ה</SelectItem>
+                <SelectItem value="married">נשוי/אה</SelectItem>
+                <SelectItem value="divorced">גרוש/ה</SelectItem>
+                <SelectItem value="widowed">אלמן/ה</SelectItem>
+              </SelectContent>
+            </Select>
+            {data.marital_status && (
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold pointer-events-none">
+                ✓ מולא מהרישום
+              </span>
+            )}
+          </div>
         </FieldTooltip>
 
         {/* כתובת מגורים */}
@@ -357,13 +381,20 @@ export default function Step1Personal({ data, onChange }: Step1Props) {
           label="🏠 איפה את/ה גר/ה?"
           tooltip="המיקום עוזר לנו להבין את רמת הוצאות המחיה באזור שלך ולתת המלצות מותאמות"
         >
-          <Input
-            id="city"
-            value={data.city || ''}
-            onChange={(e) => onChange('city', e.target.value)}
-            placeholder="לדוגמה: תל אביב, רחוב הרצל 10"
-            className="mt-1"
-          />
+          <div className="relative">
+            <Input
+              id="city"
+              value={data.city || ''}
+              onChange={(e) => onChange('city', e.target.value)}
+              placeholder="לדוגמה: תל אביב, רחוב הרצל 10"
+              className={`mt-1 ${data.city ? 'border-green-400 bg-green-50/30' : ''}`}
+            />
+            {data.city && (
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold pointer-events-none">
+                ✓ מולא מהרישום
+              </span>
+            )}
+          </div>
         </FieldTooltip>
 
         {/* מעמד תעסוקתי */}

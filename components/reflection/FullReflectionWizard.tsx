@@ -9,21 +9,30 @@ import Step1Personal from './steps/Step1Personal';
 interface FullReflectionWizardProps {
   categories: any[];
   userId: string;
+  existingData?: {
+    name?: string;
+    email?: string;
+    age?: number | null;
+    marital_status?: string;
+    city?: string;
+    children_count?: number;
+    children?: any[];
+  };
 }
 
-export default function FullReflectionWizard({ categories, userId }: FullReflectionWizardProps) {
+export default function FullReflectionWizard({ categories, userId, existingData }: FullReflectionWizardProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // State רק לפרטים אישיים
+  // State רק לפרטים אישיים - טעינה מראש של נתונים קיימים
   const [data, setData] = useState({
-    full_name: '',  // שם מלא
-    age: null,
-    marital_status: '',
-    city: '',
-    employment_status: '',
-    dependents: [],  // Array of {id, name, birthDate, gender, relationshipType, isFinanciallySupported}
+    full_name: existingData?.name || '',  // שם מלא - טוען מהאונבורדינג
+    age: existingData?.age || null,  // גיל - טוען מהאונבורדינג
+    marital_status: existingData?.marital_status || '',  // מצב משפחתי - טוען מהאונבורדינג
+    city: existingData?.city || '',  // עיר - טוען מהאונבורדינג
+    employment_status: '',  // זה חסר - צריך למלא
+    dependents: existingData?.children || [],  // ילדים - טוען מהאונבורדינג
   });
 
   const handleChange = (field: string, value: any) => {
@@ -140,10 +149,13 @@ export default function FullReflectionWizard({ categories, userId }: FullReflect
             </div>
           </motion.div>
           <h1 className="text-4xl font-bold text-gray-900 mb-3">
-            ברוכים הבאים ל-FinHealer! 🎉
+            שלום {existingData?.name ? existingData.name.split(' ')[0] : ''}! 👋
           </h1>
           <p className="text-lg text-gray-600">
-            בואו נתחיל להכיר אותך - זה יקח רק דקה
+            {existingData?.age ? 
+              'מילאנו חלק מהפרטים מהאונבורדינג - בוא נשלים את מה שחסר' : 
+              'בואו נתחיל להכיר אותך - זה יקח רק דקה'
+            }
           </p>
         </motion.div>
 
