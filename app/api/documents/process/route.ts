@@ -1086,33 +1086,26 @@ async function saveBankTransactions(supabase: any, result: any, userId: string, 
       .eq('user_id', userId)
       .eq('active', true);
 
-    const transactionsToInsert = allTransactions.map((tx: any) => {
-      // Parse date
-      let parsedDate = null;
-      if (tx.date) {
-        try {
-          const parts = tx.date.split('/');
-          if (parts.length === 3) {
-            const day = parts[0].padStart(2, '0');
-            const month = parts[1].padStart(2, '0');
-            let year = parts[2];
-            if (year.length === 2) {
-              year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
-            }
-            parsedDate = `${year}-${month}-${day}`;
-          }
-        } catch (e) {
-          console.warn(`Failed to parse date: ${tx.date}`, e);
-        }
-      }
-      
-      if (!parsedDate && statementMonthDate) {
-        parsedDate = statementMonthDate;
-      }
-      
+    // Track skipped transactions for logging
+    let skippedCount = 0;
+    
+    const transactionsToInsert = allTransactions.filter((tx: any) => {
+      // Parse date using improved date parser with fallback to statement month
+      const statementMonthStr = statementMonth ? `${statementMonth}-01` : null;
+      const parsedDate = parseDateWithFallback(tx.date, statementMonthStr);
+
+      // 🚨 CRITICAL: Skip transaction if we can't parse date
       if (!parsedDate) {
-        parsedDate = new Date().toISOString().split('T')[0];
+        skippedCount++;
+        console.warn(`⚠️  Skipping bank transaction #${skippedCount} - could not parse date: ${tx.date}, vendor: ${tx.vendor || tx.description}`);
+        return false; // Filter out this transaction
       }
+      
+      // Store parsed date on the transaction object for later use
+      (tx as any)._parsedDate = parsedDate;
+      return true; // Keep this transaction
+    }).map((tx: any) => {
+      const parsedDate = (tx as any)._parsedDate;
 
       // Validate transaction type
       let transactionType = tx.type;
@@ -1218,7 +1211,7 @@ async function saveBankTransactions(supabase: any, result: any, userId: string, 
       throw error;
     }
 
-    console.log(`💾 Saved ${transactionsToInsert.length} bank transactions (source)`);
+    console.log(`💾 Saved ${transactionsToInsert.length} bank transactions (source)${skippedCount > 0 ? `, skipped ${skippedCount} with invalid dates` : ''}`);
     
     // Update linked loans
     const linkedTransactions = transactionsToInsert.filter((tx: any) => tx.linked_loan_id);

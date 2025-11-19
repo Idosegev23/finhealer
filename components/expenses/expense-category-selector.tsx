@@ -22,9 +22,77 @@ interface ExpenseCategorySelectorProps {
 }
 
 const EXPENSE_TYPE_LABELS = {
-  fixed: 'קבועה',
-  variable: 'משתנה',
-  special: 'מיוחדת',
+  fixed: 'קבועות',
+  variable: 'משתנות',
+  special: 'מיוחדות',
+};
+
+const CATEGORY_GROUP_LABELS: Record<string, string> = {
+  housing: 'דיור',
+  communication: 'תקשורת',
+  taxes: 'מיסים',
+  food: 'מזון',
+  transportation: 'תחבורה',
+  health: 'בריאות',
+  insurance: 'ביטוחים',
+  utilities: 'שירותים',
+  entertainment: 'בידור',
+  education: 'חינוך',
+  shopping: 'קניות',
+  personal_care: 'טיפוח',
+  pets: 'חיות מחמד',
+  children: 'ילדים',
+  vehicle: 'רכב',
+  financial_transfers: 'העברות כספיות',
+  professional_services: 'שירותים מקצועיים',
+  home_services: 'שירותי בית',
+  digital: 'דיגיטלי',
+  equipment: 'ציוד',
+  marketing: 'שיווק',
+  banking: 'בנקאות',
+  donations: 'תרומות',
+  gifts: 'מתנות',
+  events: 'אירועים',
+  leisure: 'פנאי',
+  home: 'בית',
+  loans: 'הלוואות',
+  maintenance: 'תחזוקה',
+  employees: 'עובדים',
+  other: 'אחר',
+};
+
+const CATEGORY_GROUP_ICONS: Record<string, string> = {
+  housing: '🏠',
+  communication: '📞',
+  taxes: '💰',
+  food: '🛒',
+  transportation: '🚗',
+  health: '🏥',
+  insurance: '🛡️',
+  utilities: '💡',
+  entertainment: '🎬',
+  education: '📚',
+  shopping: '🛍️',
+  personal_care: '💅',
+  pets: '🐾',
+  children: '👶',
+  vehicle: '🚙',
+  financial_transfers: '💸',
+  professional_services: '💼',
+  home_services: '🔧',
+  digital: '💻',
+  equipment: '⚙️',
+  marketing: '📢',
+  banking: '🏦',
+  donations: '❤️',
+  gifts: '🎁',
+  events: '🎉',
+  leisure: '🎨',
+  home: '🏡',
+  loans: '💳',
+  maintenance: '🛠️',
+  employees: '👥',
+  other: '📦',
 };
 
 export default function ExpenseCategorySelector({
@@ -50,17 +118,28 @@ export default function ExpenseCategorySelector({
     fetchCategories();
   }, [employmentStatus, expenseType]);
 
+  // נקה "other" אם הוא ה-value הראשוני
+  useEffect(() => {
+    if (value === 'other') {
+      setSearch('');
+    }
+  }, [value]);
+
   // סגירת dropdown כשלוחצים בחוץ
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        // אם לא בחרו קטגוריה ו-value הוא other, נקה את השדה
+        if (!search && value === 'other') {
+          setSearch('');
+        }
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [search, value]);
 
   // עדכון רשימה מסוננת כשמשנים חיפוש
   useEffect(() => {
@@ -69,9 +148,16 @@ export default function ExpenseCategorySelector({
       return;
     }
 
-    const filtered = categories.filter((cat) =>
-      cat.name.toLowerCase().includes(search.toLowerCase())
-    );
+    const searchLower = search.toLowerCase();
+    const filtered = categories.filter((cat) => {
+      // חיפוש בשם הקטגוריה
+      const nameMatch = cat.name.toLowerCase().includes(searchLower);
+      // חיפוש בשם הקבוצה (עברית)
+      const groupLabel = CATEGORY_GROUP_LABELS[cat.category_group] || '';
+      const groupMatch = groupLabel.toLowerCase().includes(searchLower);
+      
+      return nameMatch || groupMatch;
+    });
     setFilteredCategories(filtered);
     setSelectedIndex(-1);
   }, [search, categories]);
@@ -142,11 +228,21 @@ export default function ExpenseCategorySelector({
     }
   }
 
-  // קיבוץ לפי סוג הוצאה
+  // פונקציית עזר לקיבוץ לפי category_group
+  function groupByCategory(cats: ExpenseCategory[]): Record<string, ExpenseCategory[]> {
+    return cats.reduce((acc, cat) => {
+      const group = cat.category_group;
+      if (!acc[group]) acc[group] = [];
+      acc[group].push(cat);
+      return acc;
+    }, {} as Record<string, ExpenseCategory[]>);
+  }
+
+  // קיבוץ לפי סוג הוצאה ואז לפי קבוצה
   const groupedCategories = {
-    fixed: filteredCategories.filter((c) => c.expense_type === 'fixed'),
-    variable: filteredCategories.filter((c) => c.expense_type === 'variable'),
-    special: filteredCategories.filter((c) => c.expense_type === 'special'),
+    fixed: groupByCategory(filteredCategories.filter((c) => c.expense_type === 'fixed')),
+    variable: groupByCategory(filteredCategories.filter((c) => c.expense_type === 'variable')),
+    special: groupByCategory(filteredCategories.filter((c) => c.expense_type === 'special')),
   };
 
   return (
@@ -157,7 +253,7 @@ export default function ExpenseCategorySelector({
         <input
           ref={inputRef}
           type="text"
-          value={search || value || ''}
+          value={search || (value && value !== 'other' ? value : '') || ''}
           onChange={(e) => {
             setSearch(e.target.value);
             setIsOpen(true);
@@ -191,38 +287,48 @@ export default function ExpenseCategorySelector({
           ) : (
             <div className="py-2">
               {Object.entries(groupedCategories).map(
-                ([type, cats]) =>
-                  cats.length > 0 && (
-                    <div key={type} className="mb-2">
-                      {/* כותרת קבוצה */}
-                      <div className="px-5 py-4 text-lg font-extrabold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-200 sticky top-0 border-b-2 border-gray-300">
+                ([type, groupsByCategory]) =>
+                  Object.keys(groupsByCategory).length > 0 && (
+                    <div key={type} className="mb-3">
+                      {/* כותרת ראשית - סוג הוצאה */}
+                      <div className="px-5 py-4 text-lg font-extrabold text-white bg-gradient-to-r from-blue-600 to-indigo-600 sticky top-0 border-b-2 border-blue-700 shadow-md">
                         📊 הוצאות {EXPENSE_TYPE_LABELS[type as keyof typeof EXPENSE_TYPE_LABELS]}
                       </div>
 
-                      {/* רשימת הוצאות */}
-                      {cats.map((category, idx) => {
-                        const globalIdx = filteredCategories.indexOf(category);
-                        const isSelected = globalIdx === selectedIndex;
+                      {/* קבוצות משנה */}
+                      {Object.entries(groupsByCategory).map(([categoryGroup, cats]) => (
+                        <div key={categoryGroup} className="mb-2">
+                          {/* כותרת קבוצה משנה */}
+                          <div className="px-7 py-3 text-base font-bold text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                            {CATEGORY_GROUP_ICONS[categoryGroup] || '📌'} {CATEGORY_GROUP_LABELS[categoryGroup] || categoryGroup}
+                          </div>
 
-                        return (
-                          <button
-                            key={category.id}
-                            type="button"
-                            onClick={() => handleSelect(category)}
-                            className={`w-full text-right px-5 py-4 hover:bg-orange-100 transition-colors flex items-center justify-between border-b border-gray-100 ${
-                              isSelected ? 'bg-orange-200 font-extrabold' : ''
-                            }`}
-                            onMouseEnter={() => setSelectedIndex(globalIdx)}
-                          >
-                            <span className="text-xl font-bold">{category.name}</span>
-                            {category.applicable_to !== 'both' && (
-                              <span className="text-base font-bold text-gray-600 bg-gray-200 px-3 py-1.5 rounded-lg">
-                                {category.applicable_to === 'employee' ? '👔 שכיר' : '💼 עצמאי'}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                          {/* רשימת קטגוריות */}
+                          {cats.map((category) => {
+                            const globalIdx = filteredCategories.indexOf(category);
+                            const isSelected = globalIdx === selectedIndex;
+
+                            return (
+                              <button
+                                key={category.id}
+                                type="button"
+                                onClick={() => handleSelect(category)}
+                                className={`w-full text-right px-10 py-3 hover:bg-orange-100 transition-colors flex items-center justify-between border-b border-gray-50 ${
+                                  isSelected ? 'bg-orange-200 font-extrabold' : ''
+                                }`}
+                                onMouseEnter={() => setSelectedIndex(globalIdx)}
+                              >
+                                <span className="text-lg font-semibold">• {category.name}</span>
+                                {category.applicable_to !== 'both' && (
+                                  <span className="text-sm font-bold text-gray-600 bg-gray-200 px-2 py-1 rounded-lg">
+                                    {category.applicable_to === 'employee' ? '👔 שכיר' : '💼 עצמאי'}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ))}
                     </div>
                   )
               )}

@@ -210,6 +210,8 @@ ${categoriesGuide}
 - "כנס אקזיט" → category: "השתלמות מקצועית", expense_type: "variable"
 - "עורך דין כהן" → category: "שכר טרחה", expense_type: "variable"
 - "רו\"ח לוי משרד חשבות" → category: "שכר טרחה", expense_type: "variable"
+- "מס הכנסה תשלום חודשי" → category: "מס הכנסה", expense_type: "fixed"
+- "מע\"מ לרשות המיסים" → category: "מע\"מ", expense_type: "fixed"
 
 **✅ עסקאות אנגלית:**
 - "CURSOR USAGE JUL" → category: "תוכנה ומנויים דיגיטליים", expense_type: "fixed"
@@ -419,8 +421,12 @@ ${special.map(c => `  • ${c.name} (${c.category_group})`).join('\n')}
 - **חריג נדיר:** אם כתוב בפירוש בנק אחר, למשל "בנק הפועלים - הלוואה" → lender_name: "בנק הפועלים"
 
 **מיסים:**
-- "מס הכנסה" → category: אם income → "החזר מס", אם expense → "מיסים"
+- "מס הכנסה" → expense_category: "מס הכנסה", expense_type: "fixed"
+- "מס בריאות" → expense_category: "מס בריאות", expense_type: "fixed"
+- "מע\"מ" / "מס ערך מוסף" → expense_category: "מע\"מ", expense_type: "fixed"
 - "ביטוח לאומי" → category: אם income → "גמלאות", אם expense → "מיסים"
+
+**חשוב:** מיסים הם תמיד הוצאות קבועות (fixed) ולא משתנות
 
 **כרטיסי אשראי:**
 - "ויזא", "מאסטרקארד" → category: "כרטיס אשראי"

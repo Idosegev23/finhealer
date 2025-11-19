@@ -6,6 +6,9 @@
 --         2. משיכת מזומן - המרה של כסף דיגיטלי למזומן
 --         3. שכר טרחה - שירותים מקצועיים (עו"ד, רו"ח, יועצים)
 --         4. השתלמות מקצועית - קורסים, סדנאות, כנסים, הדרכות
+--         5. מע"מ - מס ערך מוסף
+--         6. מס הכנסה - תשלומי מס הכנסה
+--         7. מס בריאות - מס בריאות ממשכורת
 -- ============================================================================
 
 -- הוספת קטגוריה "חיוב כרטיס אשראי"
@@ -92,7 +95,47 @@ VALUES (
 ON CONFLICT (name) DO UPDATE SET
   search_keywords = EXCLUDED.search_keywords;
 
+-- הוספת קטגוריות מיסים
+INSERT INTO expense_categories (
+  name, 
+  expense_type, 
+  category_group, 
+  applicable_to, 
+  search_keywords, 
+  is_active
+)
+VALUES 
+  -- מע"מ
+  (
+    'מע"מ',
+    'fixed',
+    'taxes',
+    'both',
+    ARRAY['מע"מ', 'מעמ', 'מס ערך מוסף', 'מס עמ', 'vat', 'value added tax', 'מס על מכירות', 'מס מוסף'],
+    true
+  ),
+  -- מס הכנסה
+  (
+    'מס הכנסה',
+    'fixed',
+    'taxes',
+    'both',
+    ARRAY['מס הכנסה', 'מס הכנסה ממשכורת', 'ניכוי מס', 'income tax', 'tax', 'income', 'מס שנתי', 'מס חודשי', 'תשלום מס', 'רשות המיסים', 'פקיד השומה'],
+    true
+  ),
+  -- מס בריאות
+  (
+    'מס בריאות',
+    'fixed',
+    'taxes',
+    'both',
+    ARRAY['מס בריאות', 'מס בריאות ממשכורת', 'health tax', 'briut', 'בריאות', 'ניכוי בריאות'],
+    true
+  )
+ON CONFLICT (name) DO UPDATE SET
+  search_keywords = EXCLUDED.search_keywords;
+
 -- הוספת הערה
-COMMENT ON TABLE expense_categories IS 'Expense categories including credit card charge, cash withdrawal, professional fees, and professional development tracking categories added on 2025-11-19';
+COMMENT ON TABLE expense_categories IS 'Expense categories including credit card charge, cash withdrawal, professional fees, professional development, and tax categories added on 2025-11-19';
 
 

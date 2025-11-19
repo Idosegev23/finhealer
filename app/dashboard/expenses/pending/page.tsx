@@ -980,7 +980,7 @@ export default function PendingExpensesPage() {
         <EditExpenseModal
           expense={{
             ...editingExpense,
-            expense_category: editingExpense.expense_category || editingExpense.category || '',
+            expense_category: editingExpense.expense_category || (editingExpense.category !== 'other' ? editingExpense.category : '') || '',
           }}
           onClose={() => setEditingExpense(null)}
           onSave={(updates, shouldApprove) => handleUpdate(editingExpense.id, updates, shouldApprove)}

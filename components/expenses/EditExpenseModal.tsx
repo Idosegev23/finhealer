@@ -36,7 +36,7 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
     amount: expense.amount,
     vendor: expense.vendor || '',
     date: expense.date || new Date().toISOString().split('T')[0],
-    expense_category: expense.expense_category || '',
+    expense_category: (expense.expense_category && expense.expense_category !== 'other') ? expense.expense_category : '',
     expense_category_id: expense.expense_category_id || '',
     expense_type: expense.expense_type || '',
     payment_method: expense.payment_method || '',
