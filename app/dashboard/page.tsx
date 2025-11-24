@@ -20,6 +20,9 @@ import { BudgetDashboard } from '@/components/dashboard/phases/BudgetDashboard'
 import { GoalsDashboard } from '@/components/dashboard/phases/GoalsDashboard'
 import { FullDashboard } from '@/components/dashboard/phases/FullDashboard'
 
+// ✨ רענון הדף כל 30 שניות כדי להציג נתונים עדכניים
+export const revalidate = 30;
+
 export default async function DashboardPage() {
   const supabase = await createClient()
 

@@ -17,6 +17,7 @@ import {
 import ConversationalIncomeWizard from '@/components/income/ConversationalIncomeWizard';
 import IncomeTable from '@/components/income/IncomeTable';
 import { SmartIncomeCalculator } from '@/components/income/SmartIncomeCalculator';
+import AdvancedTransactionsTable from '@/components/shared/AdvancedTransactionsTable';
 
 // ============================================================================
 // טיפוסים
@@ -49,6 +50,7 @@ interface Stats {
 
 export default function IncomePage() {
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
+  const [transactionIncome, setTransactionIncome] = useState<any[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
@@ -67,6 +69,7 @@ export default function IncomePage() {
 
       if (data.success) {
         setIncomeSources(data.incomeSources || []);
+        setTransactionIncome(data.transactionIncome || []);
         setStats(data.stats || null);
       }
     } catch (error) {
@@ -144,43 +147,66 @@ export default function IncomePage() {
       ) : (
         <>
           {/* Stats */}
-          {stats && incomeSources.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {stats && (incomeSources.length > 0 || transactionIncome.length > 0) && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <StatsCard
-                title="סה״כ הכנסה חודשית"
+                title="הכנסה ממקורות קבועים"
                 value={SmartIncomeCalculator.formatAmount(stats.totalMonthlyIncome)}
                 icon={DollarSign}
                 color="blue"
               />
               <StatsCard
-                title="מספר מקורות"
-                value={stats.total.toString()}
-                icon={BarChart3}
+                title="הכנסה מתנועות החודש"
+                value={`₪${stats.totalMonthlyIncomeFromTransactions?.toLocaleString('he-IL') || '0'}`}
+                subtitle={`${stats.transactionIncomeCount || 0} תנועות`}
+                icon={TrendingUp}
                 color="green"
               />
               <StatsCard
-                title="שיעור צמיחה"
-                value="+8%"
-                subtitle="לעומת חודש שעבר"
-                icon={TrendingUp}
+                title="סה״כ הכנסה כוללת"
+                value={`₪${stats.totalCombinedIncome?.toLocaleString('he-IL') || '0'}`}
+                icon={BarChart3}
                 color="purple"
+              />
+              <StatsCard
+                title="מספר מקורות"
+                value={stats.total.toString()}
+                subtitle="מקורות קבועים"
+                icon={BarChart3}
+                color="blue"
+              />
+            </div>
+          )}
+
+          {/* הכנסות מתנועות סרוקות - טבלה מתקדמת */}
+          {transactionIncome.length > 0 && (
+            <div className="mb-8">
+              <AdvancedTransactionsTable
+                transactions={transactionIncome}
+                title="💰 הכנסות מתנועות סרוקות"
+                type="income"
+                showCategory={true}
+                showPaymentMethod={false}
               />
             </div>
           )}
 
           {/* Main Content */}
-          {incomeSources.length === 0 ? (
+          {incomeSources.length === 0 && transactionIncome.length === 0 ? (
             <EmptyState onAddIncome={() => setShowWizard(true)} />
-          ) : (
-            <IncomeTable
-              incomeSources={incomeSources}
-              onRefresh={loadIncome}
-              onEdit={(income) => {
-                setEditingIncome(income);
-                setShowWizard(true);
-              }}
-            />
-          )}
+          ) : incomeSources.length > 0 ? (
+            <>
+              <h3 className="text-xl font-bold text-gray-900 mb-4">💼 מקורות הכנסה קבועים</h3>
+              <IncomeTable
+                incomeSources={incomeSources}
+                onRefresh={loadIncome}
+                onEdit={(income) => {
+                  setEditingIncome(income);
+                  setShowWizard(true);
+                }}
+              />
+            </>
+          ) : null}
         </>
       )}
 

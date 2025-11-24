@@ -13,32 +13,40 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's financial profile for fixed expenses
-    const { data: profile } = await supabase
-      .from("user_financial_profile")
-      .select("*")
+    // Get transactions and group by category_group from expense_categories table
+    const { data: transactions, error } = await supabase
+      .from("transactions")
+      .select(`
+        amount,
+        category_group,
+        type
+      `)
       .eq("user_id", user.id)
-      .single();
+      .eq("type", "expense")
+      .not("category_group", "is", null);
 
-    const expenses = profile as any || {};
+    if (error) {
+      console.error("Error fetching transactions:", error);
+      return NextResponse.json([]);
+    }
 
-    // Category mapping with Hebrew names
-    const categories = [
-      { name: "דיור", value: Number(expenses.housing_expenses) || 0 },
-      { name: "חשמל/מים/גז", value: Number(expenses.utilities) || 0 },
-      { name: "מזון", value: Number(expenses.food_expenses) || 0 },
-      { name: "תחבורה", value: Number(expenses.transportation) || 0 },
-      { name: "תקשורת", value: Number(expenses.communication) || 0 },
-      { name: "ביטוחים", value: Number(expenses.insurance) || 0 },
-      { name: "בריאות", value: Number(expenses.health_expenses) || 0 },
-      { name: "חינוך", value: Number(expenses.education) || 0 },
-      { name: "בילויים", value: Number(expenses.entertainment) || 0 },
-      { name: "הלבשה", value: Number(expenses.clothing) || 0 },
-      { name: "אחר", value: Number(expenses.other_expenses) || 0 },
-    ];
+    // Group by category_group and sum amounts
+    const categoryMap = new Map<string, number>();
 
-    // Filter out zero values
-    const result = categories.filter(cat => cat.value > 0);
+    transactions?.forEach((tx) => {
+      const group = tx.category_group || "אחר";
+      const currentAmount = categoryMap.get(group) || 0;
+      categoryMap.set(group, currentAmount + Number(tx.amount));
+    });
+
+    // Convert map to array format for the chart
+    const result = Array.from(categoryMap.entries())
+      .map(([name, value]) => ({
+        name,
+        value: Math.round(value),
+      }))
+      .filter(cat => cat.value > 0)
+      .sort((a, b) => b.value - a.value); // Sort by value descending
 
     return NextResponse.json(result);
   } catch (error: any) {

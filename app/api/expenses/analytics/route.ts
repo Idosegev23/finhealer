@@ -102,10 +102,10 @@ function calculateStats(transactions: any[]) {
 
   const total = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
   
-  // חלוקה לפי קטגוריה
+  // חלוקה לפי קטגוריה (category_group)
   const byCategory: Record<string, { total: number; count: number; percentage: number }> = {};
   transactions.forEach((t) => {
-    const cat = t.detailed_category || t.category || 'other';
+    const cat = t.category_group || t.category || 'אחר';
     if (!byCategory[cat]) {
       byCategory[cat] = { total: 0, count: 0, percentage: 0 };
     }

@@ -212,6 +212,11 @@ ${categoriesGuide}
 - "רו\"ח לוי משרד חשבות" → category: "שכר טרחה", expense_type: "variable"
 - "מס הכנסה תשלום חודשי" → category: "מס הכנסה", expense_type: "fixed"
 - "מע\"מ לרשות המיסים" → category: "מע\"מ", expense_type: "fixed"
+- "עמלת ניהול חשבון בנק לאומי" → category: "עמלות בנק", expense_type: "fixed"
+- "החזר הלוואה מקרן פנסיה" → category: "הלוואות פנסיוניות", expense_type: "fixed"
+- "החזר הלוואה פרטית" → category: "הלוואות חוץ בנקאיות", expense_type: "fixed"
+- "החזר הלוואה מכרטיס אשראי" → category: "הלוואה מכרטיס אשראי", expense_type: "fixed"
+- "תשלום משכורת לעובד יוסי כהן" → category: "תשלום משכורת", expense_type: "special"
 
 **✅ עסקאות אנגלית:**
 - "CURSOR USAGE JUL" → category: "תוכנה ומנויים דיגיטליים", expense_type: "fixed"

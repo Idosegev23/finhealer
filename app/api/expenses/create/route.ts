@@ -37,6 +37,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // שליפת category_group מטבלת expense_categories
+    let categoryGroup = null;
+    if (expense_category) {
+      const { data: categoryData } = await supabase
+        .from('expense_categories')
+        .select('category_group')
+        .eq('name', expense_category)
+        .single();
+      
+      categoryGroup = categoryData?.category_group || null;
+    }
+
     // יצירת ההוצאה
     const { data: transaction, error } = await (supabase as any)
       .from('transactions')
@@ -49,6 +61,7 @@ export async function POST(request: Request) {
         tx_date: date || new Date().toISOString().split('T')[0],
         expense_category: expense_category || 'אחר', // השם המדויק מהרשימה
         expense_category_id: expense_category_id || null,
+        category_group: categoryGroup, // הקבוצה החדשה!
         category: expense_category ? mapExpenseCategoryToOldCategory(expense_category) : 'other', // תאימות לאחור
         expense_frequency: expense_type === 'fixed' ? 'fixed' : expense_type === 'special' ? 'special' : 'one_time',
         expense_type: expense_type || 'variable',

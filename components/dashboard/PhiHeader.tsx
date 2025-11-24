@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useTheme } from "@/contexts/ThemeContext";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   Search,
   Bell,
@@ -19,13 +17,10 @@ interface PhiHeaderProps {
 }
 
 export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
-  const { theme } = useTheme();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [userName, setUserName] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-
-  const isDark = theme === "dark";
 
   useEffect(() => {
     fetchUserData();
@@ -91,9 +86,6 @@ export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
         <ul className="flex items-center flex-shrink-0 space-x-2 space-x-reverse">
           {/* Theme Toggle */}
           <li>
-            <div className="p-2 rounded-full bg-phi-slate/30 hover:bg-phi-slate/50 transition-colors">
-              <ThemeToggle />
-            </div>
           </li>
 
           {/* Notifications menu */}

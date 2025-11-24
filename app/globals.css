@@ -2,9 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme Variables */
+/* Theme Variables - Light Mode Only */
 :root {
-  /* Light Mode */
   --bg-dashboard: #f5f6f8;
   --bg-card: #ffffff;
   --bg-card-hover: #f9fafb;
@@ -13,18 +12,6 @@
   --text-tertiary: #888888;
   --border-color: #e5e7eb;
   --border-color-strong: #d1d5db;
-}
-
-.dark {
-  /* Dark Mode */
-  --bg-dashboard: #1e1e1e;
-  --bg-card: #171717;
-  --bg-card-hover: #1f1f1f;
-  --text-primary: #ffffff;
-  --text-secondary: #9ca3af;
-  --text-tertiary: #6b7280;
-  --border-color: #1f2937;
-  --border-color-strong: #374151;
 }
 
 /* Apply Theme */
@@ -60,34 +47,6 @@
   border-color: var(--border-color-strong);
 }
 
-.bg-sidebar-card {
-  background-color: #353535;
-}
-
-.sidebar-separator-top {
-  border-bottom: 1px solid #2e2e2e;
-}
-
-.sidebar-separator-bottom {
-  border-top: 1px solid #2e2e2e;
-}
-
-.card-stack-border {
-  border-bottom: 2px solid #696969;
-}
-
-.icon-background {
-  background: #2d2d2d;
-}
-
-.tooltip-head {
-  background: #1d1d1d;
-}
-
-.tooltip-body {
-  background: #252525;
-}
-
 .dashboard-gradient {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
@@ -98,7 +57,7 @@
 
 .card-hover:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
 }
 
 @layer utilities {
@@ -120,6 +79,7 @@
 
 @layer base {
   :root {
+    /* Light mode only */
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -203,32 +163,6 @@
     font-weight: 500;
   }
 
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-  }
 }
 
 @layer base {
@@ -237,13 +171,14 @@
   }
   
   body {
-    @apply bg-background text-foreground;
+    @apply bg-white text-black;
     font-feature-settings: "rlig" 1, "calt" 1;
     direction: rtl;
   }
   
   html {
     scroll-behavior: smooth;
+    color-scheme: light;
   }
 }
 

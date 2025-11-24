@@ -61,23 +61,44 @@ export async function GET(request: NextRequest) {
 
     const incomeSources = data || [];
 
+    // ✨ שליפת הכנסות מתנועות (דוחות סרוקים)
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const { data: transactionIncome, error: txError } = await (supabase as any)
+      .from('transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('type', 'income')
+      .eq('status', 'confirmed') // רק תנועות מאושרות
+      .gte('date', `${currentMonth}-01`)
+      .lte('date', `${currentMonth}-31`)
+      .or('has_details.is.null,has_details.eq.false'); // רק parent transactions
+
+    const monthlyIncomeFromTransactions = (transactionIncome || [])
+      .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+
     // חישוב סטטיסטיקות
+    const monthlyIncomeFromSources = incomeSources
+      .filter((source: any) => source.active && source.payment_frequency === 'monthly')
+      .reduce((sum: number, source: any) => sum + (source.actual_bank_amount || 0), 0);
+
     const stats = {
       total: incomeSources.length,
-      totalMonthlyIncome: incomeSources
-        .filter((source: any) => source.active && source.payment_frequency === 'monthly')
-        .reduce((sum: number, source: any) => sum + (source.actual_bank_amount || 0), 0),
+      totalMonthlyIncome: monthlyIncomeFromSources,
+      totalMonthlyIncomeFromTransactions: monthlyIncomeFromTransactions,
+      totalCombinedIncome: monthlyIncomeFromSources + monthlyIncomeFromTransactions,
       primaryCount: incomeSources.filter((source: any) => source.is_primary).length,
       typeBreakdown: incomeSources.reduce((acc: any, source: any) => {
         const type = source.employment_type || 'other';
         acc[type] = (acc[type] || 0) + 1;
         return acc;
       }, {}),
+      transactionIncomeCount: transactionIncome?.length || 0,
     };
 
     return NextResponse.json({
       success: true,
       incomeSources,
+      transactionIncome: transactionIncome || [],
       stats,
       count: incomeSources.length,
     });

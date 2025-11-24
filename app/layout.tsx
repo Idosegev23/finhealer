@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { Heebo, Inter } from 'next/font/google'
 import './globals.css'
-import { ThemeProvider } from '@/contexts/ThemeContext'
 
 const heebo = Heebo({
   subsets: ['hebrew', 'latin'],
@@ -37,10 +36,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="he" dir="rtl" className={`${heebo.variable} ${inter.variable}`}>
-      <body className={`${heebo.className} antialiased`}>
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+      <body className={`${heebo.className} antialiased bg-white text-black`}>
+        {children}
       </body>
     </html>
   )

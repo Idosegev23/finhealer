@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { FileSpreadsheet, Download } from 'lucide-react'
 import Link from 'next/link'
+import OverviewTransactionsSection from '@/components/reports/OverviewTransactionsSection'
+
+// ✨ רענון הדף כל 30 שניות כדי להציג נתונים עדכניים
+export const revalidate = 30;
 
 export default async function OverviewPage() {
   const supabase = await createClient()
@@ -63,6 +67,25 @@ export default async function OverviewPage() {
     .eq('user_id', user.id)
     .eq('active', true)
 
+  // ✨ קבלת הכנסות והוצאות מתנועות החודש (דוחות סרוקים)
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const { data: monthlyTransactions } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('status', 'confirmed') // רק תנועות מאושרות
+    .gte('date', `${currentMonth}-01`)
+    .lte('date', `${currentMonth}-31`)
+    .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // parent transactions + מזומן
+
+  const transactionIncome = (monthlyTransactions || [])
+    .filter((tx: any) => tx.type === 'income')
+    .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+
+  const transactionExpenses = (monthlyTransactions || [])
+    .filter((tx: any) => tx.type === 'expense')
+    .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+
   const profileData: any = profile || {}
 
   return (
@@ -120,9 +143,29 @@ export default async function OverviewPage() {
           </div>
         </div>
 
-        {/* טבלה - הכנסות */}
+        {/* סיכום הכנסות והוצאות מתנועות */}
+        {(transactionIncome > 0 || transactionExpenses > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-xl p-6 shadow-lg">
+              <h3 className="text-sm text-green-600 dark:text-green-400 font-semibold mb-2">💰 הכנסות החודש (מתנועות)</h3>
+              <p className="text-3xl font-black text-green-700 dark:text-green-300">₪{transactionIncome.toLocaleString('he-IL')}</p>
+            </div>
+            <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-xl p-6 shadow-lg">
+              <h3 className="text-sm text-red-600 dark:text-red-400 font-semibold mb-2">💳 הוצאות החודש (מתנועות)</h3>
+              <p className="text-3xl font-black text-red-700 dark:text-red-300">₪{transactionExpenses.toLocaleString('he-IL')}</p>
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 shadow-lg">
+              <h3 className="text-sm text-blue-600 dark:text-blue-400 font-semibold mb-2">📊 מאזן חודשי</h3>
+              <p className={`text-3xl font-black ${transactionIncome - transactionExpenses >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                {transactionIncome - transactionExpenses >= 0 ? '+' : ''}₪{(transactionIncome - transactionExpenses).toLocaleString('he-IL')}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* טבלה - הכנסות קבועות */}
         <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-lg mb-6">
-          <h2 className="text-xl font-bold text-theme-primary mb-4">💰 הכנסות</h2>
+          <h2 className="text-xl font-bold text-theme-primary mb-4">💰 מקורות הכנסה קבועים</h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -187,6 +230,13 @@ export default async function OverviewPage() {
             </table>
           </div>
         </div>
+
+        {/* טבלאות מתנועות - גרסה מתקדמת */}
+        {monthlyTransactions && monthlyTransactions.length > 0 && (
+          <div className="mb-6">
+            <OverviewTransactionsSection transactions={monthlyTransactions} />
+          </div>
+        )}
 
         {/* טבלה - חיסכון */}
         <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-lg mb-6">

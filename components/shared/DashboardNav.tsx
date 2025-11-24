@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTheme } from "@/contexts/ThemeContext";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Marquee } from "@/components/ui/marquee";
 import { usePendingExpensesCount } from "@/lib/hooks/usePendingExpensesCount";
 import PhiLogo from "@/components/ui/PhiLogo";
@@ -64,8 +62,7 @@ const reportItems = [
 
 export function DashboardNav() {
   const pathname = usePathname();
-  const { theme } = useTheme();
-  const { count: pendingCount, refresh: refreshPendingCount } = usePendingExpensesCount();
+  const { count: pendingCount, refresh: refreshPendingCount} = usePendingExpensesCount();
   const [financialData, setFinancialData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -74,7 +71,8 @@ export function DashboardNav() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [userName, setUserName] = useState<string>('');
   
-  const isDark = theme === 'dark';
+  // Light mode only - no dark mode
+  const isDark = false;
 
   useEffect(() => {
     fetchFinancialData();
@@ -165,7 +163,7 @@ export function DashboardNav() {
   ];
 
   return (
-    <div className={`sticky top-0 z-50 ${isDark ? 'bg-card-dark border-gray-800' : 'bg-white border-phi-frost'} border-b shadow-md transition-colors duration-200`} dir="rtl">
+    <div className="sticky top-0 z-50 bg-white border-phi-frost border-b shadow-md transition-colors duration-200" dir="rtl">
       {/* Phi Header with Logo */}
       <div className="bg-gradient-to-l from-phi-gold via-phi-coral to-phi-gold px-4 py-2 flex items-center justify-between">
         <Link href="/dashboard" className="hover:scale-105 transition-transform">
@@ -205,17 +203,11 @@ export function DashboardNav() {
             </button>
             
             {userMenuOpen && (
-              <div className={`absolute top-full mt-2 left-0 w-48 rounded-lg shadow-2xl border z-[200] ${
-                isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-              }`}>
+              <div className="absolute top-full mt-2 left-0 w-48 rounded-lg shadow-2xl border bg-white border-gray-200 z-[200]">
                 <Link
                   href="/settings"
                   onClick={() => setUserMenuOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 transition-colors rounded-t-lg ${
-                    isDark
-                      ? 'text-gray-300 hover:bg-gray-700'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className="flex items-center gap-3 px-4 py-3 transition-colors rounded-t-lg text-gray-700 hover:bg-gray-50"
                 >
                   <Settings className="w-4 h-4" />
                   <span className="text-sm">הגדרות ופרופיל</span>
@@ -225,11 +217,7 @@ export function DashboardNav() {
                     setUserMenuOpen(false);
                     handleLogout();
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 transition-colors rounded-b-lg ${
-                    isDark
-                      ? 'text-red-400 hover:bg-gray-700'
-                      : 'text-red-600 hover:bg-red-50'
-                  }`}
+                  className="w-full flex items-center gap-3 px-4 py-3 transition-colors rounded-b-lg text-red-600 hover:bg-red-50"
                 >
                   <LogOut className="w-4 h-4" />
                   <span className="text-sm">התנתק</span>
@@ -239,9 +227,6 @@ export function DashboardNav() {
           </div>
 
           {/* Theme Toggle */}
-          <div className="bg-phi-gold/90 backdrop-blur-sm rounded-full p-1 shadow-lg">
-          <ThemeToggle />
-          </div>
         </div>
       </div>
 
@@ -291,9 +276,7 @@ export function DashboardNav() {
                 </button>
                 
                 {dataDropdownOpen && (
-                  <div className={`absolute top-full mt-2 left-1/2 -translate-x-1/2 w-48 rounded-lg shadow-xl border z-50 ${
-                    isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                  }`}>
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-48 rounded-lg shadow-xl border bg-white border-gray-200 z-50">
                     {dataItems.map((item) => {
                       const Icon = item.icon;
                       const showBadge = item.href === '/dashboard/data/expenses' && pendingCount > 0;
@@ -341,9 +324,7 @@ export function DashboardNav() {
                 </button>
                 
                 {reportsDropdownOpen && (
-                  <div className={`absolute top-full mt-2 left-1/2 -translate-x-1/2 w-48 rounded-lg shadow-xl border z-50 ${
-                    isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                  }`}>
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-48 rounded-lg shadow-xl border bg-white border-gray-200 z-50">
                     {reportItems.map((item) => {
                       const Icon = item.icon;
                       return (
@@ -375,9 +356,9 @@ export function DashboardNav() {
               className="md:hidden p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 w-full flex items-center justify-center"
             >
               {mobileMenuOpen ? (
-                <X className="w-6 h-6 text-theme-primary" />
+                <X className="w-6 h-6 text-gray-900" />
               ) : (
-                <Menu className="w-6 h-6 text-theme-primary" />
+                <Menu className="w-6 h-6 text-gray-900" />
               )}
             </button>
           </div>
@@ -385,7 +366,7 @@ export function DashboardNav() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-theme">
+          <div className="md:hidden border-t border-gray-200">
             <div className="max-w-7xl mx-auto px-4 py-4">
               {/* Main Nav */}
               <div className="grid grid-cols-3 gap-3 mb-4">
