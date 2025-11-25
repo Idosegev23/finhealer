@@ -40,7 +40,7 @@ export async function generateInsights(userId: string): Promise<Insight[]> {
  * Detect overspending in categories
  */
 async function detectOverspending(userId: string): Promise<Insight[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const insights: Insight[] = [];
 
   // Get current month and previous month spending
@@ -102,7 +102,7 @@ async function detectOverspending(userId: string): Promise<Insight[]> {
  * Find savings opportunities
  */
 async function findSavingsOpportunities(userId: string): Promise<Insight[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const insights: Insight[] = [];
 
   // Check for duplicate subscriptions
@@ -128,7 +128,8 @@ async function findSavingsOpportunities(userId: string): Promise<Insight[]> {
     }
 
     // Find duplicates
-    for (const [vendor, subs] of vendorGroups) {
+    for (const entry of Array.from(vendorGroups.entries())) {
+      const [vendor, subs] = entry;
       if (subs.length > 1) {
         const total = subs.reduce((sum, s) => sum + s.amount, 0);
         
@@ -155,7 +156,7 @@ async function findSavingsOpportunities(userId: string): Promise<Insight[]> {
  * Analyze upcoming bills
  */
 async function analyzeUpcomingBills(userId: string): Promise<Insight[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const insights: Insight[] = [];
 
   // Get next month's expected bills
@@ -204,7 +205,7 @@ async function analyzeUpcomingBills(userId: string): Promise<Insight[]> {
  * Check goal progress
  */
 async function checkGoalProgress(userId: string): Promise<Insight[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const insights: Insight[] = [];
 
   const { data: goals } = await supabase
@@ -264,7 +265,7 @@ async function checkGoalProgress(userId: string): Promise<Insight[]> {
  * Detect spending patterns
  */
 async function detectSpendingPatterns(userId: string): Promise<Insight[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const insights: Insight[] = [];
 
   // Check for Friday night spending pattern
@@ -308,7 +309,7 @@ async function detectSpendingPatterns(userId: string): Promise<Insight[]> {
  * Detect spending anomalies
  */
 async function detectAnomalies(userId: string): Promise<Insight[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const insights: Insight[] = [];
 
   // Get last 90 days of spending

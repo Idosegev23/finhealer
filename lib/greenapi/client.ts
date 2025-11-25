@@ -173,4 +173,12 @@ export function getGreenAPIClient(): GreenAPIClient {
   return greenAPIClient;
 }
 
+/**
+ * Convenience function to send WhatsApp message
+ */
+export async function sendWhatsAppMessage(phoneNumber: string, message: string) {
+  const client = getGreenAPIClient();
+  return client.sendMessage({ phoneNumber, message });
+}
+
 

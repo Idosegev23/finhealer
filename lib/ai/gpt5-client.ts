@@ -6,7 +6,7 @@ const openai = new OpenAI({
 });
 
 interface ChatOptions {
-  reasoningEffort?: "none" | "low" | "medium" | "high";
+  reasoningEffort?: "low" | "medium" | "high";
   verbosity?: "low" | "medium" | "high";
   maxOutputTokens?: number;
   previousResponseId?: string;
@@ -78,7 +78,7 @@ export async function chatWithGPT5Fast(
     const result = await openai.responses.create({
       model: "gpt-5.1",
       input: `${buildContextSummary(userContext)}\n\nUser: ${userMessage}`,
-      reasoning: { effort: "none" },
+      reasoning: { effort: "low" },
       text: { verbosity: "low" },
       max_output_tokens: 200,
       // @ts-ignore
@@ -210,8 +210,10 @@ async function fallbackToGPT4(
  */
 export async function transcribeVoice(audioBuffer: Buffer): Promise<string> {
   try {
-    // Create a File-like object from buffer
-    const audioFile = new File([audioBuffer], "audio.ogg", {
+    // Convert Buffer to Uint8Array for File constructor
+    const uint8Array = new Uint8Array(audioBuffer);
+    const blob = new Blob([uint8Array], { type: "audio/ogg" });
+    const audioFile = new File([blob], "audio.ogg", {
       type: "audio/ogg",
     });
 

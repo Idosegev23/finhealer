@@ -435,7 +435,7 @@ export default function AdvancedTransactionsTable({
                       colSpan={showCategory && showPaymentMethod ? 2 : showCategory ? 1 : 1}
                       className="py-3 px-4 font-bold text-gray-900 dark:text-gray-100"
                     >
-                      סה"כ:
+                      סה״כ:
                     </td>
                     <td
                       className={`py-3 px-4 font-black text-lg ${

@@ -43,6 +43,9 @@ interface Stats {
   totalMonthlyIncome: number;
   primaryCount: number;
   typeBreakdown: Record<string, number>;
+  totalMonthlyIncomeFromTransactions?: number;
+  transactionIncomeCount?: number;
+  totalCombinedIncome?: number;
 }
 
 // ============================================================================

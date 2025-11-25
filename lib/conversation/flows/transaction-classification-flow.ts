@@ -103,7 +103,7 @@ export async function getNextClassificationQuestion(
   done?: boolean;
 }> {
   // Check if we should offer a break
-  if (shouldOfferBreak(session.currentIndex, userContext.conversationState?.userMood || "engaged")) {
+  if (shouldOfferBreak(session.currentIndex, (userContext as any).userMood || "engaged")) {
     const remaining = session.transactions.length - session.currentIndex;
     const breakMessage = `נראה שעבדנו די הרבה! 💪
 

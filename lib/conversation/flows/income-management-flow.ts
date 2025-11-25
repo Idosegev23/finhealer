@@ -121,7 +121,7 @@ async function handleAddIncome(
   if (!data.frequency) {
     if (message.toLowerCase().includes('דלג')) {
       // דילוג על ברוטו
-      data.amount_gross = null;
+      data.amount_gross = undefined;
     } else {
       const gross = extractAmount(message);
       if (gross && gross >= (data.amount || 0)) {
@@ -148,7 +148,7 @@ async function handleAddIncome(
         };
       } else {
         // שבועי או חד פעמי - לא צריך יום
-        data.payment_day = null;
+        data.payment_day = undefined;
       }
     } else {
       return {
@@ -181,7 +181,7 @@ async function handleAddIncome(
   // שלב 8: הערות (אופציונלי)
   if (!data.notes) {
     if (message.toLowerCase().includes('לא יודע') || message.toLowerCase().includes('דלג')) {
-      data.start_date = null;
+      data.start_date = undefined;
     } else {
       const startDate = extractDate(message);
       if (startDate) {
@@ -197,7 +197,7 @@ async function handleAddIncome(
 
   // סיום - שמירה לדאטהבייס
   if (isNegativeAnswer(message)) {
-    data.notes = null;
+    data.notes = undefined;
   } else {
     data.notes = message.trim();
   }

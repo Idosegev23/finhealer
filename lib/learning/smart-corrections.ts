@@ -29,7 +29,7 @@ export async function recordCorrection(
   patternId?: string
 ): Promise<void> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Save correction
     await supabase.from("pattern_corrections").insert({
@@ -67,7 +67,7 @@ async function learnFromCorrection(
   originalValue: any,
   correctedValue: any
 ): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   if (correctionType === "category") {
     // If user corrected a category, create or strengthen pattern
@@ -145,7 +145,7 @@ async function adjustPatternConfidence(
   patternId: string,
   correct: boolean
 ): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: pattern } = await supabase
     .from("user_patterns")
@@ -186,7 +186,7 @@ export async function getCorrectionHistory(
   limit: number = 50
 ): Promise<Correction[]> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("pattern_corrections")
@@ -254,7 +254,7 @@ export async function analyzeCorrectionPatterns(userId: string): Promise<{
 
   // Calculate accuracy score
   // Fewer corrections = higher accuracy
-  const supabase = createClient();
+  const supabase = await createClient();
   const { count: totalTransactions } = await supabase
     .from("transactions")
     .select("*", { count: "exact", head: true })
@@ -340,9 +340,10 @@ export async function batchProcessCorrections(userId: string): Promise<void> {
   }
 
   // Create or update patterns
-  const supabase = createClient();
+  const supabase = await createClient();
 
-  for (const [merchant, categoryMap] of merchantCategoryMap) {
+  for (const entry of Array.from(merchantCategoryMap.entries())) {
+    const [merchant, categoryMap] = entry;
     const sortedCategories = Array.from(categoryMap.entries()).sort(
       (a, b) => b[1] - a[1]
     );

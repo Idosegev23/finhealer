@@ -30,7 +30,7 @@ export interface TransactionPattern {
  * Detect patterns from transaction history
  */
 export async function detectPatterns(userId: string): Promise<Pattern[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const patterns: Pattern[] = [];
 
   // Get user's transactions
@@ -90,14 +90,14 @@ async function detectMerchantPatterns(
 
   const patterns: Pattern[] = [];
 
-  for (const [merchant, data] of merchantMap) {
-    if (data.count < 3) continue; // Need at least 3 occurrences
+  Array.from(merchantMap.entries()).forEach(([merchant, data]) => {
+    if (data.count < 3) return; // Need at least 3 occurrences
 
     // Find most common category
     const categoryCounts = new Map<string, number>();
-    for (const cat of data.categories) {
+    data.categories.forEach((cat) => {
       categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
-    }
+    });
 
     const sortedCategories = Array.from(categoryCounts.entries())
       .sort((a, b) => b[1] - a[1]);
@@ -120,7 +120,7 @@ async function detectMerchantPatterns(
         autoApply: confidence >= 0.8,
       });
     }
-  }
+  });
 
   return patterns;
 }
@@ -267,8 +267,8 @@ async function detectSubscriptionPatterns(
     groupMap.get(key)!.push(tx);
   }
 
-  for (const [key, txs] of groupMap) {
-    if (txs.length < 3) continue; // Need at least 3 occurrences
+  Array.from(groupMap.entries()).forEach(([key, txs]) => {
+    if (txs.length < 3) return; // Need at least 3 occurrences
 
     // Check if dates are evenly spaced (monthly)
     txs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -311,7 +311,7 @@ async function detectSubscriptionPatterns(
         autoApply: true,
       });
     }
-  }
+  });
 
   return patterns;
 }
@@ -320,7 +320,7 @@ async function detectSubscriptionPatterns(
  * Save patterns to database
  */
 export async function savePatterns(patterns: Pattern[]): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   for (const pattern of patterns) {
     await supabase
@@ -347,7 +347,7 @@ export async function getUserPatterns(
   userId: string,
   minConfidence: number = 0.5
 ): Promise<Pattern[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("user_patterns")
@@ -448,7 +448,7 @@ export async function updatePattern(
   patternId: string,
   correct: boolean
 ): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   if (correct) {
     // Increment count and boost confidence

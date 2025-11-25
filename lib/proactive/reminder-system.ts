@@ -32,7 +32,7 @@ export async function processDueReminders(): Promise<{
   for (const reminder of reminders) {
     try {
       // Get user's phone number
-      const supabase = createClient();
+      const supabase = await createClient();
       const { data: user } = await supabase
         .from("users")
         .select("phone, name")
@@ -90,7 +90,7 @@ export async function scheduleSalaryReminder(
   expectedSalaryDate: Date,
   expectedAmount: number
 ): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Check if salary was received
   const { data: salaryTransaction } = await supabase
@@ -123,7 +123,7 @@ export async function scheduleSalaryReminder(
 export async function scheduleExpenseLoggingReminder(
   userId: string
 ): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Check last expense logged
   const { data: lastExpense } = await supabase
@@ -224,7 +224,7 @@ export async function scheduleGoalMilestoneReminder(
  * Get reminder configuration for user
  */
 async function getReminderConfig(userId: string): Promise<ReminderConfig> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data } = await supabase
     .from("user_preferences")

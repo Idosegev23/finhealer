@@ -136,7 +136,7 @@ async function checkIfNeedsCreditCardStatement(
   userId: string,
   payment: CreditCardPayment
 ): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Check if we already have credit card transactions around this date
   const paymentDate = payment.date;
@@ -177,7 +177,7 @@ async function findLinkedBankPayment(
   userId: string,
   creditTransactions: any[]
 ): Promise<{ documentId: string; transactionId: string } | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Calculate total of credit card transactions
   const total = creditTransactions.reduce(
@@ -242,7 +242,7 @@ export function generateDocumentRequestMessage(
  * Save document link to database
  */
 export async function saveDocumentLink(link: DocumentLink): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   await supabase.from("document_links").insert({
     user_id: link.userId,
@@ -261,7 +261,7 @@ export async function saveDocumentLink(link: DocumentLink): Promise<void> {
 export async function getPendingDocumentRequests(
   userId: string
 ): Promise<DocumentLink[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("document_links")
@@ -292,7 +292,7 @@ export async function fulfillDocumentLink(
   linkId: string,
   linkedDocumentId: string
 ): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   await supabase
     .from("document_links")
@@ -311,7 +311,7 @@ export async function detectDuplicateDocuments(
   newDocumentId: string,
   transactions: any[]
 ): Promise<string | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Get transaction hashes for new document
   const newHashes = transactions.map((tx) =>

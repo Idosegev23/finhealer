@@ -148,7 +148,7 @@ export async function processMessage(
 async function routeToHandler(
   intent: Intent,
   message: string,
-  context: ConversationContext,
+  context: any,
   userContext: UserContext
 ): Promise<ConversationResponse> {
   const stateMachine = new ConversationStateMachine(context);
@@ -203,7 +203,7 @@ async function handleIdleState(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   const welcomeMessage = getStateWelcomeMessage("idle");
 
@@ -224,7 +224,7 @@ async function handleActiveMonitoring(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   // Check if we should still ask questions
   const { allowed, reason, breakDuration } = await shouldAskMoreQuestions(
@@ -287,7 +287,7 @@ async function handleExpenseIntent(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   const result = await handleExpenseLogging(message, userContext, context);
 
@@ -324,7 +324,7 @@ async function handleQuestionIntent(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   const conversationHistory: Message[] = [
     {
@@ -362,7 +362,7 @@ async function handleGeneralConversation(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   const response = await chatWithGPT5Fast(
     message,
@@ -387,7 +387,7 @@ async function handleClassificationState(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   const session = context.ongoingTask;
 
@@ -414,13 +414,13 @@ async function handleOnboardingState(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext,
+  context: any,
   step: "personal" | "documents"
 ): Promise<ConversationResponse> {
   const onboardingContext = {
     userId: userContext.userId,
     currentStep: step,
-    collectedData: context.collectedData || {},
+    collectedData: (context as any).collectedData || {},
   };
 
   try {
@@ -428,8 +428,8 @@ async function handleOnboardingState(
 
     // Update context with collected data
     await updateContext(userContext.userId, {
-      collectedData: onboardingContext.collectedData,
-    });
+      metadata: { collectedData: onboardingContext.collectedData },
+    } as any);
 
     // If step completed, transition state
     let stateChanged = false;
@@ -437,16 +437,16 @@ async function handleOnboardingState(
       const stateMachine = new ConversationStateMachine(context);
       
       if (result.nextStep === "documents") {
-        stateMachine.transitionTo("onboarding_income");
+        stateMachine.transition("onboarding_income");
         stateChanged = true;
       } else if (result.nextStep === "active_monitoring") {
-        stateMachine.transitionTo("active_monitoring");
+        stateMachine.transition("active_monitoring");
         stateChanged = true;
       }
 
       await updateContext(userContext.userId, {
-        state: stateMachine.getState(),
-      });
+        currentState: stateMachine.getState(),
+      } as any);
     }
 
     return {
@@ -477,20 +477,20 @@ async function handleDataCollectionState(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   const dataContext = {
     userId: userContext.userId,
-    currentStep: context.dataCollectionStep || "bank_statement" as any,
-    documentsUploaded: context.documentsUploaded || {},
-    pendingQuestions: context.pendingQuestions || 0,
-  };
+    currentStep: (context as any).dataCollectionStep || "bank_statement",
+    documentsUploaded: (context as any).documentsUploaded || {},
+    pendingQuestions: (context.pendingQuestions as any)?.length || 0,
+  } as any;
 
   const result = await handleDataCollectionFlow(dataContext, message);
 
   await updateContext(userContext.userId, {
-    dataCollectionStep: result.nextStep,
-  });
+    metadata: { dataCollectionStep: result.nextStep },
+  } as any);
 
   return {
     message: result.response,
@@ -507,7 +507,7 @@ async function handleDataCollectionState(
  */
 async function handleBudgetIntent(
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   const budgetContext = {
     userId: userContext.userId,
@@ -521,7 +521,7 @@ async function handleBudgetIntent(
     await updateContext(userContext.userId, {
       budgetStep: result.requiresAction.data.currentStep,
       budgetRecommendation: result.requiresAction.data.recommendation,
-    });
+    } as any);
   }
 
   return {
@@ -544,7 +544,7 @@ async function handleBudgetIntent(
  */
 async function handleGoalsIntent(
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   const goalsContext = {
     userId: userContext.userId,
@@ -560,7 +560,7 @@ async function handleGoalsIntent(
     await updateContext(userContext.userId, {
       goalsStep: result.requiresAction.data.currentStep,
       goalData: result.requiresAction.data.goalData,
-    });
+    } as any);
   }
 
   return {
@@ -583,7 +583,7 @@ async function handleGoalsIntent(
  */
 async function handleLoanIntent(
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   const loanContext = {
     userId: userContext.userId,
@@ -598,7 +598,7 @@ async function handleLoanIntent(
   if (result.requiresAction?.type === "set_context") {
     await updateContext(userContext.userId, {
       loanStep: result.requiresAction.data.currentStep,
-    });
+    } as any);
   }
 
   return {
@@ -623,7 +623,7 @@ async function handleDocumentProcessing(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   return {
     message: "אני מעבד את המסמך... רגע אחד 📄",
@@ -642,7 +642,7 @@ async function handlePausedState(
   intent: Intent,
   message: string,
   userContext: UserContext,
-  context: ConversationContext
+  context: any
 ): Promise<ConversationResponse> {
   return {
     message: "שמח שחזרת! 😊\nמה תרצה לעשות?",

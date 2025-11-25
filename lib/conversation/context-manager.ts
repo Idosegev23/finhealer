@@ -24,7 +24,7 @@ export interface StoredContext {
  */
 export async function saveContext(context: ConversationContext): Promise<void> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const stored: StoredContext = {
       user_id: context.userId,
@@ -60,7 +60,7 @@ export async function saveContext(context: ConversationContext): Promise<void> {
  */
 export async function loadContext(userId: string): Promise<ConversationContext | null> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("conversation_context")
@@ -135,7 +135,7 @@ export async function updateContext(
  */
 export async function clearContext(userId: string): Promise<void> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     await supabase
       .from("conversation_context")
@@ -218,7 +218,7 @@ export async function resumeStaleContext(
  */
 export async function trackPostponement(userId: string): Promise<number> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get current count
     const { data } = await supabase
@@ -254,7 +254,7 @@ export async function trackPostponement(userId: string): Promise<number> {
  */
 export async function resetPostponementCounter(userId: string): Promise<void> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { data } = await supabase
       .from("conversation_context")
@@ -286,7 +286,7 @@ export async function getConversationStats(userId: string): Promise<{
   completedTasks: number;
 }> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { data: messages } = await supabase
       .from("conversation_history")
