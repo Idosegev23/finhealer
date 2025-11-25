@@ -37,7 +37,7 @@ export default function RootLayout({
   return (
     <html lang="he" dir="rtl" className={`${heebo.variable} ${inter.variable}`}>
       <body className={`${heebo.className} antialiased bg-white text-black`}>
-        {children}
+          {children}
       </body>
     </html>
   )

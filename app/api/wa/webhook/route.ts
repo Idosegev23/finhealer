@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { SYSTEM_PROMPT, buildContextMessage, parseExpenseFromAI, type UserContext } from '@/lib/ai/system-prompt';
 import { EXPENSE_CATEGORIES_SYSTEM_PROMPT } from '@/lib/ai/expense-categories-prompt';
+import { processMessage } from '@/lib/conversation/orchestrator';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -171,7 +172,7 @@ export async function POST(request: NextRequest) {
         await handleSplitTransaction(supabase, userData.id, transactionId, phoneNumber);
       }
     }
-    // טיפול לפי סוג הודעה - עם AI! 🤖
+    // טיפול לפי סוג הודעה - עם Orchestrator! 🤖
     else if (messageType === 'textMessage') {
       const text = payload.messageData?.textMessageData?.textMessage || '';
       console.log('📝 Text message:', text);
@@ -183,8 +184,37 @@ export async function POST(request: NextRequest) {
         message: 'קיבלתי! 📝\n\nרק רגע, אני מעבד...',
       });
 
-      // שליחת ההודעה ל-AI לטיפול חכם
-      const aiResult = await handleAIChat(supabase, userData.id, text, phoneNumber);
+      // 🆕 שליחה ל-Orchestrator לטיפול חכם (6 שלבים!)
+      const orchestratorResult = await processMessage(
+        userData.id,
+        text,
+        'text',
+        {
+          userId: userData.id,
+          userName: userData.name || '',
+          phoneNumber: phoneNumber,
+        }
+      );
+
+      // המרה לפורמט ישן לתאימות
+      const aiResult = {
+        response: orchestratorResult.message,
+        detected_expense: orchestratorResult.action?.type === 'create_transaction' 
+          ? { 
+              expense_detected: true,
+              ...orchestratorResult.action.data,
+              needs_confirmation: true 
+            } 
+          : null,
+        tokens_used: 0,
+      };
+
+      // Log the result
+      console.log('🤖 Orchestrator result:', { 
+        intent: orchestratorResult.metadata?.intent,
+        hasAction: !!orchestratorResult.action,
+        stateChanged: orchestratorResult.metadata?.stateChanged 
+      });
       
       // אם AI זיהה הוצאה → צור transaction
       let expenseCreated = false;

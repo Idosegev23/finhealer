@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { FileSpreadsheet, Download } from 'lucide-react'
 import Link from 'next/link'
+import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner'
 import OverviewTransactionsSection from '@/components/reports/OverviewTransactionsSection'
 
 // ✨ רענון הדף כל 30 שניות כדי להציג נתונים עדכניים
@@ -91,6 +92,8 @@ export default async function OverviewPage() {
   return (
     <div className="min-h-screen bg-dashboard">
       <div className="container mx-auto px-4 py-8">
+        <WhatsAppBanner message="רוצה לעדכן נתונים? לשאול שאלה? כל זה דרך WhatsApp! 💬" />
+        
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>

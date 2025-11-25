@@ -2,6 +2,15 @@
   "functions": {
     "app/api/documents/process/route.ts": {
       "maxDuration": 600
+    },
+    "app/api/cron/analyze-patterns/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/weekly-summary/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/monthly-review/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -16,6 +25,22 @@
     {
       "path": "/api/cron/refresh-views",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0,15,30,45 * * * *"
+    },
+    {
+      "path": "/api/cron/analyze-patterns",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-summary",
+      "schedule": "0 9 * * 0"
+    },
+    {
+      "path": "/api/cron/monthly-review",
+      "schedule": "0 9 1 * *"
     }
   ]
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import Link from 'next/link';
+import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner';
 import TransactionDetailsView from '@/components/dashboard/TransactionDetailsView';
 
 interface MonthData {
@@ -87,6 +88,8 @@ export default function ExpensesPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6" dir="rtl">
       <div className="max-w-7xl mx-auto space-y-6">
+        <WhatsAppBanner message="רוצה לרשום הוצאה חדשה? פשוט תכתוב לבוט! 📝" />
+        
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>

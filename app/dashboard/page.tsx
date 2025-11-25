@@ -8,6 +8,7 @@ import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PendingTransactionsBanner } from '@/components/dashboard/PendingTransactionsBanner'
+import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner'
 import MissingDocumentsWidget from '@/components/dashboard/MissingDocumentsWidget'
 import { DataCollectionDashboard } from '@/components/dashboard/DataCollectionDashboard'
 import { DataCollectionPrompt } from '@/components/dashboard/DataCollectionPrompt'
@@ -178,6 +179,7 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-phi-mint/10 via-white to-phi-coral/10">
         <div className="container mx-auto px-4 py-8 max-w-6xl">
+          <WhatsAppBanner message="כל הפעולות - העלאת מסמכים, סריקת קבלות, שאלות - דרך WhatsApp! 💬" />
           <PendingTransactionsBanner />
           <DataCollectionPrompt userId={user.id} />
           <DataCollectionDashboard 
@@ -195,6 +197,7 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-dashboard">
         <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <WhatsAppBanner />
           <PendingTransactionsBanner />
           <OnboardingDashboard />
         </div>
@@ -206,6 +209,7 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-dashboard">
         <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <WhatsAppBanner />
           <PendingTransactionsBanner />
           <BehaviorDashboard />
         </div>
@@ -217,6 +221,7 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-dashboard">
         <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <WhatsAppBanner />
           <PendingTransactionsBanner />
           <BudgetDashboard />
         </div>
@@ -228,6 +233,7 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-dashboard">
         <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <WhatsAppBanner />
           <PendingTransactionsBanner />
           <GoalsDashboard />
         </div>
@@ -239,6 +245,7 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-phi-mint/10 via-white to-phi-coral/10 dark:from-phi-dark dark:via-gray-900 dark:to-phi-dark">
       <div className="container mx-auto px-4 md:px-8 py-8 max-w-7xl">
+        <WhatsAppBanner />
         <PendingTransactionsBanner />
         
         {/* Hero Section - גדול וצבעוני */}

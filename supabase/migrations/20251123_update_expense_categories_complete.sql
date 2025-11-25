@@ -249,3 +249,4 @@ END $$;
 COMMENT ON TABLE expense_categories IS 'Expense categories completely updated on 2025-11-23 with 146 categories';
 
 
+

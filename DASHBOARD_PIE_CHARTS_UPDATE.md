@@ -314,3 +314,4 @@ animationDuration={800} // שנו ל-600 למשל
 
 
 
+
