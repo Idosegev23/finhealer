@@ -160,7 +160,7 @@ export async function scheduleExpenseLoggingReminder(
 /**
  * Schedule monthly summary reminder
  */
-export async function scheduleMonthly SummaryReminder(
+export async function scheduleMonthlySummaryReminder(
   userId: string
 ): Promise<void> {
   // First day of next month at 9 AM

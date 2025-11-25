@@ -1,5 +1,4 @@
 import { transcribeVoice } from "@/lib/ai/gpt5-client";
-import axios from "axios";
 
 /**
  * Voice Message Handler
@@ -27,12 +26,21 @@ export async function downloadAudioFile(
   audioUrl: string
 ): Promise<Buffer> {
   try {
-    const response = await axios.get(audioUrl, {
-      responseType: "arraybuffer",
-      timeout: 30000, // 30 seconds
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+
+    const response = await fetch(audioUrl, {
+      signal: controller.signal,
     });
 
-    return Buffer.from(response.data);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
   } catch (error) {
     console.error("Failed to download audio:", error);
     throw new Error("Failed to download voice message");

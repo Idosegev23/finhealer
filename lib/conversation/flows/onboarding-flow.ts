@@ -572,20 +572,8 @@ async function savePersonalInfo(userId: string, data: any): Promise<void> {
 }
 
 // ============================================================================
-// Exports
+// Aliases for orchestrator compatibility
 // ============================================================================
 
-export {
-  handleOnboardingPersonal as handleOnboardingPersonal,
-  handleOnboardingDocuments as handleOnboardingIncome,
-  handleOnboardingDocuments as handleOnboardingExpenses,
-};
-
-export default {
-  handleOnboardingFlow,
-  handleOnboardingPersonal,
-  handleOnboardingDocuments,
-  getDocumentReceivedMessage,
-  getDocumentProcessedMessage,
-  getCreditStatementRequest,
-};
+export const handleOnboardingIncome = handleOnboardingDocuments;
+export const handleOnboardingExpenses = handleOnboardingDocuments;
