@@ -113,7 +113,7 @@ export function OnboardingSelector() {
   const handleFinalStep = async () => {
     try {
       setIsLoading(true);
-      
+
       // Validate phone
       if (!phone) {
         alert('אנא הכנס מספר טלפון');
@@ -149,7 +149,7 @@ export function OnboardingSelector() {
       if (!response.ok) {
         throw new Error(data.error || 'שגיאה ביצירת מנוי');
       }
-      
+
       console.log('✅ User created with phone:', phoneFormatted);
       
       setSendingWelcome(true);
@@ -179,6 +179,7 @@ export function OnboardingSelector() {
             body: JSON.stringify({
               phone: phoneFormatted,
               message: welcomeMessage,
+              isOnboarding: true, // 🆕 יוצר context עם state onboarding_personal
             }),
           });
 
@@ -666,8 +667,8 @@ export function OnboardingSelector() {
                 </div>
 
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  מספר טלפון ו-WhatsApp 📱
-                </h2>
+                מספר טלפון ו-WhatsApp 📱
+              </h2>
                 <p className="text-gray-600">
                   הכל מתנהל דרך WhatsApp - שם תפגוש את φ המאמן שלך!
                 </p>

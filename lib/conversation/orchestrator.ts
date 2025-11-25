@@ -417,14 +417,31 @@ async function handleOnboardingState(
   context: any,
   step: "personal" | "documents"
 ): Promise<ConversationResponse> {
+  // 🔧 קריאת collectedData מ-metadata (שם הוא נשמר)
+  const existingCollectedData = (context as any).metadata?.collectedData || 
+                                (context as any).collectedData || 
+                                {};
+  
   const onboardingContext = {
     userId: userContext.userId,
     currentStep: step,
-    collectedData: (context as any).collectedData || {},
+    collectedData: { ...existingCollectedData },
   };
+
+  console.log('📝 Onboarding context:', { 
+    userId: userContext.userId, 
+    step, 
+    collectedData: onboardingContext.collectedData 
+  });
 
   try {
     const result = await handleOnboardingFlow(onboardingContext, message);
+
+    console.log('📝 Onboarding result:', { 
+      nextStep: result.nextStep, 
+      completed: result.completed,
+      collectedData: onboardingContext.collectedData 
+    });
 
     // Update context with collected data
     await updateContext(userContext.userId, {

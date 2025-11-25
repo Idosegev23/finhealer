@@ -72,18 +72,23 @@ export async function handleOnboardingPersonal(
 ): Promise<{ response: string; nextStep: string; completed: boolean }> {
   const data = context.collectedData;
 
-  // שלב 1.1: שם
+  // שלב 1.1: שם - אם אין שם, ה-message הנוכחי הוא השם!
   if (!data.full_name) {
-    return {
-      response: getWelcomeMessage(),
-      nextStep: 'collect_name',
-      completed: false,
-    };
-  }
-
-  // שלב 1.2: גיל
-  if (!data.age) {
-    data.full_name = message.trim();
+    // המשתמש שלח את השם שלו - שמור אותו והמשך לשאלה הבאה
+    const name = message.trim();
+    
+    // בדיקה בסיסית שזה שם ולא הודעה אחרת
+    if (name.length < 2 || name.length > 50) {
+      return {
+        response: `לא הבנתי 🤔
+        
+אנא כתוב את השם שלך (שם פרטי ומשפחה, או רק שם פרטי)`,
+        nextStep: 'collect_name',
+        completed: false,
+      };
+    }
+    
+    data.full_name = name;
     return {
       response: `נעים מאוד ${data.full_name}! 🤝
 
@@ -98,8 +103,8 @@ export async function handleOnboardingPersonal(
     };
   }
 
-  // שלב 1.3: מצב משפחתי
-  if (!data.marital_status) {
+  // שלב 1.2: גיל
+  if (!data.age) {
     const age = extractAge(message);
     if (age && age > 0 && age < 120) {
       data.age = age;
@@ -125,8 +130,8 @@ export async function handleOnboardingPersonal(
     }
   }
 
-  // שלב 1.4: ילדים
-  if (data.children_count === undefined) {
+  // שלב 1.3: מצב משפחתי
+  if (!data.marital_status) {
     const marital = extractMaritalStatus(message);
     if (marital) {
       data.marital_status = marital;
@@ -174,8 +179,9 @@ export async function handleOnboardingPersonal(
     }
   }
 
-  // שלב 1.5: כמה ילדים
+  // שלב 1.4: ילדים - שאלה האם יש ילדים + כמה
   if (data.children_count === undefined) {
+    // קודם כל בדוק אם זו תשובה כן/לא
     if (isPositiveAnswer(message)) {
       return {
         response: `כמה ילדים יש לכם? 👶
@@ -186,35 +192,9 @@ export async function handleOnboardingPersonal(
       };
     } else if (isNegativeAnswer(message)) {
       data.children_count = 0;
-    } else {
-      const count = extractNumber(message);
-      if (count !== null) {
-        data.children_count = count;
-      } else {
-        return {
-          response: `לא הבנתי 😅
-
-יש לכם ילדים? (כן/לא)`,
-          nextStep: 'collect_children',
-          completed: false,
-        };
-      }
-    }
-  }
-
-  // שלב 1.6: סטטוס תעסוקה
-  if (!data.employment_status) {
-    const count = extractNumber(message);
-    if (count !== null && count > 0) {
-      data.children_count = count;
-    }
-    
-    const childText = data.children_count && data.children_count > 0 
-      ? `${data.children_count} ילדים - וואו, יש לכם את הידיים מלאות! 👨‍👩‍👧‍👦` 
-      : '';
-    
-    return {
-      response: `${childText}
+      // אם אין ילדים, עבור לשאלת תעסוקה
+      return {
+        response: `הבנתי! 😊
 
 עוד שאלה אחרונה לפני שנתחיל ברצינות! 💼
 
@@ -224,27 +204,62 @@ export async function handleOnboardingPersonal(
 • משולב (גם וגם)
 
 💡 זה משפיע על איך נתכנן את התקציב והחיסכון שלך.`,
-      nextStep: 'collect_employment',
-      completed: false,
-    };
+        nextStep: 'collect_employment',
+        completed: false,
+      };
+    } else {
+      // בדוק אם זה מספר (כמה ילדים)
+      const count = extractNumber(message);
+      if (count !== null && count >= 0 && count < 20) {
+        data.children_count = count;
+        const childText = count > 0 
+          ? `${count} ילדים - וואו, יש לכם את הידיים מלאות! 👨‍👩‍👧‍👦` 
+          : 'הבנתי!';
+        
+        return {
+          response: `${childText}
+
+עוד שאלה אחרונה לפני שנתחיל ברצינות! 💼
+
+מה סוג התעסוקה שלך?
+• שכיר
+• עצמאי
+• משולב (גם וגם)
+
+💡 זה משפיע על איך נתכנן את התקציב והחיסכון שלך.`,
+          nextStep: 'collect_employment',
+          completed: false,
+        };
+      } else {
+        return {
+          response: `לא הבנתי 😅
+
+יש לכם ילדים? (כן/לא)
+או כתוב כמה ילדים יש לכם (מספר)`,
+          nextStep: 'collect_children',
+          completed: false,
+        };
+      }
+    }
   }
 
-  // סיום שלב Personal - מעבר לבקשת דוחות
-  const employment = extractEmploymentStatus(message);
-  if (employment) {
-    data.employment_status = employment;
-    
-    // שמירה לדאטהבייס
-    await savePersonalInfo(context.userId, data);
-    
-    const employmentText = employment === 'employee' 
-      ? 'שכיר - יציבות זה טוב!' 
-      : employment === 'self_employed' 
-      ? 'עצמאי - חופש עם אחריות!' 
-      : 'משולב - הכי טוב משני העולמות!';
-    
-    return {
-      response: `${employmentText} 👍
+  // שלב 1.5: סטטוס תעסוקה - סיום שלב Personal
+  if (!data.employment_status) {
+    const employment = extractEmploymentStatus(message);
+    if (employment) {
+      data.employment_status = employment;
+      
+      // שמירה לדאטהבייס
+      await savePersonalInfo(context.userId, data);
+      
+      const employmentText = employment === 'employee' 
+        ? 'שכיר - יציבות זה טוב!' 
+        : employment === 'self_employed' 
+        ? 'עצמאי - חופש עם אחריות!' 
+        : 'משולב - הכי טוב משני העולמות!';
+      
+      return {
+        response: `${employmentText} 👍
 
 מעולה ${data.full_name}! סיימנו את ההיכרות 🎉
 
@@ -266,21 +281,31 @@ export async function handleOnboardingPersonal(
 (PDF, תמונה, או צילום מסך - מה שנוח לך)
 
 מוכן? שלח לי את הדוח! 🚀`,
-      nextStep: 'documents',
-      completed: true,
-    };
-  } else {
-    return {
-      response: `לא הבנתי 🤔
+        nextStep: 'documents',
+        completed: true,
+      };
+    } else {
+      return {
+        response: `לא הבנתי 🤔
 
 מה סוג התעסוקה שלך?
 • שכיר - עובד עם משכורת קבועה
 • עצמאי - עסק עצמאי או פרילנסר
 • משולב - גם וגם`,
-      nextStep: 'collect_employment',
-      completed: false,
-    };
+        nextStep: 'collect_employment',
+        completed: false,
+      };
+    }
   }
+
+  // אם הגענו לכאן, משהו לא בסדר - החזר להתחלה
+  return {
+    response: `משהו השתבש 😕
+
+בוא נתחיל מחדש - מה השם שלך?`,
+    nextStep: 'collect_name',
+    completed: false,
+  };
 }
 
 // ============================================================================

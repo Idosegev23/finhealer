@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { createContext, updateContext, getOrCreateContext } from '@/lib/conversation/context-manager';
 
 /**
  * WhatsApp Send API
@@ -10,6 +11,9 @@ import { NextRequest, NextResponse } from 'next/server';
  * תומך בשני מצבים:
  * 1. שליחה לפי userId - מחפש את הטלפון בDB
  * 2. שליחה לפי phone - שולח ישירות למספר
+ * 
+ * 🆕 תמיכה ב-onboarding:
+ * אם isOnboarding=true, יוצר context עם state "onboarding_personal"
  */
 
 interface SendMessageBody {
@@ -17,6 +21,7 @@ interface SendMessageBody {
   phone?: string;
   message: string;
   buttons?: Array<{ buttonId: string; buttonText: string }>;
+  isOnboarding?: boolean; // 🆕 האם זו הודעת onboarding
 }
 
 export async function POST(request: NextRequest) {
@@ -33,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body: SendMessageBody = await request.json();
-    const { userId, phone, message, buttons } = body;
+    const { userId, phone, message, buttons, isOnboarding } = body;
 
     if (!message) {
       return NextResponse.json(
@@ -145,6 +150,22 @@ export async function POST(request: NextRequest) {
 
       if (msgError) {
         console.error('❌ Error saving message:', msgError);
+      }
+
+      // 🆕 יצירת/עדכון context ל-onboarding
+      if (isOnboarding) {
+        try {
+          console.log(`📝 Creating onboarding context for user: ${targetUserId}`);
+          await updateContext(targetUserId, {
+            currentState: 'onboarding_personal',
+            lastInteraction: new Date(),
+            pendingQuestions: [],
+          });
+          console.log(`✅ Onboarding context created for user: ${targetUserId}`);
+        } catch (ctxError) {
+          console.error('❌ Error creating onboarding context:', ctxError);
+          // Don't fail the request if context creation fails
+        }
       }
     }
 

@@ -36,6 +36,7 @@ export async function saveContext(context: ConversationContext): Promise<void> {
       pending_questions: context.pendingQuestions,
       waiting_for_document: context.waitingForDocument,
       previous_response_id: context.previousResponseId,
+      metadata: (context as any).metadata, // 🆕 שמירת metadata (כולל collectedData)
     };
 
     // Upsert to conversation_context table
@@ -74,7 +75,7 @@ export async function loadContext(userId: string): Promise<ConversationContext |
 
     const stored = data as StoredContext;
 
-    return {
+    const context: ConversationContext & { metadata?: any } = {
       userId: stored.user_id,
       currentState: stored.current_state,
       ongoingTask: stored.ongoing_task,
@@ -84,7 +85,10 @@ export async function loadContext(userId: string): Promise<ConversationContext |
       pendingQuestions: stored.pending_questions || [],
       waitingForDocument: stored.waiting_for_document as any,
       previousResponseId: stored.previous_response_id,
+      metadata: stored.metadata, // 🆕 קריאת metadata (כולל collectedData)
     };
+
+    return context as ConversationContext;
   } catch (error) {
     console.error("Failed to load context:", error);
     return null;
