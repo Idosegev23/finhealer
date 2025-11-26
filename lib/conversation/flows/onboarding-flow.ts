@@ -153,6 +153,31 @@ export async function handleOnboardingPersonal(
           completed: false,
         };
       } else {
+        // 🆕 בדוק אם המשתמש כבר ציין מספר ילדים באותה הודעה
+        // לדוגמה: "נשוי עם 3 ילדים" או "נשוי, 2 ילדים"
+        const childrenInMessage = extractChildrenFromMessage(message);
+        if (childrenInMessage !== null) {
+          data.children_count = childrenInMessage;
+          const childText = childrenInMessage > 0 
+            ? `${childrenInMessage} ילדים - וואו, יש לכם את הידיים מלאות! 👨‍👩‍👧‍👦` 
+            : 'הבנתי!';
+          
+          return {
+            response: `${childText}
+
+עוד שאלה אחרונה לפני שנתחיל ברצינות! 💼
+
+מה סוג התעסוקה שלך?
+• שכיר
+• עצמאי
+• משולב (גם וגם)
+
+💡 זה משפיע על איך נתכנן את התקציב והחיסכון שלך.`,
+            nextStep: 'collect_employment',
+            completed: false,
+          };
+        }
+        
         return {
           response: `אחלה! 🙌
 
@@ -545,6 +570,28 @@ function extractEmploymentStatus(text: string): 'employee' | 'self_employed' | '
 function extractNumber(text: string): number | null {
   const match = text.match(/\d+/);
   return match ? parseInt(match[0]) : null;
+}
+
+/**
+ * 🆕 חילוץ מספר ילדים מהודעה מורכבת
+ * לדוגמה: "נשוי עם 3 ילדים", "נשואה, 2 ילדים", "גרוש + 1 ילד"
+ */
+function extractChildrenFromMessage(text: string): number | null {
+  const lower = text.toLowerCase();
+  
+  // חפש דפוסים כמו "X ילדים" או "X ילד"
+  const childrenMatch = lower.match(/(\d+)\s*(ילדים|ילד|children|kids|child)/);
+  if (childrenMatch) {
+    return parseInt(childrenMatch[1]);
+  }
+  
+  // חפש דפוסים כמו "עם X" או "+ X"
+  const withMatch = lower.match(/(עם|עימ|\+)\s*(\d+)/);
+  if (withMatch) {
+    return parseInt(withMatch[2]);
+  }
+  
+  return null;
 }
 
 function isPositiveAnswer(text: string): boolean {
