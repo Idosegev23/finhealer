@@ -513,9 +513,9 @@ export function getInitialMessage(session: ClassificationSession): string {
   
   // הסבר על התהליך
   message += `📝 איך זה עובד?\n`;
-  message += `• אציג 2-3 תנועות בכל פעם\n`;
-  message += `• אם זיהיתי נכון - פשוט אשר ✓\n`;
-  message += `• אם טעיתי - תקן אותי\n`;
+  message += `• אשאל על תנועה אחת בכל פעם\n`;
+  message += `• אם זיהיתי נכון - פשוט כתוב "כן" ✓\n`;
+  message += `• אם טעיתי - כתוב "לא, זה X"\n`;
   message += `• תמיד אפשר להגיד "אח"כ" ולהמשיך מחר 😊\n\n`;
   
   message += `נתחיל?`;
@@ -533,7 +533,7 @@ export function getNextQuestionBatch(session: ClassificationSession): {
   askToContinue: boolean;
   waitingForDocument?: string;
 } {
-  const QUESTIONS_PER_BATCH = 2;  // 2-3 שאלות בכל פעם
+  const QUESTIONS_PER_BATCH = 1;  // שאלה אחת בכל פעם - פחות מבלבל
   
   // אם אנחנו בשלב בקשת מסמכים
   if (session.currentPhase === 'request_documents') {
@@ -568,8 +568,8 @@ export function getNextQuestionBatch(session: ClassificationSession): {
     }
   }
 
-  // בדיקה אם צריך לשאול אם להמשיך (אחרי כל 3 שאלות)
-  if (session.questionsAskedInBatch >= 3 && session.currentIndex < currentList.length) {
+  // בדיקה אם צריך לשאול אם להמשיך (אחרי כל 5 שאלות)
+  if (session.questionsAskedInBatch >= 5 && session.currentIndex < currentList.length) {
     const remaining = currentList.length - session.currentIndex;
     const phaseText = session.currentPhase === 'income' ? 'הכנסות' : 'הוצאות';
     
@@ -1074,59 +1074,65 @@ function parseAnswers(
   pendingQuestions: PendingQuestion[]
 ): { success: boolean; answers: ParsedAnswer[] } {
   const answers: ParsedAnswer[] = [];
+  const lower = message.toLowerCase().trim();
   
-  // ניסיון לזהות תשובות מרובות
-  // "הראשון X והשני Y" או "1. X 2. Y"
-  
+  // שאלה אחת בלבד - פשוט!
   if (pendingQuestions.length === 1) {
-    // שאלה אחת - התשובה היא כל ההודעה
-    const category = categorizeFromText(message, pendingQuestions[0].type);
-    const isInternal = isInternalTransfer(message);
+    const q = pendingQuestions[0];
     
-    answers.push({
-      transactionId: pendingQuestions[0].transactionId,
-      category,
-      isInternal,
-    });
+    // 1. אישור - "כן", "נכון", "מאשר"
+    if (lower === 'כן' || lower === 'נכון' || lower === 'מאשר' || lower === 'אוקי' || lower === 'ok') {
+      answers.push({
+        transactionId: q.transactionId,
+        category: 'CONFIRMED',  // סימן לשמור את הקטגוריה הקיימת
+        isInternal: false,
+      });
+      return { success: true, answers };
+    }
     
-    return { success: true, answers };
-  }
-  
-  // שתי שאלות - חיפוש "הראשון" ו"השני"
-  const firstMatch = message.match(/(?:הראשון|ה-?1|ראשון)[:\s]+([^,]+)/i);
-  const secondMatch = message.match(/(?:השני|ה-?2|שני)[:\s]+([^,]+)/i);
-  
-  if (firstMatch && pendingQuestions[0]) {
-    const category = categorizeFromText(firstMatch[1], pendingQuestions[0].type);
+    // 2. תיקון - "לא, זה X" או "לא זה X"
+    const correctionMatch = lower.match(/^לא[,\s]*(?:זה|זו|אלה)?\s*(.+)$/);
+    if (correctionMatch) {
+      const correctionText = correctionMatch[1].trim();
+      const category = categorizeFromText(correctionText, q.type);
+      answers.push({
+        transactionId: q.transactionId,
+        category,
+        isInternal: isInternalTransfer(correctionText),
+      });
+      return { success: true, answers };
+    }
+    
+    // 3. תשובה ישירה - קטגוריה חדשה
+    const category = categorizeFromText(message, q.type);
     answers.push({
-      transactionId: pendingQuestions[0].transactionId,
-      category,
-      isInternal: isInternalTransfer(firstMatch[1]),
-    });
-  }
-  
-  if (secondMatch && pendingQuestions[1]) {
-    const category = categorizeFromText(secondMatch[1], pendingQuestions[1].type);
-    answers.push({
-      transactionId: pendingQuestions[1].transactionId,
-      category,
-      isInternal: isInternalTransfer(secondMatch[1]),
-    });
-  }
-  
-  // אם מצאנו תשובות
-  if (answers.length > 0) {
-    return { success: true, answers };
-  }
-  
-  // ניסיון אחרון - אם יש רק מילה אחת, זו התשובה לשאלה הראשונה
-  if (!message.includes(' ') || message.split(' ').length <= 3) {
-    const category = categorizeFromText(message, pendingQuestions[0].type);
-    answers.push({
-      transactionId: pendingQuestions[0].transactionId,
+      transactionId: q.transactionId,
       category,
       isInternal: isInternalTransfer(message),
     });
+    return { success: true, answers };
+  }
+  
+  // במקרה שבעתיד נרצה יותר משאלה אחת:
+  // ניסיון לזהות תשובות מרובות "1. X 2. Y"
+  const numberedPattern = /(\d+)[.\s]+([^0-9]+?)(?=\d+[.\s]|$)/g;
+  let match;
+  while ((match = numberedPattern.exec(message)) !== null) {
+    const num = parseInt(match[1]);
+    const answerText = match[2].trim();
+    if (num >= 1 && num <= pendingQuestions.length) {
+      const q = pendingQuestions[num - 1];
+      const isConfirm = /^כן|^נכון|^מאשר/.test(answerText.toLowerCase());
+      const category = isConfirm ? 'CONFIRMED' : categorizeFromText(answerText, q.type);
+      answers.push({
+        transactionId: q.transactionId,
+        category,
+        isInternal: isInternalTransfer(answerText),
+      });
+    }
+  }
+  
+  if (answers.length > 0) {
     return { success: true, answers };
   }
   
@@ -1211,6 +1217,16 @@ async function updateTransactionCategory(
   category: string,
   isInternal: boolean
 ): Promise<void> {
+  // אם המשתמש אישר - רק נעדכן סטטוס, לא נשנה קטגוריה
+  if (category === 'CONFIRMED') {
+    await supabase
+      .from('transactions')
+      .update({ status: 'approved' })
+      .eq('id', transactionId)
+      .eq('user_id', userId);
+    return;
+  }
+  
   const updates: any = {
     expense_category: isInternal ? 'העברה פנימית' : category,
     status: 'approved',
