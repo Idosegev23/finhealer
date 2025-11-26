@@ -985,7 +985,7 @@ export async function POST(request: NextRequest) {
           }));
           
           // יצירת classification session
-          const session = createClassificationSession(
+          const session = await createClassificationSession(
             userData.id,
             pendingBatchId,
             transactionsToClassify,

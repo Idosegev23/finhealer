@@ -11,6 +11,268 @@
 
 import { updateContext, loadContext } from '../context-manager';
 import { scheduleReminder as scheduleFollowUp } from '../follow-up-manager';
+import { createServiceClient } from '@/lib/supabase/server';
+
+// ============================================================================
+// Database Categories
+// ============================================================================
+
+export interface DbCategory {
+  id?: string;
+  name: string;
+  expense_type: 'fixed' | 'variable' | 'special';
+  category_group: string;
+}
+
+// Cache לקטגוריות (טעינה חד פעמית)
+let categoriesCache: DbCategory[] | null = null;
+let categoriesByGroup: Map<string, DbCategory[]> | null = null;
+
+// ============================================================================
+// Income Categories (קבוע - לא בDB)
+// ============================================================================
+
+export interface IncomeCategory {
+  name: string;
+  employmentType?: 'employee' | 'freelancer' | 'business_owner';
+  allowanceType?: 'unemployment' | 'disability' | 'pension' | 'other';
+  keywords: string[];
+}
+
+export const INCOME_CATEGORIES: IncomeCategory[] = [
+  {
+    name: 'משכורת',
+    employmentType: 'employee',
+    keywords: ['משכורת', 'שכר', 'salary', 'wages', 'תשלום שכר'],
+  },
+  {
+    name: 'עצמאי/פרילנס',
+    employmentType: 'freelancer',
+    keywords: ['עצמאי', 'פרילנס', 'freelance', 'ייעוץ', 'לקוח', 'פרויקט'],
+  },
+  {
+    name: 'הכנסה מעסק',
+    employmentType: 'business_owner',
+    keywords: ['עסק', 'רווחים', 'תקבולים', 'business'],
+  },
+  {
+    name: 'קצבת אבטלה',
+    allowanceType: 'unemployment',
+    keywords: ['אבטלה', 'unemployment', 'דמי אבטלה'],
+  },
+  {
+    name: 'קצבת נכות',
+    allowanceType: 'disability',
+    keywords: ['נכות', 'disability'],
+  },
+  {
+    name: 'פנסיה/קצבת זקנה',
+    allowanceType: 'pension',
+    keywords: ['פנסיה', 'זקנה', 'pension', 'גמלה'],
+  },
+  {
+    name: 'החזר מס',
+    keywords: ['החזר מס', 'החזר ממס', 'זיכוי מס', 'tax refund'],
+  },
+  {
+    name: 'השקעות',
+    keywords: ['דיבידנד', 'ריבית', 'קרן', 'השקעה', 'מניות', 'אג"ח', 'פנסיוני', 'גמל', 'השתלמות'],
+  },
+  {
+    name: 'שכירות',
+    keywords: ['שכירות', 'דירה', 'נדל"ן', 'השכרה', 'שוכר'],
+  },
+  {
+    name: 'מתנה/ירושה',
+    keywords: ['מתנה', 'ירושה', 'gift', 'inheritance'],
+  },
+  {
+    name: 'העברה פנימית',
+    keywords: ['העברה', 'חשבון אחר', 'פנימי', 'בין חשבונות'],
+  },
+  {
+    name: 'אחר',
+    keywords: [],
+  },
+];
+
+/**
+ * זיהוי קטגוריית הכנסה לפי vendor/description
+ */
+export function suggestIncomeCategory(vendor: string): IncomeCategory[] {
+  const lower = vendor.toLowerCase();
+  const suggestions: IncomeCategory[] = [];
+  
+  for (const cat of INCOME_CATEGORIES) {
+    if (cat.keywords.some(kw => lower.includes(kw.toLowerCase()))) {
+      suggestions.push(cat);
+    }
+  }
+  
+  // אם לא מצאנו - החזר ברירות מחדל
+  if (suggestions.length === 0) {
+    return [
+      INCOME_CATEGORIES.find(c => c.name === 'משכורת')!,
+      INCOME_CATEGORIES.find(c => c.name === 'השקעות')!,
+      INCOME_CATEGORIES.find(c => c.name === 'העברה פנימית')!,
+    ];
+  }
+  
+  return suggestions.slice(0, 3);
+}
+
+/**
+ * טעינת קטגוריות מהמסד נתונים
+ */
+export async function loadCategories(): Promise<DbCategory[]> {
+  if (categoriesCache) return categoriesCache;
+  
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('expense_categories')
+    .select('id, name, expense_type, category_group')
+    .eq('is_active', true)
+    .order('category_group')
+    .order('name');
+  
+  if (error || !data) {
+    console.error('Error loading categories:', error);
+    return [];
+  }
+  
+  categoriesCache = data as DbCategory[];
+  
+  // ארגון לפי קבוצה
+  categoriesByGroup = new Map();
+  for (const cat of categoriesCache) {
+    if (!categoriesByGroup.has(cat.category_group)) {
+      categoriesByGroup.set(cat.category_group, []);
+    }
+    categoriesByGroup.get(cat.category_group)!.push(cat);
+  }
+  
+  return categoriesCache;
+}
+
+/**
+ * קבלת קטגוריות לפי קבוצה
+ */
+export function getCategoriesByGroup(): Map<string, DbCategory[]> {
+  return categoriesByGroup || new Map();
+}
+
+/**
+ * חיפוש קטגוריה לפי שם (fuzzy match)
+ */
+export function findCategoryByName(searchText: string): DbCategory | null {
+  if (!categoriesCache) return null;
+  
+  const lower = searchText.toLowerCase().trim();
+  
+  // חיפוש מדויק
+  const exact = categoriesCache.find(c => c.name.toLowerCase() === lower);
+  if (exact) return exact;
+  
+  // חיפוש חלקי
+  const partial = categoriesCache.find(c => 
+    c.name.toLowerCase().includes(lower) || lower.includes(c.name.toLowerCase())
+  );
+  if (partial) return partial;
+  
+  // חיפוש לפי מילות מפתח
+  const keywords = lower.split(/\s+/);
+  const byKeyword = categoriesCache.find(c => 
+    keywords.some(kw => kw.length > 2 && c.name.toLowerCase().includes(kw))
+  );
+  
+  return byKeyword || null;
+}
+
+/**
+ * הצעת קטגוריות רלוונטיות לפי vendor/description
+ */
+export function suggestCategories(vendor: string, amount: number): DbCategory[] {
+  if (!categoriesCache) return [];
+  
+  const lower = vendor.toLowerCase();
+  const suggestions: DbCategory[] = [];
+  
+  // מיפוי מילות מפתח לקבוצות
+  const keywordToGroup: Record<string, string[]> = {
+    'ביטוח': ['ביטוחים'],
+    'לאומי': ['מיסים', 'ביטוחים'],
+    'מגדל': ['ביטוחים'],
+    'הראל': ['ביטוחים'],
+    'מנורה': ['ביטוחים'],
+    'פנסיה': ['ביטוחים'],
+    'קופה': ['ביטוחים', 'בריאות'],
+    'חשמל': ['דיור'],
+    'מים': ['דיור'],
+    'גז': ['דיור'],
+    'ארנונה': ['דיור'],
+    'ועד': ['דיור'],
+    'שכירות': ['דיור'],
+    'משכנתא': ['פיננסים'],
+    'הלוואה': ['פיננסים'],
+    'בנק': ['פיננסים'],
+    'עמלה': ['פיננסים'],
+    'סופר': ['מזון'],
+    'רמי לוי': ['מזון'],
+    'שופרסל': ['מזון'],
+    'מסעדה': ['מזון'],
+    'קפה': ['מזון'],
+    'דלק': ['רכב'],
+    'סונול': ['רכב'],
+    'פז': ['רכב'],
+    'דור אלון': ['רכב'],
+    'חניה': ['רכב'],
+    'כביש': ['רכב'],
+    'מוסך': ['רכב'],
+    'טסט': ['רכב'],
+    'סלקום': ['תקשורת'],
+    'פרטנר': ['תקשורת'],
+    'הוט': ['תקשורת'],
+    'yes': ['תקשורת'],
+    'בזק': ['תקשורת'],
+    'נטפליקס': ['מנויים'],
+    'ספוטיפיי': ['מנויים'],
+    'אמזון': ['מנויים'],
+    'ילדים': ['חינוך'],
+    'גן': ['חינוך'],
+    'בית ספר': ['חינוך'],
+    'חוג': ['חינוך'],
+    'רופא': ['בריאות'],
+    'תרופות': ['בריאות'],
+    'בית מרקחת': ['בריאות'],
+    'מכבי': ['בריאות'],
+    'כללית': ['בריאות'],
+  };
+  
+  // חפש התאמות
+  for (const [keyword, groups] of Object.entries(keywordToGroup)) {
+    if (lower.includes(keyword)) {
+      for (const groupName of groups) {
+        const groupCats = categoriesByGroup?.get(groupName) || [];
+        suggestions.push(...groupCats.slice(0, 3));
+      }
+      break;
+    }
+  }
+  
+  // אם לא מצאנו - הצע קטגוריות פופולריות
+  if (suggestions.length === 0) {
+    const popularGroups = ['מזון', 'דיור', 'רכב', 'ביטוחים', 'בילויים'];
+    for (const group of popularGroups) {
+      const cats = categoriesByGroup?.get(group) || [];
+      if (cats.length > 0) suggestions.push(cats[0]);
+    }
+  }
+  
+  // הסר כפילויות
+  const uniqueMap = new Map(suggestions.map(s => [s.name, s]));
+  const unique = Array.from(uniqueMap.values());
+  return unique.slice(0, 5);
+}
 
 // ============================================================================
 // Types
@@ -79,32 +341,37 @@ export interface ClassificationResponse {
 
 /**
  * יצירת session חדש אחרי זיהוי PDF
+ * 
+ * 🔑 חשוב: כל התנועות עוברות אישור מהמשתמש!
+ * גם אם AI סיווג - המשתמש צריך לאשר או לתקן.
  */
-export function createClassificationSession(
+export async function createClassificationSession(
   userId: string,
   batchId: string,
   transactions: TransactionToClassify[],
   totalIncome: number,
   totalExpenses: number,
   missingDocs?: any[]  // מה-AI response
-): ClassificationSession {
-  // הפרדה לפי סוג - תנועות שצריך לסווג (אין קטגוריה)
-  const incomeToClassify = transactions
-    .filter(tx => tx.type === 'income' && !tx.currentCategory)
-    .sort((a, b) => b.amount - a.amount);  // מהגדול לקטן
+): Promise<ClassificationSession> {
+  // טעינת קטגוריות מהDB
+  await loadCategories();
   
+  // 🔑 כל ההכנסות צריכות אישור (מהגדול לקטן)
+  const incomeToClassify = transactions
+    .filter(tx => tx.type === 'income')
+    .sort((a, b) => b.amount - a.amount);
+  
+  // 🔑 כל ההוצאות צריכות אישור (מהגדול לקטן)
   const expensesToClassify = transactions
-    .filter(tx => tx.type === 'expense' && !tx.currentCategory)
+    .filter(tx => tx.type === 'expense')
     .sort((a, b) => b.amount - a.amount);
 
-  // תנועות שכבר מסווגות (יש קטגוריה)
+  // סטטיסטיקה: כמה כבר יש להן הצעת סיווג מ-AI
   const alreadyClassifiedIncome = transactions
-    .filter(tx => tx.type === 'income' && tx.currentCategory)
-    .sort((a, b) => b.amount - a.amount);
+    .filter(tx => tx.type === 'income' && tx.currentCategory);
   
   const alreadyClassifiedExpenses = transactions
-    .filter(tx => tx.type === 'expense' && tx.currentCategory)
-    .sort((a, b) => b.amount - a.amount);
+    .filter(tx => tx.type === 'expense' && tx.currentCategory);
 
   // המרת missing_documents לפורמט שלנו
   const missingDocuments = parseMissingDocuments(missingDocs || []);
@@ -114,7 +381,7 @@ export function createClassificationSession(
     batchId,
     incomeToClassify,
     expensesToClassify,
-    alreadyClassifiedIncome,
+    alreadyClassifiedIncome,  // רק לסטטיסטיקה - כמה יש הצעה
     alreadyClassifiedExpenses,
     currentPhase: incomeToClassify.length > 0 ? 'income' : (expensesToClassify.length > 0 ? 'expenses' : 'done'),
     currentIndex: 0,
@@ -212,87 +479,46 @@ export async function clearClassificationSession(userId: string): Promise<void> 
 
 /**
  * הודעת פתיחה אחרי זיהוי PDF
+ * 
+ * 🔑 כל התנועות עוברות אישור! גם אם AI הציע סיווג.
  */
 export function getInitialMessage(session: ClassificationSession): string {
-  const toClassifyCount = session.incomeToClassify.length + session.expensesToClassify.length;
-  const totalTransactions = toClassifyCount + 
-    session.alreadyClassifiedIncome.length + 
-    session.alreadyClassifiedExpenses.length;
+  const totalTransactions = session.incomeToClassify.length + session.expensesToClassify.length;
   
-  if (toClassifyCount === 0) {
-    let message = `מעולה! זיהיתי ${totalTransactions} תנועות - כולן כבר מסווגות! 🎉\n\n`;
-    message += `💚 הכנסות: ${session.totalIncome.toLocaleString('he-IL')} ₪\n`;
-    message += `💸 הוצאות: ${session.totalExpenses.toLocaleString('he-IL')} ₪\n`;
-    message += `📊 מאזן: ${(session.totalIncome - session.totalExpenses).toLocaleString('he-IL')} ₪\n\n`;
-    
-    // הצג דוגמאות של מה שסווג
-    if (session.alreadyClassifiedIncome.length > 0 || session.alreadyClassifiedExpenses.length > 0) {
-      message += `🔍 דוגמאות לסיווג אוטומטי:\n`;
-      
-      const topIncome = session.alreadyClassifiedIncome.slice(0, 2);
-      topIncome.forEach(tx => {
-        message += `  ✅ ${tx.vendor} (${tx.amount.toLocaleString('he-IL')} ₪) → ${tx.currentCategory}\n`;
-      });
-      
-      const topExpenses = session.alreadyClassifiedExpenses.slice(0, 2);
-      topExpenses.forEach(tx => {
-        message += `  ✅ ${tx.vendor} (${tx.amount.toLocaleString('he-IL')} ₪) → ${tx.currentCategory}\n`;
-      });
-      
-      message += `\nהסיווג נכון? כתוב "כן" להמשיך או "תקן" אם יש טעות.`;
-    }
-    
-    return message;
+  if (totalTransactions === 0) {
+    return `לא זיהיתי תנועות בדוח 🤔\n\nאפשר לנסות לשלוח דוח אחר?`;
   }
 
-  // הצגת סיכום עם מספר התנועות
+  // כמה יש להן הצעת סיווג מ-AI
+  const withSuggestion = session.alreadyClassifiedIncome.length + session.alreadyClassifiedExpenses.length;
+  const withoutSuggestion = totalTransactions - withSuggestion;
+
+  // הצגת סיכום
   let message = `📊 זיהיתי ${totalTransactions} תנועות!\n\n`;
   
   // הכנסות
-  const incomeClassified = session.alreadyClassifiedIncome.length;
-  message += `💚 הכנסות: ${session.totalIncome.toLocaleString('he-IL')} ₪`;
-  if (incomeClassified > 0 && session.incomeToClassify.length > 0) {
-    message += ` (${incomeClassified} מסווגות, ${session.incomeToClassify.length} לסיווג)`;
-  } else if (session.incomeToClassify.length > 0) {
-    message += ` (${session.incomeToClassify.length} לסיווג)`;
-  } else {
-    message += ` ✓`;
+  message += `💚 הכנסות: ${session.incomeToClassify.length} תנועות (${session.totalIncome.toLocaleString('he-IL')} ₪)\n`;
+  
+  // הוצאות
+  message += `💸 הוצאות: ${session.expensesToClassify.length} תנועות (${session.totalExpenses.toLocaleString('he-IL')} ₪)\n\n`;
+  
+  // סטטוס הסיווג האוטומטי
+  if (withSuggestion > 0) {
+    message += `🤖 זיהיתי אוטומטית ${withSuggestion} תנועות - רק צריך לאשר.\n`;
+  }
+  if (withoutSuggestion > 0) {
+    message += `❓ ${withoutSuggestion} תנועות לא הצלחתי לזהות - אשאל עליהן.\n`;
   }
   message += `\n`;
   
-  // הוצאות
-  const expensesClassified = session.alreadyClassifiedExpenses.length;
-  message += `💸 הוצאות: ${session.totalExpenses.toLocaleString('he-IL')} ₪`;
-  if (expensesClassified > 0 && session.expensesToClassify.length > 0) {
-    message += ` (${expensesClassified} מסווגות, ${session.expensesToClassify.length} לסיווג)`;
-  } else if (session.expensesToClassify.length > 0) {
-    message += ` (${session.expensesToClassify.length} לסיווג)`;
-  } else {
-    message += ` ✓`;
-  }
-  message += `\n\n`;
+  // הסבר על התהליך
+  message += `📝 איך זה עובד?\n`;
+  message += `• אציג 2-3 תנועות בכל פעם\n`;
+  message += `• אם זיהיתי נכון - פשוט אשר ✓\n`;
+  message += `• אם טעיתי - תקן אותי\n`;
+  message += `• תמיד אפשר להגיד "אח"כ" ולהמשיך מחר 😊\n\n`;
   
-  // הצג דוגמאות של מה שסווג אוטומטית
-  if (incomeClassified > 0 || expensesClassified > 0) {
-    message += `🔍 סיווג אוטומטי (דוגמאות):\n`;
-    
-    const topIncome = session.alreadyClassifiedIncome.slice(0, 2);
-    topIncome.forEach(tx => {
-      message += `  ✅ ${tx.vendor} → ${tx.currentCategory}\n`;
-    });
-    
-    const topExpenses = session.alreadyClassifiedExpenses.slice(0, 2);
-    topExpenses.forEach(tx => {
-      message += `  ✅ ${tx.vendor} → ${tx.currentCategory}\n`;
-    });
-    message += `\n`;
-  }
-  
-  if (toClassifyCount > 0) {
-    message += `יש לי ${toClassifyCount} שאלות על תנועות שלא הצלחתי לזהות.\n`;
-    message += toClassifyCount <= 5 ? 'זה ייקח דקה!' : 'נעשה את זה ביחד, בקצב שלך 😊';
-    message += `\n\nנתחיל?`;
-  }
+  message += `נתחיל?`;
 
   return message;
 }
@@ -402,7 +628,7 @@ export function getNextQuestionBatch(session: ClassificationSession): {
 }
 
 /**
- * פורמט שאלה בודדת
+ * פורמט שאלה בודדת - עם הצעות קטגוריות מהמסד נתונים
  */
 function formatQuestion(
   tx: TransactionToClassify,
@@ -413,12 +639,32 @@ function formatQuestion(
   const amount = tx.amount.toLocaleString('he-IL');
   
   if (phase === 'income') {
-    return `${globalIndex}. ב-${date} נכנסו ${amount} ₪ מ"${tx.vendor}" - מה זה?`;
-  } else {
-    if (tx.suggestedCategory) {
-      return `${globalIndex}. ${amount} ₪ ב"${tx.vendor}" (${date}) - זה ${tx.suggestedCategory}?`;
+    // לגבי הכנסות - הצע מרשימת קטגוריות הכנסה
+    if (tx.currentCategory || tx.suggestedCategory) {
+      const suggested = tx.currentCategory || tx.suggestedCategory;
+      return `${globalIndex}. ${amount} ₪ מ"${tx.vendor}" (${date})\n   → זה **${suggested}**? (כן/לא/תקן)`;
     }
-    return `${globalIndex}. ${amount} ₪ ב"${tx.vendor}" (${date}) - לאיזה קטגוריה?`;
+    
+    // הצע קטגוריות הכנסה רלוונטיות
+    const incomeSuggestions = suggestIncomeCategory(tx.vendor);
+    const suggestionList = incomeSuggestions.map(s => s.name).join(' / ');
+    return `${globalIndex}. ${amount} ₪ מ"${tx.vendor}" (${date})\n   → מה זה? (${suggestionList})`;
+    
+  } else {
+    // לגבי הוצאות - הצע מהמסד נתונים
+    if (tx.currentCategory || tx.suggestedCategory) {
+      const suggested = tx.currentCategory || tx.suggestedCategory;
+      return `${globalIndex}. ${amount} ₪ ב"${tx.vendor}" (${date})\n   → זה **${suggested}**? (כן/לא/תקן)`;
+    }
+    
+    // הצע קטגוריות רלוונטיות מ-DB
+    const suggestions = suggestCategories(tx.vendor, tx.amount);
+    if (suggestions.length > 0) {
+      const suggestionList = suggestions.slice(0, 3).map(s => s.name).join(' / ');
+      return `${globalIndex}. ${amount} ₪ ב"${tx.vendor}" (${date})\n   → לאיזה קטגוריה? (${suggestionList} / אחר)`;
+    }
+    
+    return `${globalIndex}. ${amount} ₪ ב"${tx.vendor}" (${date})\n   → לאיזה קטגוריה?`;
   }
 }
 
@@ -540,6 +786,9 @@ export async function handleUserResponse(
   userMessage: string,
   supabase: any
 ): Promise<ClassificationResponse> {
+  // וודא שקטגוריות נטענו
+  await loadCategories();
+  
   const lowerMessage = userMessage.toLowerCase().trim();
 
   // אם מחכים למסמך - טיפול מיוחד
@@ -885,32 +1134,58 @@ function parseAnswers(
 }
 
 /**
- * זיהוי קטגוריה מטקסט חופשי
+ * זיהוי קטגוריה מטקסט חופשי - מחפש במסד נתונים
  */
 function categorizeFromText(text: string, type: 'income' | 'expense'): string {
   const lower = text.toLowerCase().trim();
   
+  // אם המשתמש אישר - החזר "אושר"
+  if (lower === 'כן' || lower === 'נכון' || lower === 'מאשר' || lower === '✓') {
+    return 'CONFIRMED';
+  }
+  
   if (type === 'income') {
-    // קטגוריות הכנסה
-    if (lower.includes('משכורת') || lower.includes('שכר')) return 'משכורת';
-    if (lower.includes('החזר') || lower.includes('זיכוי')) return 'החזר';
-    if (lower.includes('מתנה')) return 'מתנה';
-    if (lower.includes('העברה') || lower.includes('פנימי') || lower.includes('חשבון אחר')) return 'העברה פנימית';
-    if (lower.includes('ביטוח')) return 'החזר ביטוח';
-    if (lower.includes('קרן') || lower.includes('השתלמות') || lower.includes('פנסיה')) return 'קרן השתלמות/פנסיה';
-    if (lower.includes('שכירות') || lower.includes('דירה')) return 'הכנסה משכירות';
-    if (lower.includes('עסק') || lower.includes('לקוח')) return 'הכנסה מעסק';
-    return text.substring(0, 50);  // השתמש בטקסט כקטגוריה
+    // חפש בקטגוריות הכנסה
+    for (const cat of INCOME_CATEGORIES) {
+      // התאמה מדויקת לשם
+      if (lower === cat.name.toLowerCase()) return cat.name;
+      // התאמה לmilלות מפתח
+      if (cat.keywords.some(kw => lower.includes(kw.toLowerCase()))) return cat.name;
+    }
+    
+    // התאמות ידניות נוספות
+    if (lower.includes('החזר') || lower.includes('זיכוי')) return 'החזר מס';
+    if (lower.includes('קרן') || lower.includes('השתלמות')) return 'השקעות';
+    
+    return text.substring(0, 50);  // אם לא מצאנו - השתמש בטקסט
+    
   } else {
-    // קטגוריות הוצאה
+    // חפש בקטגוריות הוצאה מהDB
+    const dbCategory = findCategoryByName(text);
+    if (dbCategory) return dbCategory.name;
+    
+    // התאמות ידניות
     if (lower.includes('מזון') || lower.includes('סופר') || lower.includes('אוכל')) return 'קניות סופר';
     if (lower.includes('מסעדה') || lower.includes('קפה')) return 'מסעדות';
     if (lower.includes('דלק') || lower.includes('בנזין')) return 'דלק';
-    if (lower.includes('תחבורה') || lower.includes('נסיעות')) return 'תחבורה';
+    if (lower.includes('תחבורה') || lower.includes('נסיעות') || lower.includes('אוטובוס')) return 'תחבורה ציבורית';
     if (lower.includes('ביגוד') || lower.includes('בגדים')) return 'ביגוד';
-    if (lower.includes('בילוי') || lower.includes('פנאי')) return 'בידור';
-    if (lower.includes('חשבון') || lower.includes('חשמל') || lower.includes('מים')) return 'חשבונות בית';
-    if (lower.includes('שכר טרחה') || lower.includes('עו"ד') || lower.includes('רואה חשבון')) return 'שכר טרחה';
+    if (lower.includes('בילוי') || lower.includes('פנאי')) return 'בילויים ובידור';
+    if (lower.includes('חשמל')) return 'חשמל לבית';
+    if (lower.includes('מים')) return 'מים למגורים';
+    if (lower.includes('גז')) return 'גז';
+    if (lower.includes('ארנונה')) return 'ארנונה למגורים';
+    if (lower.includes('שכר טרחה') || lower.includes('עו"ד')) return 'הוצאות משפטיות';
+    if (lower.includes('רואה חשבון') || lower.includes('רו"ח')) return 'רואה חשבון';
+    if (lower.includes('ביטוח')) return 'ביטוח חיים';
+    if (lower.includes('משכנתא')) return 'הלוואת משכנתא למגורים';
+    if (lower.includes('הלוואה')) return 'הלוואות בנקאיות';
+    if (lower.includes('ילדים') || lower.includes('גן')) return 'גני ילדים פרטיים';
+    if (lower.includes('חוג')) return 'חוגים לילדים';
+    if (lower.includes('טלפון') || lower.includes('סלולר')) return 'טלפונים ניידים';
+    if (lower.includes('אינטרנט')) return 'אינטרנט ביתי';
+    if (lower.includes('נטפליקס') || lower.includes('ספוטיפיי')) return 'מנויים דיגיטליים (נטפליקס ספוטיפיי)';
+    
     return text.substring(0, 50);
   }
 }
