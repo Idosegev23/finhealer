@@ -291,12 +291,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 🆕 הודעת אישור מיידית - הבוט קיבל את ההודעה
-      await greenAPI.sendMessage({
-        phoneNumber,
-        message: 'קיבלתי! 📝\n\nרק רגע, אני מעבד...',
-      });
-
       // 🆕 שליחה ל-Orchestrator לטיפול חכם (6 שלבים!)
       const orchestratorResult = await processMessage(
         userData.id,
