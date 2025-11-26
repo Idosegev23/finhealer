@@ -856,9 +856,30 @@ export async function POST(request: NextRequest) {
             ocrData = { document_type: 'credit_statement', transactions: [] };
           }
 
-          const transactions = ocrData.transactions || [];
+          // 🆕 Handle different response formats:
+          // - Credit: transactions = array
+          // - Bank: transactions = { income: [], expenses: [], loan_payments: [], savings_transfers: [] }
+          let allTransactions: any[] = [];
           
-          if (transactions.length === 0) {
+          if (Array.isArray(ocrData.transactions)) {
+            // Credit statement format - transactions is array
+            allTransactions = ocrData.transactions;
+          } else if (ocrData.transactions && typeof ocrData.transactions === 'object') {
+            // Bank statement format - transactions is object with categories
+            const { income = [], expenses = [], loan_payments = [], savings_transfers = [] } = ocrData.transactions;
+            
+            // Add type to each transaction and merge
+            allTransactions = [
+              ...income.map((tx: any) => ({ ...tx, type: 'income' })),
+              ...expenses.map((tx: any) => ({ ...tx, type: 'expense' })),
+              ...loan_payments.map((tx: any) => ({ ...tx, type: 'expense', expense_category: tx.expense_category || 'החזר הלוואה' })),
+              ...savings_transfers.map((tx: any) => ({ ...tx, type: 'expense', expense_category: tx.expense_category || 'חיסכון' })),
+            ];
+          }
+          
+          console.log(`📊 Parsed ${allTransactions.length} transactions (income: ${ocrData.transactions?.income?.length || 0}, expenses: ${ocrData.transactions?.expenses?.length || 0})`);
+          
+          if (allTransactions.length === 0) {
             await greenAPI.sendMessage({
               phoneNumber,
               message: 'לא הצלחתי לזהות תנועות ב-PDF 😕\n\nנסה לצלם את המסך או כתוב את הפרטים ידנית.',
@@ -870,25 +891,26 @@ export async function POST(request: NextRequest) {
           const pendingBatchId = `batch_${Date.now()}_${userData.id.substring(0, 8)}`;
           const insertedIds: string[] = [];
           
-          for (const tx of transactions) {
+          for (const tx of allTransactions) {
             const txDate = tx.date || new Date().toISOString().split('T')[0];
+            const txType = tx.type || 'expense';
             
             const { data: inserted } = await (supabase as any)
               .from('transactions')
               .insert({
                 user_id: userData.id,
-                type: 'expense',
+                type: txType,
                 amount: tx.amount,
                 vendor: tx.vendor,
                 date: txDate,
                 tx_date: txDate,
                 category: tx.category || 'other',
-                expense_category: tx.expense_category || null,
-                expense_type: tx.expense_type || 'variable',
-                payment_method: ocrData.document_type === 'credit_statement' ? 'credit_card' : 'bank_transfer',
+                expense_category: tx.expense_category || tx.income_category || null,
+                expense_type: tx.expense_type || (txType === 'income' ? null : 'variable'),
+                payment_method: tx.payment_method || (documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
                 source: 'ocr',
                 status: 'pending',
-                notes: tx.description || '',
+                notes: tx.notes || tx.description || '',
                 original_description: tx.description || '',
                 auto_categorized: true,
                 confidence_score: tx.confidence || 0.5,
@@ -902,26 +924,46 @@ export async function POST(request: NextRequest) {
             }
           }
           
-          // 🆕 הצגת סיכום בוואטסאפ עם אפשרות אישור
-          const totalAmount = transactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+          // חישוב סיכומים
+          const incomeTransactions = allTransactions.filter((tx: any) => tx.type === 'income');
+          const expenseTransactions = allTransactions.filter((tx: any) => tx.type === 'expense');
+          const totalIncome = incomeTransactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+          const totalExpenses = expenseTransactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
           
-          // הצג עד 5 תנועות גדולות כדוגמה
-          const topTransactions = [...transactions]
-            .sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0))
-            .slice(0, 5);
+          // 🆕 הצגת סיכום מפורט יותר לדוח בנק
+          let summaryMessage = `🎉 זיהיתי ${allTransactions.length} תנועות מה-PDF!\n\n`;
           
-          let summaryMessage = `🎉 זיהיתי ${transactions.length} תנועות מה-PDF!\n\n`;
-          summaryMessage += `💰 סה"כ: ${totalAmount.toLocaleString('he-IL')} ₪\n\n`;
-          summaryMessage += `📋 דוגמאות מהתנועות:\n`;
+          // סיכום לפי סוג
+          if (incomeTransactions.length > 0) {
+            summaryMessage += `💚 הכנסות: ${incomeTransactions.length} (${totalIncome.toLocaleString('he-IL')} ₪)\n`;
+          }
+          if (expenseTransactions.length > 0) {
+            summaryMessage += `💸 הוצאות: ${expenseTransactions.length} (${totalExpenses.toLocaleString('he-IL')} ₪)\n`;
+          }
+          summaryMessage += `\n📊 מאזן: ${(totalIncome - totalExpenses).toLocaleString('he-IL')} ₪\n\n`;
           
-          topTransactions.forEach((tx: any, idx: number) => {
-            const emoji = tx.expense_type === 'fixed' ? '🔄' : tx.expense_type === 'variable' ? '🛒' : '⭐';
-            summaryMessage += `${idx + 1}. ${emoji} ${tx.vendor || 'לא ידוע'} - ${tx.amount?.toLocaleString('he-IL')} ₪\n`;
-            summaryMessage += `   📂 ${tx.expense_category || 'לא מסווג'}\n`;
-          });
+          // הצג עד 3 הכנסות גדולות
+          if (incomeTransactions.length > 0) {
+            summaryMessage += `📋 הכנסות עיקריות:\n`;
+            const topIncome = [...incomeTransactions].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
+            topIncome.forEach((tx: any, idx: number) => {
+              summaryMessage += `  ${idx + 1}. ✅ ${tx.vendor || 'לא ידוע'} - ${tx.amount?.toLocaleString('he-IL')} ₪\n`;
+            });
+            summaryMessage += `\n`;
+          }
           
-          if (transactions.length > 5) {
-            summaryMessage += `\n...ועוד ${transactions.length - 5} תנועות נוספות\n`;
+          // הצג עד 3 הוצאות גדולות
+          if (expenseTransactions.length > 0) {
+            summaryMessage += `📋 הוצאות עיקריות:\n`;
+            const topExpenses = [...expenseTransactions].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
+            topExpenses.forEach((tx: any, idx: number) => {
+              const emoji = tx.expense_type === 'fixed' ? '🔄' : tx.expense_type === 'special' ? '⭐' : '🛒';
+              summaryMessage += `  ${idx + 1}. ${emoji} ${tx.vendor || 'לא ידוע'} - ${tx.amount?.toLocaleString('he-IL')} ₪\n`;
+            });
+          }
+          
+          if (allTransactions.length > 6) {
+            summaryMessage += `\n...ועוד ${allTransactions.length - 6} תנועות נוספות\n`;
           }
           
           summaryMessage += `\n---\n`;
@@ -941,8 +983,11 @@ export async function POST(request: NextRequest) {
               ongoingTask: 'transaction_approval',
               taskProgress: {
                 batchId: pendingBatchId,
-                transactionCount: transactions.length,
-                totalAmount: totalAmount,
+                transactionCount: allTransactions.length,
+                totalIncome: totalIncome,
+                totalExpenses: totalExpenses,
+                incomeCount: incomeTransactions.length,
+                expenseCount: expenseTransactions.length,
                 transactionIds: insertedIds,
               },
             } as any);
