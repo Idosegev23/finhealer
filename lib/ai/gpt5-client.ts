@@ -33,19 +33,30 @@ export async function chatWithGPT5(
       previousResponseId,
     } = options;
 
-    // Build input with context
-    const input = buildInputWithContext(conversationHistory, userContext);
+    // Build input with context - include system prompt in the input
+    const contextSummary = buildContextSummary(userContext);
+    const conversationText = conversationHistory
+      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+      .join("\n");
+    
+    // 🔧 Combine system prompt with input (Responses API doesn't support 'system' param)
+    const fullInput = `[System Instructions]
+${systemPrompt}
+
+[User Context]
+${contextSummary}
+
+[Conversation]
+${conversationText}`;
 
     // Call GPT-5.1 with Responses API
     const result = await openai.responses.create({
       model: "gpt-5.1",
-      input: input,
+      input: fullInput,
       reasoning: { effort: reasoningEffort },
       text: { verbosity: verbosity },
       max_output_tokens: maxOutputTokens,
       previous_response_id: previousResponseId,
-      // @ts-ignore - system parameter exists but may not be in types yet
-      system: systemPrompt,
     });
 
     return {
@@ -75,14 +86,22 @@ export async function chatWithGPT5Fast(
   userContext: UserContext
 ): Promise<string> {
   try {
+    // 🔧 Combine system prompt with input (Responses API doesn't support 'system' param)
+    const fullInput = `[System Instructions]
+${systemPrompt}
+
+[User Context]
+${buildContextSummary(userContext)}
+
+[User Message]
+${userMessage}`;
+
     const result = await openai.responses.create({
       model: "gpt-5.1",
-      input: `${buildContextSummary(userContext)}\n\nUser: ${userMessage}`,
+      input: fullInput,
       reasoning: { effort: "low" },
       text: { verbosity: "low" },
       max_output_tokens: 200,
-      // @ts-ignore
-      system: systemPrompt,
     });
 
     return result.output_text || "";
@@ -105,15 +124,28 @@ export async function chatWithGPT5Deep(
   response: string;
   responseId: string;
 }> {
+  // 🔧 Combine system prompt with input
+  const contextSummary = buildContextSummary(userContext);
+  const conversationText = conversationHistory
+    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+    .join("\n");
+  
+  const fullInput = `[System Instructions]
+${systemPrompt}
+
+[User Context]
+${contextSummary}
+
+[Conversation]
+${conversationText}`;
+
   const result = await openai.responses.create({
     model: "gpt-5.1",
-    input: buildInputWithContext(conversationHistory, userContext),
+    input: fullInput,
     reasoning: { effort: "high" },
     text: { verbosity: "medium" },
     max_output_tokens: 1000,
     previous_response_id: previousResponseId,
-    // @ts-ignore
-    system: systemPrompt,
   });
 
   return {

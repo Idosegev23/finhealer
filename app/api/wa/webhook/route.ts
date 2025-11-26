@@ -625,18 +625,28 @@ export async function POST(request: NextRequest) {
           // הורדת ה-PDF
           const pdfResponse = await fetch(downloadUrl);
           const pdfBuffer = await pdfResponse.arrayBuffer();
-          const base64PDF = Buffer.from(pdfBuffer).toString('base64');
+          const buffer = Buffer.from(pdfBuffer);
           
-          // GPT-4o יכול לקרוא PDF ישירות כמו תמונות!
-          console.log('🤖 Starting PDF analysis with GPT-4o Vision...');
+          console.log('🤖 Starting PDF analysis with OpenAI Files API...');
           
-          // שימוש באותו פרומפט כמו לתמונות
-          const visionResponse = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-              {
-                role: 'system',
-                content: `${EXPENSE_CATEGORIES_SYSTEM_PROMPT}
+          // 🆕 שימוש ב-Files API (כמו ב-scan-center)
+          const fs = require('fs').promises;
+          const tempFilePath = `/tmp/${Date.now()}-${fileName}`;
+          await fs.writeFile(tempFilePath, buffer);
+          
+          let fileUpload: any;
+          try {
+            fileUpload = await openai.files.create({
+              file: require('fs').createReadStream(tempFilePath),
+              purpose: 'assistants'
+            });
+            console.log(`✅ PDF uploaded to OpenAI Files API: ${fileUpload.id}`);
+          } finally {
+            // Clean up temp file
+            await fs.unlink(tempFilePath).catch(() => {});
+          }
+          
+          const prompt = `${EXPENSE_CATEGORIES_SYSTEM_PROMPT}
 
 **פורמט החזרה:**
 {
@@ -652,33 +662,66 @@ export async function POST(request: NextRequest) {
       "confidence": <0.0-1.0>
     }
   ]
-}`
-              },
-              {
+}
+
+נתח את דוח הבנק/אשראי הזה וחלץ את כל התנועות. שים לב מיוחד לתאריכים! החזר תשובה בפורמט JSON.`;
+
+          // 🆕 נסה GPT-5.1 קודם, אח"כ GPT-4o
+          let content = '';
+          try {
+            console.log('🔄 Trying GPT-5.1 with Responses API (direct PDF file)...');
+            const gpt51Response = await openai.responses.create({
+              model: 'gpt-5.1',
+              input: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'input_file', file_id: fileUpload.id },
+                    { type: 'input_text', text: prompt }
+                  ]
+                }
+              ],
+              reasoning: { effort: 'low' },
+              text: { verbosity: 'low' },
+              max_output_tokens: 16000
+            });
+            content = gpt51Response.output_text || '{}';
+            console.log('✅ GPT-5.1 succeeded');
+          } catch (gpt51Error: any) {
+            console.log(`❌ GPT-5.1 failed: ${gpt51Error.message}, trying GPT-4o...`);
+            
+            // Fallback to GPT-4o
+            const visionResponse = await openai.chat.completions.create({
+              model: 'gpt-4o',
+              messages: [{
                 role: 'user',
                 content: [
-                  {
-                    type: 'text',
-                    text: 'נתח את דוח הבנק/אשראי הזה וחלץ את כל התנועות. שים לב מיוחד לתאריכים! החזר תשובה בפורמט JSON.'
-                  },
-                  {
-                    type: 'image_url',
-                    image_url: { url: `data:application/pdf;base64,${base64PDF}` }
-                  }
+                  { type: 'file', file: { file_id: fileUpload.id } },
+                  { type: 'text', text: prompt }
                 ]
-              }
-            ],
-            temperature: 0.1,
-            max_tokens: 4000,
-            response_format: { type: 'json_object' },
-          });
+              }],
+              temperature: 0.1,
+              max_tokens: 16384,
+              response_format: { type: 'json_object' }
+            });
+            content = visionResponse.choices[0]?.message?.content || '{}';
+            console.log('✅ GPT-4o succeeded');
+          }
+          
+          // Clean up uploaded file from OpenAI
+          try {
+            await openai.files.del(fileUpload.id);
+          } catch (e) {
+            // Ignore cleanup errors
+          }
 
-          const aiText = visionResponse.choices[0].message.content || '{}';
-          console.log('🎯 PDF OCR Result:', aiText);
+          console.log('🎯 PDF OCR Result:', content);
 
           let ocrData: any;
           try {
-            ocrData = JSON.parse(aiText);
+            // Try to extract JSON from the response (may include markdown)
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            ocrData = JSON.parse(jsonMatch ? jsonMatch[0] : content);
           } catch {
             ocrData = { document_type: 'credit_statement', transactions: [] };
           }
