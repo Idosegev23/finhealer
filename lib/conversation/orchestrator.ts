@@ -62,6 +62,13 @@ export async function processMessage(
   try {
     // 1. Get or create conversation context
     let context = await getOrCreateContext(userId);
+    
+    // 🔍 DEBUG: Log the loaded context
+    console.log('🔍 Orchestrator - Loaded context:', {
+      userId,
+      currentState: context.currentState,
+      metadata: (context as any).metadata,
+    });
 
     // 2. Build user context if not provided
     if (!userContext) {
@@ -153,6 +160,13 @@ async function routeToHandler(
 ): Promise<ConversationResponse> {
   const stateMachine = new ConversationStateMachine(context);
   const currentState = stateMachine.getState();
+
+  // 🔍 DEBUG: Log the routing decision
+  console.log('🔍 RouteToHandler:', {
+    currentState,
+    contextCurrentState: context.currentState,
+    intentType: intent.type,
+  });
 
   // Handle special intents first (can override state)
   switch (intent.type) {

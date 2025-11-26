@@ -70,10 +70,17 @@ export async function loadContext(userId: string): Promise<ConversationContext |
       .single();
 
     if (error || !data) {
+      console.log(`🔍 loadContext: No context found for ${userId}, error: ${error?.message}`);
       return null;
     }
 
     const stored = data as StoredContext;
+    
+    // 🔍 DEBUG: Log loaded context from DB
+    console.log(`🔍 loadContext: Loaded from DB for ${userId}:`, {
+      current_state: stored.current_state,
+      user_id: stored.user_id,
+    });
 
     const context: ConversationContext & { metadata?: any } = {
       userId: stored.user_id,
