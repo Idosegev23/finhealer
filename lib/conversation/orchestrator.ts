@@ -205,6 +205,10 @@ async function routeToHandler(
     case "transaction_classification":
       return await handleClassificationState(intent, message, userContext, context);
 
+    case "classification_questions":
+      // 🆕 טיפול בשאלות סיווג מה-document-classification-session
+      return await handleDocumentClassificationState(intent, message, userContext, context);
+
     case "onboarding_personal":
       return await handleOnboardingState(intent, message, userContext, context, "personal");
 
@@ -431,6 +435,54 @@ async function handleClassificationState(
       intent: intent.type,
       confidence: intent.confidence,
       stateChanged: result.done || false,
+    },
+  };
+}
+
+/**
+ * Handle document classification state (new interactive flow)
+ * 🆕 משתמש ב-document-classification-session
+ */
+async function handleDocumentClassificationState(
+  intent: Intent,
+  message: string,
+  userContext: UserContext,
+  context: any
+): Promise<ConversationResponse> {
+  const { 
+    loadClassificationSession, 
+    handleUserResponse, 
+    clearClassificationSession 
+  } = await import("./flows/document-classification-session");
+  
+  const { createServiceClient } = await import("@/lib/supabase/server");
+  const supabase = createServiceClient();
+  
+  const session = await loadClassificationSession(userContext.userId);
+  
+  if (!session) {
+    // אין session פעיל - חזור ל-active_monitoring
+    return await handleActiveMonitoring(intent, message, userContext, context);
+  }
+  
+  const result = await handleUserResponse(session, message, supabase);
+  
+  if (result.done) {
+    // סיימנו - ניקוי session
+    await clearClassificationSession(userContext.userId);
+    
+    // עדכון state
+    await updateContext(userContext.userId, {
+      currentState: "active_monitoring",
+    });
+  }
+  
+  return {
+    message: result.message,
+    metadata: {
+      intent: intent.type,
+      confidence: intent.confidence,
+      stateChanged: result.done,
     },
   };
 }

@@ -320,7 +320,9 @@ export function getStatePriority(state: ConversationState): number {
     budget_planning: 8,           // שלב 3
     behavior_analysis: 9,         // שלב 2
     data_collection: 10,          // שלב 1
+    data_collection_pending_approval: 10,  // חלק משלב 1
     transaction_classification: 11,
+    classification_questions: 11, // 🆕 סיווג אינטראקטיבי
     document_processing: 12,
     onboarding_personal: 13,      // חובה קודם
     onboarding_income: 14,        // legacy

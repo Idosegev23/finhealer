@@ -26,8 +26,10 @@ export type ConversationState =
   | "onboarding_expenses"
   | "document_processing"
   | "transaction_classification"
+  | "classification_questions"  // 🆕 שאלות סיווג אינטראקטיביות
   | "active_monitoring"
   | "data_collection"      // שלב 1: איסוף מסמכים
+  | "data_collection_pending_approval"  // ממתין לאישור תנועות
   | "behavior_analysis"    // שלב 2: ניתוח דפוסים
   | "budget_planning"      // שלב 3: בניית תקציב
   | "goals_setting"        // שלב 4: הגדרת יעדים
@@ -35,7 +37,7 @@ export type ConversationState =
   | "paused";
 
 export interface OngoingTask {
-  taskType: "classify_transactions" | "upload_document" | "set_goal" | "review_budget";
+  taskType: "classify_transactions" | "upload_document" | "set_goal" | "review_budget" | "classification_questions" | "transaction_approval";
   totalItems: number;
   completedItems: number;
   data: any;

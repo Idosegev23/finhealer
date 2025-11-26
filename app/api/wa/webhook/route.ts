@@ -6,6 +6,7 @@ import OpenAI from 'openai';
 import { SYSTEM_PROMPT, buildContextMessage, parseExpenseFromAI, type UserContext } from '@/lib/ai/system-prompt';
 import { EXPENSE_CATEGORIES_SYSTEM_PROMPT } from '@/lib/ai/expense-categories-prompt';
 import { processMessage } from '@/lib/conversation/orchestrator';
+import { updateContext, loadContext } from '@/lib/conversation/context-manager';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -186,13 +187,48 @@ export async function POST(request: NextRequest) {
       const isCorrectionRequest = lowerText.startsWith('תקן ') || lowerText.startsWith('שנה ');
       
       // טען את ה-context לבדוק אם יש תנועות ממתינות
-      const { loadContext } = await import('@/lib/conversation/context-manager');
       const currentContext = await loadContext(userData.id);
       
-      const hasPendingApproval = currentContext?.ongoingTask === 'transaction_approval';
+      // 🆕 בדיקה אם יש classification session פעיל
+      const hasClassificationSession = currentContext?.ongoingTask?.taskType === 'classification_questions';
+      
+      if (hasClassificationSession) {
+        console.log('📋 Processing classification response...');
+        
+        const { 
+          loadClassificationSession, 
+          handleUserResponse,
+          clearClassificationSession 
+        } = await import('@/lib/conversation/flows/document-classification-session');
+        
+        const session = await loadClassificationSession(userData.id);
+        
+        if (session) {
+          const result = await handleUserResponse(session, text, supabase);
+          
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: result.message,
+          });
+          
+          if (result.done) {
+            // סיימנו - ניקוי session
+            await clearClassificationSession(userData.id);
+            console.log('✅ Classification session completed');
+          }
+          
+          return NextResponse.json({ 
+            status: 'classification_response', 
+            done: result.done 
+          });
+        }
+      }
+      
+      // 🆕 Legacy: תמיכה לאחור עבור אישור/ביטול ישן
+      const hasPendingApproval = currentContext?.ongoingTask?.taskType === 'transaction_approval';
       
       if (hasPendingApproval && (isApproval || isCancellation || isCorrectionRequest)) {
-        const taskProgress = currentContext?.taskProgress as any;
+        const taskProgress = currentContext?.ongoingTask?.data as any;
         
         if (isApproval && taskProgress?.transactionIds) {
           // ✅ אישור כל התנועות
@@ -694,7 +730,6 @@ export async function POST(request: NextRequest) {
       
       if (isPDF) {
         // 🆕 זיהוי חכם של סוג המסמך לפי ה-state וה-context
-        const { loadContext } = await import('@/lib/conversation/context-manager');
         const currentContext = await loadContext(userData.id);
         const currentState = currentContext?.currentState;
         const explicitDocType = currentContext?.waitingForDocument;
@@ -887,7 +922,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ status: 'no_data' });
           }
 
-          // 🆕 שמירת התנועות ב-pending_transactions לאישור בוואטסאפ
+          // 🆕 שמירת התנועות ב-pending לסיווג אינטראקטיבי
           const pendingBatchId = `batch_${Date.now()}_${userData.id.substring(0, 8)}`;
           const insertedIds: string[] = [];
           
@@ -912,7 +947,7 @@ export async function POST(request: NextRequest) {
                 status: 'pending',
                 notes: tx.notes || tx.description || '',
                 original_description: tx.description || '',
-                auto_categorized: true,
+                auto_categorized: !!tx.expense_category,  // true רק אם יש כבר קטגוריה
                 confidence_score: tx.confidence || 0.5,
                 batch_id: pendingBatchId,
               })
@@ -930,70 +965,62 @@ export async function POST(request: NextRequest) {
           const totalIncome = incomeTransactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
           const totalExpenses = expenseTransactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
           
-          // 🆕 הצגת סיכום מפורט יותר לדוח בנק
-          let summaryMessage = `🎉 זיהיתי ${allTransactions.length} תנועות מה-PDF!\n\n`;
+          // 🆕 Import classification session manager
+          const { 
+            createClassificationSession, 
+            saveClassificationSession, 
+            getInitialMessage,
+            getNextQuestionBatch 
+          } = await import('@/lib/conversation/flows/document-classification-session');
           
-          // סיכום לפי סוג
-          if (incomeTransactions.length > 0) {
-            summaryMessage += `💚 הכנסות: ${incomeTransactions.length} (${totalIncome.toLocaleString('he-IL')} ₪)\n`;
-          }
-          if (expenseTransactions.length > 0) {
-            summaryMessage += `💸 הוצאות: ${expenseTransactions.length} (${totalExpenses.toLocaleString('he-IL')} ₪)\n`;
-          }
-          summaryMessage += `\n📊 מאזן: ${(totalIncome - totalExpenses).toLocaleString('he-IL')} ₪\n\n`;
+          // יצירת רשימת תנועות לסיווג
+          const transactionsToClassify = allTransactions.map((tx: any, idx: number) => ({
+            id: insertedIds[idx] || `temp_${idx}`,
+            date: tx.date || new Date().toISOString().split('T')[0],
+            vendor: tx.vendor || 'לא ידוע',
+            amount: tx.amount || 0,
+            type: (tx.type || 'expense') as 'income' | 'expense',
+            currentCategory: tx.expense_category || tx.income_category || null,
+            suggestedCategory: tx.expense_category || null,
+          }));
           
-          // הצג עד 3 הכנסות גדולות
-          if (incomeTransactions.length > 0) {
-            summaryMessage += `📋 הכנסות עיקריות:\n`;
-            const topIncome = [...incomeTransactions].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
-            topIncome.forEach((tx: any, idx: number) => {
-              summaryMessage += `  ${idx + 1}. ✅ ${tx.vendor || 'לא ידוע'} - ${tx.amount?.toLocaleString('he-IL')} ₪\n`;
-            });
-            summaryMessage += `\n`;
-          }
+          // יצירת classification session
+          const session = createClassificationSession(
+            userData.id,
+            pendingBatchId,
+            transactionsToClassify,
+            totalIncome,
+            totalExpenses,
+            ocrData.missing_documents || []  // מסמכים חסרים (כרטיסי אשראי וכו')
+          );
           
-          // הצג עד 3 הוצאות גדולות
-          if (expenseTransactions.length > 0) {
-            summaryMessage += `📋 הוצאות עיקריות:\n`;
-            const topExpenses = [...expenseTransactions].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
-            topExpenses.forEach((tx: any, idx: number) => {
-              const emoji = tx.expense_type === 'fixed' ? '🔄' : tx.expense_type === 'special' ? '⭐' : '🛒';
-              summaryMessage += `  ${idx + 1}. ${emoji} ${tx.vendor || 'לא ידוע'} - ${tx.amount?.toLocaleString('he-IL')} ₪\n`;
-            });
-          }
+          // שמירת ה-session
+          await saveClassificationSession(userData.id, session);
           
-          if (allTransactions.length > 6) {
-            summaryMessage += `\n...ועוד ${allTransactions.length - 6} תנועות נוספות\n`;
-          }
-          
-          summaryMessage += `\n---\n`;
-          summaryMessage += `מה תרצה לעשות?\n\n`;
-          summaryMessage += `✅ כתוב "אשר" או "אשר הכל" - לאשר את כל התנועות\n`;
-          summaryMessage += `❌ כתוב "בטל" - לבטל ולהתחיל מחדש\n`;
-          summaryMessage += `✏️ כתוב "תקן X" - לתקן תנועה ספציפית (לדוגמה: "תקן 1")\n`;
-          
+          // הודעת פתיחה
+          const initialMessage = getInitialMessage(session);
           await greenAPI.sendMessage({
             phoneNumber,
-            message: summaryMessage,
+            message: initialMessage,
           });
           
-          // 🆕 שמור את ה-batch ID ב-context לאישור מאוחר יותר
-          try {
-            await updateContext(userData.id, {
-              ongoingTask: 'transaction_approval',
-              taskProgress: {
-                batchId: pendingBatchId,
-                transactionCount: allTransactions.length,
-                totalIncome: totalIncome,
-                totalExpenses: totalExpenses,
-                incomeCount: incomeTransactions.length,
-                expenseCount: expenseTransactions.length,
-                transactionIds: insertedIds,
-              },
-            } as any);
-          } catch (ctxError) {
-            console.error('Error updating context for approval:', ctxError);
+          // אם יש תנועות לסיווג, נשלח גם את השאלה הראשונה
+          if (session.incomeToClassify.length > 0 || session.expensesToClassify.length > 0) {
+            // קטן timeout לחוויה יותר טבעית
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const firstBatch = getNextQuestionBatch(session);
+            if (!firstBatch.done) {
+              await greenAPI.sendMessage({
+                phoneNumber,
+                message: firstBatch.message,
+              });
+              // עדכון ה-session עם pendingQuestions
+              await saveClassificationSession(userData.id, session);
+            }
           }
+          
+          console.log(`✅ Classification session created: ${session.incomeToClassify.length} income, ${session.expensesToClassify.length} expenses to classify, ${session.missingDocuments.length} missing docs`)
           
         } catch (pdfError: any) {
           console.error('❌ PDF Error:', pdfError);
