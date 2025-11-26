@@ -177,8 +177,84 @@ export async function POST(request: NextRequest) {
       const text = payload.messageData?.textMessageData?.textMessage || '';
       console.log('📝 Text message:', text);
 
-      // 🆕 הודעת אישור מיידית - הבוט קיבל את ההודעה
       const greenAPI = getGreenAPIClient();
+      
+      // 🆕 בדיקה אם זה אישור/ביטול תנועות ממתינות
+      const lowerText = text.toLowerCase().trim();
+      const isApproval = lowerText === 'אשר' || lowerText === 'אשר הכל' || lowerText === 'כן' || lowerText === 'אישור';
+      const isCancellation = lowerText === 'בטל' || lowerText === 'לא' || lowerText === 'ביטול';
+      const isCorrectionRequest = lowerText.startsWith('תקן ') || lowerText.startsWith('שנה ');
+      
+      // טען את ה-context לבדוק אם יש תנועות ממתינות
+      const { loadContext } = await import('@/lib/conversation/context-manager');
+      const currentContext = await loadContext(userData.id);
+      const hasPendingApproval = currentContext?.ongoingTask === 'transaction_approval';
+      
+      if (hasPendingApproval && (isApproval || isCancellation || isCorrectionRequest)) {
+        const taskProgress = currentContext?.taskProgress as any;
+        
+        if (isApproval && taskProgress?.transactionIds) {
+          // ✅ אישור כל התנועות
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: '⏳ מאשר את התנועות...',
+          });
+          
+          const { data: updatedCount } = await (supabase as any)
+            .from('transactions')
+            .update({ status: 'approved' })
+            .eq('user_id', userData.id)
+            .eq('batch_id', taskProgress.batchId)
+            .select('id');
+          
+          // ניקוי ה-context
+          await updateContext(userData.id, {
+            ongoingTask: undefined,
+            taskProgress: undefined,
+          } as any);
+          
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: `✅ מעולה! אישרתי ${updatedCount?.length || taskProgress.transactionCount} תנועות.\n\n💰 סה"כ: ${taskProgress.totalAmount?.toLocaleString('he-IL')} ₪\n\nהתנועות נשמרו בהיסטוריה שלך.\n\nמה עכשיו? 🚀\n• שלח לי עוד דוח\n• שאל אותי שאלה\n• כתוב "סיכום" לראות את המצב`,
+          });
+          
+          return NextResponse.json({ status: 'transactions_approved' });
+        }
+        
+        if (isCancellation && taskProgress?.batchId) {
+          // ❌ ביטול כל התנועות
+          await (supabase as any)
+            .from('transactions')
+            .delete()
+            .eq('user_id', userData.id)
+            .eq('batch_id', taskProgress.batchId);
+          
+          // ניקוי ה-context
+          await updateContext(userData.id, {
+            ongoingTask: undefined,
+            taskProgress: undefined,
+          } as any);
+          
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: '🗑️ בוטל! מחקתי את כל התנועות מהדוח.\n\nאפשר לשלוח דוח אחר או לנסות שוב 📄',
+          });
+          
+          return NextResponse.json({ status: 'transactions_cancelled' });
+        }
+        
+        if (isCorrectionRequest) {
+          // ✏️ תיקון תנועה ספציפית (TODO: implement full flow)
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: '✏️ תיקון תנועות - בקרוב!\n\nלעת עתה, כתוב "אשר" לאשר הכל או "בטל" להתחיל מחדש.',
+          });
+          
+          return NextResponse.json({ status: 'correction_requested' });
+        }
+      }
+
+      // 🆕 הודעת אישור מיידית - הבוט קיבל את ההודעה
       await greenAPI.sendMessage({
         phoneNumber,
         message: 'קיבלתי! 📝\n\nרק רגע, אני מעבד...',
@@ -736,11 +812,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ status: 'no_data' });
           }
 
-          // שמירת כל התנועות
+          // 🆕 שמירת התנועות ב-pending_transactions לאישור בוואטסאפ
+          const pendingBatchId = `batch_${Date.now()}_${userData.id.substring(0, 8)}`;
+          const insertedIds: string[] = [];
+          
           for (const tx of transactions) {
             const txDate = tx.date || new Date().toISOString().split('T')[0];
             
-            await (supabase as any)
+            const { data: inserted } = await (supabase as any)
               .from('transactions')
               .insert({
                 user_id: userData.id,
@@ -759,14 +838,63 @@ export async function POST(request: NextRequest) {
                 original_description: tx.description || '',
                 auto_categorized: true,
                 confidence_score: tx.confidence || 0.5,
-              });
+                batch_id: pendingBatchId,
+              })
+              .select('id')
+              .single();
+            
+            if (inserted?.id) {
+              insertedIds.push(inserted.id);
+            }
           }
           
-          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app';
+          // 🆕 הצגת סיכום בוואטסאפ עם אפשרות אישור
+          const totalAmount = transactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+          
+          // הצג עד 5 תנועות גדולות כדוגמה
+          const topTransactions = [...transactions]
+            .sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0))
+            .slice(0, 5);
+          
+          let summaryMessage = `🎉 זיהיתי ${transactions.length} תנועות מה-PDF!\n\n`;
+          summaryMessage += `💰 סה"כ: ${totalAmount.toLocaleString('he-IL')} ₪\n\n`;
+          summaryMessage += `📋 דוגמאות מהתנועות:\n`;
+          
+          topTransactions.forEach((tx: any, idx: number) => {
+            const emoji = tx.expense_type === 'fixed' ? '🔄' : tx.expense_type === 'variable' ? '🛒' : '⭐';
+            summaryMessage += `${idx + 1}. ${emoji} ${tx.vendor || 'לא ידוע'} - ${tx.amount?.toLocaleString('he-IL')} ₪\n`;
+            summaryMessage += `   📂 ${tx.expense_category || 'לא מסווג'}\n`;
+          });
+          
+          if (transactions.length > 5) {
+            summaryMessage += `\n...ועוד ${transactions.length - 5} תנועות נוספות\n`;
+          }
+          
+          summaryMessage += `\n---\n`;
+          summaryMessage += `מה תרצה לעשות?\n\n`;
+          summaryMessage += `✅ כתוב "אשר" או "אשר הכל" - לאשר את כל התנועות\n`;
+          summaryMessage += `❌ כתוב "בטל" - לבטל ולהתחיל מחדש\n`;
+          summaryMessage += `✏️ כתוב "תקן X" - לתקן תנועה ספציפית (לדוגמה: "תקן 1")\n`;
+          
           await greenAPI.sendMessage({
             phoneNumber,
-            message: `🎉 זיהיתי ${transactions.length} תנועות מה-PDF!\n\n👉 אשר את ההוצאות כאן:\n${siteUrl}/dashboard/expenses/pending`,
+            message: summaryMessage,
           });
+          
+          // 🆕 שמור את ה-batch ID ב-context לאישור מאוחר יותר
+          try {
+            await updateContext(userData.id, {
+              ongoingTask: 'transaction_approval',
+              taskProgress: {
+                batchId: pendingBatchId,
+                transactionCount: transactions.length,
+                totalAmount: totalAmount,
+                transactionIds: insertedIds,
+              },
+            } as any);
+          } catch (ctxError) {
+            console.error('Error updating context for approval:', ctxError);
+          }
           
         } catch (pdfError: any) {
           console.error('❌ PDF Error:', pdfError);
