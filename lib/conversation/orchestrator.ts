@@ -159,7 +159,7 @@ async function routeToHandler(
   userContext: UserContext
 ): Promise<ConversationResponse> {
   const stateMachine = new ConversationStateMachine(context);
-  const currentState = stateMachine.getState();
+  let currentState = stateMachine.getState();
 
   // 🔍 DEBUG: Log the routing decision
   console.log('🔍 RouteToHandler:', {
@@ -167,6 +167,20 @@ async function routeToHandler(
     contextCurrentState: context.currentState,
     intentType: intent.type,
   });
+
+  // 🆕 אם המשתמש ב-state idle אבל צריך onboarding - שנה state אוטומטית
+  if (currentState === "idle") {
+    // בדוק אם המשתמש צריך onboarding (אין לו full_name ב-users)
+    const needsOnboarding = await checkIfUserNeedsOnboarding(userContext.userId);
+    if (needsOnboarding) {
+      console.log('🔄 User needs onboarding, switching to onboarding_personal');
+      currentState = "onboarding_personal";
+      // עדכן את ה-context
+      await updateContext(userContext.userId, {
+        currentState: "onboarding_personal",
+      });
+    }
+  }
 
   // Handle special intents first (can override state)
   switch (intent.type) {
@@ -703,6 +717,36 @@ async function buildUserContext(userId: string): Promise<UserContext> {
 async function getRecentMessages(userId: string, limit: number): Promise<Message[]> {
   // TODO: Get from database
   return [];
+}
+
+/**
+ * Check if user needs onboarding (no full_name in users table)
+ */
+async function checkIfUserNeedsOnboarding(userId: string): Promise<boolean> {
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const supabase = createServiceClient();
+    
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("full_name, age")
+      .eq("id", userId)
+      .single();
+    
+    if (error || !user) {
+      console.log(`🔍 checkIfUserNeedsOnboarding: User not found or error: ${error?.message}`);
+      return true; // If can't find user, assume needs onboarding
+    }
+    
+    // User needs onboarding if no full_name
+    const needsOnboarding = !user.full_name;
+    console.log(`🔍 checkIfUserNeedsOnboarding: ${userId} - full_name: ${user.full_name}, needsOnboarding: ${needsOnboarding}`);
+    
+    return needsOnboarding;
+  } catch (error) {
+    console.error("checkIfUserNeedsOnboarding error:", error);
+    return false;
+  }
 }
 
 export default {
