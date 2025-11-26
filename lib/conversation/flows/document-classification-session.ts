@@ -41,6 +41,8 @@ export interface ClassificationSession {
   batchId: string;
   incomeToClassify: TransactionToClassify[];
   expensesToClassify: TransactionToClassify[];
+  alreadyClassifiedIncome: TransactionToClassify[];  // הכנסות שכבר מסווגות
+  alreadyClassifiedExpenses: TransactionToClassify[];  // הוצאות שכבר מסווגות
   currentPhase: 'income' | 'expenses' | 'request_documents' | 'done';
   currentIndex: number;
   questionsAskedInBatch: number;  // מונה שאלות ב-batch הנוכחי (reset אחרי 2-3)
@@ -86,13 +88,22 @@ export function createClassificationSession(
   totalExpenses: number,
   missingDocs?: any[]  // מה-AI response
 ): ClassificationSession {
-  // הפרדה לפי סוג
+  // הפרדה לפי סוג - תנועות שצריך לסווג (אין קטגוריה)
   const incomeToClassify = transactions
     .filter(tx => tx.type === 'income' && !tx.currentCategory)
     .sort((a, b) => b.amount - a.amount);  // מהגדול לקטן
   
   const expensesToClassify = transactions
     .filter(tx => tx.type === 'expense' && !tx.currentCategory)
+    .sort((a, b) => b.amount - a.amount);
+
+  // תנועות שכבר מסווגות (יש קטגוריה)
+  const alreadyClassifiedIncome = transactions
+    .filter(tx => tx.type === 'income' && tx.currentCategory)
+    .sort((a, b) => b.amount - a.amount);
+  
+  const alreadyClassifiedExpenses = transactions
+    .filter(tx => tx.type === 'expense' && tx.currentCategory)
     .sort((a, b) => b.amount - a.amount);
 
   // המרת missing_documents לפורמט שלנו
@@ -103,7 +114,9 @@ export function createClassificationSession(
     batchId,
     incomeToClassify,
     expensesToClassify,
-    currentPhase: incomeToClassify.length > 0 ? 'income' : 'expenses',
+    alreadyClassifiedIncome,
+    alreadyClassifiedExpenses,
+    currentPhase: incomeToClassify.length > 0 ? 'income' : (expensesToClassify.length > 0 ? 'expenses' : 'done'),
     currentIndex: 0,
     questionsAskedInBatch: 0,
     totalClassified: 0,
@@ -201,27 +214,85 @@ export async function clearClassificationSession(userId: string): Promise<void> 
  * הודעת פתיחה אחרי זיהוי PDF
  */
 export function getInitialMessage(session: ClassificationSession): string {
-  const totalTransactions = session.incomeToClassify.length + session.expensesToClassify.length;
-  const totalAll = session.totalIncome + session.totalExpenses;
+  const toClassifyCount = session.incomeToClassify.length + session.expensesToClassify.length;
+  const totalTransactions = toClassifyCount + 
+    session.alreadyClassifiedIncome.length + 
+    session.alreadyClassifiedExpenses.length;
   
-  if (totalTransactions === 0) {
-    return `מעולה! זיהיתי את כל התנועות אוטומטית! 🎉
-
-💚 הכנסות: ${session.totalIncome.toLocaleString('he-IL')} ₪
-💸 הוצאות: ${session.totalExpenses.toLocaleString('he-IL')} ₪
-
-הכל מסווג - רוצה לראות סיכום?`;
+  if (toClassifyCount === 0) {
+    let message = `מעולה! זיהיתי ${totalTransactions} תנועות - כולן כבר מסווגות! 🎉\n\n`;
+    message += `💚 הכנסות: ${session.totalIncome.toLocaleString('he-IL')} ₪\n`;
+    message += `💸 הוצאות: ${session.totalExpenses.toLocaleString('he-IL')} ₪\n`;
+    message += `📊 מאזן: ${(session.totalIncome - session.totalExpenses).toLocaleString('he-IL')} ₪\n\n`;
+    
+    // הצג דוגמאות של מה שסווג
+    if (session.alreadyClassifiedIncome.length > 0 || session.alreadyClassifiedExpenses.length > 0) {
+      message += `🔍 דוגמאות לסיווג אוטומטי:\n`;
+      
+      const topIncome = session.alreadyClassifiedIncome.slice(0, 2);
+      topIncome.forEach(tx => {
+        message += `  ✅ ${tx.vendor} (${tx.amount.toLocaleString('he-IL')} ₪) → ${tx.currentCategory}\n`;
+      });
+      
+      const topExpenses = session.alreadyClassifiedExpenses.slice(0, 2);
+      topExpenses.forEach(tx => {
+        message += `  ✅ ${tx.vendor} (${tx.amount.toLocaleString('he-IL')} ₪) → ${tx.currentCategory}\n`;
+      });
+      
+      message += `\nהסיווג נכון? כתוב "כן" להמשיך או "תקן" אם יש טעות.`;
+    }
+    
+    return message;
   }
 
-  let message = `זיהיתי ${totalAll} תנועות! 📊
-
-💚 הכנסות: ${session.incomeToClassify.length > 0 ? `${session.incomeToClassify.length} לסיווג` : 'מסווגות ✓'}
-💸 הוצאות: ${session.expensesToClassify.length > 0 ? `${session.expensesToClassify.length} לסיווג` : 'מסווגות ✓'}
-
-יש לי כמה שאלות קצרות כדי להבין את התנועות.
-${totalTransactions <= 5 ? 'זה ייקח דקה!' : 'נעשה את זה ביחד, בקצב שלך 😊'}
-
-נתחיל?`;
+  // הצגת סיכום עם מספר התנועות
+  let message = `📊 זיהיתי ${totalTransactions} תנועות!\n\n`;
+  
+  // הכנסות
+  const incomeClassified = session.alreadyClassifiedIncome.length;
+  message += `💚 הכנסות: ${session.totalIncome.toLocaleString('he-IL')} ₪`;
+  if (incomeClassified > 0 && session.incomeToClassify.length > 0) {
+    message += ` (${incomeClassified} מסווגות, ${session.incomeToClassify.length} לסיווג)`;
+  } else if (session.incomeToClassify.length > 0) {
+    message += ` (${session.incomeToClassify.length} לסיווג)`;
+  } else {
+    message += ` ✓`;
+  }
+  message += `\n`;
+  
+  // הוצאות
+  const expensesClassified = session.alreadyClassifiedExpenses.length;
+  message += `💸 הוצאות: ${session.totalExpenses.toLocaleString('he-IL')} ₪`;
+  if (expensesClassified > 0 && session.expensesToClassify.length > 0) {
+    message += ` (${expensesClassified} מסווגות, ${session.expensesToClassify.length} לסיווג)`;
+  } else if (session.expensesToClassify.length > 0) {
+    message += ` (${session.expensesToClassify.length} לסיווג)`;
+  } else {
+    message += ` ✓`;
+  }
+  message += `\n\n`;
+  
+  // הצג דוגמאות של מה שסווג אוטומטית
+  if (incomeClassified > 0 || expensesClassified > 0) {
+    message += `🔍 סיווג אוטומטי (דוגמאות):\n`;
+    
+    const topIncome = session.alreadyClassifiedIncome.slice(0, 2);
+    topIncome.forEach(tx => {
+      message += `  ✅ ${tx.vendor} → ${tx.currentCategory}\n`;
+    });
+    
+    const topExpenses = session.alreadyClassifiedExpenses.slice(0, 2);
+    topExpenses.forEach(tx => {
+      message += `  ✅ ${tx.vendor} → ${tx.currentCategory}\n`;
+    });
+    message += `\n`;
+  }
+  
+  if (toClassifyCount > 0) {
+    message += `יש לי ${toClassifyCount} שאלות על תנועות שלא הצלחתי לזהות.\n`;
+    message += toClassifyCount <= 5 ? 'זה ייקח דקה!' : 'נעשה את זה ביחד, בקצב שלך 😊';
+    message += `\n\nנתחיל?`;
+  }
 
   return message;
 }
