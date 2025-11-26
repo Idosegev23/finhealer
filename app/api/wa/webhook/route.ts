@@ -188,6 +188,7 @@ export async function POST(request: NextRequest) {
       // טען את ה-context לבדוק אם יש תנועות ממתינות
       const { loadContext } = await import('@/lib/conversation/context-manager');
       const currentContext = await loadContext(userData.id);
+      
       const hasPendingApproval = currentContext?.ongoingTask === 'transaction_approval';
       
       if (hasPendingApproval && (isApproval || isCancellation || isCorrectionRequest)) {
@@ -692,9 +693,56 @@ export async function POST(request: NextRequest) {
       const isPDF = fileName.toLowerCase().endsWith('.pdf');
       
       if (isPDF) {
+        // 🆕 זיהוי חכם של סוג המסמך לפי ה-state וה-context
+        const { loadContext } = await import('@/lib/conversation/context-manager');
+        const currentContext = await loadContext(userData.id);
+        const currentState = currentContext?.currentState;
+        const explicitDocType = currentContext?.waitingForDocument;
+        
+        // 🎯 זיהוי סוג מסמך לפי:
+        // 1. סוג מסמך שהוגדר במפורש ב-context (waitingForDocument)
+        // 2. ה-state הנוכחי של המשתמש
+        // 3. ניסיון זיהוי מהשם של הקובץ
+        let documentType = 'bank'; // ברירת מחדל
+        let documentTypeHebrew = 'דוח בנק';
+        
+        const lowerFileName = fileName.toLowerCase();
+        
+        if (explicitDocType && explicitDocType !== 'pending_type_selection') {
+          // סוג מסמך הוגדר במפורש
+          documentType = explicitDocType;
+        } else if (currentState === 'onboarding_income' || currentState === 'data_collection') {
+          // ב-onboarding - הבוט ביקש דוח בנק
+          documentType = 'bank';
+          documentTypeHebrew = 'דוח בנק';
+        } else if (lowerFileName.includes('אשראי') || lowerFileName.includes('credit') || lowerFileName.includes('ויזה') || lowerFileName.includes('כאל') || lowerFileName.includes('מקס') || lowerFileName.includes('visa') || lowerFileName.includes('mastercard')) {
+          documentType = 'credit';
+          documentTypeHebrew = 'דוח אשראי';
+        } else if (lowerFileName.includes('בנק') || lowerFileName.includes('bank') || lowerFileName.includes('עוש') || lowerFileName.includes('תנועות')) {
+          documentType = 'bank';
+          documentTypeHebrew = 'דוח בנק';
+        } else if (lowerFileName.includes('תלוש') || lowerFileName.includes('משכורת') || lowerFileName.includes('שכר') || lowerFileName.includes('payslip')) {
+          documentType = 'payslip';
+          documentTypeHebrew = 'תלוש משכורת';
+        } else if (lowerFileName.includes('הלוואה') || lowerFileName.includes('loan')) {
+          documentType = 'loan';
+          documentTypeHebrew = 'דוח הלוואות';
+        } else if (lowerFileName.includes('משכנתא') || lowerFileName.includes('mortgage')) {
+          documentType = 'mortgage';
+          documentTypeHebrew = 'דוח משכנתא';
+        } else if (lowerFileName.includes('פנסיה') || lowerFileName.includes('מסלקה') || lowerFileName.includes('pension')) {
+          documentType = 'pension';
+          documentTypeHebrew = 'דוח פנסיה';
+        } else if (lowerFileName.includes('ביטוח') || lowerFileName.includes('insurance')) {
+          documentType = 'insurance';
+          documentTypeHebrew = 'דוח ביטוחים';
+        }
+        
+        console.log(`📋 Document type detected: ${documentType} (state: ${currentState}, fileName: ${fileName})`);
+        
         await greenAPI.sendMessage({
           phoneNumber,
-          message: 'קיבלתי את המסמך! 📄\n\nאני מנתח אותו עם AI...',
+          message: `📄 קיבלתי ${documentTypeHebrew}!\n\n📊 מנתח את המסמך עם AI... זה יכול לקחת כמה שניות ⏳`,
         });
         
         try {
@@ -703,9 +751,9 @@ export async function POST(request: NextRequest) {
           const pdfBuffer = await pdfResponse.arrayBuffer();
           const buffer = Buffer.from(pdfBuffer);
           
-          console.log('🤖 Starting PDF analysis with OpenAI Files API...');
+          console.log(`🤖 Starting PDF analysis (type: ${documentType}) with OpenAI Files API...`);
           
-          // 🆕 שימוש ב-Files API (כמו ב-scan-center)
+          // העלאה ל-Files API
           const fs = require('fs').promises;
           const tempFilePath = `/tmp/${Date.now()}-${fileName}`;
           await fs.writeFile(tempFilePath, buffer);
@@ -718,29 +766,31 @@ export async function POST(request: NextRequest) {
             });
             console.log(`✅ PDF uploaded to OpenAI Files API: ${fileUpload.id}`);
           } finally {
-            // Clean up temp file
             await fs.unlink(tempFilePath).catch(() => {});
           }
           
-          const prompt = `${EXPENSE_CATEGORIES_SYSTEM_PROMPT}
-
-**פורמט החזרה:**
-{
-  "document_type": "receipt | bank_statement | credit_statement",
-  "transactions": [
-    {
-      "amount": <number>,
-      "vendor": "שם העסק",
-      "date": "YYYY-MM-DD",
-      "expense_category": "הקטגוריה המדויקת",
-      "expense_type": "fixed | variable | special",
-      "description": "תיאור",
-      "confidence": <0.0-1.0>
-    }
-  ]
-}
-
-נתח את דוח הבנק/אשראי הזה וחלץ את כל התנועות. שים לב מיוחד לתאריכים! החזר תשובה בפורמט JSON.`;
+          // 🆕 טען קטגוריות ובחר את הפרומפט המתאים לסוג המסמך
+          const { getPromptForDocumentType } = await import('@/lib/ai/document-prompts');
+          let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
+          
+          if (documentType === 'credit' || documentType === 'bank') {
+            const { data: categories } = await supabase
+              .from('expense_categories')
+              .select('name, expense_type, category_group')
+              .eq('is_active', true);
+            expenseCategories = categories || [];
+            console.log(`📋 Loaded ${expenseCategories.length} expense categories`);
+          }
+          
+          const prompt = getPromptForDocumentType(
+            documentType === 'credit' ? 'credit_statement' : 
+            documentType === 'bank' ? 'bank_statement' : 
+            documentType,
+            null, // text - null כי אנחנו שולחים את הקובץ ישירות
+            expenseCategories
+          );
+          
+          console.log(`📝 Using prompt for document type: ${documentType} (${prompt.length} chars)`);
 
           // 🆕 נסה GPT-5.1 קודם, אח"כ GPT-4o
           let content = '';
@@ -759,7 +809,7 @@ export async function POST(request: NextRequest) {
               ],
               reasoning: { effort: 'low' },
               text: { verbosity: 'low' },
-              max_output_tokens: 16000
+              max_output_tokens: 32000
             });
             content = gpt51Response.output_text || '{}';
             console.log('✅ GPT-5.1 succeeded');
@@ -784,9 +834,13 @@ export async function POST(request: NextRequest) {
             console.log('✅ GPT-4o succeeded');
           }
           
-          // Clean up uploaded file from OpenAI
+          // Clean up uploaded file from OpenAI + context
           try {
             await openai.files.del(fileUpload.id);
+            await updateContext(userData.id, {
+              waitingForDocument: undefined,
+              taskProgress: undefined,
+            } as any);
           } catch (e) {
             // Ignore cleanup errors
           }
