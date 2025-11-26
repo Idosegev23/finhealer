@@ -119,16 +119,27 @@ export async function updateContext(
 ): Promise<ConversationContext> {
   const existing = await loadContext(userId);
   
-  if (!existing) {
-    // Create new context if none exists
-    return await createContext(userId);
-  }
+  // 🔧 תיקון: גם אם אין context קיים, יישם את ה-updates
+  const base: ConversationContext = existing || {
+    userId,
+    currentState: "idle",
+    lastInteraction: new Date(),
+    pendingQuestions: [],
+  };
 
   const updated: ConversationContext = {
-    ...existing,
+    ...base,
     ...updates,
     lastInteraction: new Date(),
   };
+
+  // 🆕 העתק גם metadata אם יש
+  if ((updates as any).metadata) {
+    (updated as any).metadata = {
+      ...(base as any).metadata,
+      ...(updates as any).metadata,
+    };
+  }
 
   await saveContext(updated);
   return updated;
