@@ -101,16 +101,24 @@ export async function POST(request: NextRequest) {
       }
       
       phoneNumber = cleanPhone;
+      console.log(`🔍 Looking for user with phone: ${phoneNumber}`);
 
       // נסה למצוא משתמש לפי טלפון (לשמירת ההודעה)
-      const { data: user } = await supabase
+      const { data: user, error: userError } = await supabase
         .from('users')
         .select('id')
         .eq('phone', phoneNumber)
         .single();
 
+      if (userError) {
+        console.log(`⚠️ User lookup error: ${userError.message}`);
+      }
+
       if (user) {
         targetUserId = user.id;
+        console.log(`✅ Found user: ${targetUserId}`);
+      } else {
+        console.log(`❌ No user found for phone: ${phoneNumber}`);
       }
     }
 
@@ -155,18 +163,22 @@ export async function POST(request: NextRequest) {
       // 🆕 יצירת/עדכון context ל-onboarding
       if (isOnboarding) {
         try {
-          console.log(`📝 Creating onboarding context for user: ${targetUserId}`);
-          await updateContext(targetUserId, {
+          console.log(`📝 Creating onboarding context for user: ${targetUserId}, isOnboarding: ${isOnboarding}`);
+          const updatedContext = await updateContext(targetUserId, {
             currentState: 'onboarding_personal',
             lastInteraction: new Date(),
             pendingQuestions: [],
           });
-          console.log(`✅ Onboarding context created for user: ${targetUserId}`);
-        } catch (ctxError) {
-          console.error('❌ Error creating onboarding context:', ctxError);
+          console.log(`✅ Onboarding context created for user: ${targetUserId}, state: ${updatedContext.currentState}`);
+        } catch (ctxError: any) {
+          console.error('❌ Error creating onboarding context:', ctxError?.message || ctxError);
           // Don't fail the request if context creation fails
         }
+      } else {
+        console.log(`ℹ️ Not an onboarding message, skipping context creation`);
       }
+    } else {
+      console.log(`⚠️ No targetUserId, cannot save message or create context`);
     }
 
     return NextResponse.json({
