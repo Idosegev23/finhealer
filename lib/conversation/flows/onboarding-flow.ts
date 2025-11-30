@@ -7,9 +7,134 @@
  * עקרון מפתח:
  * ❌ לא: שאלות יבשות וקצרות
  * ✅ כן: שיחה חמה שמסבירה ומעודדת
+ * 
+ * 🆕 שימוש ב-AI לפרסור חכם של תשובות!
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { chatWithGPT5Fast } from '@/lib/ai/gpt5-client';
+
+// ============================================================================
+// AI-Powered Parser - פרסור חכם עם AI
+// ============================================================================
+
+interface ParsedOnboardingData {
+  age?: number;
+  marital_status?: 'single' | 'married' | 'divorced' | 'widowed';
+  children_count?: number;
+  employment_status?: 'employee' | 'self_employed' | 'both';
+  name?: string;
+}
+
+/**
+ * 🆕 פרסור חכם עם AI - מבין כל צורת תשובה!
+ * 
+ * דוגמאות:
+ * - "בן 39 נשוי פלוס 3" → { age: 39, marital_status: 'married', children_count: 3 }
+ * - "אני בת 28, רווקה" → { age: 28, marital_status: 'single' }
+ * - "45 גרוש עם שני ילדים" → { age: 45, marital_status: 'divorced', children_count: 2 }
+ */
+async function parseOnboardingWithAI(
+  message: string, 
+  currentContext: { waitingFor: string; existingData: Partial<ParsedOnboardingData> }
+): Promise<ParsedOnboardingData> {
+  const systemPrompt = `אתה מפרסר תשובות של משתמש ישראלי בתהליך אונבורדינג פיננסי.
+
+המשתמש יכול לענות בכל צורה - המשימה שלך לחלץ את המידע.
+
+חלץ רק את השדות הרלוונטיים מהתשובה:
+- age: גיל (מספר בין 18-120)
+- marital_status: מצב משפחתי (single/married/divorced/widowed)
+- children_count: מספר ילדים (0-15)
+- employment_status: תעסוקה (employee/self_employed/both)
+- name: שם מלא (אם נאמר)
+
+מיפוי מצב משפחתי:
+- רווק/רווקה/סינגל → single
+- נשוי/נשואה/נשואים → married  
+- גרוש/גרושה → divorced
+- אלמן/אלמנה → widowed
+
+מיפוי תעסוקה:
+- שכיר/עובד/employee → employee
+- עצמאי/פרילנסר/עסק → self_employed
+- משולב/גם וגם/שניהם → both
+
+מיפוי ילדים:
+- "פלוס 3" / "עם 3" / "ועוד 3" / "3 ילדים" / "שלושה" → 3
+- "אין ילדים" / "בלי" / "0" → 0
+
+החזר JSON בלבד, ללא טקסט נוסף.
+אם לא הצלחת לזהות שדה - אל תכלול אותו.
+
+דוגמאות:
+"בן 39 נשוי פלוס 3" → {"age":39,"marital_status":"married","children_count":3}
+"אני בת 28 רווקה" → {"age":28,"marital_status":"single"}
+"גרוש, שני ילדים, עצמאי" → {"marital_status":"divorced","children_count":2,"employment_status":"self_employed"}
+"45" → {"age":45}
+"עצמאי" → {"employment_status":"self_employed"}`;
+
+  const userPrompt = `הקונטקסט: ממתין ל-${currentContext.waitingFor}
+נתונים קיימים: ${JSON.stringify(currentContext.existingData)}
+
+תשובת המשתמש: "${message}"
+
+חלץ את המידע והחזר JSON:`;
+
+  try {
+    const response = await chatWithGPT5Fast(
+      userPrompt,
+      systemPrompt,
+      { userId: 'system', userName: 'Parser', phoneNumber: '' }
+    );
+    
+    // נקה את התשובה מכל טקסט שאינו JSON
+    const jsonMatch = response.match(/\{[^}]+\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('[AI Parser] Parsed:', parsed);
+      return parsed;
+    }
+    
+    return {};
+  } catch (error) {
+    console.error('[AI Parser] Error:', error);
+    // fallback לפרסור רגיל אם AI נכשל
+    return fallbackParse(message);
+  }
+}
+
+/**
+ * Fallback parser - אם AI לא זמין
+ */
+function fallbackParse(message: string): ParsedOnboardingData {
+  const result: ParsedOnboardingData = {};
+  const lower = message.toLowerCase();
+  
+  // גיל
+  const ageMatch = message.match(/\d+/);
+  if (ageMatch) {
+    const age = parseInt(ageMatch[0]);
+    if (age >= 18 && age <= 120) result.age = age;
+  }
+  
+  // מצב משפחתי
+  if (lower.includes('רווק') || lower.includes('single')) result.marital_status = 'single';
+  else if (lower.includes('נשוי') || lower.includes('נשואה')) result.marital_status = 'married';
+  else if (lower.includes('גרוש') || lower.includes('גרושה')) result.marital_status = 'divorced';
+  else if (lower.includes('אלמן') || lower.includes('אלמנה')) result.marital_status = 'widowed';
+  
+  // ילדים
+  const childMatch = lower.match(/(פלוס|עם|\+|ועוד)\s*(\d+)/);
+  if (childMatch) result.children_count = parseInt(childMatch[2]);
+  
+  // תעסוקה
+  if (lower.includes('משולב') || lower.includes('גם וגם')) result.employment_status = 'both';
+  else if (lower.includes('שכיר') || lower.includes('עובד')) result.employment_status = 'employee';
+  else if (lower.includes('עצמאי') || lower.includes('פרילנס')) result.employment_status = 'self_employed';
+  
+  return result;
+}
 
 interface OnboardingContext {
   userId: string;
@@ -92,22 +217,225 @@ export async function handleOnboardingPersonal(
     return {
       response: `נעים מאוד ${data.full_name}! 🤝
 
-עכשיו, אני צריך לדעת כמה אתה בן/בת - 
-זה עוזר לי להתאים את העצות שלי לשלב החיים שלך.
+עכשיו ספר לי קצת על עצמך -
+גיל, מצב משפחתי, ואם יש ילדים.
 
-(למשל, מי שבן 25 ומי שבן 50 מתמודדים עם אתגרים פיננסיים שונים לגמרי!)
+💡 אתה יכול לכתוב הכל במשפט אחד, למשל:
+"בן 35, נשוי, 2 ילדים"
+או לענות בנפרד - מה שנוח לך!
 
-אז... בן/בת כמה אתה?`,
-      nextStep: 'collect_age',
+אז... ספר לי 😊`,
+      nextStep: 'collect_personal_info',
       completed: false,
     };
   }
+  
+  // 🆕 שלב 1.2: פרסור חכם עם AI - מבין כל תשובה!
+  // המשתמש יכול לכתוב "בן 39 נשוי פלוס 3" או לענות בנפרד
+  
+  // בדוק מה עדיין חסר
+  const missingFields: string[] = [];
+  if (!data.age) missingFields.push('age');
+  if (!data.marital_status) missingFields.push('marital_status');
+  if (data.children_count === undefined && data.marital_status && data.marital_status !== 'single') {
+    missingFields.push('children_count');
+  }
+  if (!data.employment_status) missingFields.push('employment_status');
+  
+  // 🆕 שלח ל-AI לפרסר
+  const parsed = await parseOnboardingWithAI(message, {
+    waitingFor: missingFields.join(', ') || 'any',
+    existingData: {
+      age: data.age,
+      marital_status: data.marital_status,
+      children_count: data.children_count,
+      employment_status: data.employment_status,
+    }
+  });
+  
+  // עדכן את הנתונים
+  if (parsed.age) data.age = parsed.age;
+  if (parsed.marital_status) data.marital_status = parsed.marital_status;
+  if (parsed.children_count !== undefined) data.children_count = parsed.children_count;
+  if (parsed.employment_status) data.employment_status = parsed.employment_status;
+  
+  // אם יש מצב משפחתי "רווק" - אין ילדים (בד"כ)
+  if (data.marital_status === 'single' && data.children_count === undefined) {
+    data.children_count = 0;
+  }
+  
+  // בדוק מה עדיין חסר אחרי הפרסור
+  const stillMissing: string[] = [];
+  if (!data.age) stillMissing.push('גיל');
+  if (!data.marital_status) stillMissing.push('מצב משפחתי');
+  if (data.children_count === undefined && data.marital_status && data.marital_status !== 'single') {
+    stillMissing.push('מספר ילדים');
+  }
+  if (!data.employment_status) stillMissing.push('סוג תעסוקה');
+  
+  // אם חסר משהו - שאל
+  if (stillMissing.length > 0) {
+    // בנה תגובה מותאמת
+    let response = '';
+    let gotSomething = parsed.age || parsed.marital_status || parsed.children_count !== undefined || parsed.employment_status;
+    
+    if (gotSomething) {
+      response = 'תפסתי! ✅\n\n';
+      if (parsed.age) response += `• גיל: ${parsed.age}\n`;
+      if (parsed.marital_status) response += `• מצב משפחתי: ${formatMaritalStatus(parsed.marital_status)}\n`;
+      if (parsed.children_count !== undefined) response += `• ילדים: ${parsed.children_count}\n`;
+      if (parsed.employment_status) response += `• תעסוקה: ${formatEmployment(parsed.employment_status)}\n`;
+      response += '\n';
+    }
+    
+    // שאל על מה שחסר
+    if (stillMissing.includes('גיל')) {
+      response += 'בן/בת כמה אתה?';
+    } else if (stillMissing.includes('מצב משפחתי')) {
+      response += 'מה המצב המשפחתי שלך? (רווק/נשוי/גרוש/אלמן)';
+    } else if (stillMissing.includes('מספר ילדים')) {
+      response += 'כמה ילדים יש לכם? (מספר או "אין")';
+    } else if (stillMissing.includes('סוג תעסוקה')) {
+      response += 'מה סוג התעסוקה שלך?\n• שכיר\n• עצמאי\n• משולב (גם וגם)';
+    }
+    
+    return {
+      response,
+      nextStep: 'collect_personal_info',
+      completed: false,
+    };
+  }
+  
+  // 🎉 יש את כל המידע! עבור לשלב הבא
+  await savePersonalInfo(context.userId, data);
+  
+  const summary = `מעולה ${data.full_name}! יש לי את כל מה שצריך 🎉
+
+📋 סיכום:
+• גיל: ${data.age}
+• מצב משפחתי: ${formatMaritalStatus(data.marital_status!)}
+${data.children_count && data.children_count > 0 ? `• ילדים: ${data.children_count}\n` : ''}• תעסוקה: ${formatEmployment(data.employment_status!)}
+
+עכשיו מגיע החלק המעניין! 📊
+
+כדי שאוכל לתת לך תמונה מדויקת של המצב הפיננסי שלך,
+אני צריך לראות את התנועות בחשבון הבנק.
+
+📄 מה צריך?
+דוח בנק של 3 החודשים האחרונים
+
+🔒 למה זה בטוח?
+• אני לא שומר את הקובץ
+• אני רק קורא את התנועות
+• המידע שלך מוצפן ומאובטח
+
+📱 איך שולחים?
+פשוט שלח לי את הקובץ פה בWhatsApp!
+(PDF, תמונה, או צילום מסך - מה שנוח לך)
+
+מוכן? שלח לי את הדוח! 🚀`;
+
+  return {
+    response: summary,
+    nextStep: 'collect_documents',
+    completed: false,
+  };
+}
+
+// Helper functions for formatting
+function formatMaritalStatus(status: string): string {
+  const map: Record<string, string> = {
+    single: 'רווק/ה',
+    married: 'נשוי/אה',
+    divorced: 'גרוש/ה',
+    widowed: 'אלמן/ה',
+  };
+  return map[status] || status;
+}
+
+function formatEmployment(status: string): string {
+  const map: Record<string, string> = {
+    employee: 'שכיר',
+    self_employed: 'עצמאי',
+    both: 'משולב',
+  };
+  return map[status] || status;
+}
+
+// ============================================================================
+// Legacy handlers (kept for backwards compatibility)
+// ============================================================================
+
+async function handleOnboardingPersonalLegacy(
+  context: OnboardingContext,
+  message: string
+): Promise<{ response: string; nextStep: string; completed: boolean }> {
+  const data = context.collectedData;
 
   // שלב 1.2: גיל
+  // 🆕 פרסור חכם - המשתמש יכול לכתוב "בן 39 נשוי פלוס 3" בהודעה אחת!
   if (!data.age) {
     const age = extractAge(message);
     if (age && age > 0 && age < 120) {
       data.age = age;
+      
+      // 🆕 בדוק אם יש גם מצב משפחתי באותה הודעה
+      const marital = extractMaritalStatus(message);
+      if (marital) {
+        data.marital_status = marital;
+        
+        // 🆕 בדוק אם יש גם ילדים באותה הודעה
+        const children = extractChildrenFromMessage(message);
+        if (children !== null) {
+          data.children_count = children;
+          
+          // יש גיל + מצב משפחתי + ילדים - דלג לתעסוקה!
+          const childText = children > 0 
+            ? `${children} ילדים - וואו, יש לכם את הידיים מלאות! 👨‍👩‍👧‍👦` 
+            : '';
+          
+          return {
+            response: `תפסתי הכל! ${age}, ${marital === 'married' ? 'נשוי/אה' : marital === 'divorced' ? 'גרוש/ה' : 'אלמן/ה'}${children > 0 ? `, ${childText}` : ''} ✅
+
+עוד שאלה אחרונה! 💼
+
+מה סוג התעסוקה שלך?
+• שכיר
+• עצמאי  
+• משולב (גם וגם)`,
+            nextStep: 'collect_employment',
+            completed: false,
+          };
+        }
+        
+        // יש גיל + מצב משפחתי, אין ילדים - שאל על ילדים
+        if (marital === 'single') {
+          data.children_count = 0;
+          return {
+            response: `תפסתי! ${age}, רווק/ה ✅
+
+עוד שאלה אחרונה! 💼
+
+מה סוג התעסוקה שלך?
+• שכיר
+• עצמאי
+• משולב (גם וגם)`,
+            nextStep: 'collect_employment',
+            completed: false,
+          };
+        }
+        
+        return {
+          response: `תפסתי! ${age}, ${marital === 'married' ? 'נשוי/אה' : marital === 'divorced' ? 'גרוש/ה' : 'אלמן/ה'} ✅
+
+יש לכם ילדים? כמה?
+(פשוט מספר, או "אין")`,
+          nextStep: 'collect_children',
+          completed: false,
+        };
+      }
+      
+      // רק גיל - שאל על מצב משפחתי
       return {
         response: `מעולה! ${age} - גיל מצוין ${age < 30 ? 'להתחיל לבנות הרגלים פיננסיים טובים' : age < 50 ? 'לקחת שליטה על הכסף' : 'לתכנן לטווח ארוך'}! 💪
 
@@ -574,7 +902,7 @@ function extractNumber(text: string): number | null {
 
 /**
  * 🆕 חילוץ מספר ילדים מהודעה מורכבת
- * לדוגמה: "נשוי עם 3 ילדים", "נשואה, 2 ילדים", "גרוש + 1 ילד"
+ * לדוגמה: "נשוי עם 3 ילדים", "נשואה, 2 ילדים", "גרוש + 1 ילד", "נשוי פלוס 3"
  */
 function extractChildrenFromMessage(text: string): number | null {
   const lower = text.toLowerCase();
@@ -585,10 +913,23 @@ function extractChildrenFromMessage(text: string): number | null {
     return parseInt(childrenMatch[1]);
   }
   
-  // חפש דפוסים כמו "עם X" או "+ X"
-  const withMatch = lower.match(/(עם|עימ|\+)\s*(\d+)/);
+  // חפש דפוסים כמו "עם X" או "+ X" או "פלוס X" או "ועוד X"
+  const withMatch = lower.match(/(עם|עימ|\+|פלוס|ועוד|plus)\s*(\d+)/);
   if (withMatch) {
     return parseInt(withMatch[2]);
+  }
+  
+  // אם יש מצב משפחתי (לא רווק) ויש מספר אחרי הגיל הראשון
+  // לדוגמה: "39 נשוי 3" - המספר השני הוא ילדים
+  if (lower.includes('נשוי') || lower.includes('נשואה') || lower.includes('גרוש')) {
+    const numbers = lower.match(/\d+/g);
+    if (numbers && numbers.length >= 2) {
+      const secondNum = parseInt(numbers[1]);
+      // אם המספר השני קטן מ-10, זה כנראה ילדים
+      if (secondNum > 0 && secondNum < 10) {
+        return secondNum;
+      }
+    }
   }
   
   return null;
