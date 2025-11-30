@@ -12,6 +12,22 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// 🆕 Helper functions לפורמט תאריכים לעברית
+const HEBREW_MONTHS = [
+  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+];
+
+function formatHebrewMonth(date: Date): string {
+  return `${HEBREW_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function formatMonthFromYYYYMM(monthStr: string): string {
+  const [year, month] = monthStr.split('-');
+  const monthIndex = parseInt(month) - 1;
+  return `${HEBREW_MONTHS[monthIndex]} ${year}`;
+}
+
 /**
  * GreenAPI Webhook Handler עם AI
  * מקבל הודעות WhatsApp נכנסות (טקסט ותמונות)
@@ -206,8 +222,8 @@ export async function POST(request: NextRequest) {
         if (session) {
           const result = await handleUserResponse(session, text, supabase);
           
-          await greenAPI.sendMessage({
-            phoneNumber,
+      await greenAPI.sendMessage({
+        phoneNumber,
             message: result.message,
           });
           
@@ -828,9 +844,9 @@ export async function POST(request: NextRequest) {
             const gpt51Response = await openai.responses.create({
               model: 'gpt-5.1',
               input: [
-                {
-                  role: 'user',
-                  content: [
+              {
+                role: 'user',
+                content: [
                     { type: 'input_file', file_id: fileUpload.id },
                     { type: 'input_text', text: prompt }
                   ]
@@ -855,7 +871,7 @@ export async function POST(request: NextRequest) {
                   { type: 'text', text: prompt }
                 ]
               }],
-              temperature: 0.1,
+            temperature: 0.1,
               max_tokens: 16384,
               response_format: { type: 'json_object' }
             });
@@ -959,6 +975,51 @@ export async function POST(request: NextRequest) {
           const totalIncome = incomeTransactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
           const totalExpenses = expenseTransactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
           
+          // 🆕 בדיקת תקופה - צריך לפחות 3 חודשים!
+          const { 
+            extractPeriodFromOCR, 
+            getUserPeriodCoverage, 
+            getCoverageMessage,
+            updateDocumentPeriod 
+          } = await import('@/lib/documents/period-tracker');
+          
+          // חילוץ תקופה מה-OCR
+          const { start: periodStart, end: periodEnd } = extractPeriodFromOCR(ocrData);
+          
+          console.log(`📅 Document period: ${periodStart?.toISOString().split('T')[0] || 'unknown'} - ${periodEnd?.toISOString().split('T')[0] || 'unknown'}`);
+          
+          // שמירת תקופה למסמך uploaded_statements אם יש כזה
+          if (periodStart && periodEnd) {
+            // יצירת רשומת מסמך אם לא קיימת
+            const { data: docRecord } = await (supabase as any)
+              .from('uploaded_statements')
+              .insert({
+                user_id: userData.id,
+                file_name: fileName,
+                file_type: documentType === 'credit' ? 'credit_statement' : 'bank_statement',
+                document_type: documentType,
+                status: 'completed',
+                period_start: periodStart.toISOString().split('T')[0],
+                period_end: periodEnd.toISOString().split('T')[0],
+                transactions_extracted: allTransactions.length,
+              })
+              .select('id')
+              .single();
+            
+            if (docRecord?.id) {
+              // עדכון תנועות עם document_id
+              await (supabase as any)
+                .from('transactions')
+                .update({ document_id: docRecord.id })
+                .eq('batch_id', pendingBatchId);
+            }
+          }
+          
+          // בדיקת כיסוי תקופות - האם יש 3 חודשים?
+          const periodCoverage = await getUserPeriodCoverage(userData.id);
+          
+          console.log(`📊 Period coverage: ${periodCoverage.totalMonths} months, missing: ${periodCoverage.missingMonths.join(', ')}`);
+          
           // 🆕 Import classification session manager
           const { 
             createClassificationSession, 
@@ -991,17 +1052,90 @@ export async function POST(request: NextRequest) {
           // שמירת ה-session
           await saveClassificationSession(userData.id, session);
           
-          // הודעת פתיחה
-          const initialMessage = getInitialMessage(session);
+          // 🆕 בניית הודעה משולבת - כוללת סיכום + מסמכים חסרים
+          let combinedMessage = '';
+          
+          // קודם מראים מה נמצא בדוח הזה
+          combinedMessage += `📊 *דוח ${documentType === 'credit' ? 'אשראי' : 'בנק'} עובד בהצלחה!*\n\n`;
+          combinedMessage += `📅 תקופה: ${periodStart ? formatHebrewMonth(periodStart) : '?'} - ${periodEnd ? formatHebrewMonth(periodEnd) : '?'}\n`;
+          combinedMessage += `📝 תנועות: ${allTransactions.length}\n`;
+          combinedMessage += `💚 הכנסות: ${totalIncome.toLocaleString('he-IL')} ₪\n`;
+          combinedMessage += `💸 הוצאות: ${totalExpenses.toLocaleString('he-IL')} ₪\n\n`;
+          
+          // 🆕 הצגת מסמכים חסרים שזוהו מהדוח
+          const missingDocs = ocrData.missing_documents || [];
+          if (missingDocs.length > 0) {
+            combinedMessage += `📋 *זיהיתי מסמכים שיעזרו להשלים את התמונה:*\n\n`;
+            
+            // קיבוץ לפי סוג
+            const byType: Record<string, any[]> = {};
+            for (const doc of missingDocs) {
+              const type = doc.type || 'other';
+              if (!byType[type]) byType[type] = [];
+              byType[type].push(doc);
+            }
+            
+            const typeLabels: Record<string, { icon: string; name: string; why: string }> = {
+              credit: { icon: '💳', name: 'דוח אשראי', why: 'לראות פירוט הוצאות' },
+              payslip: { icon: '💼', name: 'תלוש משכורת', why: 'לראות פנסיה, קה"ש, ניכויים' },
+              mortgage: { icon: '🏠', name: 'דוח משכנתא', why: 'לראות יתרה, קרן וריבית' },
+              loan: { icon: '🏦', name: 'דוח הלוואות', why: 'לראות פירוט כל ההלוואות' },
+              insurance: { icon: '🛡️', name: 'פוליסת ביטוח', why: 'לראות כיסויים ותנאים' },
+              pension: { icon: '👴', name: 'דוח פנסיה', why: 'לראות יתרה ודמי ניהול' },
+              savings: { icon: '💰', name: 'דוח חיסכון', why: 'לראות יתרות ותשואות' },
+            };
+            
+            for (const [type, docs] of Object.entries(byType)) {
+              const label = typeLabels[type] || { icon: '📄', name: type, why: '' };
+              if (docs.length === 1) {
+                const doc = docs[0];
+                combinedMessage += `${label.icon} *${label.name}*`;
+                if (doc.card_last_4) combinedMessage += ` (****${doc.card_last_4})`;
+                if (doc.employer) combinedMessage += ` - ${doc.employer}`;
+                if (doc.provider) combinedMessage += ` - ${doc.provider}`;
+                combinedMessage += `\n   ${label.why}\n`;
+              } else {
+                combinedMessage += `${label.icon} *${docs.length} ${label.name}*\n   ${label.why}\n`;
+              }
+            }
+            
+            combinedMessage += `\n💡 *למה זה חשוב?*\n`;
+            combinedMessage += `כשאני רואה משכורת בבנק, התלוש מראה לי כמה הולך לפנסיה.\n`;
+            combinedMessage += `כשאני רואה חיוב אשראי, הדוח מראה לי על מה בדיוק הוצאת.\n`;
+            combinedMessage += `ככה אני בונה לך תמונה מלאה! 📊\n\n`;
+          }
+          
+          // בדיקה אם יש מספיק חודשים
+          if (!periodCoverage.hasMinimumCoverage) {
+            combinedMessage += `⚠️ *עוד משהו:* צריך לפחות 3 חודשים של נתונים.\n`;
+            combinedMessage += `יש לי: ${periodCoverage.totalMonths} ${periodCoverage.totalMonths === 1 ? 'חודש' : 'חודשים'}\n`;
+            
+            if (periodCoverage.missingMonths.length > 0) {
+              combinedMessage += `חסר: ${periodCoverage.missingMonths.map(formatMonthFromYYYYMM).join(', ')}\n\n`;
+            }
+          } else {
+            combinedMessage += `✅ יש לי ${periodCoverage.totalMonths} חודשים - מעולה!\n\n`;
+          }
+          
+          // הצעה להמשיך
+          if (missingDocs.length > 0) {
+            combinedMessage += `🎯 *מה עכשיו?*\n`;
+            combinedMessage += `שלח לי עוד מסמכים (בכל סדר שנוח לך) או כתוב "נמשיך" אם אין לך כרגע.\n`;
+          } else if (periodCoverage.hasMinimumCoverage) {
+            // עכשיו ניתן להמשיך לסיווג
+            const initialMessage = getInitialMessage(session);
+            combinedMessage += initialMessage;
+          }
+          
           await greenAPI.sendMessage({
             phoneNumber,
-            message: initialMessage,
+            message: combinedMessage,
           });
           
-          // אם יש תנועות לסיווג, נשלח גם את השאלה הראשונה
-          if (session.incomeToClassify.length > 0 || session.expensesToClassify.length > 0) {
-            // קטן timeout לחוויה יותר טבעית
-            await new Promise(resolve => setTimeout(resolve, 1000));
+          // אם יש מספיק נתונים ויש תנועות לסיווג, נשלח את השאלה הראשונה
+          if (periodCoverage.hasMinimumCoverage && 
+              (session.incomeToClassify.length > 0 || session.expensesToClassify.length > 0)) {
+            await new Promise(resolve => setTimeout(resolve, 1500));
             
             const firstBatch = getNextQuestionBatch(session);
             if (!firstBatch.done) {
@@ -1009,12 +1143,35 @@ export async function POST(request: NextRequest) {
                 phoneNumber,
                 message: firstBatch.message,
               });
-              // עדכון ה-session עם pendingQuestions
               await saveClassificationSession(userData.id, session);
             }
           }
           
-          console.log(`✅ Classification session created: ${session.incomeToClassify.length} income, ${session.expensesToClassify.length} expenses to classify, ${session.missingDocuments.length} missing docs`)
+          // 🆕 שמירת מסמכים חסרים ב-DB לבקשה עתידית
+          if (ocrData.missing_documents && ocrData.missing_documents.length > 0) {
+            for (const missingDoc of ocrData.missing_documents) {
+              await (supabase as any)
+                .from('missing_documents')
+                .upsert({
+                  user_id: userData.id,
+                  document_type: missingDoc.type,
+                  card_last_4: missingDoc.card_last_4 || null,
+                  period_start: missingDoc.period_start || null,
+                  period_end: missingDoc.period_end || null,
+                  expected_amount: missingDoc.charge_amount || missingDoc.salary_amount || missingDoc.payment_amount || null,
+                  description: missingDoc.description || null,
+                  status: 'pending',
+                  priority: missingDoc.type === 'credit' ? 10 : (missingDoc.type === 'payslip' ? 5 : 1),
+                }, {
+                  onConflict: 'user_id,document_type,card_last_4',
+                  ignoreDuplicates: true,
+                });
+            }
+            
+            console.log(`📋 Saved ${ocrData.missing_documents.length} missing documents requests`);
+          }
+          
+          console.log(`✅ Document processed: ${allTransactions.length} transactions, coverage: ${periodCoverage.totalMonths} months`)
           
         } catch (pdfError: any) {
           console.error('❌ PDF Error:', pdfError);
