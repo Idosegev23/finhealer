@@ -724,13 +724,13 @@ function getCategoryEmoji(category: string): string {
 /**
  * קבלת batch הבא של שאלות (2-3 שאלות)
  */
-export function getNextQuestionBatch(session: ClassificationSession): {
+export async function getNextQuestionBatch(session: ClassificationSession): Promise<{
   message: string;
   questions: PendingQuestion[];
   done: boolean;
   askToContinue: boolean;
   waitingForDocument?: string;
-} {
+}> {
   const QUESTIONS_PER_BATCH = 1;  // שאלה אחת בכל פעם - פחות מבלבל
   
   // 🆕 שלב אישור כללי - לא שואלים שאלות, רק מציגים סיכום
@@ -760,7 +760,7 @@ export function getNextQuestionBatch(session: ClassificationSession): {
       session.currentPhase = 'expenses';
       session.currentIndex = 0;
       session.questionsAskedInBatch = 0;
-      return getNextQuestionBatch(session);  // recursive call
+      return await getNextQuestionBatch(session);  // recursive call
     } else if (session.missingDocuments.length > 0) {
       // יש דוחות חסרים - עוברים לבקש אותם
       session.currentPhase = 'request_documents';
@@ -794,44 +794,33 @@ export function getNextQuestionBatch(session: ClassificationSession): {
 
   // יצירת השאלות הבאות
   const questions: PendingQuestion[] = [];
-  const messageParts: string[] = [];
   
-  // הוספת כותרת אם זו התחלה של phase
-  if (session.currentIndex === 0) {
-    if (session.currentPhase === 'income') {
-      messageParts.push('מעולה! קודם על הכנסות:\n');
-    } else {
-      messageParts.push('עכשיו נעבור להוצאות:\n');
-    }
-  }
-
-  // הוספת עד 2 שאלות
-  let questionNum = 1;
-  while (
-    questionNum <= QUESTIONS_PER_BATCH && 
-    session.currentIndex + questionNum - 1 < currentList.length
-  ) {
-    const tx = currentList[session.currentIndex + questionNum - 1];
-    const question = formatQuestion(tx, session.totalClassified + questionNum, session.currentPhase);
-    
-    questions.push({
-      transactionId: tx.id,
-      questionNumber: questionNum,
-      vendor: tx.vendor,
-      amount: tx.amount,
-      date: tx.date,
-      type: tx.type,
-    });
-    
-    messageParts.push(question);
-    questionNum++;
-  }
+  // הוספת שאלה אחת (AI מייצר)
+  const tx = currentList[session.currentIndex];
+  
+  questions.push({
+    transactionId: tx.id,
+    questionNumber: 1,
+    vendor: tx.vendor,
+    amount: tx.amount,
+    date: tx.date,
+    type: tx.type,
+  });
 
   // עדכון ה-session
   session.pendingQuestions = questions;
 
+  // 🧠 AI מייצר את השאלה - טבעית ודינמית!
+  const aiQuestion = await formatQuestionSmart(
+    tx, 
+    session.totalClassified + 1, 
+    session.currentPhase,
+    session.userId,
+    session
+  );
+
   return {
-    message: messageParts.join('\n'),
+    message: aiQuestion,
     questions,
     done: false,
     askToContinue: false,
@@ -1248,7 +1237,7 @@ export async function handleUserResponse(
       session.pendingQuestions = [];  // 🔑 חשוב! מנקה את השאלות הממתינות
       
       // קבלת השאלות הבאות
-      const next = getNextQuestionBatch(session);
+      const next = await getNextQuestionBatch(session);
       await saveClassificationSession(session.userId, session);
       
       // 🆕 תגובה דינמית וטבעית
@@ -1294,7 +1283,7 @@ export async function handleUserResponse(
   // 3. בדיקה אם זה אישור להתחיל/להמשיך (פשוט)
   if (isConfirmation(lowerMessage)) {
     session.questionsAskedInBatch = 0;  // reset counter
-    const next = getNextQuestionBatch(session);
+    const next = await getNextQuestionBatch(session);
     await saveClassificationSession(session.userId, session);
     return {
       message: next.message,
@@ -1309,7 +1298,7 @@ export async function handleUserResponse(
   
   if (aiIntent === 'continue') {
     session.questionsAskedInBatch = 0;
-    const next = getNextQuestionBatch(session);
+    const next = await getNextQuestionBatch(session);
     await saveClassificationSession(session.userId, session);
     return {
       message: next.message,
@@ -1390,7 +1379,7 @@ async function handleBulkApproval(
     const lowConfidenceCount = session.lowConfidenceIncome.length + session.lowConfidenceExpenses.length;
     
     if (lowConfidenceCount > 0) {
-      const next = getNextQuestionBatch(session);
+      const next = await getNextQuestionBatch(session);
       return {
         message: `מעולה! ✅ אישרתי ${highConfidenceCount} תנועות.\n\nעכשיו נעבור על ${lowConfidenceCount} תנועות שאני צריך עזרה איתן.\n\n${next.message}`,
         session,
@@ -1426,7 +1415,7 @@ async function handleBulkApproval(
     
     await saveClassificationSession(session.userId, session);
     
-    const next = getNextQuestionBatch(session);
+    const next = await getNextQuestionBatch(session);
     return {
       message: `אין בעיה! נעבור על התנועות אחת אחת.\n\n${next.message}`,
       session,
@@ -2134,7 +2123,7 @@ export async function resumeClassificationSession(
   session.reminderScheduled = undefined;
   session.questionsAskedInBatch = 0;  // reset
   
-  const next = getNextQuestionBatch(session);
+  const next = await getNextQuestionBatch(session);
   await saveClassificationSession(userId, session);
   
   return {

@@ -260,42 +260,52 @@ export async function askAboutTransaction(
   const progressPercent = Math.round((progress.done / progress.total) * 100);
   const isHalfway = progressPercent >= 45 && progressPercent <= 55;
   const isAlmostDone = progress.total - progress.done <= 3;
+  const remaining = progress.total - progress.done;
   
-  const systemPrompt = `אתה φ - מאמן פיננסי ישראלי. אתה שואל על תנועה פיננסית.
+  const amountStr = transaction.amount.toLocaleString('he-IL');
+  const prefix = transaction.type === 'income' ? 'מ' : 'ב';
+  
+  const systemPrompt = `אתה φ - מאמן פיננסי ישראלי. שאל על תנועה פיננסית.
 
-📌 התנועה:
-- סוג: ${transaction.type === 'income' ? 'הכנסה' : 'הוצאה'}
-- סכום: ${transaction.amount.toLocaleString('he-IL')} ₪
-- ספק/מקור: ${transaction.vendor}
-- תאריך: ${transaction.date}
-${transaction.suggestedCategory ? `- הצעה: ${transaction.suggestedCategory}` : ''}
+⚠️ חובה! השאלה חייבת לכלול:
+- הסכום: ${amountStr} ₪
+- הספק: ${transaction.vendor}
+- התאריך: ${transaction.date}
+
+${transaction.suggestedCategory ? `יש הצעת סיווג: ${transaction.suggestedCategory}` : 'אין הצעת סיווג'}
 
 📊 התקדמות: ${progress.done}/${progress.total} (${progressPercent}%)
-${isHalfway ? '🎯 חצי דרך!' : ''}
-${isAlmostDone ? '🏁 כמעט סיימנו!' : ''}
+${isHalfway ? '- חצי דרך!' : ''}
+${isAlmostDone ? `- נשארו ${remaining}!` : ''}
 
-${recentClassifications?.length ? `
-סיווגים אחרונים: ${recentClassifications.slice(-3).map(r => `${r.vendor}→${r.category}`).join(', ')}
-` : ''}
+📝 פורמט השאלה:
+אם יש הצעה: "${amountStr} ₪ ${prefix}*${transaction.vendor}* (${transaction.date}) - זה *${transaction.suggestedCategory || 'X'}*?"
+אם אין הצעה: "${amountStr} ₪ ${prefix}*${transaction.vendor}* (${transaction.date}) - מה זה?"
 
-📝 כללים:
-1. שאלה קצרה וטבעית
-2. אם יש הצעה - שאל "זה X, נכון?" 
-3. אם אין - שאל "מה זה?"
-4. אם חצי דרך - הוסף עידוד קצר עם השם
-5. אם כמעט סוף - "עוד X ונסיים!"
-6. אימוג'י אחד מקסימום
+אפשר לשנות קצת את הניסוח, אבל *חובה* לכלול סכום + ספק + תאריך!
+${isHalfway ? `אפשר להוסיף: "${userName}, חצי דרך!"` : ''}
+${isAlmostDone ? `אפשר להוסיף: "עוד ${remaining} ונסיים!"` : ''}
 
-החזר רק את השאלה.`;
+החזר רק את השאלה (שורה-שתיים מקסימום).`;
 
   const response = await chatWithGPT5Fast(
-    `שאל על התנועה`,
+    `צור שאלה על: ${amountStr} ₪ ${prefix}${transaction.vendor}`,
     systemPrompt,
     { userId, userName, phoneNumber: '' },
     history
   );
   
-  return response?.trim() || `${transaction.amount.toLocaleString('he-IL')} ₪ ב-${transaction.vendor} - מה זה?`;
+  // וודא שהתשובה מכילה את הסכום - אם לא, השתמש ב-fallback
+  const result = response?.trim();
+  if (result && result.includes(transaction.vendor)) {
+    return result;
+  }
+  
+  // Fallback ברור
+  if (transaction.suggestedCategory) {
+    return `${amountStr} ₪ ${prefix}*${transaction.vendor}* (${transaction.date})\nזה *${transaction.suggestedCategory}*?`;
+  }
+  return `${amountStr} ₪ ${prefix}*${transaction.vendor}* (${transaction.date})\nמה זה?`;
 }
 
 /**
@@ -315,59 +325,63 @@ export async function respondAndContinue(
   },
   progress?: { done: number; total: number }
 ): Promise<string> {
+  // אם אין תנועה הבאה, רק תגובה קצרה
+  if (!nextTransaction) {
+    const quickResponses = ['👍', 'יופי!', 'מעולה!', 'סבבה'];
+    return quickResponses[Math.floor(Math.random() * quickResponses.length)];
+  }
+  
   const history = await getHistoryForOpenAI(userId, 5);
   
-  let context = `המשתמש סיווג תנועה כ: "${classifiedAs}"`;
-  
-  if (nextTransaction) {
-    context += `\n\nהתנועה הבאה:
-- ${nextTransaction.type === 'income' ? 'הכנסה' : 'הוצאה'}: ${nextTransaction.amount.toLocaleString('he-IL')} ₪
-- ספק: ${nextTransaction.vendor}
-${nextTransaction.suggestedCategory ? `- הצעה: ${nextTransaction.suggestedCategory}` : ''}`;
-  }
-  
-  if (progress) {
-    context += `\n\nהתקדמות: ${progress.done}/${progress.total}`;
-  }
+  const amountStr = nextTransaction.amount.toLocaleString('he-IL');
+  const prefix = nextTransaction.type === 'income' ? 'מ' : 'ב';
+  const remaining = progress ? progress.total - progress.done : 0;
   
   const systemPrompt = `אתה φ - מאמן פיננסי ישראלי.
 
-${context}
+המשתמש סיווג תנועה כ: "${classifiedAs}"
 
 📝 משימה:
-1. תגובה קצרה על הסיווג (מילה-שתיים: "👍", "יופי", "מעולה")
+1. תגובה קצרה (מילה אחת: "👍" / "יופי" / "מעולה" / "סבבה")
 2. שורה ריקה
-3. שאלה על התנועה הבאה (אם יש)
+3. שאלה על התנועה הבאה
 
-❌ לא לעשות:
-- לא לחזור על מה שהמשתמש אמר
-- לא להאריך
-- לא "נהדר! רשמתי ש..."
+⚠️ השאלה הבאה חייבת לכלול:
+- סכום: ${amountStr} ₪
+- ספק: ${nextTransaction.vendor}  
+- תאריך: ${nextTransaction.date}
+${nextTransaction.suggestedCategory ? `- הצעה: ${nextTransaction.suggestedCategory}` : ''}
 
-✅ דוגמאות:
-"יופי 👍
+${progress ? `התקדמות: ${progress.done}/${progress.total}` : ''}
+${remaining <= 3 && remaining > 0 ? `נשארו רק ${remaining}!` : ''}
 
-350 ₪ בקפה קפה - קפה?"
+📝 פורמט:
+יופי 👍
 
-"מעולה!
+${amountStr} ₪ ${prefix}*${nextTransaction.vendor}* (${nextTransaction.date})
+${nextTransaction.suggestedCategory ? `זה *${nextTransaction.suggestedCategory}*?` : 'מה זה?'}
 
-2,500 ₪ מהראל - זה ביטוח?"
-
-החזר רק את התגובה והשאלה הבאה.`;
+החזר רק את התגובה והשאלה.`;
 
   const response = await chatWithGPT5Fast(
-    userAnswer,
+    `תגובה + שאלה על: ${amountStr} ₪ ${prefix}${nextTransaction.vendor}`,
     systemPrompt,
     { userId, userName, phoneNumber: '' },
     history
   );
   
-  // אם אין תנועה הבאה, רק תגובה
-  if (!nextTransaction) {
-    return response?.trim() || '👍';
+  // וודא שהתשובה מכילה את פרטי התנועה
+  const result = response?.trim();
+  if (result && result.includes(nextTransaction.vendor)) {
+    return result;
   }
   
-  return response?.trim() || `👍\n\n${nextTransaction.amount.toLocaleString('he-IL')} ₪ ב-${nextTransaction.vendor} - מה זה?`;
+  // Fallback ברור
+  const quickResponse = ['👍', 'יופי!', 'מעולה!'][Math.floor(Math.random() * 3)];
+  if (nextTransaction.suggestedCategory) {
+    return `${quickResponse}\n\n${amountStr} ₪ ${prefix}*${nextTransaction.vendor}* (${nextTransaction.date})\nזה *${nextTransaction.suggestedCategory}*?`;
+  }
+  return `${quickResponse}\n\n${amountStr} ₪ ${prefix}*${nextTransaction.vendor}* (${nextTransaction.date})\nמה זה?`;
 }
 
 /**

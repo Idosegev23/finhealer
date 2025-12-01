@@ -587,7 +587,7 @@ async function handleClassificationApproval(
     });
     
     // קבל את השאלה הראשונה
-    const firstQuestion = getNextQuestionBatch(session);
+    const firstQuestion = await getNextQuestionBatch(session);
     await saveClassificationSession(userContext.userId, session);
     
     // 🆕 הקדמה קצרה מ-AI לפני השאלה הראשונה
@@ -649,7 +649,7 @@ async function handleContinueToClassification(
   
   if (session) {
     // יש session קיים - נמשיך איפה שעצרנו
-    const nextBatch = getNextQuestionBatch(session);
+    const nextBatch = await getNextQuestionBatch(session);
     
     if (nextBatch.done) {
       return {
