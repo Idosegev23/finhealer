@@ -1007,7 +1007,8 @@ export async function handleUserResponse(
           session.totalClassified,
           remainingCount,
           next.message,
-          session.currentPhase as 'income' | 'expenses'
+          session.currentPhase as 'income' | 'expenses',
+          session  // 🆕 העברת session לזיהוי דפוסים
         );
       }
       
@@ -1111,53 +1112,89 @@ async function generateSmartResponse(
   totalClassified: number,
   remainingCount: number,
   nextQuestion: string,
-  phase: 'income' | 'expenses'
+  phase: 'income' | 'expenses',
+  session?: ClassificationSession
 ): Promise<string> {
   const { chatWithGPT5Fast } = await import('@/lib/ai/gpt5-client');
   
   try {
+    // טעינת שם המשתמש
+    const userName = await getUserName(userId);
+    
+    // זיהוי דפוסים מה-session
+    const patterns = session ? detectSessionPatterns(session) : null;
+    
+    // חישוב התקדמות
+    const totalItems = totalClassified + remainingCount;
+    const progressPercent = Math.round((totalClassified / totalItems) * 100);
+    const isMilestone = progressPercent === 50 || progressPercent === 75 || remainingCount <= 3;
+    
     // טעינת היסטוריית שיחה
     const history = await getHistoryForOpenAI(userId, 5);
+    
+    // בניית הקשר מיוחד
+    let specialContext = '';
+    if (isMilestone && progressPercent === 50) {
+      specialContext = '🎯 המשתמש עבר חצי דרך! אפשר להזכיר את זה בקצרה.';
+    } else if (remainingCount <= 3 && remainingCount > 0) {
+      specialContext = `🏁 כמעט סיימנו! נשארו רק ${remainingCount}. אפשר לעודד.`;
+    }
+    
+    if (patterns && patterns.topCategory) {
+      specialContext += `\n📊 דפוס: הרבה הוצאות על ${patterns.topCategory} (${patterns.topCategoryCount} פעמים)`;
+    }
     
     const response = await chatWithGPT5Fast(
       `פרטי הסיווג האחרון:
 - סכום: ${classifiedAnswer.amount?.toLocaleString('he-IL') || 'לא ידוע'} ₪
 - ספק: ${classifiedAnswer.vendor || 'לא ידוע'}
 - סווג כ: ${classifiedAnswer.category}
-- עברנו על: ${totalClassified} תנועות
+- עברנו על: ${totalClassified} תנועות (${progressPercent}%)
 - נשארו: ${remainingCount} ${phase === 'income' ? 'הכנסות' : 'הוצאות'}
+- שם המשתמש: ${userName || 'לא ידוע'}
+${specialContext ? `- הערה מיוחדת: ${specialContext}` : ''}
 - השאלה הבאה: ${nextQuestion}`,
       `אתה מאמן פיננסי בשם φ שעובר עם המשתמש על תנועות פיננסיות.
-המשתמש סיווג תנועה. צור תגובה קצרה (מילה או שתיים מקסימום) ואז עבור ישר לשאלה הבאה.
+המשתמש סיווג תנועה. צור תגובה קצרה וטבעית.
 
-דוגמאות לתגובות טבעיות:
-- "מעולה." / "סבבה." / "אוקי." / "יופי." / "👍" / "בסדר."
+כללי תגובה:
+1. תגובה קצרה (מילה-שתיים): "מעולה." / "סבבה." / "👍" / "יופי."
+2. אם יש אבן דרך (50%, כמעט סיימנו) - אפשר להוסיף משפט קצר עם השם
+3. אם יש דפוס מעניין - אפשר להעיר בקצרה בהומור קל
+4. אחרי התגובה - שורה ריקה והשאלה הבאה
+
+דוגמאות טובות:
+- "👍\n\n[שאלה]"
+- "מעולה!\n\n[שאלה]"  
+- "${userName}, חצי דרך! 🎯\n\n[שאלה]"
+- "עוד 2 ונסיים! 💪\n\n[שאלה]"
+- "סבבה. הרבה קפה החודש הזה 😅\n\n[שאלה]"
 
 חוקים:
-1. תגובה קצרה ביותר - מילה או שתיים, או אימוג'י אחד
-2. אחר כך שורה ריקה והשאלה הבאה
-3. לא לחזור על מה שהמשתמש אמר
-4. טבעי כמו שיחה בין חברים
+- לא לחזור על מה שהמשתמש אמר
+- לא להאריך - קצר וטבעי
+- להשתמש בשם רק באבני דרך
+- הומור רק אם יש דפוס מעניין
 
-החזר רק את התגובה והשאלה, בפורמט:
-[תגובה קצרה]
-
-[השאלה הבאה]`,
-      { userId, userName: 'Classification', phoneNumber: '' },
+החזר רק את התגובה והשאלה.`,
+      { userId, userName: userName || 'Classification', phoneNumber: '' },
       history
     );
     
     // אם ה-AI החזיר תשובה טובה
-    if (response && response.length > 0) {
-      // בדוק שיש את השאלה הבאה בתגובה
-      if (response.includes(classifiedAnswer.vendor || '') || response.length > 200) {
-        // AI הוסיף יותר מדי - נחזור לפשוט
-        return `👍\n\n${nextQuestion}`;
-      }
+    if (response && response.length > 0 && response.length < 300) {
       return response.trim();
     }
     
-    // fallback
+    // fallback עם התקדמות
+    if (isMilestone) {
+      if (progressPercent === 50) {
+        return `חצי דרך! 🎯\n\n${nextQuestion}`;
+      } else if (remainingCount <= 3) {
+        return `עוד ${remainingCount} ונסיים! 💪\n\n${nextQuestion}`;
+      }
+    }
+    
     return `👍\n\n${nextQuestion}`;
   } catch {
     // fallback פשוט
@@ -1165,6 +1202,76 @@ async function generateSmartResponse(
     const randomResponse = quickResponses[Math.floor(Math.random() * quickResponses.length)];
     return `${randomResponse}\n\n${nextQuestion}`;
   }
+}
+
+/**
+ * 🆕 קבלת שם המשתמש מה-DB
+ */
+async function getUserName(userId: string): Promise<string | null> {
+  try {
+    const supabase = createServiceClient();
+    const { data } = await supabase
+      .from('users')
+      .select('full_name, name')
+      .eq('id', userId)
+      .single();
+    
+    return data?.full_name || data?.name || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 🆕 זיהוי דפוסים מה-session הנוכחי
+ */
+function detectSessionPatterns(session: ClassificationSession): {
+  topCategory: string | null;
+  topCategoryCount: number;
+  topVendor: string | null;
+  topVendorCount: number;
+} | null {
+  // סופר קטגוריות מהתנועות שכבר סווגו
+  const categoryCount: Record<string, number> = {};
+  const vendorCount: Record<string, number> = {};
+  
+  const allTransactions = [
+    ...session.incomeToClassify.slice(0, session.currentIndex),
+    ...session.expensesToClassify.slice(0, session.currentIndex),
+  ];
+  
+  for (const tx of allTransactions) {
+    if (tx.currentCategory) {
+      categoryCount[tx.currentCategory] = (categoryCount[tx.currentCategory] || 0) + 1;
+    }
+    if (tx.vendor) {
+      vendorCount[tx.vendor] = (vendorCount[tx.vendor] || 0) + 1;
+    }
+  }
+  
+  // מצא את הקטגוריה והספק הנפוצים ביותר
+  let topCategory: string | null = null;
+  let topCategoryCount = 0;
+  let topVendor: string | null = null;
+  let topVendorCount = 0;
+  
+  for (const [cat, count] of Object.entries(categoryCount)) {
+    if (count > topCategoryCount && count >= 3) { // רק אם יש לפחות 3
+      topCategory = cat;
+      topCategoryCount = count;
+    }
+  }
+  
+  for (const [vendor, count] of Object.entries(vendorCount)) {
+    if (count > topVendorCount && count >= 2) { // רק אם יש לפחות 2
+      topVendor = vendor;
+      topVendorCount = count;
+    }
+  }
+  
+  if (!topCategory && !topVendor) return null;
+  
+  return { topCategory, topCategoryCount, topVendor, topVendorCount };
 }
 
 /**
@@ -1704,4 +1811,5 @@ export default {
   handleUserResponse,
   resumeClassificationSession,
 };
+
 
