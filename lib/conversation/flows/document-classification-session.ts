@@ -287,6 +287,8 @@ export interface TransactionToClassify {
   type: 'income' | 'expense';
   currentCategory?: string | null;
   suggestedCategory?: string | null;
+  confidenceScore?: number;  // 🆕 ציון ביטחון מ-AI
+  learnedFromUser?: boolean;  // 🆕 האם הקטגוריה נלמדה מהמשתמש
 }
 
 export interface MissingDocument {
@@ -306,7 +308,13 @@ export interface ClassificationSession {
   expensesToClassify: TransactionToClassify[];
   alreadyClassifiedIncome: TransactionToClassify[];  // הכנסות שכבר מסווגות
   alreadyClassifiedExpenses: TransactionToClassify[];  // הוצאות שכבר מסווגות
-  currentPhase: 'income' | 'expenses' | 'request_documents' | 'done';
+  // 🆕 חלוקה לפי ביטחון
+  highConfidenceIncome: TransactionToClassify[];  // הכנסות בטוחות - רק צריך אישור
+  highConfidenceExpenses: TransactionToClassify[];  // הוצאות בטוחות - רק צריך אישור
+  lowConfidenceIncome: TransactionToClassify[];  // הכנסות שצריכות שאלה
+  lowConfidenceExpenses: TransactionToClassify[];  // הוצאות שצריכות שאלה
+  bulkApprovalPending: boolean;  // האם מחכים לאישור כללי
+  currentPhase: 'bulk_approval' | 'income' | 'expenses' | 'request_documents' | 'done';
   currentIndex: number;
   questionsAskedInBatch: number;  // מונה שאלות ב-batch הנוכחי (reset אחרי 2-3)
   totalClassified: number;
@@ -357,34 +365,62 @@ export async function createClassificationSession(
   // טעינת קטגוריות מהDB
   await loadCategories();
   
-  // 🔑 כל ההכנסות צריכות אישור (מהגדול לקטן)
-  const incomeToClassify = transactions
+  // 🆕 טען patterns של המשתמש לזיהוי ביטחון גבוה
+  const userPatterns = await loadUserPatterns(userId);
+  
+  // 🔑 כל ההכנסות (מהגדול לקטן)
+  const allIncome = transactions
     .filter(tx => tx.type === 'income')
     .sort((a, b) => b.amount - a.amount);
   
-  // 🔑 כל ההוצאות צריכות אישור (מהגדול לקטן)
-  const expensesToClassify = transactions
+  // 🔑 כל ההוצאות (מהגדול לקטן)
+  const allExpenses = transactions
     .filter(tx => tx.type === 'expense')
     .sort((a, b) => b.amount - a.amount);
 
-  // סטטיסטיקה: כמה כבר יש להן הצעת סיווג מ-AI
-  const alreadyClassifiedIncome = transactions
-    .filter(tx => tx.type === 'income' && tx.currentCategory);
+  // 🆕 חלוקה לפי ביטחון - הכנסות
+  const { highConfidence: highConfidenceIncome, lowConfidence: lowConfidenceIncome } = 
+    splitByConfidence(allIncome, userPatterns);
   
-  const alreadyClassifiedExpenses = transactions
-    .filter(tx => tx.type === 'expense' && tx.currentCategory);
+  // 🆕 חלוקה לפי ביטחון - הוצאות
+  const { highConfidence: highConfidenceExpenses, lowConfidence: lowConfidenceExpenses } = 
+    splitByConfidence(allExpenses, userPatterns);
+
+  // סטטיסטיקה
+  const alreadyClassifiedIncome = allIncome.filter(tx => tx.currentCategory);
+  const alreadyClassifiedExpenses = allExpenses.filter(tx => tx.currentCategory);
 
   // המרת missing_documents לפורמט שלנו
   const missingDocuments = parseMissingDocuments(missingDocs || []);
 
+  // 🆕 קביעת שלב התחלתי - אם יש תנועות בטוחות, מתחילים עם bulk_approval
+  const hasHighConfidence = highConfidenceIncome.length > 0 || highConfidenceExpenses.length > 0;
+  const hasLowConfidence = lowConfidenceIncome.length > 0 || lowConfidenceExpenses.length > 0;
+  
+  let currentPhase: ClassificationSession['currentPhase'];
+  if (hasHighConfidence) {
+    currentPhase = 'bulk_approval';
+  } else if (lowConfidenceIncome.length > 0) {
+    currentPhase = 'income';
+  } else if (lowConfidenceExpenses.length > 0) {
+    currentPhase = 'expenses';
+  } else {
+    currentPhase = 'done';
+  }
+
   return {
     userId,
     batchId,
-    incomeToClassify,
-    expensesToClassify,
-    alreadyClassifiedIncome,  // רק לסטטיסטיקה - כמה יש הצעה
+    incomeToClassify: lowConfidenceIncome,  // רק אלה שצריכים שאלות
+    expensesToClassify: lowConfidenceExpenses,
+    alreadyClassifiedIncome,
     alreadyClassifiedExpenses,
-    currentPhase: incomeToClassify.length > 0 ? 'income' : (expensesToClassify.length > 0 ? 'expenses' : 'done'),
+    highConfidenceIncome,  // 🆕
+    highConfidenceExpenses,  // 🆕
+    lowConfidenceIncome,  // 🆕
+    lowConfidenceExpenses,  // 🆕
+    bulkApprovalPending: hasHighConfidence,  // 🆕
+    currentPhase,
     currentIndex: 0,
     questionsAskedInBatch: 0,
     totalClassified: 0,
@@ -394,6 +430,72 @@ export async function createClassificationSession(
     missingDocuments,
     requestedDocumentIndex: 0,
   };
+}
+
+/**
+ * 🆕 טעינת patterns של המשתמש
+ */
+async function loadUserPatterns(userId: string): Promise<Map<string, { category: string; confidence: number }>> {
+  const supabase = createServiceClient();
+  const patterns = new Map<string, { category: string; confidence: number }>();
+  
+  try {
+    const { data } = await supabase
+      .from('user_patterns')
+      .select('pattern_key, pattern_value, confidence_score')
+      .eq('user_id', userId)
+      .eq('pattern_type', 'merchant')
+      .gte('confidence_score', 0.7);  // רק patterns עם ביטחון גבוה
+    
+    if (data) {
+      for (const p of data) {
+        patterns.set(p.pattern_key, {
+          category: p.pattern_value?.category || '',
+          confidence: p.confidence_score,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[Patterns] Error loading:', error);
+  }
+  
+  return patterns;
+}
+
+/**
+ * 🆕 חלוקת תנועות לפי רמת ביטחון
+ */
+function splitByConfidence(
+  transactions: TransactionToClassify[],
+  userPatterns: Map<string, { category: string; confidence: number }>
+): { highConfidence: TransactionToClassify[]; lowConfidence: TransactionToClassify[] } {
+  const highConfidence: TransactionToClassify[] = [];
+  const lowConfidence: TransactionToClassify[] = [];
+  
+  for (const tx of transactions) {
+    const vendorKey = tx.vendor?.toLowerCase().trim() || '';
+    const pattern = userPatterns.get(vendorKey);
+    
+    // בדיקת ביטחון:
+    // 1. יש pattern מהמשתמש עם ביטחון >= 0.7
+    // 2. או יש currentCategory מ-AI עם confidenceScore >= 0.85
+    const hasUserPattern = pattern && pattern.confidence >= 0.7;
+    const hasHighAIConfidence = tx.currentCategory && tx.confidenceScore && tx.confidenceScore >= 0.85;
+    
+    if (hasUserPattern || hasHighAIConfidence) {
+      // אם יש pattern, השתמש בקטגוריה שלו
+      if (hasUserPattern && pattern) {
+        tx.currentCategory = pattern.category;
+        tx.suggestedCategory = pattern.category;
+        tx.learnedFromUser = true;  // סימון שזה מ-pattern של המשתמש
+      }
+      highConfidence.push(tx);
+    } else {
+      lowConfidence.push(tx);
+    }
+  }
+  
+  return { highConfidence, lowConfidence };
 }
 
 /**
@@ -484,50 +586,139 @@ export async function clearClassificationSession(userId: string): Promise<void> 
  * 🔑 כל התנועות עוברות אישור! גם אם AI הציע סיווג.
  */
 export function getInitialMessage(session: ClassificationSession): string {
-  const totalTransactions = session.incomeToClassify.length + session.expensesToClassify.length;
+  const highConfidenceCount = session.highConfidenceIncome.length + session.highConfidenceExpenses.length;
+  const lowConfidenceCount = session.lowConfidenceIncome.length + session.lowConfidenceExpenses.length;
+  const totalTransactions = highConfidenceCount + lowConfidenceCount;
   
   if (totalTransactions === 0) {
     return `לא זיהיתי תנועות בדוח.\n\nאפשר לנסות לשלוח דוח אחר?`;
   }
 
-  // כמה יש להן הצעת סיווג מ-AI
-  const withSuggestion = session.alreadyClassifiedIncome.length + session.alreadyClassifiedExpenses.length;
-  const withoutSuggestion = totalTransactions - withSuggestion;
-
-  // הצגת סיכום - יותר מסוגנן
-  let message = `*זיהיתי ${totalTransactions} תנועות*\n\n`;
-  
-  message += `הכנסות: *${session.incomeToClassify.length}* (${session.totalIncome.toLocaleString('he-IL')} ₪)\n`;
-  message += `הוצאות: *${session.expensesToClassify.length}* (${session.totalExpenses.toLocaleString('he-IL')} ₪)\n\n`;
+  let message = `*זיהיתי ${totalTransactions} תנועות* 📊\n\n`;
   
   // מאזן
   const balance = session.totalIncome - session.totalExpenses;
   const balanceText = balance >= 0 ? `+${balance.toLocaleString('he-IL')}` : balance.toLocaleString('he-IL');
-  message += `מאזן: *${balanceText} ₪*\n\n`;
+  message += `💚 הכנסות: ${session.totalIncome.toLocaleString('he-IL')} ₪\n`;
+  message += `💸 הוצאות: ${session.totalExpenses.toLocaleString('he-IL')} ₪\n`;
+  message += `📈 מאזן: *${balanceText} ₪*\n\n`;
   
   message += `---\n\n`;
   
-  // סטטוס הסיווג האוטומטי
-  if (withSuggestion > 0) {
-    message += `זיהיתי אוטומטית *${withSuggestion}* תנועות.\n`;
+  // 🆕 אם יש תנועות בטוחות - להציג סיכום שלהן
+  if (highConfidenceCount > 0) {
+    message += `✨ *${highConfidenceCount} תנועות שאני די בטוח בהן:*\n\n`;
+    
+    // קיבוץ לפי קטגוריה
+    const categorySummary = groupByCategory([
+      ...session.highConfidenceIncome,
+      ...session.highConfidenceExpenses,
+    ]);
+    
+    // הצג עד 8 קטגוריות
+    const topCategories = Array.from(categorySummary.entries())
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 8);
+    
+    for (const [category, data] of topCategories) {
+      const emoji = getCategoryEmoji(category);
+      message += `${emoji} ${category}: ${data.count} תנועות (${data.total.toLocaleString('he-IL')} ₪)\n`;
+    }
+    
+    if (categorySummary.size > 8) {
+      message += `   ועוד ${categorySummary.size - 8} קטגוריות...\n`;
+    }
+    
+    message += `\n`;
   }
-  if (withoutSuggestion > 0) {
-    message += `*${withoutSuggestion}* תנועות צריכות את העזרה שלך.\n`;
+  
+  // כמה צריכות שאלות
+  if (lowConfidenceCount > 0) {
+    message += `❓ *${lowConfidenceCount} תנועות* שאני צריך לשאול עליהן\n\n`;
   }
-  message += `\n`;
   
-  // הסבר + בקשת הסכמה מפורשת
-  message += `*לפני שנתחיל:*\n`;
-  message += `אני צריך לעבור איתך על התנועות כדי לוודא שהסיווג נכון.\n`;
-  message += `זה יקח כמה דקות.\n\n`;
-  
-  message += `אם זיהיתי נכון - תגיד *"כן"*\n`;
-  message += `אם טעיתי - תגיד מה הקטגוריה הנכונה\n\n`;
-  
-  message += `*מתאים לך עכשיו?*\n`;
-  message += `(אפשר גם אחר כך)`;
+  // 🆕 הסבר חכם לפי המצב
+  if (highConfidenceCount > 0 && lowConfidenceCount > 0) {
+    message += `*מה עכשיו?*\n`;
+    message += `1️⃣ קודם תאשר את ${highConfidenceCount} התנועות הבטוחות\n`;
+    message += `2️⃣ אח"כ נעבור על ${lowConfidenceCount} שצריכות עזרה\n\n`;
+    message += `*הכל נראה לך נכון?*\n`;
+    message += `(כן / לא, יש טעות)`;
+  } else if (highConfidenceCount > 0) {
+    message += `*נראה לי שזיהיתי הכל!* 🎉\n`;
+    message += `תבדוק שהכל נכון ותאשר.\n\n`;
+    message += `*הכל בסדר?*\n`;
+    message += `(כן / לא, יש טעות)`;
+  } else {
+    message += `*נעבור ביחד על התנועות?*\n`;
+    message += `זה ייקח כמה דקות.\n\n`;
+    message += `*מתאים עכשיו?*\n`;
+    message += `(כן / אחר כך)`;
+  }
 
   return message;
+}
+
+/**
+ * 🆕 קיבוץ תנועות לפי קטגוריה לסיכום
+ */
+function groupByCategory(transactions: TransactionToClassify[]): Map<string, { count: number; total: number }> {
+  const summary = new Map<string, { count: number; total: number }>();
+  
+  for (const tx of transactions) {
+    const category = tx.currentCategory || tx.suggestedCategory || 'לא מסווג';
+    const existing = summary.get(category) || { count: 0, total: 0 };
+    existing.count++;
+    existing.total += tx.amount;
+    summary.set(category, existing);
+  }
+  
+  return summary;
+}
+
+/**
+ * 🆕 אימוג'י לפי קטגוריה
+ */
+function getCategoryEmoji(category: string): string {
+  const emojiMap: Record<string, string> = {
+    'קפה': '☕',
+    'מזון': '🍽️',
+    'סופר': '🛒',
+    'קניות': '🛍️',
+    'דלק': '⛽',
+    'תחבורה': '🚗',
+    'בילויים': '🎉',
+    'מסעדות': '🍕',
+    'בריאות': '🏥',
+    'ביטוח': '🛡️',
+    'תקשורת': '📱',
+    'חשמל': '💡',
+    'מים': '💧',
+    'ארנונה': '🏠',
+    'שכירות': '🏠',
+    'משכנתא': '🏠',
+    'משכורת': '💰',
+    'העברה': '↔️',
+    'העברה פנימית': '↔️',
+    'השקעות': '📈',
+    'חיסכון': '🏦',
+    'הלוואה': '🏦',
+    'מנוי': '📺',
+    'לימודים': '📚',
+    'ילדים': '👶',
+    'בגדים': '👕',
+    'ספורט': '🏃',
+  };
+  
+  // חיפוש התאמה חלקית
+  const lowerCategory = category.toLowerCase();
+  for (const [key, emoji] of Object.entries(emojiMap)) {
+    if (lowerCategory.includes(key.toLowerCase())) {
+      return emoji;
+    }
+  }
+  
+  return '📌';
 }
 
 /**
@@ -541,6 +732,17 @@ export function getNextQuestionBatch(session: ClassificationSession): {
   waitingForDocument?: string;
 } {
   const QUESTIONS_PER_BATCH = 1;  // שאלה אחת בכל פעם - פחות מבלבל
+  
+  // 🆕 שלב אישור כללי - לא שואלים שאלות, רק מציגים סיכום
+  if (session.currentPhase === 'bulk_approval') {
+    // זה כבר הוצג ב-getInitialMessage, מחכים לאישור
+    return {
+      message: '', // לא צריך הודעה נוספת
+      questions: [],
+      done: false,
+      askToContinue: false,
+    };
+  }
   
   // אם אנחנו בשלב בקשת מסמכים
   if (session.currentPhase === 'request_documents') {
@@ -935,6 +1137,11 @@ export async function handleUserResponse(
   
   const lowerMessage = userMessage.toLowerCase().trim();
 
+  // 🆕 טיפול בשלב אישור כללי (bulk_approval)
+  if (session.currentPhase === 'bulk_approval') {
+    return await handleBulkApproval(session, userMessage, supabase);
+  }
+
   // אם מחכים למסמך - טיפול מיוחד
   if (session.currentPhase === 'request_documents' && session.waitingForDocument) {
     // אם המשתמש רוצה לדחות את המסמך הזה
@@ -1070,6 +1277,115 @@ export async function handleUserResponse(
 /**
  * 🆕 פרסור כוונה עם AI
  */
+/**
+ * 🆕 טיפול באישור כללי של תנועות בטוחות
+ */
+async function handleBulkApproval(
+  session: ClassificationSession,
+  userMessage: string,
+  supabase: any
+): Promise<ClassificationResponse> {
+  const lowerMessage = userMessage.toLowerCase().trim();
+  const highConfidenceCount = session.highConfidenceIncome.length + session.highConfidenceExpenses.length;
+  
+  // בדיקה אם המשתמש מאשר
+  const isApproval = isConfirmation(lowerMessage);
+  
+  // בדיקה אם המשתמש אומר שיש טעות
+  const hasCorrection = lowerMessage.includes('לא') || 
+                        lowerMessage.includes('טעות') || 
+                        lowerMessage.includes('שגוי') ||
+                        lowerMessage.includes('לתקן');
+  
+  if (isApproval && !hasCorrection) {
+    // 🎉 המשתמש מאשר! נאשר את כל התנועות הבטוחות
+    const allHighConfidence = [...session.highConfidenceIncome, ...session.highConfidenceExpenses];
+    
+    for (const tx of allHighConfidence) {
+      const category = tx.currentCategory || tx.suggestedCategory || 'לא מסווג';
+      await updateTransactionCategory(supabase, session.userId, tx.id, 'CONFIRMED', false);
+      
+      // למידה - חיזוק ה-pattern
+      if (tx.vendor) {
+        await learnFromClassification(supabase, session.userId, tx.vendor, category, true);
+      }
+    }
+    
+    session.totalClassified += highConfidenceCount;
+    session.bulkApprovalPending = false;
+    
+    // עוברים לשלב הבא
+    if (session.lowConfidenceIncome.length > 0) {
+      session.currentPhase = 'income';
+    } else if (session.lowConfidenceExpenses.length > 0) {
+      session.currentPhase = 'expenses';
+    } else if (session.missingDocuments.length > 0) {
+      session.currentPhase = 'request_documents';
+    } else {
+      session.currentPhase = 'done';
+    }
+    
+    session.currentIndex = 0;
+    await saveClassificationSession(session.userId, session);
+    
+    // הודעת מעבר
+    const lowConfidenceCount = session.lowConfidenceIncome.length + session.lowConfidenceExpenses.length;
+    
+    if (lowConfidenceCount > 0) {
+      const next = getNextQuestionBatch(session);
+      return {
+        message: `מעולה! ✅ אישרתי ${highConfidenceCount} תנועות.\n\nעכשיו נעבור על ${lowConfidenceCount} תנועות שאני צריך עזרה איתן.\n\n${next.message}`,
+        session,
+        done: false,
+        waitingForAnswer: true,
+      };
+    } else {
+      // אין יותר תנועות לסווג
+      return {
+        message: getCompletionMessage(session),
+        session,
+        done: true,
+        waitingForAnswer: false,
+      };
+    }
+  }
+  
+  if (hasCorrection) {
+    // המשתמש אומר שיש טעות - נעבור לסיווג ידני
+    session.bulkApprovalPending = false;
+    
+    // מעבירים את הכל לרשימת low confidence
+    session.lowConfidenceIncome = [...session.highConfidenceIncome, ...session.lowConfidenceIncome];
+    session.lowConfidenceExpenses = [...session.highConfidenceExpenses, ...session.lowConfidenceExpenses];
+    session.highConfidenceIncome = [];
+    session.highConfidenceExpenses = [];
+    
+    // מתחילים מההתחלה
+    session.incomeToClassify = session.lowConfidenceIncome;
+    session.expensesToClassify = session.lowConfidenceExpenses;
+    session.currentPhase = session.lowConfidenceIncome.length > 0 ? 'income' : 'expenses';
+    session.currentIndex = 0;
+    
+    await saveClassificationSession(session.userId, session);
+    
+    const next = getNextQuestionBatch(session);
+    return {
+      message: `אין בעיה! נעבור על התנועות אחת אחת.\n\n${next.message}`,
+      session,
+      done: false,
+      waitingForAnswer: true,
+    };
+  }
+  
+  // לא הבנתי - שאל שוב
+  return {
+    message: `לא הבנתי 😅\n\nהתנועות שהצגתי נכונות?\n(כן / לא, יש טעות)`,
+    session,
+    done: false,
+    waitingForAnswer: true,
+  };
+}
+
 async function parseUserIntentWithAI(
   message: string,
   session: ClassificationSession
