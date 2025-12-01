@@ -774,6 +774,75 @@ function getCompletionMessage(session: ClassificationSession): string {
 רוצה לראות ניתוח מפורט?`;
 }
 
+/**
+ * 🆕 טיפול בסיום סיווג - מעבר לשלב 2
+ */
+export async function handleClassificationComplete(
+  userId: string,
+  session: ClassificationSession
+): Promise<{ message: string; phiScore?: number }> {
+  const { createServiceClient } = await import('@/lib/supabase/server');
+  const { updateContext } = await import('../context-manager');
+  const supabase = createServiceClient();
+  
+  console.log(`✅ Classification complete for user ${userId}. Transitioning to phase 2...`);
+  
+  // 1. עדכון ה-state ל-behavior_analysis
+  await updateContext(userId, {
+    currentState: 'behavior_analysis',
+  });
+  
+  // 2. עדכון ה-phase ב-users table
+  await supabase
+    .from('users')
+    .update({ 
+      current_phase: 'behavior',
+      phase_updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+  
+  // 3. חישוב ציון φ (phi score)
+  let phiScore: number | undefined;
+  try {
+    const { data: scoreResult } = await supabase
+      .rpc('calculate_financial_health', { p_user_id: userId });
+    
+    if (scoreResult && typeof scoreResult === 'number') {
+      phiScore = scoreResult;
+      
+      // שמירת הציון
+      await supabase
+        .from('users')
+        .update({ phi_score: phiScore })
+        .eq('id', userId);
+      
+      console.log(`📊 Phi Score calculated: ${phiScore}`);
+    }
+  } catch (err) {
+    console.error('Failed to calculate phi score:', err);
+  }
+  
+  // 4. בניית הודעה עם ציון phi
+  let message = getCompletionMessage(session);
+  
+  if (phiScore !== undefined) {
+    const scoreEmoji = phiScore >= 80 ? '🌟' : phiScore >= 60 ? '👍' : phiScore >= 40 ? '📈' : '💪';
+    message += `\n\n${scoreEmoji} *ציון φ שלך: ${phiScore}/100*`;
+    
+    if (phiScore >= 80) {
+      message += `\nמצוין! אתה בדרך הנכונה!`;
+    } else if (phiScore >= 60) {
+      message += `\nטוב! יש מקום לשיפור.`;
+    } else {
+      message += `\nיש עבודה לעשות, אבל ביחד נשפר!`;
+    }
+  }
+  
+  console.log(`✅ Transitioned to behavior_analysis phase`);
+  
+  return { message, phiScore };
+}
+
 // ============================================================================
 // Response Handling
 // ============================================================================

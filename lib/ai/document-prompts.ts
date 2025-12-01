@@ -1043,6 +1043,289 @@ ${text}
 }
 
 // ============================================================================
+// 5.5️⃣ דוח חסכונות (Savings Report)
+// ============================================================================
+
+export function getSavingsPrompt(text: string | null): string {
+  return `אתה מומחה בניתוח דוחות חסכונות ופיקדונות ישראליים.
+
+## **סוגי חסכונות בישראל:**
+1. **פיקדונות בנקאיים** - פקדונות קצרים/ארוכים, שקלי/דולרי/אירו
+2. **חשבונות חיסכון** - חשבונות נזילים/לא נזילים
+3. **תוכניות חיסכון** - תוכנית 5 שנים, חיסכון לכל ילד
+4. **קרנות נאמנות** - שקליות/מט"ח/מעורבות
+5. **חיסכון מנוהל** - תיק מנוהל בבנק
+
+## **מה לחלץ:**
+
+### **1. מידע כללי (report_info):**
+- שם הלקוח (customer_name)
+- מספר חשבון (account_number)
+- בנק/מוסד (institution)
+- תאריך דוח (report_date)
+- סה"כ יתרות (total_balance)
+
+### **2. פיקדונות (deposits):**
+עבור כל פיקדון:
+- סוג פיקדון (deposit_type): "short_term", "long_term", "structured"
+- מטבע (currency): "ILS", "USD", "EUR"
+- סכום מקורי (principal_amount)
+- יתרה נוכחית (current_balance)
+- ריבית שנתית (annual_interest_rate)
+- ריבית צבורה (accrued_interest)
+- תאריך פתיחה (start_date)
+- תאריך פדיון (maturity_date)
+- האם שובר (is_breakable): true/false
+- קנס שבירה (break_penalty)
+
+### **3. תוכניות חיסכון (savings_plans):**
+עבור כל תוכנית:
+- שם תוכנית (plan_name)
+- סוג (plan_type): "five_year", "child_savings", "target_savings", "monthly"
+- הפקדה חודשית (monthly_deposit)
+- יתרה נוכחית (current_balance)
+- תאריך התחלה (start_date)
+- תאריך סיום (end_date)
+- תשואה מצטברת (cumulative_return)
+- יעד (target_amount) - אם יש
+
+### **4. קרנות נאמנות (mutual_funds):**
+עבור כל קרן:
+- שם הקרן (fund_name)
+- מספר קרן (fund_id)
+- חברה מנהלת (management_company)
+- סוג (fund_type): "money_market", "bonds", "equity", "mixed"
+- יחידות (units)
+- שווי יחידה (unit_value)
+- שווי נוכחי (current_value)
+- עלות מקורית (cost_basis)
+- רווח/הפסד (gain_loss)
+- דמי ניהול (management_fee)
+
+## **פורמט JSON:**
+{
+  "report_info": {
+    "report_date": "2024-11-15",
+    "customer_name": "ישראל ישראלי",
+    "account_number": "123456",
+    "institution": "בנק הפועלים",
+    "total_balance": 250000.00
+  },
+  "deposits": [
+    {
+      "deposit_type": "short_term",
+      "currency": "ILS",
+      "principal_amount": 100000.00,
+      "current_balance": 102500.00,
+      "annual_interest_rate": 5.0,
+      "accrued_interest": 2500.00,
+      "start_date": "2024-01-01",
+      "maturity_date": "2025-01-01",
+      "is_breakable": true,
+      "break_penalty": 0.5
+    }
+  ],
+  "savings_plans": [
+    {
+      "plan_name": "חיסכון לכל ילד",
+      "plan_type": "child_savings",
+      "monthly_deposit": 100.00,
+      "current_balance": 12500.00,
+      "start_date": "2019-01-01",
+      "end_date": "2037-01-01",
+      "cumulative_return": 12.5,
+      "beneficiary": "ילד 1"
+    }
+  ],
+  "mutual_funds": [
+    {
+      "fund_name": "קרן כספית שקלית",
+      "fund_id": "5120000",
+      "management_company": "אלטשולר שחם",
+      "fund_type": "money_market",
+      "units": 1000,
+      "unit_value": 115.50,
+      "current_value": 115500.00,
+      "cost_basis": 100000.00,
+      "gain_loss": 15500.00,
+      "management_fee": 0.3
+    }
+  ],
+  "summary": {
+    "total_deposits": 102500.00,
+    "total_savings_plans": 12500.00,
+    "total_mutual_funds": 115500.00,
+    "total_all": 230500.00,
+    "by_currency": {
+      "ILS": 230500.00,
+      "USD": 0,
+      "EUR": 0
+    }
+  }
+}
+
+**הדוח:**
+${text}
+
+**חלץ את כל החסכונות - כולל קטנים!**`;
+}
+
+// ============================================================================
+// 5.6️⃣ דוח השקעות (Investment Report)
+// ============================================================================
+
+export function getInvestmentPrompt(text: string | null): string {
+  return `אתה מומחה בניתוח דוחות השקעות ותיקי ניירות ערך.
+
+## **סוגי השקעות בישראל:**
+1. **מניות** - ישראליות (TASE) ובינלאומיות
+2. **אג"ח** - ממשלתיות, קונצרניות
+3. **קרנות סל (ETF)** - מקומיות ובינלאומיות
+4. **קרנות נאמנות** - כל הסוגים
+5. **מוצרים מובנים** - פיקדונות מובנים, נעים
+6. **תעודות סל** - מקומיות
+7. **אופציות ונגזרים** - אם יש
+
+## **מה לחלץ:**
+
+### **1. מידע כללי (report_info):**
+- שם הלקוח (customer_name)
+- מספר תיק (portfolio_number)
+- ברוקר/בנק (broker)
+- תאריך דוח (report_date)
+- שווי תיק (portfolio_value)
+- עלות מקורית (total_cost_basis)
+- רווח/הפסד כולל (total_gain_loss)
+- תשואה כוללת באחוזים (total_return_percent)
+
+### **2. מניות (stocks):**
+עבור כל מניה:
+- שם (name)
+- סימול (symbol)
+- בורסה (exchange): "TASE", "NYSE", "NASDAQ"
+- כמות (quantity)
+- מחיר ממוצע (avg_cost)
+- מחיר נוכחי (current_price)
+- שווי נוכחי (market_value)
+- עלות מקורית (cost_basis)
+- רווח/הפסד (gain_loss)
+- תשואה % (return_percent)
+- דיבידנד שנתי (annual_dividend) - אם יש
+- תשואת דיבידנד (dividend_yield)
+
+### **3. אג"ח (bonds):**
+עבור כל אג"ח:
+- שם (name)
+- סוג (type): "government", "corporate", "municipal"
+- דירוג (rating): "AAA", "AA", "A", וכו'
+- מח"מ (duration)
+- ע.נ. (face_value)
+- תשואה לפדיון (yield_to_maturity)
+- ריבית קופון (coupon_rate)
+- תאריך פדיון (maturity_date)
+- שווי נוכחי (market_value)
+
+### **4. קרנות סל ETF (etfs):**
+עבור כל ETF:
+- שם (name)
+- סימול (symbol)
+- מדד עוקב (underlying_index)
+- יחידות (units)
+- שווי נוכחי (market_value)
+- עלות מקורית (cost_basis)
+- דמי ניהול (expense_ratio)
+- רווח/הפסד (gain_loss)
+
+### **5. הקצאת נכסים (asset_allocation):**
+- מניות % (stocks_percent)
+- אג"ח % (bonds_percent)
+- מזומן % (cash_percent)
+- נדל"ן % (real_estate_percent)
+- סחורות % (commodities_percent)
+- אלטרנטיבי % (alternatives_percent)
+
+## **פורמט JSON:**
+{
+  "report_info": {
+    "report_date": "2024-11-15",
+    "customer_name": "ישראל ישראלי",
+    "portfolio_number": "789012",
+    "broker": "IBI",
+    "portfolio_value": 500000.00,
+    "total_cost_basis": 400000.00,
+    "total_gain_loss": 100000.00,
+    "total_return_percent": 25.0
+  },
+  "stocks": [
+    {
+      "name": "טבע תעשיות",
+      "symbol": "TEVA",
+      "exchange": "TASE",
+      "quantity": 500,
+      "avg_cost": 42.00,
+      "current_price": 55.00,
+      "market_value": 27500.00,
+      "cost_basis": 21000.00,
+      "gain_loss": 6500.00,
+      "return_percent": 30.95,
+      "annual_dividend": 250.00,
+      "dividend_yield": 0.91
+    }
+  ],
+  "bonds": [
+    {
+      "name": "אג\"ח ממשלתי 0225",
+      "type": "government",
+      "rating": "AA+",
+      "face_value": 50000.00,
+      "duration": 3.5,
+      "coupon_rate": 2.0,
+      "yield_to_maturity": 4.5,
+      "maturity_date": "2027-02-15",
+      "market_value": 48500.00
+    }
+  ],
+  "etfs": [
+    {
+      "name": "קסם S&P500",
+      "symbol": "1159184",
+      "underlying_index": "S&P 500",
+      "units": 100,
+      "market_value": 55000.00,
+      "cost_basis": 45000.00,
+      "expense_ratio": 0.25,
+      "gain_loss": 10000.00
+    }
+  ],
+  "mutual_funds": [],
+  "asset_allocation": {
+    "stocks_percent": 45,
+    "bonds_percent": 30,
+    "cash_percent": 10,
+    "real_estate_percent": 10,
+    "alternatives_percent": 5
+  },
+  "summary": {
+    "total_stocks": 150000.00,
+    "total_bonds": 100000.00,
+    "total_etfs": 120000.00,
+    "total_mutual_funds": 80000.00,
+    "total_cash": 50000.00,
+    "total_all": 500000.00,
+    "top_holdings": [
+      {"name": "טבע", "percent": 12.5},
+      {"name": "קסם S&P500", "percent": 11.0}
+    ]
+  }
+}
+
+**הדוח:**
+${text}
+
+**חלץ את כל הנכסים - כולל פוזיציות קטנות!**`;
+}
+
+// ============================================================================
 // 6️⃣ תלוש שכר (Payslip / Salary Slip)
 // ============================================================================
 
@@ -1249,6 +1532,173 @@ ${text}
 }
 
 // ============================================================================
+// 7️⃣ דוח הר הביטוח (Har HaBituach - All Insurance Report)
+// ============================================================================
+
+export function getHarBituachPrompt(text: string | null): string {
+  return `אתה מומחה בניתוח דוח הר הביטוח - הדוח שמרכז את כל הביטוחים של אדם במקום אחד.
+
+## **מטרת העל:** לחלץ **את כל פוליסות הביטוח** בכל הקטגוריות!
+
+🚨 **חשוב:** הדוח מכיל את **כל** הביטוחים - חיים, בריאות, רכב, דירה, נסיעות, וכו'. חלץ את כולם!
+
+## **1. מידע כללי (report_info):**
+- שם הלקוח (customer_name)
+- תעודת זהות (id_number)
+- תאריך הפקת הדוח (report_date)
+- סה"כ פוליסות פעילות (total_active_policies)
+- סה"כ פרמיה חודשית (total_monthly_premium)
+
+## **2. קטגוריות ביטוח:**
+
+### **ביטוח חיים (life_insurance):**
+- סכום ביטוח (coverage_amount)
+- פרמיה חודשית (monthly_premium)
+- מוטבים (beneficiaries)
+- תאריך סיום (end_date)
+- חברת ביטוח (provider)
+
+### **ביטוח בריאות (health_insurance):**
+- סוג (type): "שב"ן", "משלים", "פרטי", "קולקטיבי"
+- חברת ביטוח (provider)
+- פרמיה חודשית (monthly_premium)
+- כיסויים (coverage): תרופות, ניתוחים, אשפוז, רופאים פרטיים
+- השתתפויות עצמיות (deductibles)
+
+### **ביטוח סיעודי (nursing_insurance):**
+- סכום חודשי לכיסוי (monthly_benefit)
+- תקופת המתנה (waiting_period)
+- תקופת כיסוי (coverage_period)
+- פרמיה חודשית (monthly_premium)
+
+### **ביטוח אובדן כושר עבודה (disability_insurance):**
+- סכום חודשי (monthly_benefit)
+- אחוז כיסוי מהשכר (coverage_percent)
+- תקופת המתנה (waiting_period)
+- הגדרת אובדן כושר (definition): "עיסוקי", "כל עיסוק"
+
+### **ביטוח מחלות קשות (critical_illness):**
+- סכום ביטוח (coverage_amount)
+- מחלות מכוסות (covered_conditions)
+- פרמיה חודשית (monthly_premium)
+
+### **ביטוח רכב (car_insurance):**
+- סוג ביטוח (type): "חובה", "מקיף", "צד ג'"
+- פרטי רכב (vehicle): יצרן, דגם, שנה, מספר רישוי
+- חברת ביטוח (provider)
+- פרמיה שנתית (annual_premium)
+- השתתפות עצמית (deductible)
+- תוקף (valid_until)
+
+### **ביטוח דירה (home_insurance):**
+- סוג (type): "מבנה", "תכולה", "משולב"
+- כתובת הנכס (property_address)
+- סכום ביטוח מבנה (building_coverage)
+- סכום ביטוח תכולה (contents_coverage)
+- פרמיה שנתית (annual_premium)
+- חברת ביטוח (provider)
+
+### **ביטוח נסיעות לחו"ל (travel_insurance):**
+- סוג (type): "שנתי", "חד פעמי"
+- פרמיה (premium)
+- כיסויים (coverage)
+
+## **פורמט JSON:**
+{
+  "report_info": {
+    "report_date": "2024-11-15",
+    "customer_name": "ישראל ישראלי",
+    "id_number": "123456789",
+    "total_active_policies": 8,
+    "total_monthly_premium": 1250.00
+  },
+  "life_insurance": [
+    {
+      "provider": "הראל",
+      "policy_number": "12345678",
+      "coverage_amount": 500000.00,
+      "monthly_premium": 150.00,
+      "start_date": "2020-01-01",
+      "end_date": "2040-01-01",
+      "beneficiaries": "בן/בת הזוג",
+      "status": "active"
+    }
+  ],
+  "health_insurance": [
+    {
+      "provider": "כללית מושלם",
+      "type": "משלים",
+      "monthly_premium": 89.00,
+      "coverage": ["רופאים פרטיים", "תרופות", "MRI"],
+      "status": "active"
+    }
+  ],
+  "disability_insurance": [
+    {
+      "provider": "מגדל",
+      "monthly_benefit": 8000.00,
+      "coverage_percent": 75,
+      "waiting_period": "90 יום",
+      "definition": "עיסוקי",
+      "monthly_premium": 200.00,
+      "status": "active"
+    }
+  ],
+  "nursing_insurance": [],
+  "critical_illness": [],
+  "car_insurance": [
+    {
+      "provider": "הפניקס",
+      "type": "מקיף",
+      "vehicle": {
+        "make": "טויוטה",
+        "model": "קורולה",
+        "year": 2022,
+        "license_plate": "12-345-67"
+      },
+      "annual_premium": 3500.00,
+      "deductible": 1000.00,
+      "valid_until": "2025-03-15",
+      "status": "active"
+    }
+  ],
+  "home_insurance": [
+    {
+      "provider": "איילון",
+      "type": "משולב",
+      "property_address": "הרצל 10, תל אביב",
+      "building_coverage": 1500000.00,
+      "contents_coverage": 200000.00,
+      "annual_premium": 1200.00,
+      "status": "active"
+    }
+  ],
+  "travel_insurance": [],
+  "summary": {
+    "total_policies": 8,
+    "total_monthly_premium": 689.00,
+    "total_annual_premium": 4700.00,
+    "by_category": {
+      "life": 1,
+      "health": 1,
+      "disability": 1,
+      "car": 1,
+      "home": 1
+    },
+    "recommendations": [
+      "אין ביטוח סיעודי - מומלץ לבחון",
+      "אין ביטוח מחלות קשות - מומלץ לבחון"
+    ]
+  }
+}
+
+**הדוח:**
+${text}
+
+**חלץ את כל הפוליסות - גם אם חלקן לא פעילות!**`;
+}
+
+// ============================================================================
 // Helper: בחירת פרומפט לפי סוג מסמך
 // ============================================================================
 
@@ -1259,6 +1709,27 @@ export function getPromptForDocumentType(
 ): string {
   const normalizedType = documentType.toLowerCase();
 
+  // 🆕 דוחות כוללים - בדיקה ראשונה!
+  // דוח מסלקה פנסיונית - כל הפנסיות במקום אחד
+  if (normalizedType.includes('מסלקה') || 
+      normalizedType.includes('clearing') || 
+      normalizedType.includes('pension_clearing') ||
+      normalizedType.includes('pension_report') ||
+      normalizedType.includes('דוח פנסיה כולל')) {
+    return getPensionStatementPrompt(extractedText);
+  }
+
+  // דוח הר הביטוח - כל הביטוחים במקום אחד
+  if (normalizedType.includes('הר הביטוח') || 
+      normalizedType.includes('har_bituach') ||
+      normalizedType.includes('har bituach') ||
+      normalizedType.includes('all_insurance') ||
+      normalizedType.includes('insurance_report') ||
+      normalizedType.includes('דוח ביטוחים כולל')) {
+    return getHarBituachPrompt(extractedText);
+  }
+
+  // דוחות רגילים
   if (normalizedType.includes('credit') || normalizedType === 'credit_statement') {
     return getCreditStatementPrompt(extractedText, categories);
   }
@@ -1267,28 +1738,126 @@ export function getPromptForDocumentType(
     return getBankStatementPrompt(extractedText, categories);
   }
 
-  if (normalizedType.includes('mortgage')) {
+  if (normalizedType.includes('mortgage') || normalizedType.includes('משכנתא')) {
     return getMortgageStatementPrompt(extractedText);
   }
 
-  if (normalizedType.includes('loan')) {
+  if (normalizedType.includes('loan') || normalizedType.includes('הלוואה')) {
     return getLoanStatementPrompt(extractedText);
   }
 
-  if (normalizedType.includes('insurance')) {
+  // ביטוח בודד (לא דוח כולל)
+  if (normalizedType.includes('insurance') || normalizedType.includes('ביטוח') || normalizedType.includes('פוליסה')) {
     return getInsuranceStatementPrompt(extractedText);
   }
 
-  if (normalizedType.includes('pension') || normalizedType.includes('פנסיה') || normalizedType.includes('מסלקה')) {
+  // פנסיה בודדת (לא מסלקה)
+  if (normalizedType.includes('pension') || normalizedType.includes('פנסיה') || 
+      normalizedType.includes('גמל') || normalizedType.includes('השתלמות')) {
     return getPensionStatementPrompt(extractedText);
   }
 
-  if (normalizedType.includes('payslip') || normalizedType.includes('salary') || normalizedType.includes('תלוש')) {
+  if (normalizedType.includes('payslip') || normalizedType.includes('salary') || 
+      normalizedType.includes('תלוש') || normalizedType.includes('משכורת')) {
     return getPayslipPrompt(extractedText);
   }
 
-  // Default to credit statement for unknown types
-  console.warn(`Unknown document type: ${documentType}, using credit statement prompt`);
-  return getCreditStatementPrompt(extractedText, categories);
+  // 🆕 חסכונות
+  if (normalizedType.includes('savings') || normalizedType.includes('חסכון') || 
+      normalizedType.includes('פיקדון') || normalizedType.includes('deposit')) {
+    return getSavingsPrompt(extractedText);
+  }
+
+  // 🆕 השקעות
+  if (normalizedType.includes('investment') || normalizedType.includes('השקעות') || 
+      normalizedType.includes('תיק') || normalizedType.includes('portfolio') ||
+      normalizedType.includes('ניירות ערך') || normalizedType.includes('מניות')) {
+    return getInvestmentPrompt(extractedText);
+  }
+
+  // Default to bank statement for unknown types (more common)
+  console.warn(`Unknown document type: ${documentType}, using bank statement prompt`);
+  return getBankStatementPrompt(extractedText, categories);
+}
+
+// ============================================================================
+// 🆕 זיהוי אוטומטי של סוג מסמך לפי תוכן
+// ============================================================================
+
+export function detectDocumentType(fileName: string, content?: string): string {
+  const lowerFileName = fileName.toLowerCase();
+  const lowerContent = (content || '').toLowerCase();
+  
+  // דוחות כוללים - עדיפות גבוהה
+  if (lowerFileName.includes('מסלקה') || lowerContent.includes('מסלקה פנסיונית') ||
+      lowerContent.includes('דוח מרכז') || lowerContent.includes('clearing house')) {
+    return 'pension_clearing';
+  }
+  
+  if (lowerFileName.includes('הר הביטוח') || lowerFileName.includes('har_bituach') ||
+      lowerContent.includes('הר הביטוח') || lowerContent.includes('רשימת הביטוחים שלך')) {
+    return 'har_bituach';
+  }
+  
+  // דוחות רגילים
+  if (lowerFileName.includes('אשראי') || lowerFileName.includes('credit') ||
+      lowerFileName.includes('ויזא') || lowerFileName.includes('מאסטר') ||
+      lowerFileName.includes('כאל') || lowerFileName.includes('מקס') ||
+      lowerContent.includes('פירוט עסקאות') || lowerContent.includes('כרטיס אשראי')) {
+    return 'credit';
+  }
+  
+  if (lowerFileName.includes('בנק') || lowerFileName.includes('עוש') ||
+      lowerFileName.includes('bank') || lowerFileName.includes('תנועות בחשבון') ||
+      lowerContent.includes('תנועות בחשבון') || lowerContent.includes('יתרת פתיחה')) {
+    return 'bank';
+  }
+  
+  if (lowerFileName.includes('משכנתא') || lowerFileName.includes('mortgage') ||
+      lowerContent.includes('הלוואת דיור') || lowerContent.includes('משכנתא')) {
+    return 'mortgage';
+  }
+  
+  if (lowerFileName.includes('הלוואה') || lowerFileName.includes('loan') ||
+      lowerContent.includes('פירעון הלוואה') || lowerContent.includes('יתרת הלוואה')) {
+    return 'loan';
+  }
+  
+  if (lowerFileName.includes('תלוש') || lowerFileName.includes('משכורת') ||
+      lowerFileName.includes('payslip') || lowerFileName.includes('salary') ||
+      lowerContent.includes('תלוש שכר') || lowerContent.includes('ברוטו')) {
+    return 'payslip';
+  }
+  
+  if (lowerFileName.includes('פנסיה') || lowerFileName.includes('pension') ||
+      lowerFileName.includes('גמל') || lowerFileName.includes('השתלמות') ||
+      lowerContent.includes('קרן פנסיה') || lowerContent.includes('קופת גמל')) {
+    return 'pension';
+  }
+  
+  if (lowerFileName.includes('ביטוח') || lowerFileName.includes('insurance') ||
+      lowerFileName.includes('פוליסה') ||
+      lowerContent.includes('פוליסת ביטוח') || lowerContent.includes('פרמיה')) {
+    return 'insurance';
+  }
+  
+  // 🆕 חסכונות
+  if (lowerFileName.includes('חסכון') || lowerFileName.includes('savings') ||
+      lowerFileName.includes('פיקדון') || lowerFileName.includes('deposit') ||
+      lowerContent.includes('פיקדון') || lowerContent.includes('חשבון חיסכון')) {
+    return 'savings';
+  }
+  
+  // 🆕 השקעות
+  if (lowerFileName.includes('השקעות') || lowerFileName.includes('investment') ||
+      lowerFileName.includes('תיק') || lowerFileName.includes('portfolio') ||
+      lowerFileName.includes('ני"ע') || lowerFileName.includes('מניות') ||
+      lowerContent.includes('תיק השקעות') || lowerContent.includes('ניירות ערך') ||
+      lowerContent.includes('בורסה')) {
+    return 'investment';
+  }
+  
+  // ברירת מחדל - דוח בנק (הכי נפוץ)
+  return 'bank';
 }
 

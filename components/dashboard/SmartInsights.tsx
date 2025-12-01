@@ -1,16 +1,32 @@
 'use client';
 
-import { Lightbulb, Users, Target, AlertTriangle } from 'lucide-react';
+import { Lightbulb, Users, Target, AlertTriangle, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+
+interface BehaviorInsight {
+  id?: string;
+  insight_type: string;
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  suggested_action?: string;
+  data?: Record<string, any>;
+}
 
 interface SmartInsightsProps {
   profile: any;
   monthlyExpenses: number;
+  behaviorInsights?: BehaviorInsight[]; // 🆕 תובנות מ-analyzeBehavior
 }
 
-export default function SmartInsights({ profile, monthlyExpenses }: SmartInsightsProps) {
-  const insights = generateInsights(profile, monthlyExpenses);
+export default function SmartInsights({ profile, monthlyExpenses, behaviorInsights = [] }: SmartInsightsProps) {
+  // 🆕 שילוב תובנות מ-DB עם תובנות מחושבות
+  const profileInsights = generateInsights(profile, monthlyExpenses);
+  const dbInsights = behaviorInsights.map(mapBehaviorInsight);
+  
+  // תובנות מ-DB קודמות (יותר רלוונטיות)
+  const allInsights = [...dbInsights, ...profileInsights].slice(0, 5);
 
-  if (insights.length === 0) {
+  if (allInsights.length === 0) {
     return null;
   }
 
@@ -22,9 +38,9 @@ export default function SmartInsights({ profile, monthlyExpenses }: SmartInsight
       </h3>
 
       <div className="space-y-3">
-        {insights.map((insight, index) => (
+        {allInsights.map((insight, index) => (
           <div 
-            key={index}
+            key={insight.id || index}
             className={`p-4 rounded-lg border-r-4 ${
               insight.type === 'warning' 
                 ? 'bg-[#FFF3E0] border-[#F6A623]' 
@@ -52,6 +68,37 @@ export default function SmartInsights({ profile, monthlyExpenses }: SmartInsight
       </div>
     </div>
   );
+}
+
+// 🆕 המרת תובנה מ-DB לפורמט תצוגה
+function mapBehaviorInsight(insight: BehaviorInsight) {
+  const iconMap: Record<string, JSX.Element> = {
+    'spending_spike': <TrendingUp className="w-5 h-5 text-[#D64541]" />,
+    'positive_change': <TrendingDown className="w-5 h-5 text-[#7ED957]" />,
+    'category_trend': <Target className="w-5 h-5 text-[#3A7BD5]" />,
+    'subscription_found': <RefreshCw className="w-5 h-5 text-[#F6A623]" />,
+    'saving_opportunity': <Lightbulb className="w-5 h-5 text-[#7ED957]" />,
+    'warning': <AlertTriangle className="w-5 h-5 text-[#F6A623]" />,
+  };
+  
+  const typeMap: Record<string, 'warning' | 'success' | 'info'> = {
+    'spending_spike': 'warning',
+    'warning': 'warning',
+    'positive_change': 'success',
+    'saving_opportunity': 'success',
+    'category_trend': 'info',
+    'subscription_found': 'info',
+    'day_pattern': 'info',
+  };
+  
+  return {
+    id: insight.id,
+    type: typeMap[insight.insight_type] || 'info',
+    icon: iconMap[insight.insight_type] || <Lightbulb className="w-5 h-5 text-[#3A7BD5]" />,
+    title: insight.title,
+    description: insight.description,
+    action: insight.suggested_action,
+  };
 }
 
 function generateInsights(profile: any, monthlyExpenses: number) {

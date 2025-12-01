@@ -8,12 +8,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { sendWhatsAppMessage } from "@/lib/greenapi/client";
+import { getGreenAPIClient } from "@/lib/greenapi/client";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const greenAPI = getGreenAPIClient();
 
 export async function GET(request: NextRequest) {
   // Verify cron secret
@@ -48,9 +50,12 @@ export async function GET(request: NextRequest) {
         // Generate weekly summary
         const summary = await generateWeeklySummary(user.id);
         
-        if (summary) {
+        if (summary && user.phone) {
           // Send via WhatsApp
-          await sendWhatsAppMessage(user.phone, summary);
+          await greenAPI.sendMessage({
+            phoneNumber: user.phone,
+            message: summary,
+          });
           sentCount++;
         }
       } catch (error) {
@@ -93,30 +98,38 @@ async function generateWeeklySummary(userId: string): Promise<string | null> {
   const weekAgoStr = weekAgo.toISOString().split("T")[0];
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // Get transactions
+  // Get user info including phi score
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("full_name, phi_score, current_phase")
+    .eq("id", userId)
+    .single();
+
+  // Get transactions (using amount < 0 for expenses)
   const { data: transactions } = await supabaseAdmin
     .from("transactions")
-    .select("amount, type, expense_category")
+    .select("amount, expense_category, date")
     .eq("user_id", userId)
-    .gte("tx_date", weekAgoStr)
-    .lte("tx_date", todayStr);
+    .eq("status", "approved")
+    .gte("date", weekAgoStr)
+    .lte("date", todayStr);
 
   if (!transactions || transactions.length === 0) {
     return null;
   }
 
   // Calculate totals
-  const expenses = transactions.filter(t => t.type === "expense");
-  const income = transactions.filter(t => t.type === "income");
+  const expenses = transactions.filter(t => t.amount < 0);
+  const income = transactions.filter(t => t.amount > 0);
   
-  const totalExpenses = expenses.reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenses = Math.abs(expenses.reduce((sum, t) => sum + t.amount, 0));
   const totalIncome = income.reduce((sum, t) => sum + t.amount, 0);
 
   // Group by category
   const byCategory: Record<string, number> = {};
   for (const t of expenses) {
     const cat = t.expense_category || "אחר";
-    byCategory[cat] = (byCategory[cat] || 0) + t.amount;
+    byCategory[cat] = (byCategory[cat] || 0) + Math.abs(t.amount);
   }
 
   // Sort categories
@@ -124,19 +137,33 @@ async function generateWeeklySummary(userId: string): Promise<string | null> {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
-  // Get budget for comparison
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const { data: budget } = await supabaseAdmin
-    .from("budgets")
-    .select("total_budget")
+  // Get previous week for comparison
+  const twoWeeksAgo = new Date(weekAgo);
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 7);
+  
+  const { data: prevTransactions } = await supabaseAdmin
+    .from("transactions")
+    .select("amount")
     .eq("user_id", userId)
-    .eq("month", currentMonth)
-    .single();
-
-  const weeklyBudget = budget ? Math.round(budget.total_budget / 4) : null;
+    .eq("status", "approved")
+    .lt("amount", 0)
+    .gte("date", twoWeeksAgo.toISOString().split("T")[0])
+    .lt("date", weekAgoStr);
+  
+  const prevWeekExpenses = Math.abs(prevTransactions?.reduce((sum, t) => sum + t.amount, 0) || 0);
+  const changePercent = prevWeekExpenses > 0 
+    ? Math.round(((totalExpenses - prevWeekExpenses) / prevWeekExpenses) * 100)
+    : 0;
 
   // Build message
-  let msg = `📊 **סיכום שבועי:**\n\n`;
+  const userName = user?.full_name?.split(' ')[0] || 'היי';
+  let msg = `📊 *סיכום שבועי, ${userName}!*\n\n`;
+  
+  // Phi Score if available
+  if (user?.phi_score) {
+    const scoreEmoji = user.phi_score >= 80 ? '🌟' : user.phi_score >= 60 ? '👍' : '📈';
+    msg += `${scoreEmoji} *ציון φ:* ${user.phi_score}/100\n\n`;
+  }
   
   if (totalIncome > 0) {
     msg += `💰 הכנסות: ${formatCurrency(totalIncome)}\n`;
@@ -144,25 +171,41 @@ async function generateWeeklySummary(userId: string): Promise<string | null> {
   
   msg += `💸 הוצאות: ${formatCurrency(totalExpenses)}\n`;
   
-  if (weeklyBudget) {
-    const percentage = Math.round((totalExpenses / weeklyBudget) * 100);
-    const status = percentage > 100 ? "⚠️" : percentage > 80 ? "🟡" : "✅";
-    msg += `📈 מתקציב שבועי: ${percentage}% ${status}\n`;
+  // Week over week comparison
+  if (prevWeekExpenses > 0) {
+    if (changePercent > 0) {
+      msg += `📈 ${changePercent}% יותר מהשבוע שעבר\n`;
+    } else if (changePercent < 0) {
+      msg += `📉 ${Math.abs(changePercent)}% פחות מהשבוע שעבר 🎉\n`;
+    } else {
+      msg += `➡️ כמו השבוע שעבר\n`;
+    }
   }
   
-  msg += `\n🔝 **הוצאות לפי קטגוריה:**\n`;
+  // Balance
+  const balance = totalIncome - totalExpenses;
+  if (balance > 0) {
+    msg += `✅ חסכת: ${formatCurrency(balance)}\n`;
+  } else if (balance < 0 && totalIncome > 0) {
+    msg += `⚠️ גירעון: ${formatCurrency(Math.abs(balance))}\n`;
+  }
+  
+  msg += `\n🔝 *הוצאות לפי קטגוריה:*\n`;
   
   for (const [category, amount] of sortedCategories) {
-    msg += `• ${category}: ${formatCurrency(amount)}\n`;
+    const percent = Math.round((amount / totalExpenses) * 100);
+    msg += `• ${category}: ${formatCurrency(amount)} (${percent}%)\n`;
   }
   
-  // Add tip
+  // Insight based on data
   const biggestCategory = sortedCategories[0];
-  if (biggestCategory) {
-    msg += `\n💡 **טיפ:** הקטגוריה הגדולה ביותר השבוע היא "${biggestCategory[0]}".`;
-    if (biggestCategory[1] > totalExpenses * 0.3) {
-      msg += ` זה ${Math.round(biggestCategory[1] / totalExpenses * 100)}% מההוצאות - שווה לשים לב!`;
-    }
+  if (biggestCategory && biggestCategory[1] > totalExpenses * 0.35) {
+    msg += `\n💡 *תובנה:* ${biggestCategory[0]} היא ${Math.round(biggestCategory[1] / totalExpenses * 100)}% מההוצאות. `;
+    msg += `אפשר לחסוך שם?`;
+  } else if (changePercent < -10) {
+    msg += `\n💡 *כל הכבוד!* צמצמת הוצאות השבוע - המשך ככה!`;
+  } else if (changePercent > 20) {
+    msg += `\n💡 *שים לב:* עלייה משמעותית בהוצאות השבוע. רוצה לבדוק יחד?`;
   }
   
   msg += `\n\nשבוע טוב! 😊`;

@@ -240,6 +240,92 @@ export async function POST(request: NextRequest) {
         }
       }
       
+      // 🆕 בדיקה אם המשתמש רוצה להמשיך (אחרי העלאת מסמכים)
+      const { isContinueRequest, handleContinueRequest } = await import('@/lib/conversation/flows/document-upload-flow');
+      
+      if (isContinueRequest(text)) {
+        console.log('▶️ User wants to continue - checking if can start classification');
+        
+        const continueResult = await handleContinueRequest(userData.id);
+        
+        if (continueResult.shouldStartClassification) {
+          // יש תנועות לסיווג - התחל session
+          const { 
+            createClassificationSession, 
+            saveClassificationSession, 
+            getNextQuestionBatch 
+          } = await import('@/lib/conversation/flows/document-classification-session');
+          
+          // קבל את התנועות ה-pending
+          const { data: pendingTx } = await supabase
+            .from('transactions')
+            .select('id, date, vendor, amount, type, expense_category, income_category')
+            .eq('user_id', userData.id)
+            .eq('status', 'pending')
+            .order('date', { ascending: false });
+          
+          if (pendingTx && pendingTx.length > 0) {
+            // חשב סיכומים
+            const income = pendingTx.filter(t => t.type === 'income');
+            const expenses = pendingTx.filter(t => t.type === 'expense');
+            const totalIncome = income.reduce((sum, t) => sum + (t.amount || 0), 0);
+            const totalExpenses = expenses.reduce((sum, t) => sum + (t.amount || 0), 0);
+            
+            // יצירת רשימה לסיווג
+            const transactionsToClassify = pendingTx.map(tx => ({
+              id: tx.id,
+              date: tx.date || new Date().toISOString().split('T')[0],
+              vendor: tx.vendor || 'לא ידוע',
+              amount: tx.amount || 0,
+              type: (tx.type || 'expense') as 'income' | 'expense',
+              currentCategory: tx.expense_category || tx.income_category || null,
+              suggestedCategory: tx.expense_category || null,
+            }));
+            
+            // צור session
+            const batchId = `continue_${Date.now()}_${userData.id.substring(0, 8)}`;
+            const session = await createClassificationSession(
+              userData.id,
+              batchId,
+              transactionsToClassify,
+              totalIncome,
+              totalExpenses,
+              [] // no missing docs at this point
+            );
+            
+            await saveClassificationSession(userData.id, session);
+            
+            // שלח הודעת התחלה
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: continueResult.message,
+            });
+            
+            // המתן קצת ושלח שאלה ראשונה
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            const firstQuestion = getNextQuestionBatch(session);
+            if (!firstQuestion.done) {
+              await greenAPI.sendMessage({
+                phoneNumber,
+                message: firstQuestion.message,
+              });
+              await saveClassificationSession(userData.id, session);
+            }
+            
+            return NextResponse.json({ status: 'classification_started' });
+          }
+        }
+        
+        // אין מה לסווג או צריך עוד מסמכים
+        await greenAPI.sendMessage({
+          phoneNumber,
+          message: continueResult.message,
+        });
+        
+        return NextResponse.json({ status: 'continue_response' });
+      }
+      
       // 🆕 Legacy: תמיכה לאחור עבור אישור/ביטול ישן
       const hasPendingApproval = currentContext?.ongoingTask?.taskType === 'transaction_approval';
       
@@ -753,34 +839,92 @@ export async function POST(request: NextRequest) {
         
         const lowerFileName = fileName.toLowerCase();
         
+        // מיפוי סוגים לשמות בעברית
+        const typeLabels: Record<string, string> = {
+          'bank': 'דוח בנק',
+          'credit': 'דוח אשראי',
+          'payslip': 'תלוש משכורת',
+          'loan': 'דוח הלוואות',
+          'mortgage': 'דוח משכנתא',
+          'pension': 'דוח פנסיה',
+          'pension_clearing': 'דוח מסלקה פנסיונית (כל הפנסיות!)',
+          'insurance': 'דוח ביטוח',
+          'har_bituach': 'דוח הר הביטוח (כל הביטוחים!)',
+          'savings': 'דוח חסכונות',
+          'investment': 'דוח השקעות',
+        };
+        
         if (explicitDocType && explicitDocType !== 'pending_type_selection') {
           // סוג מסמך הוגדר במפורש
           documentType = explicitDocType;
+          documentTypeHebrew = typeLabels[explicitDocType] || explicitDocType;
         } else if (currentState === 'onboarding_income' || currentState === 'data_collection') {
           // ב-onboarding - הבוט ביקש דוח בנק
           documentType = 'bank';
-          documentTypeHebrew = 'דוח בנק';
-        } else if (lowerFileName.includes('אשראי') || lowerFileName.includes('credit') || lowerFileName.includes('ויזה') || lowerFileName.includes('כאל') || lowerFileName.includes('מקס') || lowerFileName.includes('visa') || lowerFileName.includes('mastercard')) {
+          documentTypeHebrew = typeLabels['bank'];
+        } 
+        // === דוחות כוללים (עדיפות גבוהה!) ===
+        else if (lowerFileName.includes('מסלקה') || lowerFileName.includes('clearing') || 
+                 lowerFileName.includes('פנסיוני') || lowerFileName.includes('pension_report')) {
+          documentType = 'pension_clearing';
+          documentTypeHebrew = typeLabels['pension_clearing'];
+        } 
+        else if (lowerFileName.includes('הר הביטוח') || lowerFileName.includes('har') || 
+                 lowerFileName.includes('all_insurance') || lowerFileName.includes('כל הביטוחים')) {
+          documentType = 'har_bituach';
+          documentTypeHebrew = typeLabels['har_bituach'];
+        }
+        // === דוחות רגילים ===
+        else if (lowerFileName.includes('אשראי') || lowerFileName.includes('credit') || 
+                 lowerFileName.includes('ויזה') || lowerFileName.includes('ויזא') ||
+                 lowerFileName.includes('כאל') || lowerFileName.includes('מקס') || 
+                 lowerFileName.includes('visa') || lowerFileName.includes('mastercard') ||
+                 lowerFileName.includes('ישראכרט') || lowerFileName.includes('דיינרס')) {
           documentType = 'credit';
-          documentTypeHebrew = 'דוח אשראי';
-        } else if (lowerFileName.includes('בנק') || lowerFileName.includes('bank') || lowerFileName.includes('עוש') || lowerFileName.includes('תנועות')) {
+          documentTypeHebrew = typeLabels['credit'];
+        } 
+        else if (lowerFileName.includes('בנק') || lowerFileName.includes('bank') || 
+                 lowerFileName.includes('עוש') || lowerFileName.includes('תנועות') ||
+                 lowerFileName.includes('חשבון')) {
           documentType = 'bank';
-          documentTypeHebrew = 'דוח בנק';
-        } else if (lowerFileName.includes('תלוש') || lowerFileName.includes('משכורת') || lowerFileName.includes('שכר') || lowerFileName.includes('payslip')) {
+          documentTypeHebrew = typeLabels['bank'];
+        } 
+        else if (lowerFileName.includes('תלוש') || lowerFileName.includes('משכורת') || 
+                 lowerFileName.includes('שכר') || lowerFileName.includes('payslip') ||
+                 lowerFileName.includes('salary')) {
           documentType = 'payslip';
-          documentTypeHebrew = 'תלוש משכורת';
-        } else if (lowerFileName.includes('הלוואה') || lowerFileName.includes('loan')) {
+          documentTypeHebrew = typeLabels['payslip'];
+        } 
+        else if (lowerFileName.includes('הלוואה') || lowerFileName.includes('loan') ||
+                 lowerFileName.includes('הלוואות')) {
           documentType = 'loan';
-          documentTypeHebrew = 'דוח הלוואות';
-        } else if (lowerFileName.includes('משכנתא') || lowerFileName.includes('mortgage')) {
+          documentTypeHebrew = typeLabels['loan'];
+        } 
+        else if (lowerFileName.includes('משכנתא') || lowerFileName.includes('mortgage') ||
+                 lowerFileName.includes('דיור')) {
           documentType = 'mortgage';
-          documentTypeHebrew = 'דוח משכנתא';
-        } else if (lowerFileName.includes('פנסיה') || lowerFileName.includes('מסלקה') || lowerFileName.includes('pension')) {
+          documentTypeHebrew = typeLabels['mortgage'];
+        } 
+        else if (lowerFileName.includes('פנסיה') || lowerFileName.includes('pension') ||
+                 lowerFileName.includes('גמל') || lowerFileName.includes('השתלמות')) {
           documentType = 'pension';
-          documentTypeHebrew = 'דוח פנסיה';
-        } else if (lowerFileName.includes('ביטוח') || lowerFileName.includes('insurance')) {
+          documentTypeHebrew = typeLabels['pension'];
+        } 
+        else if (lowerFileName.includes('ביטוח') || lowerFileName.includes('insurance') ||
+                 lowerFileName.includes('פוליסה') || lowerFileName.includes('פרמיה')) {
           documentType = 'insurance';
-          documentTypeHebrew = 'דוח ביטוחים';
+          documentTypeHebrew = typeLabels['insurance'];
+        }
+        else if (lowerFileName.includes('חסכון') || lowerFileName.includes('savings') ||
+                 lowerFileName.includes('פיקדון') || lowerFileName.includes('deposit')) {
+          documentType = 'savings';
+          documentTypeHebrew = typeLabels['savings'];
+        }
+        else if (lowerFileName.includes('השקעות') || lowerFileName.includes('investment') ||
+                 lowerFileName.includes('תיק') || lowerFileName.includes('portfolio') ||
+                 lowerFileName.includes('מניות') || lowerFileName.includes('ני"ע')) {
+          documentType = 'investment';
+          documentTypeHebrew = typeLabels['investment'];
         }
         
         console.log(`📋 Document type detected: ${documentType} (state: ${currentState}, fileName: ${fileName})`);
@@ -932,6 +1076,26 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ status: 'no_data' });
           }
 
+          // 🆕 בדיקת כפילויות - האם יש כבר תנועות דומות במערכת?
+          const { checkForDuplicateTransactions } = await import('@/lib/documents/period-tracker');
+          const duplicateCheck = await checkForDuplicateTransactions(userData.id, allTransactions);
+          
+          if (duplicateCheck.isDuplicate) {
+            console.log(`⚠️ Duplicate document detected! Overlap: ${duplicateCheck.overlapPercent}%`);
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: `⚠️ שים לב - נראה שהמסמך הזה כבר הועלה!\n\nזיהיתי ${duplicateCheck.overlapPercent}% חפיפה עם תנועות קיימות.\n\n${duplicateCheck.overlappingPeriod ? `תקופה חופפת: ${duplicateCheck.overlappingPeriod}` : ''}\n\nרוצה להעלות מסמך אחר?`,
+            });
+            return NextResponse.json({ status: 'duplicate_detected' });
+          }
+          
+          // 🆕 אזהרה על חפיפה חלקית - נשמור כדי להציג בהודעה
+          let partialOverlapWarning = '';
+          if (duplicateCheck.hasPartialOverlap) {
+            console.log(`⚠️ Partial overlap detected: ${duplicateCheck.overlapPercent}%`);
+            partialOverlapWarning = `\n\n⚠️ *שים לב:* ${duplicateCheck.overlapPercent}% מהתנועות כבר קיימות במערכת.\nייתכן שחלק מהמסמך כבר הועלה קודם.`;
+          }
+
           // 🆕 שמירת התנועות ב-pending לסיווג אינטראקטיבי
           const pendingBatchId = `batch_${Date.now()}_${userData.id.substring(0, 8)}`;
           const insertedIds: string[] = [];
@@ -1052,79 +1216,51 @@ export async function POST(request: NextRequest) {
           // שמירת ה-session
           await saveClassificationSession(userData.id, session);
           
-          // 🆕 בניית הודעה משולבת - כוללת סיכום + מסמכים חסרים
-          let combinedMessage = '';
+          // 🆕 בניית הודעה טבעית וקצרה
+          const { buildDocumentAnalysisMessage } = await import('@/lib/conversation/flows/document-upload-flow');
           
-          // קודם מראים מה נמצא בדוח הזה
-          combinedMessage += `📊 *דוח ${documentType === 'credit' ? 'אשראי' : 'בנק'} עובד בהצלחה!*\n\n`;
-          combinedMessage += `📅 תקופה: ${periodStart ? formatHebrewMonth(periodStart) : '?'} - ${periodEnd ? formatHebrewMonth(periodEnd) : '?'}\n`;
-          combinedMessage += `📝 תנועות: ${allTransactions.length}\n`;
-          combinedMessage += `💚 הכנסות: ${totalIncome.toLocaleString('he-IL')} ₪\n`;
-          combinedMessage += `💸 הוצאות: ${totalExpenses.toLocaleString('he-IL')} ₪\n\n`;
+          // בדוק אם זה המסמך הראשון
+          const { count: existingDocsCount } = await supabase
+            .from('uploaded_statements')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userData.id)
+            .eq('status', 'completed');
           
-          // 🆕 הצגת מסמכים חסרים שזוהו מהדוח
+          const isFirstDocument = (existingDocsCount || 0) <= 1;
+          
+          // הכן את הנתונים לבניית ההודעה
           const missingDocs = ocrData.missing_documents || [];
-          if (missingDocs.length > 0) {
-            combinedMessage += `📋 *זיהיתי מסמכים שיעזרו להשלים את התמונה:*\n\n`;
-            
-            // קיבוץ לפי סוג
-            const byType: Record<string, any[]> = {};
-            for (const doc of missingDocs) {
-              const type = doc.type || 'other';
-              if (!byType[type]) byType[type] = [];
-              byType[type].push(doc);
-            }
-            
-            const typeLabels: Record<string, { icon: string; name: string; why: string }> = {
-              credit: { icon: '💳', name: 'דוח אשראי', why: 'לראות פירוט הוצאות' },
-              payslip: { icon: '💼', name: 'תלוש משכורת', why: 'לראות פנסיה, קה"ש, ניכויים' },
-              mortgage: { icon: '🏠', name: 'דוח משכנתא', why: 'לראות יתרה, קרן וריבית' },
-              loan: { icon: '🏦', name: 'דוח הלוואות', why: 'לראות פירוט כל ההלוואות' },
-              insurance: { icon: '🛡️', name: 'פוליסת ביטוח', why: 'לראות כיסויים ותנאים' },
-              pension: { icon: '👴', name: 'דוח פנסיה', why: 'לראות יתרה ודמי ניהול' },
-              savings: { icon: '💰', name: 'דוח חיסכון', why: 'לראות יתרות ותשואות' },
-            };
-            
-            for (const [type, docs] of Object.entries(byType)) {
-              const label = typeLabels[type] || { icon: '📄', name: type, why: '' };
-              if (docs.length === 1) {
-                const doc = docs[0];
-                combinedMessage += `${label.icon} *${label.name}*`;
-                if (doc.card_last_4) combinedMessage += ` (****${doc.card_last_4})`;
-                if (doc.employer) combinedMessage += ` - ${doc.employer}`;
-                if (doc.provider) combinedMessage += ` - ${doc.provider}`;
-                combinedMessage += `\n   ${label.why}\n`;
-              } else {
-                combinedMessage += `${label.icon} *${docs.length} ${label.name}*\n   ${label.why}\n`;
-              }
-            }
-            
-            combinedMessage += `\n💡 *למה זה חשוב?*\n`;
-            combinedMessage += `כשאני רואה משכורת בבנק, התלוש מראה לי כמה הולך לפנסיה.\n`;
-            combinedMessage += `כשאני רואה חיוב אשראי, הדוח מראה לי על מה בדיוק הוצאת.\n`;
-            combinedMessage += `ככה אני בונה לך תמונה מלאה! 📊\n\n`;
-          }
+          const analysisResult = {
+            totalTransactions: allTransactions.length,
+            incomeCount: incomeTransactions.length,
+            expenseCount: expenseTransactions.length,
+            totalIncome,
+            totalExpenses,
+            periodStart: periodStart?.toISOString().split('T')[0] || null,
+            periodEnd: periodEnd?.toISOString().split('T')[0] || null,
+            missingDocuments: missingDocs.map((doc: any) => ({
+              type: doc.type,
+              description: doc.description || '',
+              priority: doc.type === 'credit' ? 'high' : doc.type === 'payslip' ? 'high' : 'medium',
+              details: {
+                card_last_4: doc.card_last_4,
+                employer: doc.employer,
+                provider: doc.provider,
+                amount: doc.charge_amount || doc.salary_amount,
+              },
+            })),
+            documentType,
+          };
           
-          // בדיקה אם יש מספיק חודשים
-          if (!periodCoverage.hasMinimumCoverage) {
-            combinedMessage += `⚠️ *עוד משהו:* צריך לפחות 3 חודשים של נתונים.\n`;
-            combinedMessage += `יש לי: ${periodCoverage.totalMonths} ${periodCoverage.totalMonths === 1 ? 'חודש' : 'חודשים'}\n`;
-            
-            if (periodCoverage.missingMonths.length > 0) {
-              combinedMessage += `חסר: ${periodCoverage.missingMonths.map(formatMonthFromYYYYMM).join(', ')}\n\n`;
-            }
-          } else {
-            combinedMessage += `✅ יש לי ${periodCoverage.totalMonths} חודשים - מעולה!\n\n`;
-          }
+          let combinedMessage = buildDocumentAnalysisMessage(
+            analysisResult as any,
+            periodCoverage,
+            isFirstDocument
+          );
           
-          // הצעה להמשיך
-          if (missingDocs.length > 0) {
-            combinedMessage += `🎯 *מה עכשיו?*\n`;
-            combinedMessage += `שלח לי עוד מסמכים (בכל סדר שנוח לך) או כתוב "נמשיך" אם אין לך כרגע.\n`;
-          } else if (periodCoverage.hasMinimumCoverage) {
-            // עכשיו ניתן להמשיך לסיווג
-            const initialMessage = getInitialMessage(session);
-            combinedMessage += initialMessage;
+          // 🆕 הוסף אזהרה על חפיפה חלקית אם יש
+          if (partialOverlapWarning) {
+            combinedMessage += partialOverlapWarning;
           }
           
           await greenAPI.sendMessage({
@@ -1132,20 +1268,9 @@ export async function POST(request: NextRequest) {
             message: combinedMessage,
           });
           
-          // אם יש מספיק נתונים ויש תנועות לסיווג, נשלח את השאלה הראשונה
-          if (periodCoverage.hasMinimumCoverage && 
-              (session.incomeToClassify.length > 0 || session.expensesToClassify.length > 0)) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            const firstBatch = getNextQuestionBatch(session);
-            if (!firstBatch.done) {
-              await greenAPI.sendMessage({
-                phoneNumber,
-                message: firstBatch.message,
-              });
-              await saveClassificationSession(userData.id, session);
-            }
-          }
+          // 🆕 לא מתחילים סיווג אוטומטי - מחכים שהמשתמש יכתוב "נמשיך"
+          // זה נותן למשתמש שליטה ואפשרות לשלוח עוד מסמכים קודם
+          console.log(`📝 Session saved. User can write "נמשיך" to start classification.`);
           
           // 🆕 שמירת מסמכים חסרים ב-DB לבקשה עתידית
           if (ocrData.missing_documents && ocrData.missing_documents.length > 0) {

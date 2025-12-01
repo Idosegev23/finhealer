@@ -46,18 +46,25 @@ export interface UploadedDocument {
 
 /**
  * חילוץ תקופה מתוצאות ה-OCR
+ * 
+ * שלבי זיהוי:
+ * 1. מנסה לקחת מ-report_info (ה-AI חילץ מכותרת הדוח)
+ * 2. אם אין - מחשב מהתנועות עצמן (תאריך ראשון עד אחרון)
  */
 export function extractPeriodFromOCR(ocrData: any): { start: Date | null; end: Date | null } {
   try {
     const reportInfo = ocrData.report_info || ocrData.reportInfo || {};
     
-    // נסה למצוא תקופה מ-report_info
+    // נסה למצוא תקופה מ-report_info (מכותרת הדוח)
     let start = reportInfo.period_start || reportInfo.periodStart;
     let end = reportInfo.period_end || reportInfo.periodEnd;
+    let source = 'report_info';
     
     // אם אין - נסה לחשב מהתנועות
     if (!start || !end) {
+      source = 'transactions';
       const transactions = getAllTransactions(ocrData);
+      
       if (transactions.length > 0) {
         const dates = transactions
           .map(tx => tx.date)
@@ -73,10 +80,15 @@ export function extractPeriodFromOCR(ocrData: any): { start: Date | null; end: D
       }
     }
     
-    return {
-      start: start ? new Date(start) : null,
-      end: end ? new Date(end) : null,
-    };
+    const startDate = start ? new Date(start) : null;
+    const endDate = end ? new Date(end) : null;
+    
+    console.log(`[PeriodTracker] 📅 Period extracted from ${source}:`, {
+      start: startDate?.toISOString().split('T')[0] || 'none',
+      end: endDate?.toISOString().split('T')[0] || 'none',
+    });
+    
+    return { start: startDate, end: endDate };
   } catch (error) {
     console.error('[PeriodTracker] Error extracting period:', error);
     return { start: null, end: null };
@@ -353,6 +365,115 @@ function formatMonth(monthStr: string): string {
 }
 
 // ============================================================================
+// Duplicate Detection
+// ============================================================================
+
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;           // true if >80% overlap
+  hasPartialOverlap: boolean;     // true if 30-80% overlap
+  overlapPercent: number;
+  overlappingPeriod?: string;
+  overlappingTransactions: number;
+}
+
+/**
+ * בדיקת כפילויות - האם תנועות אלו כבר קיימות במערכת?
+ */
+export async function checkForDuplicateTransactions(
+  userId: string,
+  newTransactions: any[]
+): Promise<DuplicateCheckResult> {
+  const supabase = createServiceClient();
+  
+  if (!newTransactions || newTransactions.length === 0) {
+    return {
+      isDuplicate: false,
+      hasPartialOverlap: false,
+      overlapPercent: 0,
+      overlappingTransactions: 0,
+    };
+  }
+  
+  // יצירת hashes לתנועות החדשות
+  const newHashes = newTransactions.map(tx => generateTransactionHash(tx));
+  
+  // חילוץ תקופה מהתנועות החדשות
+  const dates = newTransactions
+    .map(tx => tx.date)
+    .filter(d => d)
+    .sort();
+  
+  const periodStart = dates[0];
+  const periodEnd = dates[dates.length - 1];
+  
+  // חיפוש תנועות קיימות באותה תקופה
+  const { data: existingTransactions } = await supabase
+    .from('transactions')
+    .select('id, date, amount, vendor, original_description')
+    .eq('user_id', userId)
+    .gte('date', periodStart)
+    .lte('date', periodEnd)
+    .limit(500);
+  
+  if (!existingTransactions || existingTransactions.length === 0) {
+    return {
+      isDuplicate: false,
+      hasPartialOverlap: false,
+      overlapPercent: 0,
+      overlappingTransactions: 0,
+    };
+  }
+  
+  // יצירת hashes לתנועות קיימות
+  const existingHashes = existingTransactions.map(tx => 
+    generateTransactionHash({
+      date: tx.date,
+      amount: tx.amount,
+      vendor: tx.vendor,
+      description: tx.original_description,
+    })
+  );
+  
+  // חישוב חפיפה
+  const overlapping = newHashes.filter(hash => existingHashes.includes(hash));
+  const overlapPercent = Math.round((overlapping.length / newHashes.length) * 100);
+  
+  console.log(`[DuplicateCheck] Found ${overlapping.length}/${newHashes.length} overlapping transactions (${overlapPercent}%)`);
+  
+  return {
+    isDuplicate: overlapPercent > 80,
+    hasPartialOverlap: overlapPercent >= 30 && overlapPercent <= 80,
+    overlapPercent,
+    overlappingPeriod: periodStart && periodEnd ? `${formatDateShort(periodStart)} - ${formatDateShort(periodEnd)}` : undefined,
+    overlappingTransactions: overlapping.length,
+  };
+}
+
+/**
+ * יצירת hash לתנועה (לזיהוי כפילויות)
+ */
+function generateTransactionHash(tx: any): string {
+  const date = tx.date || '';
+  const amount = Math.abs(tx.amount || 0).toFixed(2);
+  const vendor = (tx.vendor || '').toLowerCase().trim();
+  const desc = (tx.description || tx.original_description || '').toLowerCase().trim().substring(0, 30);
+  
+  return `${date}|${amount}|${vendor}|${desc}`;
+}
+
+/**
+ * פורמט תאריך קצר
+ */
+function formatDateShort(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+  } catch {
+    return dateStr;
+  }
+}
+
+// ============================================================================
 // Export
 // ============================================================================
 
@@ -364,5 +485,6 @@ export default {
   getUserPeriodCoverage,
   getCoverageMessage,
   getMissingDocumentRequest,
+  checkForDuplicateTransactions,
 };
 

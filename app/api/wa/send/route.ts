@@ -59,30 +59,30 @@ export async function POST(request: NextRequest) {
 
     // מצב 1: שליחה לפי userId
     if (userId) {
-      const { data: user, error: userError } = await supabase
-        .from('users')
-        .select('id, name, phone, wa_opt_in')
-        .eq('id', userId)
-        .single();
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, name, phone, wa_opt_in')
+      .eq('id', userId)
+      .single();
 
-      if (userError || !user) {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
-      }
+    if (userError || !user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
 
-      const userData = user as any;
+    const userData = user as any;
 
-      if (!userData.wa_opt_in) {
-        return NextResponse.json(
-          { error: 'User has not opted in to WhatsApp' },
-          { status: 403 }
-        );
-      }
+    if (!userData.wa_opt_in) {
+      return NextResponse.json(
+        { error: 'User has not opted in to WhatsApp' },
+        { status: 403 }
+      );
+    }
 
-      if (!userData.phone) {
-        return NextResponse.json(
-          { error: 'User has no phone number' },
-          { status: 400 }
-        );
+    if (!userData.phone) {
+      return NextResponse.json(
+        { error: 'User has no phone number' },
+        { status: 400 }
+      );
       }
 
       phoneNumber = userData.phone;
@@ -146,18 +146,18 @@ export async function POST(request: NextRequest) {
     // שמירת ההודעה היוצאת (אם יש userId)
     if (targetUserId) {
       const { error: msgError } = await (supabase as any)
-        .from('wa_messages')
-        .insert({
+      .from('wa_messages')
+      .insert({
           user_id: targetUserId,
-          direction: 'outgoing',
-          msg_type: buttons ? 'buttons' : 'text',
-          payload: { message, buttons },
-          provider_msg_id: result.idMessage,
-          status: 'sent',
+        direction: 'outgoing',
+        msg_type: buttons ? 'buttons' : 'text',
+        payload: { message, buttons },
+        provider_msg_id: result.idMessage,
+        status: 'sent',
         });
 
-      if (msgError) {
-        console.error('❌ Error saving message:', msgError);
+    if (msgError) {
+      console.error('❌ Error saving message:', msgError);
       }
 
       // 🆕 יצירת/עדכון context ל-onboarding

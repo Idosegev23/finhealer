@@ -21,6 +21,7 @@ import { handleDataCollectionFlow } from "./flows/data-collection-flow";
 import { handleBudgetManagement } from "./flows/budget-management-flow";
 import { handleGoalsManagement } from "./flows/goals-management-flow";
 import { handleLoanConsolidation } from "./flows/loan-consolidation-flow";
+import { isContinueRequest, handleContinueRequest } from "./flows/document-upload-flow";
 
 /**
  * Main Conversation Orchestrator
@@ -194,6 +195,24 @@ async function routeToHandler(
       return await handleLoanIntent(userContext, context);
   }
 
+  // 🆕 בדיקה אם משתמש כתב "נמשיך" - מתחיל סיווג תנועות
+  if (isContinueRequest(message)) {
+    console.log('🔄 User wrote "נמשיך" - checking if can start classification');
+    return await handleContinueToClassification(userContext, context);
+  }
+
+  // 🆕 בדיקה אם משתמש רוצה ניתוח דפוסים (אחרי סיום סיווג)
+  if (isAnalysisRequest(message)) {
+    console.log('🔄 User requested analysis');
+    return await handleAnalysisRequest(userContext, context);
+  }
+  
+  // 🆕 בדיקה אם משתמש שואל על סטטוס
+  if (isStatusRequest(message)) {
+    console.log('🔄 User requested status');
+    return await handleStatusRequest(userContext);
+  }
+
   // Handle based on current state
   switch (currentState) {
     case "idle":
@@ -208,6 +227,10 @@ async function routeToHandler(
     case "classification_questions":
       // 🆕 טיפול בשאלות סיווג מה-document-classification-session
       return await handleDocumentClassificationState(intent, message, userContext, context);
+
+    case "behavior_analysis":
+      // 🆕 שלב 2 - ניתוח דפוסים
+      return await handleBehaviorAnalysisState(intent, message, userContext, context);
 
     case "onboarding_personal":
       return await handleOnboardingState(intent, message, userContext, context, "personal");
@@ -452,7 +475,8 @@ async function handleDocumentClassificationState(
   const { 
     loadClassificationSession, 
     handleUserResponse, 
-    clearClassificationSession 
+    clearClassificationSession,
+    handleClassificationComplete 
   } = await import("./flows/document-classification-session");
   
   const { createServiceClient } = await import("@/lib/supabase/server");
@@ -467,24 +491,424 @@ async function handleDocumentClassificationState(
   
   const result = await handleUserResponse(session, message, supabase);
   
+  let finalMessage = result.message;
+  
   if (result.done) {
-    // סיימנו - ניקוי session
+    // 🆕 סיימנו - מעבר לשלב 2 (behavior_analysis)!
+    const completion = await handleClassificationComplete(userContext.userId, session);
+    finalMessage = completion.message;
+    
+    // ניקוי session
     await clearClassificationSession(userContext.userId);
     
-    // עדכון state
-    await updateContext(userContext.userId, {
-      currentState: "active_monitoring",
-    });
+    console.log(`✅ Classification complete! Phi Score: ${completion.phiScore || 'N/A'}`);
   }
   
   return {
-    message: result.message,
+    message: finalMessage,
     metadata: {
       intent: intent.type,
       confidence: intent.confidence,
       stateChanged: result.done,
     },
   };
+}
+
+/**
+ * 🆕 טיפול ב-"נמשיך" - התחלת סיווג תנועות
+ */
+async function handleContinueToClassification(
+  userContext: UserContext,
+  context: any
+): Promise<ConversationResponse> {
+  const { 
+    loadClassificationSession, 
+    getNextQuestionBatch, 
+    getInitialMessage,
+    saveClassificationSession 
+  } = await import("./flows/document-classification-session");
+  
+  // בדוק אם יש session קיים
+  let session = await loadClassificationSession(userContext.userId);
+  
+  if (session) {
+    // יש session קיים - נמשיך איפה שעצרנו
+    const nextBatch = getNextQuestionBatch(session);
+    
+    if (nextBatch.done) {
+      return {
+        message: `✅ כבר סיימנו לסווג את כל התנועות!\n\nאפשר להעלות עוד מסמכים או לשאול שאלות.`,
+        metadata: {
+          intent: "continue_classification",
+          confidence: 1.0,
+          stateChanged: false,
+        },
+      };
+    }
+    
+    // עדכן state ל-classification_questions
+    await updateContext(userContext.userId, {
+      currentState: "classification_questions",
+    });
+    
+    return {
+      message: `בוא נמשיך מאיפה שעצרנו 😊\n\n${nextBatch.message}`,
+      metadata: {
+        intent: "continue_classification",
+        confidence: 1.0,
+        stateChanged: true,
+      },
+    };
+  }
+  
+  // אין session - בדוק אם יש תנועות לסיווג
+  const result = await handleContinueRequest(userContext.userId);
+  
+  if (!result.shouldStartClassification) {
+    return {
+      message: result.message,
+      metadata: {
+        intent: "continue_classification",
+        confidence: 1.0,
+        stateChanged: false,
+      },
+    };
+  }
+  
+  // יש תנועות - צור session חדש
+  const { createClassificationSession } = await import("./flows/document-classification-session");
+  const { createServiceClient } = await import("@/lib/supabase/server");
+  const supabase = createServiceClient();
+  
+  // קח תנועות pending
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userContext.userId)
+    .eq('status', 'pending')
+    .order('date', { ascending: false });
+  
+  if (!transactions || transactions.length === 0) {
+    return {
+      message: `אין לי תנועות לסיווג 🤔\n\nשלח לי דוח בנק או דוח אשראי ונתחיל!`,
+      metadata: {
+        intent: "continue_classification",
+        confidence: 1.0,
+        stateChanged: false,
+      },
+    };
+  }
+  
+  // מיין לפי הכנסות והוצאות
+  const income = transactions.filter(t => t.amount > 0);
+  const expenses = transactions.filter(t => t.amount < 0);
+  
+  const totalIncome = income.reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenses = Math.abs(expenses.reduce((sum, t) => sum + t.amount, 0));
+  
+  // המרת התנועות לפורמט TransactionToClassify
+  const transactionsToClassify = transactions.map(t => ({
+    id: t.id,
+    amount: Math.abs(t.amount),
+    type: (t.amount > 0 ? 'income' : 'expense') as 'income' | 'expense',
+    description: t.vendor || t.notes || t.original_description || 'לא ידוע',
+    date: t.date || t.tx_date,
+    vendor: t.vendor,
+    currentCategory: t.expense_category || null,
+    aiSuggestedCategory: t.ai_suggested_category || null,
+    confidence: t.confidence_score || null,
+  }));
+  
+  // צור session
+  session = await createClassificationSession(
+    userContext.userId,
+    `manual-${Date.now()}`,
+    transactionsToClassify,
+    totalIncome,
+    totalExpenses,
+    [] // no missing docs at this point
+  );
+  
+  if (!session) {
+    return {
+      message: `משהו השתבש ביצירת הסיווג 😅\n\nנסה שוב או שלח דוח חדש.`,
+      metadata: {
+        intent: "continue_classification",
+        confidence: 1.0,
+        stateChanged: false,
+      },
+    };
+  }
+  
+  // שמור session
+  await saveClassificationSession(userContext.userId, session);
+  
+  // עדכן state
+  await updateContext(userContext.userId, {
+    currentState: "classification_questions",
+  });
+  
+  // שלח הודעה ראשונה + שאלה ראשונה
+  const initialMessage = getInitialMessage(session);
+  const firstQuestion = getNextQuestionBatch(session);
+  
+  return {
+    message: `${result.message}\n\n${initialMessage}\n\n${firstQuestion.message}`,
+    metadata: {
+      intent: "continue_classification",
+      confidence: 1.0,
+      stateChanged: true,
+    },
+  };
+}
+
+// ============================================================================
+// 🆕 Analysis & Status Handlers
+// ============================================================================
+
+/**
+ * בדיקה אם משתמש מבקש ניתוח
+ */
+function isAnalysisRequest(message: string): boolean {
+  const lowerMessage = message.toLowerCase().trim();
+  const analysisWords = [
+    'כן', 'בטח', 'רוצה', 'ניתוח', 'לראות', 'הראה', 'מה יש',
+    'דפוסים', 'תראה', 'כן!', 'yes', 'show', 'analysis',
+  ];
+  return analysisWords.some(word => lowerMessage.includes(word));
+}
+
+/**
+ * בדיקה אם משתמש שואל על סטטוס
+ */
+function isStatusRequest(message: string): boolean {
+  const lowerMessage = message.toLowerCase().trim();
+  const statusWords = [
+    'איפה אני', 'מה הסטטוס', 'סטטוס', 'כמה חודשים', 
+    'מצב', 'התקדמות', 'איפה עומד', 'status',
+  ];
+  return statusWords.some(word => lowerMessage.includes(word));
+}
+
+/**
+ * 🆕 Handler לבקשת ניתוח דפוסים
+ */
+async function handleAnalysisRequest(
+  userContext: UserContext,
+  context: any
+): Promise<ConversationResponse> {
+  const { createServiceClient } = await import("@/lib/supabase/server");
+  const supabase = createServiceClient();
+  
+  // קבל נתונים לניתוח
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userContext.userId)
+    .eq('status', 'approved')
+    .gte('date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+    .order('date', { ascending: false });
+  
+  if (!transactions || transactions.length < 5) {
+    return {
+      message: `אין לי מספיק נתונים לניתוח 📊\n\nשלח לי עוד דוחות כדי שאוכל לזהות דפוסים.`,
+      metadata: { intent: "analysis_request", confidence: 1.0, stateChanged: false },
+    };
+  }
+  
+  // חשב דפוסים בסיסיים
+  const expensesByCategory: Record<string, number> = {};
+  const incomeBySource: Record<string, number> = {};
+  let totalExpenses = 0;
+  let totalIncome = 0;
+  
+  for (const tx of transactions) {
+    if (tx.amount < 0) {
+      const cat = tx.expense_category || 'אחר';
+      expensesByCategory[cat] = (expensesByCategory[cat] || 0) + Math.abs(tx.amount);
+      totalExpenses += Math.abs(tx.amount);
+    } else {
+      const src = tx.expense_category || 'הכנסה';
+      incomeBySource[src] = (incomeBySource[src] || 0) + tx.amount;
+      totalIncome += tx.amount;
+    }
+  }
+  
+  // מיין קטגוריות לפי סכום
+  const topCategories = Object.entries(expensesByCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  
+  // בנה הודעה
+  let message = `📊 *ניתוח דפוסי ההוצאות שלך*\n\n`;
+  
+  message += `💰 *סה"כ הכנסות:* ${totalIncome.toLocaleString('he-IL')} ₪\n`;
+  message += `💸 *סה"כ הוצאות:* ${totalExpenses.toLocaleString('he-IL')} ₪\n`;
+  message += `📈 *מאזן:* ${(totalIncome - totalExpenses).toLocaleString('he-IL')} ₪\n\n`;
+  
+  message += `🏆 *הקטגוריות המובילות:*\n`;
+  for (let i = 0; i < topCategories.length; i++) {
+    const [cat, amount] = topCategories[i];
+    const percent = Math.round((amount / totalExpenses) * 100);
+    message += `${i + 1}. ${cat}: ${amount.toLocaleString('he-IL')} ₪ (${percent}%)\n`;
+  }
+  
+  // תובנות
+  const savingsRate = Math.round(((totalIncome - totalExpenses) / totalIncome) * 100);
+  message += `\n💡 *תובנות:*\n`;
+  
+  if (savingsRate > 20) {
+    message += `✅ שיעור חיסכון מצוין! ${savingsRate}% מההכנסה.\n`;
+  } else if (savingsRate > 10) {
+    message += `👍 שיעור חיסכון סביר: ${savingsRate}%. יש מקום לשיפור.\n`;
+  } else if (savingsRate > 0) {
+    message += `⚠️ שיעור חיסכון נמוך: ${savingsRate}%. בוא נחשוב איפה אפשר לחסוך.\n`;
+  } else {
+    message += `🚨 אתה מוציא יותר ממה שנכנס! צריך לפעול.\n`;
+  }
+  
+  // 🆕 הוסף AI tip אישי
+  try {
+    const { getQuickAITip } = await import('@/lib/analysis/behavior-analyzer');
+    const aiTip = await getQuickAITip(userContext.userId);
+    if (aiTip) {
+      message += `\n✨ *טיפ אישי מ-φ:*\n${aiTip}\n`;
+    }
+  } catch (error) {
+    console.error('Error generating AI tip:', error);
+  }
+  
+  message += `\nרוצה שנבנה תקציב חכם? כתוב *"בוא נבנה תקציב"*`;
+  
+  return {
+    message,
+    metadata: {
+      intent: "analysis_request",
+      confidence: 1.0,
+      stateChanged: false,
+    },
+  };
+}
+
+/**
+ * 🆕 Handler לשאלת סטטוס
+ */
+async function handleStatusRequest(
+  userContext: UserContext
+): Promise<ConversationResponse> {
+  const { createServiceClient } = await import("@/lib/supabase/server");
+  const { getUserPeriodCoverage } = await import("@/lib/documents/period-tracker");
+  const supabase = createServiceClient();
+  
+  // קבל כיסוי תקופות
+  const coverage = await getUserPeriodCoverage(userContext.userId);
+  
+  // קבל מידע על משתמש
+  const { data: user } = await supabase
+    .from('users')
+    .select('current_phase, phi_score, full_name')
+    .eq('id', userContext.userId)
+    .single();
+  
+  // קבל ספירת תנועות
+  const { count: totalTx } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userContext.userId);
+  
+  const { count: approvedTx } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userContext.userId)
+    .eq('status', 'approved');
+  
+  const { count: pendingTx } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userContext.userId)
+    .eq('status', 'pending');
+  
+  // בנה הודעה
+  const phaseName = getPhaseDisplayName(user?.current_phase || 'reflection');
+  let message = `📊 *הסטטוס שלך*\n\n`;
+  
+  message += `👤 ${user?.full_name || 'משתמש'}\n`;
+  message += `🎯 שלב נוכחי: *${phaseName}*\n`;
+  
+  if (user?.phi_score) {
+    message += `φ ציון: *${user.phi_score}/100*\n`;
+  }
+  
+  message += `\n📅 *כיסוי נתונים:* ${coverage.totalMonths} חודשים\n`;
+  if (coverage.hasMinimumCoverage) {
+    message += `✅ יש מספיק נתונים (3+ חודשים)\n`;
+  } else {
+    message += `⚠️ חסרים ${3 - coverage.totalMonths} חודשים להשלמת התמונה\n`;
+  }
+  
+  message += `\n📝 *תנועות:*\n`;
+  message += `• סה"כ: ${totalTx || 0}\n`;
+  message += `• מסווגות: ${approvedTx || 0}\n`;
+  message += `• ממתינות: ${pendingTx || 0}\n`;
+  
+  // המלצה לשלב הבא
+  message += `\n💡 *מה עכשיו?*\n`;
+  if (!coverage.hasMinimumCoverage) {
+    message += `שלח לי עוד דוחות להשלמת 3 חודשים.`;
+  } else if ((pendingTx || 0) > 0) {
+    message += `יש ${pendingTx} תנועות ממתינות לסיווג. כתוב "נמשיך" לסיווג.`;
+  } else {
+    message += `הכל מוכן! כתוב "ניתוח" לראות דפוסים או "תקציב" לבנות תקציב.`;
+  }
+  
+  return {
+    message,
+    metadata: {
+      intent: "status_request",
+      confidence: 1.0,
+      stateChanged: false,
+    },
+  };
+}
+
+/**
+ * 🆕 Handler לשלב behavior_analysis
+ */
+async function handleBehaviorAnalysisState(
+  intent: Intent,
+  message: string,
+  userContext: UserContext,
+  context: any
+): Promise<ConversationResponse> {
+  // אם רוצים ניתוח - תן להם
+  if (isAnalysisRequest(message)) {
+    return await handleAnalysisRequest(userContext, context);
+  }
+  
+  // ברירת מחדל - הצע אפשרויות
+  return {
+    message: `🔍 *שלב 2: ניתוח דפוסים*\n\nעכשיו אני יכול לזהות את דפוסי ההוצאות שלך.\n\nמה תרצה לעשות?\n• כתוב *"ניתוח"* - לראות דפוסי הוצאות\n• כתוב *"תקציב"* - לבנות תקציב חכם\n• כתוב *"סטטוס"* - לראות איפה אתה עומד`,
+    metadata: {
+      intent: intent.type,
+      confidence: intent.confidence,
+      stateChanged: false,
+    },
+  };
+}
+
+/**
+ * שם תצוגה לשלב
+ */
+function getPhaseDisplayName(phase: string): string {
+  const phases: Record<string, string> = {
+    reflection: 'שלב 1: השתקפות (איסוף נתונים)',
+    behavior: 'שלב 2: שינוי הרגלים',
+    budget: 'שלב 3: בניית תקציב',
+    goals: 'שלב 4: יעדים',
+    consolidation: 'שלב 5: איחוד הלוואות',
+    monitoring: 'שלב 6: מעקב שוטף',
+  };
+  return phases[phase] || phase;
 }
 
 /**

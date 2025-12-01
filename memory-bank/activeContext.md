@@ -2,246 +2,207 @@
 
 ## מיקום נוכחי בפרויקט
 
-### 🎉 **עדכון אחרון: 8 בנובמבר 2025 - PHI REBRAND! 🚀**
+### 🎉 **עדכון אחרון: 1 בדצמבר 2025**
 
 **ריברנדינג מלא!** המוצר עבר מ-FinHealer ל-**Phi (φ)** - היחס הזהב של הכסף שלך.
 
-### מה השתנה? ✅
-- ✅ **שם חדש:** Phi (φ) - φ = איזון, נוסחה, תכנון חכם
-- ✅ **פלטת צבעים חדשה:** Nord-inspired (phi-dark, phi-gold, phi-mint, phi-coral)
-- ✅ **דף נחיתה מחדש לגמרי:** עיצוב מינימליסטי מודרני בהשראת Stripe
-- ✅ **קומפוננטות חדשות:** PhiLogo, PhiScore, PhiAnimation
-- ✅ **טיפוגרפיה:** הוספת Inter לheaders + φ Symbol בגופן serif
-- ✅ **אנימציות:** Framer Motion חלקות (phi-glow, phi-rotate)
-- ✅ **מסרים חדשים:** דגש על φ Score (0-100), איזון, וליווי גדי
+---
 
-### מה עשינו עד כה? ✅
-1. **הקמת מסד נתונים מלא בסופאבייס**
-   - 19 טבלאות עם RLS מלא
-   - Views למעקב ואנליטיקה
-   - פונקציות עזר (בריאות פיננסית, סיכומים)
-   - Triggers אוטומטיים (הקמת משתמש חדש)
-   - Storage buckets (קבלות, אווטרים)
-   - קטגוריות ברירת מחדל
-   - תבניות הודעות
+## 📱 עקרון מפתח: WhatsApp-First
 
-### מה נוצר?
-**טבלאות:**
-- ✅ users - משתמשים בסיסיים
-- ✅ transactions - תנועות כספיות
-- ✅ budget_categories - קטגוריות תקציב
-- ✅ goals - יעדים פיננסיים
-- ✅ wa_messages - הודעות WhatsApp
-- ✅ alerts - התראות למשתמש
-- ✅ subscriptions - מנויים
-- ✅ receipts - קבלות OCR
-- ✅ admin_users - מנהלי מערכת
-- ✅ message_templates - תבניות הודעות
-- ✅ user_settings - הגדרות משתמש
-- ✅ audit_logs - לוגים
-- ✅ default_categories - קטגוריות ברירת מחדל
+> **הדסקטופ לצפייה בלבד. כל הפעולות דרך WhatsApp.**
 
-**Views:**
-- ✅ monthly_budget_tracking - מעקב תקציב חודשי
-- ✅ user_monthly_stats - סטטיסטיקות משתמש
-- ✅ active_users_stats - משתמשים פעילים
-- ✅ category_spending_report - דוח הוצאות
-- ✅ goals_progress_report - דוח יעדים
+| ממשק | תפקיד |
+|------|-------|
+| **WhatsApp** | סריקה, רישום הוצאות, אישורים, סיווג, שיחות עם גדי |
+| **Desktop** | צפייה בנתונים, גרפים, דוחות - READ ONLY |
 
-**פונקציות:**
-- ✅ calculate_financial_health - חישוב ציון בריאות
-- ✅ get_daily_summary - סיכום יומי
-- ✅ create_default_user_categories - יצירת קטגוריות
-- ✅ is_admin - בדיקת הרשאות אדמין
-- ✅ get_top_spenders - דוח הוצאות גבוהות
-- ✅ get_inactive_users - זיהוי משתמשים לא פעילים
+---
 
-**Policies:**
-- ✅ RLS מלא לכל הטבלאות
-- ✅ הרשאות אדמין מורחבות
-- ✅ Storage policies
+## 🎯 קורלציה: שלבי המוצר ↔ מצב הפיתוח
 
-## מה הלאה? 🎯
+### Phase 1: Reflection (שיקוף עבר) - ✅ פיתוח הושלם
+**מטרה:** הבנת דפוסי הוצאה היסטוריים (3-6 חודשים)
 
-### שלב נוכחי: המשך הרחבת ה-MVP - Week 4
+| פיצ'ר | סטטוס | איפה? |
+|-------|--------|------|
+| Onboarding via WhatsApp | ✅ | `onboarding-flow.ts` |
+| AI parser לתשובות | ✅ | `parseOnboardingDataWithAI()` |
+| Reflection Wizard (web) | ✅ | `/reflection` - 6 שלבים |
+| user_baselines | ✅ | טבלה ב-DB |
+| user_financial_profile | ✅ | טבלה ב-DB |
 
-**השלמנו בשבוע 3:**
-✅ תשתית Next.js מלאה
-✅ Landing Page + Google OAuth
-✅ Onboarding בסיסי
-✅ Dashboard MVP → **Dashboard 2.0** (CRM-style!) 🚀
-✅ DB עם 19 טבלאות
-✅ **Full Reflection Wizard** - 6 שלבים
-✅ **user_financial_profile** - תמונת מצב 360°
+### Phase 1.5: Document Scanning - 🔄 בפיתוח פעיל
+**מטרה:** סריקה אוטומטית של דוחות בנק/אשראי
 
-**צריך להוסיף:**
+| פיצ'ר | סטטוס | איפה? |
+|-------|--------|------|
+| PDF Upload via WhatsApp | ✅ | `webhook/route.ts` |
+| AI Document Analysis | ✅ | `document-prompts.ts` |
+| Transaction Extraction | ✅ | OCR + GPT |
+| Classification Session | ✅ | `document-classification-session.ts` |
+| Period Tracking (3 months) | ✅ | `period-tracker.ts` |
+| Missing Docs Request | ✅ | אוטומטי אחרי סריקה |
+| דוחות מקיפים (מסלקה/הר הביטוח) | ✅ | Prompts מוכנים |
+| Handler ל-"נמשיך" | ✅ | `document-upload-flow.ts` |
+| הודעה טבעית אחרי סריקה | ✅ | `buildDocumentAnalysisMessage()` |
 
-### Priority 1: Database Extensions ✅ הושלם!
-- ✅ הוספת טבלאות חדשות:
-  - user_baselines 
-  - behavior_insights 
-  - advisor_notes
-  - alerts_rules
-  - alerts_events
-  - user_financial_profile (360° profile)
-- ✅ עדכון users: phase + ai_personality + locale
-- ✅ עדכון transactions: category_id FK + currency + tx_date
-- ✅ עדכון goals: child_name + priority
-- ✅ עדכון budget_categories: priority
-- ✅ עדכון receipts: tx_date
+**Flow טבעי:**
+1. משתמש שולח מסמך
+2. בוט מנתח ומציג: תקופה, תנועות, מסמכים חסרים
+3. משתמש יכול: לשלוח עוד / לכתוב "נמשיך"
+4. אם "נמשיך" - מתחיל סיווג (גם אם אין 3 חודשים מלאים)
 
-### Priority 2: Phase 1 - Reflection ✅ הושלם!
-- ✅ דף `/reflection` - Wizard מלא ב-6 שלבים
-- ✅ טבלת קטגוריות עם ממוצעים (3-6 חודשים)
-- ✅ איסוף מלא: אישי, הכנסות, קבועות, חובות, נכסים, מטרות
-- ✅ API: `POST /api/reflection/baseline`
-- ✅ API: `GET/POST /api/reflection/profile`
-- ✅ לוגיקת מעבר ל-Phase 2 (Behavior)
+**לבדוק:**
+- [ ] E2E test של כל ה-flow
+- [ ] מעבר אוטומטי לשלב 2 בסיום סיווג
 
-### Priority 2.5: Dashboard 2.0 ✅ הושלם!
-- ✅ **FinancialOverview** - הכנסות/הוצאות/תקציב פנוי
-- ✅ **DebtVsAssets** - ויזואליזציה של מאזן
-- ✅ **SmartInsights** - תובנות מבוססות פרופיל
-- ✅ **PhaseProgress** - Timeline מסע + הצעד הבא
-- ✅ **GoalsQuickView** - תצוגת יעדים + המלצות
-- ✅ Layout: 2/3 שמאל + 1/3 ימין
-- ✅ עיצוב CRM מקצועי
+### Phase 2: Behavior (התנהלות והרגלים) - ✅ **מושלם!**
+**מטרה:** זיהוי דפוסי הוצאה בפועל (30+ ימים)
 
-### Priority 2.6: UX Polish + AI Import Spec ✅ הושלם! (9 באוקטובר)
-- ✅ **Stepper Upgrade** - החלפה ל-`motion` library
-  - אנימציות spring physics חלקות
-  - slide transitions מתקדמות
-  - עיצוב FinHealer מותאם (צבעים, RTL)
-  - Stepper.css responsive
-- ✅ **תיקוני Reflection Wizard**
-  - שדה גילאי ילדים: תמיכה בפסיקים/רווחים + visual feedback
-  - Step 3: הבהרות, העלאת דוח בנק (UI)
-  - Step 4: "מינוס/אשראי שוטף", שדה יתרת עו״ש חדש
-- ✅ **AI Import Infrastructure**
-  - מפרט מפורט ב-`IMPORT_SPEC.md`
-  - תכנון OCR + AI parsing
-  - יעד דיוק 90%+
-  - תמיכה ב-PDF/Excel/Images
+| פיצ'ר | סטטוס | איפה? |
+|-------|--------|------|
+| analyzeBehavior() | ✅ | `lib/analysis/behavior-analyzer.ts` |
+| Cron יומי 20:30 | ✅ | `api/cron/daily-summary` |
+| Cron שבועי ראשון 09:00 | ✅ | `api/cron/weekly-summary` |
+| behavior_insights טבלה | ✅ | Migration + RLS |
+| AI Tips אישיים | ✅ | `generateAITip()` עם GPT-4o-mini |
+| מעבר אוטו לשלב 3 | ✅ | `checkReadyForBudget()` + `transitionToBudget()` |
+| BehaviorDashboard | ✅ | נתונים אמיתיים מ-DB |
+| SmartInsights | ✅ | מושך תובנות מ-DB |
+| WhatsApp Handler לתובנות | ✅ | `handleAnalysisRequest()` |
+| Handler לסטטוס | ✅ | `handleStatusRequest()` |
+| getQuickAITip() | ✅ | טיפ מהיר ב-WhatsApp |
 
-### Priority 0: Phi Rebrand ✅ הושלם! (8 בנובמבר)
-- ✅ **Branding Update**
-  - שינוי שם מ-FinHealer ל-Phi (φ)
-  - פלטת צבעים חדשה (Nord-inspired)
-  - עדכון .cursorrules + projectbrief.md
-- ✅ **Landing Page Redesign**
-  - דף נחיתה מחדש לגמרי
-  - עיצוב מינימליסטי (Stripe/Linear inspired)
-  - 9 sections: Hero, What is Phi, 5 Phases, Features, Phi Score, Pricing, Meet Gadi, Testimonials, CTA
-- ✅ **New Components**
-  - PhiLogo - לוגו מונפש עם φ
-  - PhiScore - circular progress (0-100)
-  - PhiAnimation - φ symbol animation
-- ✅ **Tailwind Config**
-  - צבעי Phi (dark, gold, mint, coral, slate, frost, bg)
-  - אנימציות (phi-glow, phi-rotate)
-  - font-inter
-- ✅ **Layout & Metadata**
-  - title: "Phi (φ) - היחס הזהב של הכסף שלך"
-  - description מעודכן
-  - theme color: #2E3440
+**Flow אוטומטי מושלם:**
+1. כל יום 20:30 - ניתוח דפוסים + סיכום יומי + AI tip אישי
+2. אם יש תובנה חשובה - נשלחת בהודעה
+3. כל ראשון 09:00 - סיכום שבועי מקיף
+4. אחרי 30+ ימים ו-50+ תנועות - מעבר אוטומטי לשלב 3
+5. משתמש יכול לכתוב "ניתוח" ולקבל תובנות + AI tip
+6. משתמש יכול לכתוב "איפה אני עומד?" ולקבל סטטוס
 
-### Priority 2.7: Loan Application System ✅ הושלם! (22 באוקטובר)
-- ✅ **Database Tables**
-  - `loan_applications` - בקשות לאיחוד הלוואות
-  - `loan_documents` - מסמכים מועלים עם מעקב אימות
-  - RLS policies מלאות למשתמשים
-  - Storage bucket `loan-documents` (נדרש setup ידני)
-- ✅ **Smart Document System** (`lib/loanDocuments.ts`)
-  - דינמי לפי סוג הלוואה (regular/mortgage)
-  - דינמי לפי סוג תעסוקה (employee/self_employed/business_owner/spouse_employee)
-  - קישורים חיצוניים (בנק ישראל, וכו')
-  - חישוב progress אוטומטי
-- ✅ **3-Step Wizard** (`components/loans/LoanApplicationWizard.tsx`)
-  - שלב 1: פרטים אישיים (conditional fields)
-  - שלב 2: פרטי הלוואה + סיכום הלוואות קיימות
-  - שלב 3: צ'קליסט מסמכים + העלאות
-  - שמירה אוטומטית (draft status)
-  - מעקב progress באחוזים
-- ✅ **Simulator Upgrade** (`/loans-simulator`)
-  - טעינה אוטומטית של הלוואות מה-DB
-  - אינדיקציה ויזואלית של טעינה
-  - כפתור "הגש בקשה לאיחוד"
-  - חיבור ל-Wizard
-- ✅ **API Routes**
-  - `POST/GET/PATCH /api/loan-applications`
-  - `POST/GET/DELETE /api/loan-applications/documents`
-- ✅ **Documentation**
-  - `STORAGE_SETUP.md` - הנחיות להגדרת Storage RLS
-  - `LOAN_APPLICATION_MIGRATION.sql` - SQL migration מלא
-  - עדכון README עם הפיצ'רים החדשים
+### Phase 3: Budget (תקציב אוטומטי) - ⏳ בהמתנה
+**מטרה:** יצירת תקציב חכם מבוסס היסטוריה
 
-### Priority 3: Phase 2 - Behavior Engine (שבוע הבא)
-- [ ] Cron יומי לניתוח דפוסים
-- [ ] יצירת behavior_insights
-- [ ] הודעות טיפים מותאמות
-- [ ] Dashboard: הצגת תובנות
+| פיצ'ר | סטטוס | איפה? |
+|-------|--------|------|
+| דף `/budget` | ⏳ | צריך לפתח |
+| generateBudgetFromHistory() | ⏳ | צריך לפתח |
+| S-curve visualization | ⏳ | צריך לפתח |
+| התראות חריגה | ⏳ | alerts_rules קיים |
 
-### Priority 4: Transactions Management (שבוע הבא)
-- [ ] דף `/transactions` - טבלה מלאה
-- [ ] Add/Edit Modal (React Hook Form + Zod)
-- [ ] Upload Receipt → OCR
-- [ ] Filters: תאריך, קטגוריה, סטטוס
-- [ ] תמיכה ב-proposed/confirmed
-- [ ] API: GET/POST `/api/transactions`
+### Phase 4: Goals (יעדים ומטרות) - ⏳ בהמתנה
+**מטרה:** הגדרת יעדים אישיים ומשפחתיים
 
-### Priority 5: Phase 3 - Budget Auto (שבועיים)
-- [ ] דף `/budget` 
-- [ ] פונקציה: generateBudgetFromHistory()
-- [ ] S-curve visualization
-- [ ] התאמות בקליקים
-- [ ] מעבר ל-Phase 4
+| פיצ'ר | סטטוס | איפה? |
+|-------|--------|------|
+| דף `/goals` | ⏳ | צריך לפתח |
+| child_name support | ✅ | DB ready |
+| העברת עודפים אוטומטית | ⏳ | צריך לפתח |
+| GoalsQuickView | ✅ | Dashboard component |
 
-### Priority 6: Phase 4 - Goals (שבועיים)
-- [ ] דף `/goals`
-- [ ] תמיכה ב-child_name (ילדים ומטרות)
-- [ ] חוקי העברת עודפים
-- [ ] API: GET/POST `/api/goals`
+### Phase 5: Monitoring (בקרה רציפה) - ⏳ בהמתנה
+**מטרה:** ליווי ארוך טווח
 
-### Priority 7: Integrations ⭐ חלקי הושלם!
-- ✅ **GreenAPI** - webhook + send + buttons מלא!
-- ✅ **Tesseract.js** - OCR לקבלות (עברית + אנגלית)
-- [ ] OpenAI: בוט AI בעברית (בתור ש 5-6)
-- [ ] Green Invoice: Recurring billing (בשבוע 5-6)
+| פיצ'ר | סטטוס | איפה? |
+|-------|--------|------|
+| Dashboard 2.0 | ✅ | `/dashboard` |
+| דוחות חודשיים/שנתיים | ⏳ | צריך לפתח |
+| התראות חכמות | ⏳ | alerts_events קיים |
+| סיכום שבועי WhatsApp | ⏳ | צריך לפתח |
 
-### Priority 8: Admin Dashboard (שבוע)
-- [ ] `/admin/dashboard` - KPIs
-- [ ] `/admin/users` - ניהול משתמשים
-- [ ] `/admin/user/[id]` - כרטיס לקוח מלא
-- [ ] `/admin/messages` - תבניות וקמפיינים
-- [ ] Advisor Notes: POST `/api/advice/note`
+---
 
-## החלטות פתוחות
+## 🔧 מה נבנה בימים האחרונים
 
-### שאלות שצריך לענות עליהן
-1. **אינטגרציית חשבונית ירוקה**
-   - מה המפתחות הנדרשים?
-   - איך נבנה את ה-webhook handler?
+### WhatsApp Bot - Document Scanning
+1. ✅ תיקון באג מספר תנועות (הציג סכום במקום כמות)
+2. ✅ שינוי לשאלה אחת בכל פעם (היה 2-3)
+3. ✅ AI parser לתשובות Onboarding (במקום regex)
+4. ✅ הסרת הודעת "קיבלתי" המיידית
+5. ✅ תמיכה בדוחות מקיפים (מסלקה פנסיונית, הר הביטוח)
+6. ✅ period-tracker - מעקב כיסוי 3 חודשים
+7. ✅ הסתרת עמוד הסריקה מהתפריט (WhatsApp-first)
 
-2. **GreenAPI Setup**
-   - מהם פרטי החיבור?
-   - איך נבנה את ה-webhook לקבלת הודעות?
+### Database
+- ✅ 19+ טבלאות עם RLS מלא
+- ✅ uploaded_statements לmעקב מסמכים
+- ✅ expense_categories + income_sources
 
-3. **OpenAI Integration**
-   - איזה מודל נשתמש? (GPT-4?)
-   - מה ה-system prompt?
-   - איך נגביל שימוש?
+---
 
-4. **עיצוב**
-   - צריך דוגמאות עיצוב?
-   - לוגו קיים?
-   - צבעי המותג מוגדרים? (כן, בקובץ projectbrief)
+## 📋 מה הלאה?
 
-## בעיות ידועות
-- אין (עדיין פרויקט חדש)
+### Priority 1: Phase 3 - Budget 🚀
+1. [ ] דף `/budget` עם wizard
+2. [ ] `generateBudgetFromHistory()`
+3. [ ] S-curve visualization
+4. [ ] התראות חריגה via WhatsApp
 
-## הערות חשובות
-- השפה העיקרית היא **עברית** - UI, הודעות, בוט
-- המערכת צריכה להיות רספונסיבית מלאה (Mobile First)
-- חווית המשתמש צריכה להיות פשוטה ונעימה
-- הבוט צריך לדבר בשפה חמה ומעודדת, לא פורמלית
+### Priority 3: Integrations
+- ✅ GreenAPI - webhook + send
+- [ ] OpenAI Chat - בוט AI מלא
+- [ ] Green Invoice - Recurring
 
+---
+
+## 📁 קבצים מרכזיים
+
+### WhatsApp Bot
+```
+app/api/wa/webhook/route.ts          - Main webhook handler
+lib/conversation/orchestrator.ts     - Message routing
+lib/conversation/flows/
+  ├── onboarding-flow.ts            - Onboarding questions
+  ├── document-classification-session.ts - Transaction classification
+  └── ...
+lib/ai/document-prompts.ts          - AI prompts for documents
+lib/documents/period-tracker.ts     - 3-month coverage tracking
+```
+
+### Dashboard (View-Only)
+```
+app/dashboard/page.tsx              - Main dashboard
+components/dashboard/
+  ├── FinancialOverview.tsx
+  ├── DebtVsAssets.tsx
+  ├── SmartInsights.tsx
+  ├── PhaseProgress.tsx
+  └── GoalsQuickView.tsx
+```
+
+### Hidden Pages
+```
+app/dashboard/scan-center/page.tsx  - 🔒 Hidden (WhatsApp-first)
+```
+
+---
+
+## 🎨 עיצוב ו-Branding
+
+### Phi Color Palette (Nord-inspired)
+```css
+--phi-dark: #2E3440;      /* Primary dark */
+--phi-gold: #A96B48;      /* Accent gold */
+--phi-mint: #8FBCBB;      /* Success mint */
+--phi-bg: #ECEFF4;        /* Background */
+--phi-coral: #D08770;     /* Highlight coral */
+```
+
+### Typography
+- Headers: Inter
+- Body: Heebo (עברית)
+- φ Symbol: Georgia, serif
+
+---
+
+## ⚠️ בעיות ידועות
+
+| בעיה | סטטוס |
+|------|--------|
+| Build error בגלל sandbox (לא באמת שגיאה) | ⚠️ לוקאלי בלבד |
+
+---
+
+**עדכון אחרון:** 1 בדצמבר 2025

@@ -1,5 +1,15 @@
 "use client"
 
+/**
+ * 🔒 SCAN CENTER - HIDDEN PAGE
+ * 
+ * This page is HIDDEN from navigation.
+ * All document scanning happens via WhatsApp (WhatsApp-first approach).
+ * The Desktop dashboard is VIEW-ONLY and reflects WhatsApp data.
+ * 
+ * This page is kept for potential future use or admin purposes.
+ */
+
 import { useState, useEffect, Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -201,16 +211,28 @@ function ScanCenterContent() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl" dir="rtl">
-      {/* Header */}
+      {/* Header - Hidden Page Notice */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <h1 className="text-3xl font-bold text-gray-900">
             🔍 מרכז סריקה
           </h1>
-          <Badge className="bg-green-100 text-green-700 border-green-300">
-            ✅ פעיל
+          <Badge className="bg-amber-100 text-amber-700 border-amber-300">
+            🔒 מוסתר - לשימוש עתידי
           </Badge>
         </div>
+        
+        {/* Important Notice */}
+        <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-xl mb-4">
+          <p className="text-blue-900 font-bold text-lg mb-1">
+            📱 הסריקה עוברת דרך WhatsApp!
+          </p>
+          <p className="text-blue-800 text-sm">
+            שלח את הדוחות שלך בוואטסאפ ל-Phi והמערכת תעבד אותם אוטומטית.
+            הדשבורד משקף את הנתונים שנאספו - לצפייה בלבד.
+          </p>
+        </div>
+        
         <p className="text-gray-600">
           העלה דוחות בנק ופירוט אשראי - נזהה ונסווג את ההוצאות אוטומטית עם AI
         </p>

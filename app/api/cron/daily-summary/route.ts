@@ -1,19 +1,18 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
+import { analyzeBehavior, checkReadyForBudget, transitionToBudget } from '@/lib/analysis/behavior-analyzer';
 
 /**
- * Cron: סיכום יומי (20:30)
+ * Cron: סיכום יומי + ניתוח התנהגות (20:30)
+ * 
+ * Schedule: 30 20 * * * (כל יום ב-20:30)
  * 
  * מה זה עושה:
- * 1. מוצא משתמשים עם wa_opt_in = true
- * 2. בודק אם היו הוצאות היום
- * 3. שולח סיכום יומי ב-WhatsApp:
- *    - אם היו הוצאות → סיכום עם סכום כולל
- *    - אם לא היו הוצאות → הודעת "יום ללא הוצאות" 🎉
- * 4. מעדכן behavior insights
- * 5. בודק אם צריך להעדכן Phase
+ * 1. מוצא משתמשים פעילים
+ * 2. מריץ ניתוח התנהגות (analyzeBehavior)
+ * 3. שולח סיכום יומי + תובנות ב-WhatsApp
+ * 4. בודק אם המשתמש מוכן לשלב הבא (Budget)
  */
 
 export async function GET(request: NextRequest) {
@@ -24,15 +23,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    console.log('[Cron] Starting daily summary + behavior analysis...');
+    const startTime = Date.now();
+    
+    const supabase = createServiceClient();
     const greenAPI = getGreenAPIClient();
 
     // מצא משתמשים פעילים עם WhatsApp
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, name, phone, wa_opt_in')
+      .select('id, full_name, phone, wa_opt_in, current_phase')
       .eq('wa_opt_in', true)
-      .eq('subscription_status', 'active')
       .not('phone', 'is', null);
 
     if (error) {
@@ -45,35 +46,71 @@ export async function GET(request: NextRequest) {
 
     for (const user of users || []) {
       try {
-        // בדוק הוצאות היום (parent transactions + cash expenses)
+        // 1. בדוק הוצאות היום
         const { data: todayTransactions } = await supabase
           .from('transactions')
-          .select('amount, category, vendor')
+          .select('amount, expense_category, vendor')
           .eq('user_id', user.id)
-          .eq('type', 'expense')
-          .eq('tx_date', today)
-          .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
+          .lt('amount', 0) // הוצאות בלבד
+          .eq('date', today);
 
-        const totalSpent = todayTransactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
+        const totalSpent = Math.abs(todayTransactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0);
         const transactionCount = todayTransactions?.length || 0;
 
-        let message = '';
-
-        if (transactionCount === 0) {
-          // יום ללא הוצאות!
-          message = `🎉 ${user.name || 'היי'}!\n\nיום ללא הוצאות! זה מעולה! 💪\n\nהמשך ככה - אתה שולט! 🌟`;
-        } else {
-          // יום עם הוצאות
-          const topExpenses = todayTransactions
-            ?.sort((a, b) => Number(b.amount) - Number(a.amount))
-            .slice(0, 3)
-            .map((tx) => `• ${tx.vendor || tx.category}: ₪${Number(tx.amount).toFixed(0)}`)
-            .join('\n');
-
-          message = `📊 ${user.name || 'היי'}, סיכום היום:\n\n💸 סה״כ הוצאות: ₪${totalSpent.toFixed(0)}\n📝 ${transactionCount} תנועות\n\nההוצאות הגדולות:\n${topExpenses}\n\nלילה טוב! 🌙`;
+        // 2. ניתוח התנהגות (רק למי שבשלב behavior או יותר)
+        let behaviorInsight: string | null = null;
+        let shouldTransition = false;
+        
+        if (user.current_phase && ['behavior', 'budget', 'goals', 'monitoring'].includes(user.current_phase)) {
+          try {
+            const analysis = await analyzeBehavior(user.id);
+            
+            // אם יש תובנה חשובה - הוסף להודעה
+            if (analysis.shouldNotify && analysis.notificationMessage) {
+              behaviorInsight = analysis.notificationMessage;
+            }
+            
+            // בדוק אם מוכן לשלב Budget
+            if (user.current_phase === 'behavior') {
+              const readyCheck = await checkReadyForBudget(user.id);
+              if (readyCheck.ready) {
+                shouldTransition = await transitionToBudget(user.id);
+              }
+            }
+          } catch (analysisError) {
+            console.error(`Analysis error for user ${user.id}:`, analysisError);
+          }
         }
 
-        // שלח ב-WhatsApp
+        // 3. בניית הודעה
+        let message = '';
+        const userName = user.full_name?.split(' ')[0] || 'היי';
+
+        if (transactionCount === 0) {
+          message = `🎉 ${userName}!\n\nיום ללא הוצאות! זה מעולה! 💪\n\nהמשך ככה - אתה שולט! 🌟`;
+        } else {
+          const topExpenses = todayTransactions
+            ?.sort((a, b) => Math.abs(Number(b.amount)) - Math.abs(Number(a.amount)))
+            .slice(0, 3)
+            .map((tx) => `• ${tx.vendor || tx.expense_category || 'אחר'}: ${Math.abs(Number(tx.amount)).toLocaleString('he-IL')} ₪`)
+            .join('\n');
+
+          message = `📊 ${userName}, סיכום היום:\n\n💸 סה״כ הוצאות: ${totalSpent.toLocaleString('he-IL')} ₪\n📝 ${transactionCount} תנועות\n\nההוצאות הגדולות:\n${topExpenses}`;
+        }
+
+        // 4. הוסף תובנה אם יש
+        if (behaviorInsight) {
+          message += `\n\n---\n${behaviorInsight}`;
+        }
+        
+        // 5. הודעה על מעבר שלב
+        if (shouldTransition) {
+          message += `\n\n🎯 *חדשות טובות!*\nאתה מוכן לשלב הבא - בניית תקציב!\nכתוב "בוא נבנה תקציב" להתחיל.`;
+        }
+        
+        message += `\n\nלילה טוב! 🌙`;
+
+        // 6. שלח ב-WhatsApp
         if (user.phone) {
           await greenAPI.sendMessage({
             phoneNumber: user.phone,
@@ -88,7 +125,13 @@ export async function GET(request: NextRequest) {
             status: 'sent',
           });
 
-          results.push({ user_id: user.id, success: true, spent: totalSpent });
+          results.push({ 
+            user_id: user.id, 
+            success: true, 
+            spent: totalSpent,
+            hadInsight: !!behaviorInsight,
+            transitioned: shouldTransition,
+          });
         }
       } catch (userError) {
         console.error(`Error processing user ${user.id}:`, userError);
@@ -96,10 +139,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const duration = Date.now() - startTime;
+    console.log(`[Cron] Daily summary complete: ${results.length} users, ${duration}ms`);
+
     return NextResponse.json({
       success: true,
       processed: results.length,
       results,
+      duration: `${duration}ms`,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
@@ -110,4 +157,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // 5 minutes
 
