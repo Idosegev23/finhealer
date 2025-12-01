@@ -27,6 +27,7 @@ export type ConversationState =
   | "document_processing"
   | "transaction_classification"
   | "classification_questions"  // 🆕 שאלות סיווג אינטראקטיביות
+  | "classification_pending_approval"  // 🆕 מחכה לאישור לפני סיווג
   | "active_monitoring"
   | "data_collection"      // שלב 1: איסוף מסמכים
   | "data_collection_pending_approval"  // ממתין לאישור תנועות

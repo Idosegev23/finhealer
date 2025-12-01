@@ -2,6 +2,7 @@ import { chatWithGPT5, chatWithGPT5Fast } from "@/lib/ai/gpt5-client";
 import { parseIntent, detectUserMood } from "@/lib/ai/intent-parser";
 import { PHI_COACH_SYSTEM_PROMPT } from "@/lib/ai/prompts/phi-coach-system";
 import { Message, UserContext, ConversationContext, Intent } from "@/types/conversation";
+import { getRecentHistory, getHistoryForOpenAI } from "./history-manager";
 import {
   loadContext,
   updateContext,
@@ -228,6 +229,10 @@ async function routeToHandler(
       // 🆕 טיפול בשאלות סיווג מה-document-classification-session
       return await handleDocumentClassificationState(intent, message, userContext, context);
 
+    case "classification_pending_approval":
+      // 🆕 מחכים לאישור מהמשתמש לפני שמתחילים לסווג
+      return await handleClassificationApproval(intent, message, userContext, context);
+
     case "behavior_analysis":
       // 🆕 שלב 2 - ניתוח דפוסים
       return await handleBehaviorAnalysisState(intent, message, userContext, context);
@@ -419,10 +424,14 @@ async function handleGeneralConversation(
   userContext: UserContext,
   context: any
 ): Promise<ConversationResponse> {
+  // 🆕 טעינת היסטוריית שיחה לקונטקסט
+  const history = await getHistoryForOpenAI(userContext.userId, 10);
+  
   const response = await chatWithGPT5Fast(
     message,
     PHI_COACH_SYSTEM_PROMPT,
-    userContext
+    userContext,
+    history
   );
 
   return {
@@ -515,7 +524,114 @@ async function handleDocumentClassificationState(
 }
 
 /**
- * 🆕 טיפול ב-"נמשיך" - התחלת סיווג תנועות
+ * 🆕 טיפול באישור להתחלת סיווג
+ * המשתמש קיבל הקדמה ועכשיו מאשר או מבקש לדחות
+ */
+async function handleClassificationApproval(
+  intent: Intent,
+  message: string,
+  userContext: UserContext,
+  context: any
+): Promise<ConversationResponse> {
+  const { 
+    loadClassificationSession, 
+    getNextQuestionBatch,
+    saveClassificationSession 
+  } = await import("./flows/document-classification-session");
+  const { chatWithGPT5Fast } = await import("@/lib/ai/gpt5-client");
+  
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // בדיקה אם המשתמש מאשר
+  const approvalWords = ['כן', 'בטח', 'יאללה', 'מתאים', 'בוא', 'נתחיל', 'ok', 'yes', 'אוקי', 'סבבה', 'בסדר', 'מוכן'];
+  const isApproval = approvalWords.some(word => lowerMessage.includes(word));
+  
+  // בדיקה אם המשתמש רוצה לדחות
+  const postponeWords = ['לא', 'אחר כך', 'מאוחר', 'לא עכשיו', 'אח"כ', 'מחר', 'בערב'];
+  const isPostpone = postponeWords.some(word => lowerMessage.includes(word));
+  
+  if (isPostpone) {
+    // דחייה - שמור את ה-session ותזמן תזכורת
+    await updateContext(userContext.userId, {
+      currentState: "idle",
+    });
+    
+    return {
+      message: `בסדר, אני כאן כשתהיה מוכן.\n\nפשוט כתוב "נמשיך" ונתחיל.`,
+      metadata: {
+        intent: "classification_postponed",
+        confidence: 1.0,
+        stateChanged: true,
+      },
+    };
+  }
+  
+  if (isApproval) {
+    // אישור! נתחיל את הסיווג
+    const session = await loadClassificationSession(userContext.userId);
+    
+    if (!session) {
+      return {
+        message: `משהו השתבש. נסה לכתוב "נמשיך" שוב.`,
+        metadata: {
+          intent: "classification_error",
+          confidence: 1.0,
+          stateChanged: false,
+        },
+      };
+    }
+    
+    // עדכן state ל-classification_questions
+    await updateContext(userContext.userId, {
+      currentState: "classification_questions",
+    });
+    
+    // קבל את השאלה הראשונה
+    const firstQuestion = getNextQuestionBatch(session);
+    await saveClassificationSession(userContext.userId, session);
+    
+    // 🆕 הקדמה קצרה מ-AI לפני השאלה הראשונה
+    let transitionMessage: string;
+    try {
+      const aiResponse = await chatWithGPT5Fast(
+        `המשתמש אישר להתחיל סיווג תנועות. יש ${session.incomeToClassify.length} הכנסות ו-${session.expensesToClassify.length} הוצאות.`,
+        `אתה מאמן פיננסי בשם φ.
+המשתמש אישר להתחיל לעבור על התנועות.
+צור הודעת מעבר קצרה (משפט אחד או שניים) שאומרת שמתחילים.
+אם יש הכנסות - נתחיל איתן קודם ותגיד את זה.
+בלי אימוג'ים. קצר וענייני.`,
+        { userId: 'system', userName: 'Classification', phoneNumber: '' }
+      );
+      transitionMessage = aiResponse?.trim() || 'מעולה! נתחיל עם ההכנסות.';
+    } catch {
+      transitionMessage = session.incomeToClassify.length > 0 
+        ? 'מעולה! נתחיל עם ההכנסות.' 
+        : 'מעולה! נתחיל עם ההוצאות.';
+    }
+    
+    return {
+      message: `${transitionMessage}\n\n${firstQuestion.message}`,
+      metadata: {
+        intent: "classification_started",
+        confidence: 1.0,
+        stateChanged: true,
+      },
+    };
+  }
+  
+  // לא הבנתי - שאל שוב
+  return {
+    message: `לא הבנתי. מתאים לך עכשיו לעבור על התנועות?\n\n(כתוב "כן" להתחיל או "אחר כך" לדחות)`,
+    metadata: {
+      intent: "classification_unclear",
+      confidence: 0.5,
+      stateChanged: false,
+    },
+  };
+}
+
+/**
+ * 🆕 טיפול ב-"נמשיך" - הקדמה עם AI ובקשת אישור לפני סיווג
  */
 async function handleContinueToClassification(
   userContext: UserContext,
@@ -524,9 +640,9 @@ async function handleContinueToClassification(
   const { 
     loadClassificationSession, 
     getNextQuestionBatch, 
-    getInitialMessage,
     saveClassificationSession 
   } = await import("./flows/document-classification-session");
+  const { chatWithGPT5Fast } = await import("@/lib/ai/gpt5-client");
   
   // בדוק אם יש session קיים
   let session = await loadClassificationSession(userContext.userId);
@@ -537,7 +653,7 @@ async function handleContinueToClassification(
     
     if (nextBatch.done) {
       return {
-        message: `✅ כבר סיימנו לסווג את כל התנועות!\n\nאפשר להעלות עוד מסמכים או לשאול שאלות.`,
+        message: `כבר סיימנו לסווג את כל התנועות!\n\nאפשר להעלות עוד מסמכים או לשאול שאלות.`,
         metadata: {
           intent: "continue_classification",
           confidence: 1.0,
@@ -552,7 +668,7 @@ async function handleContinueToClassification(
     });
     
     return {
-      message: `בוא נמשיך מאיפה שעצרנו 😊\n\n${nextBatch.message}`,
+      message: `בוא נמשיך מאיפה שעצרנו.\n\n${nextBatch.message}`,
       metadata: {
         intent: "continue_classification",
         confidence: 1.0,
@@ -590,7 +706,7 @@ async function handleContinueToClassification(
   
   if (!transactions || transactions.length === 0) {
     return {
-      message: `אין לי תנועות לסיווג 🤔\n\nשלח לי דוח בנק או דוח אשראי ונתחיל!`,
+      message: `אין לי תנועות לסיווג.\n\nשלח לי דוח בנק או דוח אשראי ונתחיל!`,
       metadata: {
         intent: "continue_classification",
         confidence: 1.0,
@@ -631,7 +747,7 @@ async function handleContinueToClassification(
   
   if (!session) {
     return {
-      message: `משהו השתבש ביצירת הסיווג 😅\n\nנסה שוב או שלח דוח חדש.`,
+      message: `משהו השתבש ביצירת הסיווג. נסה שוב או שלח דוח חדש.`,
       metadata: {
         intent: "continue_classification",
         confidence: 1.0,
@@ -643,23 +759,97 @@ async function handleContinueToClassification(
   // שמור session
   await saveClassificationSession(userContext.userId, session);
   
-  // עדכן state
+  // 🆕 עדכן state ל-"ממתין לאישור" - לא ישר לשאלות!
   await updateContext(userContext.userId, {
-    currentState: "classification_questions",
+    currentState: "classification_pending_approval",
   });
   
-  // שלח הודעה ראשונה + שאלה ראשונה
-  const initialMessage = getInitialMessage(session);
-  const firstQuestion = getNextQuestionBatch(session);
+  // 🆕 הקדמה דינמית מ-AI
+  const introMessage = await generateClassificationIntro(
+    userContext.userName || 'חבר',
+    income.length,
+    expenses.length,
+    totalIncome,
+    totalExpenses
+  );
   
   return {
-    message: `${result.message}\n\n${initialMessage}\n\n${firstQuestion.message}`,
+    message: introMessage,
     metadata: {
       intent: "continue_classification",
       confidence: 1.0,
       stateChanged: true,
     },
   };
+}
+
+/**
+ * 🆕 יצירת הקדמה דינמית לסיווג תנועות
+ */
+async function generateClassificationIntro(
+  userName: string,
+  incomeCount: number,
+  expenseCount: number,
+  totalIncome: number,
+  totalExpenses: number
+): Promise<string> {
+  const { chatWithGPT5Fast } = await import("@/lib/ai/gpt5-client");
+  
+  try {
+    const response = await chatWithGPT5Fast(
+      `נתונים:
+שם: ${userName}
+הכנסות: ${incomeCount} תנועות (${totalIncome.toLocaleString('he-IL')} ₪)
+הוצאות: ${expenseCount} תנועות (${totalExpenses.toLocaleString('he-IL')} ₪)
+מאזן: ${(totalIncome - totalExpenses).toLocaleString('he-IL')} ₪`,
+      `אתה מאמן פיננסי בשם φ. המשתמש העלה דוח בנק והגיע הזמן לעבור על התנועות ביחד.
+
+צור הודעה קצרה (3-5 שורות) שמכילה:
+1. פתיחה אישית וחמה (לא גנרית)
+2. סיכום קצר של מה יש בדוח (הכנסות/הוצאות/מאזן)
+3. הסבר קצר על מה שנעשה - נעבור על התנועות ביחד כדי לסווג אותן
+4. בקשת אישור להתחיל - שאל "מתאים לך עכשיו?" או משהו דומה
+
+כללים:
+- בלי אימוג'ים מיותרים (מקסימום 1-2)
+- טון אישי וחם אבל מקצועי
+- השתמש ב-*כוכביות* להדגשות
+- סיים בשאלה שמבקשת אישור
+
+החזר רק את ההודעה, בלי הסברים.`,
+      { userId: 'system', userName: 'Classification', phoneNumber: '' }
+    );
+    
+    return response?.trim() || getDefaultClassificationIntro(userName, incomeCount, expenseCount, totalIncome, totalExpenses);
+  } catch {
+    return getDefaultClassificationIntro(userName, incomeCount, expenseCount, totalIncome, totalExpenses);
+  }
+}
+
+/**
+ * הקדמה ברירת מחדל אם AI נכשל
+ */
+function getDefaultClassificationIntro(
+  userName: string,
+  incomeCount: number,
+  expenseCount: number,
+  totalIncome: number,
+  totalExpenses: number
+): string {
+  const balance = totalIncome - totalExpenses;
+  const balanceText = balance >= 0 ? `+${balance.toLocaleString('he-IL')}` : balance.toLocaleString('he-IL');
+  
+  return `${userName}, יש לי תמונה ראשונית!
+
+*${incomeCount + expenseCount}* תנועות:
+הכנסות: *${totalIncome.toLocaleString('he-IL')} ₪*
+הוצאות: *${totalExpenses.toLocaleString('he-IL')} ₪*
+מאזן: *${balanceText} ₪*
+
+עכשיו נעבור ביחד על התנועות כדי לסווג אותן נכון.
+אשאל שאלה אחת בכל פעם - פשוט תאשר או תתקן.
+
+מתאים לך עכשיו?`;
 }
 
 // ============================================================================
@@ -1191,8 +1381,12 @@ async function buildUserContext(userId: string): Promise<UserContext> {
  * Get recent messages for mood detection
  */
 async function getRecentMessages(userId: string, limit: number): Promise<Message[]> {
-  // TODO: Get from database
-  return [];
+  const history = await getRecentHistory(userId, limit);
+  return history.map((h) => ({
+    role: h.role,
+    content: h.content,
+    timestamp: h.timestamp || new Date(),
+  }));
 }
 
 /**

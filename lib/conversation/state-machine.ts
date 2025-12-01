@@ -323,6 +323,7 @@ export function getStatePriority(state: ConversationState): number {
     data_collection_pending_approval: 10,  // חלק משלב 1
     transaction_classification: 11,
     classification_questions: 11, // 🆕 סיווג אינטראקטיבי
+    classification_pending_approval: 11, // 🆕 מחכה לאישור לפני סיווג
     document_processing: 12,
     onboarding_personal: 13,      // חובה קודם
     onboarding_income: 14,        // legacy

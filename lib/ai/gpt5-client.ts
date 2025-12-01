@@ -76,23 +76,43 @@ ${conversationText}`;
   }
 }
 
+export interface HistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 /**
  * Fast response for quick interactions (reasoning: none)
  * Best for simple confirmations and casual chat
+ * 
+ * @param userMessage - Current user message
+ * @param systemPrompt - System instructions
+ * @param userContext - User context info
+ * @param conversationHistory - Optional recent conversation history
  */
 export async function chatWithGPT5Fast(
   userMessage: string,
   systemPrompt: string,
-  userContext: UserContext
+  userContext: UserContext,
+  conversationHistory?: HistoryMessage[]
 ): Promise<string> {
   try {
+    // Build conversation history section
+    let historySection = '';
+    if (conversationHistory && conversationHistory.length > 0) {
+      const historyText = conversationHistory
+        .map((msg) => `${msg.role === 'user' ? 'משתמש' : 'φ'}: ${msg.content}`)
+        .join('\n');
+      historySection = `\n[היסטוריית שיחה אחרונה]\n${historyText}\n`;
+    }
+
     // 🔧 Combine system prompt with input (Responses API doesn't support 'system' param)
     const fullInput = `[System Instructions]
 ${systemPrompt}
 
 [User Context]
 ${buildContextSummary(userContext)}
-
+${historySection}
 [User Message]
 ${userMessage}`;
 

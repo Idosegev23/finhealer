@@ -28,6 +28,111 @@ function formatMonthFromYYYYMM(monthStr: string): string {
   return `${HEBREW_MONTHS[monthIndex]} ${year}`;
 }
 
+// ============================================================================
+// 🆕 טיפים והודעות בזמן עיבוד מסמך
+// ============================================================================
+
+const PROCESSING_TIPS = [
+  "💡 ידעת? לפי מחקרים, אנשים שעוקבים אחרי ההוצאות שלהם חוסכים בממוצע 15% יותר!",
+  "💡 טיפ: הגדרת תקציב לכל קטגוריה עוזרת להימנע מהוצאות אימפולסיביות.",
+  "💡 הידעת? רוב ההוצאות הקטנות (קפה, חטיפים) מצטברות ל-15% מהתקציב החודשי.",
+  "💡 טיפ: בדיקת דוחות פעם בשבוע עוזרת לזהות בעיות לפני שהן גדלות.",
+  "💡 הידעת? השקעה של 10% מההכנסה מגיל צעיר יכולה להכפיל את החיסכון לפנסיה.",
+  "💡 טיפ: לפני קנייה גדולה, המתן 48 שעות - זה מונע רכישות אימפולסיביות.",
+  "💡 הידעת? מנוי שלא משתמשים בו עולה בממוצע 200₪ בחודש לישראלי.",
+  "💡 טיפ: כלל 50/30/20 - 50% לצרכים, 30% לרצונות, 20% לחיסכון.",
+];
+
+const PROCESSING_STAGES = [
+  "🔍 סורק את המסמך...",
+  "📊 מזהה תנועות...",
+  "🏷️ מסווג קטגוריות...",
+  "🧮 מחשב סיכומים...",
+  "✨ מסיים ניתוח...",
+];
+
+/**
+ * שליחת טיפ אקראי בזמן עיבוד
+ */
+async function sendProcessingTip(greenAPI: any, phoneNumber: string, tipIndex: number): Promise<void> {
+  const tip = PROCESSING_TIPS[tipIndex % PROCESSING_TIPS.length];
+  await greenAPI.sendMessage({ phoneNumber, message: tip });
+}
+
+/**
+ * שליחת עדכון התקדמות
+ */
+async function sendProgressUpdate(greenAPI: any, phoneNumber: string, stage: number): Promise<void> {
+  const stageMessage = PROCESSING_STAGES[Math.min(stage, PROCESSING_STAGES.length - 1)];
+  await greenAPI.sendMessage({ phoneNumber, message: stageMessage });
+}
+
+/**
+ * הפעלת עדכוני התקדמות ברקע
+ * מחזיר פונקציית ביטול
+ */
+function startProgressUpdates(
+  greenAPI: any, 
+  phoneNumber: string
+): { stop: () => void } {
+  let stage = 0;
+  let tipIndex = Math.floor(Math.random() * PROCESSING_TIPS.length);
+  let stopped = false;
+  
+  // שלח טיפ ראשון אחרי 15 שניות
+  const tipTimeout = setTimeout(async () => {
+    if (!stopped) {
+      await sendProcessingTip(greenAPI, phoneNumber, tipIndex);
+      tipIndex++;
+    }
+  }, 15000);
+  
+  // שלח עדכון התקדמות אחרי 30 שניות
+  const progressTimeout = setTimeout(async () => {
+    if (!stopped) {
+      stage++;
+      await sendProgressUpdate(greenAPI, phoneNumber, stage);
+    }
+  }, 30000);
+  
+  // שלח טיפ נוסף אחרי 50 שניות
+  const tipTimeout2 = setTimeout(async () => {
+    if (!stopped) {
+      await sendProcessingTip(greenAPI, phoneNumber, tipIndex);
+      tipIndex++;
+    }
+  }, 50000);
+  
+  // שלח עדכון נוסף אחרי 70 שניות
+  const progressTimeout2 = setTimeout(async () => {
+    if (!stopped) {
+      stage++;
+      await sendProgressUpdate(greenAPI, phoneNumber, stage);
+    }
+  }, 70000);
+  
+  // שלח עדכון אחרי 90 שניות
+  const progressTimeout3 = setTimeout(async () => {
+    if (!stopped) {
+      await greenAPI.sendMessage({ 
+        phoneNumber, 
+        message: "⏳ עוד קצת... המסמך מורכב אבל אני כמעט סיימתי!" 
+      });
+    }
+  }, 90000);
+  
+  return {
+    stop: () => {
+      stopped = true;
+      clearTimeout(tipTimeout);
+      clearTimeout(progressTimeout);
+      clearTimeout(tipTimeout2);
+      clearTimeout(progressTimeout2);
+      clearTimeout(progressTimeout3);
+    }
+  };
+}
+
 /**
  * GreenAPI Webhook Handler עם AI
  * מקבל הודעות WhatsApp נכנסות (טקסט ותמונות)
@@ -931,8 +1036,11 @@ export async function POST(request: NextRequest) {
         
         await greenAPI.sendMessage({
           phoneNumber,
-          message: `📄 קיבלתי ${documentTypeHebrew}!\n\n📊 מנתח את המסמך עם AI... זה יכול לקחת כמה שניות ⏳`,
+          message: `📄 קיבלתי ${documentTypeHebrew}!\n\nמתחיל לנתח... זה יקח כדקה-שתיים.`,
         });
+        
+        // 🆕 הפעל עדכוני התקדמות ברקע
+        const progressUpdater = startProgressUpdates(greenAPI, phoneNumber);
         
         try {
           // הורדת ה-PDF
@@ -1326,11 +1434,17 @@ export async function POST(request: NextRequest) {
           
           console.log(`✅ Document processed: ${allTransactions.length} transactions, coverage: ${actualCoverage.totalMonths} months`)
           
+          // 🆕 עצור עדכוני התקדמות - הניתוח הסתיים!
+          progressUpdater.stop();
+          
         } catch (pdfError: any) {
+          // 🆕 עצור עדכוני התקדמות גם במקרה של שגיאה
+          progressUpdater.stop();
+          
           console.error('❌ PDF Error:', pdfError);
           await greenAPI.sendMessage({
             phoneNumber,
-            message: 'משהו השתבש בניתוח ה-PDF 😕\n\nנסה לצלם את המסך או כתוב את הפרטים ידנית.',
+            message: 'משהו השתבש בניתוח. נסה לשלוח שוב או צלם את המסך.',
           });
         }
       } else {

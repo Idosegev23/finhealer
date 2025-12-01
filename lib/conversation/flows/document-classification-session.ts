@@ -577,10 +577,12 @@ export function getNextQuestionBatch(session: ClassificationSession): {
   // בדיקה אם צריך לשאול אם להמשיך (אחרי כל 5 שאלות)
   if (session.questionsAskedInBatch >= 5 && session.currentIndex < currentList.length) {
     const remaining = currentList.length - session.currentIndex;
+    const classified = session.totalClassified;
     const phaseText = session.currentPhase === 'income' ? 'הכנסות' : 'הוצאות';
     
+    // 🆕 שאלה יותר טבעית
     return {
-      message: `נשארו עוד ${remaining} ${phaseText} - נמשיך או מספיק לעכשיו?`,
+      message: `עברנו על ${classified} תנועות עד עכשיו.\nנשארו עוד ${remaining} ${phaseText}.\n\nנמשיך?`,
       questions: [],
       done: false,
       askToContinue: true,
@@ -634,8 +636,82 @@ export function getNextQuestionBatch(session: ClassificationSession): {
 }
 
 /**
- * פורמט שאלה בודדת - עם הצעות קטגוריות מהמסד נתונים
+ * פורמט שאלה בודדת - עם למידה מהיסטוריה!
+ * 🆕 אם המשתמש סיווג vendor דומה בעבר - נציע את הקטגוריה שלו
  */
+async function formatQuestionSmart(
+  tx: TransactionToClassify,
+  globalIndex: number,
+  phase: 'income' | 'expenses' | 'request_documents' | 'done',
+  userId: string
+): Promise<string> {
+  const date = formatHebrewDate(tx.date);
+  const amount = tx.amount.toLocaleString('he-IL');
+  
+  // 🆕 בדוק אם יש pattern קיים למשתמש הזה
+  const learnedCategory = await getLearnedCategoryForVendor(userId, tx.vendor);
+  
+  if (phase === 'income') {
+    // לגבי הכנסות
+    const suggested = learnedCategory || tx.currentCategory || tx.suggestedCategory;
+    
+    if (suggested) {
+      // 🆕 אם זה מ-pattern שנלמד - ציין את זה
+      const source = learnedCategory ? '(לפי הסיווגים שלך)' : '';
+      return `${amount} ₪ מ-*${tx.vendor}* (${date})\nזה *${suggested}*? ${source}`;
+    }
+    
+    // הצע קטגוריות הכנסה רלוונטיות
+    const incomeSuggestions = suggestIncomeCategory(tx.vendor);
+    const suggestionList = incomeSuggestions.map(s => s.name).join(' / ');
+    return `${amount} ₪ מ-*${tx.vendor}* (${date})\nמה זה? (${suggestionList})`;
+    
+  } else {
+    // לגבי הוצאות
+    const suggested = learnedCategory || tx.currentCategory || tx.suggestedCategory;
+    
+    if (suggested) {
+      const source = learnedCategory ? '(לפי הסיווגים שלך)' : '';
+      return `${amount} ₪ ב-*${tx.vendor}* (${date})\nזה *${suggested}*? ${source}`;
+    }
+    
+    // הצע קטגוריות רלוונטיות מ-DB
+    const suggestions = suggestCategories(tx.vendor, tx.amount);
+    if (suggestions.length > 0) {
+      const suggestionList = suggestions.slice(0, 3).map(s => s.name).join(' / ');
+      return `${amount} ₪ ב-*${tx.vendor}* (${date})\nלאיזה קטגוריה? (${suggestionList} / אחר)`;
+    }
+    
+    return `${amount} ₪ ב-*${tx.vendor}* (${date})\nלאיזה קטגוריה?`;
+  }
+}
+
+/**
+ * 🆕 קבלת קטגוריה שנלמדה מהמשתמש עבור vendor
+ */
+async function getLearnedCategoryForVendor(userId: string, vendor: string): Promise<string | null> {
+  if (!vendor) return null;
+  
+  const supabase = createServiceClient();
+  
+  // חפש pattern קיים
+  const { data: pattern } = await supabase
+    .from('user_patterns')
+    .select('pattern_value, confidence_score')
+    .eq('user_id', userId)
+    .eq('pattern_type', 'merchant')
+    .eq('pattern_key', vendor.toLowerCase())
+    .single();
+  
+  // רק אם הביטחון גבוה מספיק
+  if (pattern && pattern.confidence_score >= 0.6) {
+    return pattern.pattern_value?.category || null;
+  }
+  
+  return null;
+}
+
+// Sync version for backwards compatibility
 function formatQuestion(
   tx: TransactionToClassify,
   globalIndex: number,
@@ -645,32 +721,24 @@ function formatQuestion(
   const amount = tx.amount.toLocaleString('he-IL');
   
   if (phase === 'income') {
-    // לגבי הכנסות - הצע מרשימת קטגוריות הכנסה
     if (tx.currentCategory || tx.suggestedCategory) {
       const suggested = tx.currentCategory || tx.suggestedCategory;
-      return `${globalIndex}. ${amount} ₪ מ"${tx.vendor}" (${date})\n   → זה **${suggested}**? (כן/לא/תקן)`;
+      return `${amount} ₪ מ-*${tx.vendor}* (${date})\nזה *${suggested}*?`;
     }
-    
-    // הצע קטגוריות הכנסה רלוונטיות
     const incomeSuggestions = suggestIncomeCategory(tx.vendor);
     const suggestionList = incomeSuggestions.map(s => s.name).join(' / ');
-    return `${globalIndex}. ${amount} ₪ מ"${tx.vendor}" (${date})\n   → מה זה? (${suggestionList})`;
-    
+    return `${amount} ₪ מ-*${tx.vendor}* (${date})\nמה זה? (${suggestionList})`;
   } else {
-    // לגבי הוצאות - הצע מהמסד נתונים
     if (tx.currentCategory || tx.suggestedCategory) {
       const suggested = tx.currentCategory || tx.suggestedCategory;
-      return `${globalIndex}. ${amount} ₪ ב"${tx.vendor}" (${date})\n   → זה **${suggested}**? (כן/לא/תקן)`;
+      return `${amount} ₪ ב-*${tx.vendor}* (${date})\nזה *${suggested}*?`;
     }
-    
-    // הצע קטגוריות רלוונטיות מ-DB
     const suggestions = suggestCategories(tx.vendor, tx.amount);
     if (suggestions.length > 0) {
       const suggestionList = suggestions.slice(0, 3).map(s => s.name).join(' / ');
-      return `${globalIndex}. ${amount} ₪ ב"${tx.vendor}" (${date})\n   → לאיזה קטגוריה? (${suggestionList} / אחר)`;
+      return `${amount} ₪ ב-*${tx.vendor}* (${date})\nלאיזה קטגוריה? (${suggestionList} / אחר)`;
     }
-    
-    return `${globalIndex}. ${amount} ₪ ב"${tx.vendor}" (${date})\n   → לאיזה קטגוריה?`;
+    return `${amount} ₪ ב-*${tx.vendor}* (${date})\nלאיזה קטגוריה?`;
   }
 }
 
@@ -926,12 +994,12 @@ export async function handleUserResponse(
     }
   }
 
-  // 2. בדיקה אם רוצה לעצור
+  // 2. בדיקה אם רוצה לעצור (פשוט)
   if (isPostponement(lowerMessage)) {
     return await handlePostponement(session, userMessage);
   }
 
-  // 3. בדיקה אם זה אישור להתחיל/להמשיך (רק אם אין שאלות פתוחות!)
+  // 3. בדיקה אם זה אישור להתחיל/להמשיך (פשוט)
   if (isConfirmation(lowerMessage)) {
     session.questionsAskedInBatch = 0;  // reset counter
     const next = getNextQuestionBatch(session);
@@ -944,13 +1012,67 @@ export async function handleUserResponse(
     };
   }
 
-  // 4. לא הבנתי - ביקוש הבהרה
+  // 4. 🆕 לא הבנתי - נשתמש ב-AI לפרסר את הכוונה!
+  const aiIntent = await parseUserIntentWithAI(userMessage, session);
+  
+  if (aiIntent === 'continue') {
+    session.questionsAskedInBatch = 0;
+    const next = getNextQuestionBatch(session);
+    await saveClassificationSession(session.userId, session);
+    return {
+      message: next.message,
+      session,
+      done: next.done,
+      waitingForAnswer: !next.done && !next.askToContinue,
+    };
+  }
+  
+  if (aiIntent === 'stop') {
+    return await handlePostponement(session, userMessage);
+  }
+  
+  // גם AI לא הבין - שאל שוב בצורה ברורה
   return {
-    message: `לא הבנתי 😅\n\n${getHelpMessage(session)}`,
+    message: `לא הבנתי.\n\nרוצה להמשיך לסווג תנועות?\n(כתוב "כן" או "לא")`,
     session,
     done: false,
     waitingForAnswer: true,
   };
+}
+
+/**
+ * 🆕 פרסור כוונה עם AI
+ */
+async function parseUserIntentWithAI(
+  message: string,
+  session: ClassificationSession
+): Promise<'continue' | 'stop' | 'unclear'> {
+  const { chatWithGPT5Fast } = await import('@/lib/ai/gpt5-client');
+  
+  try {
+    const response = await chatWithGPT5Fast(
+      `הודעת המשתמש: "${message}"`,
+      `אתה מפרסר כוונות.
+המשתמש נשאל אם הוא רוצה להמשיך לסווג תנועות פיננסיות או לעצור.
+
+הודעת המשתמש יכולה להיות בכל צורה - עברית, אנגלית, קצר, ארוך.
+
+קבע את הכוונה:
+- continue: המשתמש רוצה להמשיך (כן, בטח, יאללה, נמשיך, אוקי, בסדר, מה עוד, ועוד...)
+- stop: המשתמש רוצה לעצור (לא, מספיק, די, עייף, אחר כך, מחר, לא עכשיו...)
+- unclear: לא ברור מה המשתמש רוצה
+
+החזר רק מילה אחת: continue / stop / unclear`,
+      { userId: 'system', userName: 'IntentParser', phoneNumber: '' }
+    );
+    
+    const result = response?.toLowerCase().trim();
+    if (result?.includes('continue')) return 'continue';
+    if (result?.includes('stop')) return 'stop';
+    return 'unclear';
+  } catch {
+    return 'unclear';
+  }
 }
 
 /**
@@ -1284,7 +1406,7 @@ function isInternalTransfer(text: string): boolean {
 }
 
 /**
- * עדכון קטגוריה בDB
+ * עדכון קטגוריה בDB + 🆕 למידה לפעם הבאה!
  */
 async function updateTransactionCategory(
   supabase: any,
@@ -1293,6 +1415,16 @@ async function updateTransactionCategory(
   category: string,
   isInternal: boolean
 ): Promise<void> {
+  // קבל את פרטי התנועה כדי ללמוד מה-vendor
+  const { data: transaction } = await supabase
+    .from('transactions')
+    .select('vendor, expense_category')
+    .eq('id', transactionId)
+    .single();
+  
+  const vendor = transaction?.vendor;
+  const existingCategory = transaction?.expense_category;
+  
   // אם המשתמש אישר - רק נעדכן סטטוס, לא נשנה קטגוריה
   if (category === 'CONFIRMED') {
     await supabase
@@ -1300,11 +1432,18 @@ async function updateTransactionCategory(
       .update({ status: 'approved' })
       .eq('id', transactionId)
       .eq('user_id', userId);
+    
+    // 🆕 אישור = חיזוק ה-pattern הקיים
+    if (vendor && existingCategory) {
+      await learnFromClassification(supabase, userId, vendor, existingCategory, true);
+    }
     return;
   }
   
+  const finalCategory = isInternal ? 'העברה פנימית' : category;
+  
   const updates: any = {
-    expense_category: isInternal ? 'העברה פנימית' : category,
+    expense_category: finalCategory,
     status: 'approved',
   };
   
@@ -1318,6 +1457,105 @@ async function updateTransactionCategory(
     .update(updates)
     .eq('id', transactionId)
     .eq('user_id', userId);
+  
+  // 🆕 למד מהסיווג החדש
+  if (vendor && !isInternal) {
+    await learnFromClassification(supabase, userId, vendor, finalCategory, false);
+  }
+}
+
+/**
+ * 🆕 למידה מסיווג - שמירת pattern לשימוש עתידי
+ */
+async function learnFromClassification(
+  supabase: any,
+  userId: string,
+  vendor: string,
+  category: string,
+  isConfirmation: boolean
+): Promise<void> {
+  if (!vendor || !category) return;
+  
+  const vendorKey = vendor.toLowerCase().trim();
+  
+  try {
+    // בדוק אם יש pattern קיים
+    const { data: existing } = await supabase
+      .from('user_patterns')
+      .select('id, confidence_score, learned_from_count, pattern_value')
+      .eq('user_id', userId)
+      .eq('pattern_type', 'merchant')
+      .eq('pattern_key', vendorKey)
+      .single();
+    
+    if (existing) {
+      // עדכון pattern קיים
+      const currentCategory = existing.pattern_value?.category;
+      
+      if (currentCategory === category) {
+        // אותה קטגוריה = חיזוק
+        const newConfidence = Math.min(existing.confidence_score + 0.1, 1.0);
+        const newCount = (existing.learned_from_count || 1) + 1;
+        
+        await supabase
+          .from('user_patterns')
+          .update({
+            confidence_score: newConfidence,
+            learned_from_count: newCount,
+            last_seen: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+          
+        console.log(`📚 Pattern strengthened: ${vendor} → ${category} (confidence: ${newConfidence})`);
+      } else {
+        // קטגוריה שונה = תיקון
+        if (isConfirmation) {
+          // המשתמש אישר קטגוריה אחרת - החלשת הקיימת
+          const newConfidence = Math.max(existing.confidence_score - 0.2, 0);
+          await supabase
+            .from('user_patterns')
+            .update({ confidence_score: newConfidence })
+            .eq('id', existing.id);
+        } else {
+          // המשתמש תיקן - יצירת pattern חדש
+          await supabase
+            .from('user_patterns')
+            .upsert({
+              user_id: userId,
+              pattern_type: 'merchant',
+              pattern_key: vendorKey,
+              pattern_value: { category },
+              confidence_score: 0.6,
+              learned_from_count: 1,
+              last_seen: new Date().toISOString(),
+              auto_apply: false,
+            }, {
+              onConflict: 'user_id,pattern_type,pattern_key',
+            });
+            
+          console.log(`📚 Pattern updated: ${vendor} → ${category}`);
+        }
+      }
+    } else {
+      // יצירת pattern חדש
+      await supabase
+        .from('user_patterns')
+        .insert({
+          user_id: userId,
+          pattern_type: 'merchant',
+          pattern_key: vendorKey,
+          pattern_value: { category },
+          confidence_score: 0.5,
+          learned_from_count: 1,
+          last_seen: new Date().toISOString(),
+          auto_apply: false,
+        });
+        
+      console.log(`📚 New pattern created: ${vendor} → ${category}`);
+    }
+  } catch (error) {
+    console.error('Failed to learn from classification:', error);
+  }
 }
 
 /**
