@@ -839,54 +839,55 @@ export function getNextQuestionBatch(session: ClassificationSession): {
 }
 
 /**
- * פורמט שאלה בודדת - עם למידה מהיסטוריה!
- * 🆕 אם המשתמש סיווג vendor דומה בעבר - נציע את הקטגוריה שלו
+ * 🧠 שאלה חכמה עם AI - טבעית ואנושית!
+ * AI מייצר שאלה שמתחשבת בהקשר, היסטוריה והתקדמות
  */
 async function formatQuestionSmart(
   tx: TransactionToClassify,
   globalIndex: number,
   phase: 'income' | 'expenses' | 'request_documents' | 'done',
-  userId: string
+  userId: string,
+  session?: ClassificationSession
 ): Promise<string> {
-  const date = formatHebrewDate(tx.date);
-  const amount = tx.amount.toLocaleString('he-IL');
+  // 🆕 ייבוא AI
+  const { askAboutTransaction } = await import('@/lib/ai/conversation-ai');
   
   // 🆕 בדוק אם יש pattern קיים למשתמש הזה
   const learnedCategory = await getLearnedCategoryForVendor(userId, tx.vendor);
+  const suggestedCategory = learnedCategory || tx.currentCategory || tx.suggestedCategory || undefined;
   
-  if (phase === 'income') {
-    // לגבי הכנסות
-    const suggested = learnedCategory || tx.currentCategory || tx.suggestedCategory;
-    
-    if (suggested) {
-      // 🆕 אם זה מ-pattern שנלמד - ציין את זה
-      const source = learnedCategory ? '(לפי הסיווגים שלך)' : '';
-      return `${amount} ₪ מ-*${tx.vendor}* (${date})\nזה *${suggested}*? ${source}`;
-    }
-    
-    // הצע קטגוריות הכנסה רלוונטיות
-    const incomeSuggestions = suggestIncomeCategory(tx.vendor);
-    const suggestionList = incomeSuggestions.map(s => s.name).join(' / ');
-    return `${amount} ₪ מ-*${tx.vendor}* (${date})\nמה זה? (${suggestionList})`;
-    
-  } else {
-    // לגבי הוצאות
-    const suggested = learnedCategory || tx.currentCategory || tx.suggestedCategory;
-    
-    if (suggested) {
-      const source = learnedCategory ? '(לפי הסיווגים שלך)' : '';
-      return `${amount} ₪ ב-*${tx.vendor}* (${date})\nזה *${suggested}*? ${source}`;
-    }
-    
-    // הצע קטגוריות רלוונטיות מ-DB
-    const suggestions = suggestCategories(tx.vendor, tx.amount);
-    if (suggestions.length > 0) {
-      const suggestionList = suggestions.slice(0, 3).map(s => s.name).join(' / ');
-      return `${amount} ₪ ב-*${tx.vendor}* (${date})\nלאיזה קטגוריה? (${suggestionList} / אחר)`;
-    }
-    
-    return `${amount} ₪ ב-*${tx.vendor}* (${date})\nלאיזה קטגוריה?`;
-  }
+  // חשב התקדמות
+  const progress = session ? {
+    done: session.totalClassified,
+    total: session.highConfidenceIncome.length + session.highConfidenceExpenses.length + 
+           session.lowConfidenceIncome.length + session.lowConfidenceExpenses.length,
+  } : { done: globalIndex, total: 100 };
+  
+  // קבל סיווגים אחרונים לקונטקסט
+  const recentClassifications = session?.pendingQuestions
+    ?.filter(q => q.transactionId !== tx.id)
+    .slice(-3)
+    .map(q => ({ vendor: q.vendor, category: '' }));
+  
+  // טעינת שם המשתמש
+  const userName = await getUserName(userId) || 'חבר';
+  
+  // 🧠 AI מייצר את השאלה!
+  const aiQuestion = await askAboutTransaction(
+    userId,
+    userName,
+    {
+      vendor: tx.vendor,
+      amount: tx.amount,
+      date: formatHebrewDate(tx.date),
+      type: tx.type,
+      suggestedCategory,
+    },
+    progress,
+    recentClassifications
+  );
+  
+  return aiQuestion;
 }
 
 /**
@@ -1039,6 +1040,63 @@ function getNextDocumentRequest(session: ClassificationSession): {
 /**
  * הודעת סיום
  */
+/**
+ * 🧠 הודעת סיום עם AI - אישית ומעניינת!
+ */
+async function getCompletionMessageAsync(session: ClassificationSession): Promise<string> {
+  const { generateCompletionMessage } = await import('@/lib/ai/conversation-ai');
+  
+  try {
+    const userName = await getUserName(session.userId) || 'חבר';
+    
+    // חישוב קטגוריות מובילות
+    const categoryCount: Record<string, { count: number; total: number }> = {};
+    const allTransactions = [
+      ...session.highConfidenceIncome,
+      ...session.highConfidenceExpenses,
+      ...session.lowConfidenceIncome,
+      ...session.lowConfidenceExpenses,
+    ];
+    
+    for (const tx of allTransactions) {
+      const cat = tx.currentCategory || tx.suggestedCategory || 'אחר';
+      if (!categoryCount[cat]) {
+        categoryCount[cat] = { count: 0, total: 0 };
+      }
+      categoryCount[cat].count++;
+      categoryCount[cat].total += tx.amount;
+    }
+    
+    const topCategories = Object.entries(categoryCount)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 5)
+      .map(([name, data]) => ({ name, count: data.count, total: data.total }));
+    
+    // 🧠 AI מייצר הודעת סיום!
+    const aiMessage = await generateCompletionMessage(
+      session.userId,
+      userName,
+      {
+        totalClassified: session.totalClassified,
+        totalIncome: session.totalIncome,
+        totalExpenses: session.totalExpenses,
+        topCategories,
+      }
+    );
+    
+    return aiMessage;
+  } catch {
+    // fallback
+    return `🎉 מעולה! סיימנו!
+
+💚 הכנסות: ${session.totalIncome.toLocaleString('he-IL')} ₪
+💸 הוצאות: ${session.totalExpenses.toLocaleString('he-IL')} ₪
+
+עכשיו יש לי תמונה מלאה! רוצה לראות ניתוח?`;
+  }
+}
+
+// גרסה סינכרונית לתאימות אחורה
 function getCompletionMessage(session: ClassificationSession): string {
   return `🎉 מעולה! סיימנו לסווג את כל התנועות!
 
@@ -1419,8 +1477,8 @@ async function parseUserIntentWithAI(
 }
 
 /**
- * 🆕 יצירת תגובה דינמית אחרי סיווג תנועה
- * תגובה טבעית שמתייחסת למה שסווג ומתקדמת לשאלה הבאה
+ * 🧠 תגובה דינמית עם AI - טבעית ואנושית!
+ * AI מגיב לסיווג ושואל הלאה בשיחה אחת רציפה
  */
 async function generateSmartResponse(
   userId: string,
@@ -1431,90 +1489,60 @@ async function generateSmartResponse(
   phase: 'income' | 'expenses',
   session?: ClassificationSession
 ): Promise<string> {
-  const { chatWithGPT5Fast } = await import('@/lib/ai/gpt5-client');
+  // 🆕 ייבוא AI
+  const { respondAndContinue } = await import('@/lib/ai/conversation-ai');
   
   try {
     // טעינת שם המשתמש
     const userName = await getUserName(userId);
     
-    // זיהוי דפוסים מה-session
-    const patterns = session ? detectSessionPatterns(session) : null;
+    // מציאת התנועה הבאה מה-session
+    let nextTransaction: {
+      vendor: string;
+      amount: number;
+      date: string;
+      type: 'income' | 'expense';
+      suggestedCategory?: string;
+    } | undefined;
     
-    // חישוב התקדמות
-    const totalItems = totalClassified + remainingCount;
-    const progressPercent = Math.round((totalClassified / totalItems) * 100);
-    const isMilestone = progressPercent === 50 || progressPercent === 75 || remainingCount <= 3;
-    
-    // טעינת היסטוריית שיחה
-    const history = await getHistoryForOpenAI(userId, 5);
-    
-    // בניית הקשר מיוחד
-    let specialContext = '';
-    if (isMilestone && progressPercent === 50) {
-      specialContext = '🎯 המשתמש עבר חצי דרך! אפשר להזכיר את זה בקצרה.';
-    } else if (remainingCount <= 3 && remainingCount > 0) {
-      specialContext = `🏁 כמעט סיימנו! נשארו רק ${remainingCount}. אפשר לעודד.`;
-    }
-    
-    if (patterns && patterns.topCategory) {
-      specialContext += `\n📊 דפוס: הרבה הוצאות על ${patterns.topCategory} (${patterns.topCategoryCount} פעמים)`;
-    }
-    
-    const response = await chatWithGPT5Fast(
-      `פרטי הסיווג האחרון:
-- סכום: ${classifiedAnswer.amount?.toLocaleString('he-IL') || 'לא ידוע'} ₪
-- ספק: ${classifiedAnswer.vendor || 'לא ידוע'}
-- סווג כ: ${classifiedAnswer.category}
-- עברנו על: ${totalClassified} תנועות (${progressPercent}%)
-- נשארו: ${remainingCount} ${phase === 'income' ? 'הכנסות' : 'הוצאות'}
-- שם המשתמש: ${userName || 'לא ידוע'}
-${specialContext ? `- הערה מיוחדת: ${specialContext}` : ''}
-- השאלה הבאה: ${nextQuestion}`,
-      `אתה מאמן פיננסי בשם φ שעובר עם המשתמש על תנועות פיננסיות.
-המשתמש סיווג תנועה. צור תגובה קצרה וטבעית.
-
-כללי תגובה:
-1. תגובה קצרה (מילה-שתיים): "מעולה." / "סבבה." / "👍" / "יופי."
-2. אם יש אבן דרך (50%, כמעט סיימנו) - אפשר להוסיף משפט קצר עם השם
-3. אם יש דפוס מעניין - אפשר להעיר בקצרה בהומור קל
-4. אחרי התגובה - שורה ריקה והשאלה הבאה
-
-דוגמאות טובות:
-- "👍\n\n[שאלה]"
-- "מעולה!\n\n[שאלה]"  
-- "${userName}, חצי דרך! 🎯\n\n[שאלה]"
-- "עוד 2 ונסיים! 💪\n\n[שאלה]"
-- "סבבה. הרבה קפה החודש הזה 😅\n\n[שאלה]"
-
-חוקים:
-- לא לחזור על מה שהמשתמש אמר
-- לא להאריך - קצר וטבעי
-- להשתמש בשם רק באבני דרך
-- הומור רק אם יש דפוס מעניין
-
-החזר רק את התגובה והשאלה.`,
-      { userId, userName: userName || 'Classification', phoneNumber: '' },
-      history
-    );
-    
-    // אם ה-AI החזיר תשובה טובה
-    if (response && response.length > 0 && response.length < 300) {
-      return response.trim();
-    }
-    
-    // fallback עם התקדמות
-    if (isMilestone) {
-      if (progressPercent === 50) {
-        return `חצי דרך! 🎯\n\n${nextQuestion}`;
-      } else if (remainingCount <= 3) {
-        return `עוד ${remainingCount} ונסיים! 💪\n\n${nextQuestion}`;
+    if (session && remainingCount > 0) {
+      const currentList = phase === 'income' 
+        ? session.lowConfidenceIncome 
+        : session.lowConfidenceExpenses;
+      const nextTx = currentList[session.currentIndex];
+      
+      if (nextTx) {
+        const learnedCategory = await getLearnedCategoryForVendor(userId, nextTx.vendor);
+        nextTransaction = {
+          vendor: nextTx.vendor,
+          amount: nextTx.amount,
+          date: formatHebrewDate(nextTx.date),
+          type: nextTx.type,
+          suggestedCategory: learnedCategory || nextTx.currentCategory || nextTx.suggestedCategory || undefined,
+        };
       }
     }
     
+    // 🧠 AI מגיב ושואל הלאה!
+    const response = await respondAndContinue(
+      userId,
+      userName || 'חבר',
+      `${classifiedAnswer.vendor || ''}: ${classifiedAnswer.category}`,
+      classifiedAnswer.category,
+      nextTransaction,
+      { done: totalClassified, total: totalClassified + remainingCount }
+    );
+    
+    // אם ה-AI החזיר תשובה טובה
+    if (response && response.length > 0 && response.length < 400) {
+      return response.trim();
+    }
+    
+    // fallback פשוט
     return `👍\n\n${nextQuestion}`;
   } catch {
     // fallback פשוט
-    const quickResponses = ['👍', 'מעולה.', 'יופי.', 'סבבה.', 'אוקי.'];
+    const quickResponses = ['👍', 'מעולה.', 'יופי.', 'סבבה.'];
     const randomResponse = quickResponses[Math.floor(Math.random() * quickResponses.length)];
     return `${randomResponse}\n\n${nextQuestion}`;
   }
