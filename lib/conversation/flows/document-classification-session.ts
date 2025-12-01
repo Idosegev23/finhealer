@@ -486,39 +486,45 @@ export function getInitialMessage(session: ClassificationSession): string {
   const totalTransactions = session.incomeToClassify.length + session.expensesToClassify.length;
   
   if (totalTransactions === 0) {
-    return `לא זיהיתי תנועות בדוח 🤔\n\nאפשר לנסות לשלוח דוח אחר?`;
+    return `לא זיהיתי תנועות בדוח.\n\nאפשר לנסות לשלוח דוח אחר?`;
   }
 
   // כמה יש להן הצעת סיווג מ-AI
   const withSuggestion = session.alreadyClassifiedIncome.length + session.alreadyClassifiedExpenses.length;
   const withoutSuggestion = totalTransactions - withSuggestion;
 
-  // הצגת סיכום
-  let message = `📊 זיהיתי ${totalTransactions} תנועות!\n\n`;
+  // הצגת סיכום - יותר מסוגנן
+  let message = `*זיהיתי ${totalTransactions} תנועות*\n\n`;
   
-  // הכנסות
-  message += `💚 הכנסות: ${session.incomeToClassify.length} תנועות (${session.totalIncome.toLocaleString('he-IL')} ₪)\n`;
+  message += `הכנסות: *${session.incomeToClassify.length}* (${session.totalIncome.toLocaleString('he-IL')} ₪)\n`;
+  message += `הוצאות: *${session.expensesToClassify.length}* (${session.totalExpenses.toLocaleString('he-IL')} ₪)\n\n`;
   
-  // הוצאות
-  message += `💸 הוצאות: ${session.expensesToClassify.length} תנועות (${session.totalExpenses.toLocaleString('he-IL')} ₪)\n\n`;
+  // מאזן
+  const balance = session.totalIncome - session.totalExpenses;
+  const balanceText = balance >= 0 ? `+${balance.toLocaleString('he-IL')}` : balance.toLocaleString('he-IL');
+  message += `מאזן: *${balanceText} ₪*\n\n`;
+  
+  message += `---\n\n`;
   
   // סטטוס הסיווג האוטומטי
   if (withSuggestion > 0) {
-    message += `🤖 זיהיתי אוטומטית ${withSuggestion} תנועות - רק צריך לאשר.\n`;
+    message += `זיהיתי אוטומטית *${withSuggestion}* תנועות.\n`;
   }
   if (withoutSuggestion > 0) {
-    message += `❓ ${withoutSuggestion} תנועות לא הצלחתי לזהות - אשאל עליהן.\n`;
+    message += `*${withoutSuggestion}* תנועות צריכות את העזרה שלך.\n`;
   }
   message += `\n`;
   
-  // הסבר על התהליך
-  message += `📝 איך זה עובד?\n`;
-  message += `• אשאל על תנועה אחת בכל פעם\n`;
-  message += `• אם זיהיתי נכון - פשוט כתוב "כן" ✓\n`;
-  message += `• אם טעיתי - כתוב "לא, זה X"\n`;
-  message += `• תמיד אפשר להגיד "אח"כ" ולהמשיך מחר 😊\n\n`;
+  // הסבר + בקשת הסכמה מפורשת
+  message += `*לפני שנתחיל:*\n`;
+  message += `אני צריך לעבור איתך על התנועות כדי לוודא שהסיווג נכון.\n`;
+  message += `זה יקח כמה דקות.\n\n`;
   
-  message += `נתחיל?`;
+  message += `אם זיהיתי נכון - תגיד *"כן"*\n`;
+  message += `אם טעיתי - תגיד מה הקטגוריה הנכונה\n\n`;
+  
+  message += `*מתאים לך עכשיו?*\n`;
+  message += `(אפשר גם אחר כך)`;
 
   return message;
 }
@@ -886,25 +892,8 @@ export async function handleUserResponse(
     };
   }
 
-  // 1. בדיקה אם זה אישור להמשיך
-  if (isConfirmation(lowerMessage)) {
-    session.questionsAskedInBatch = 0;  // reset counter
-    const next = getNextQuestionBatch(session);
-    await saveClassificationSession(session.userId, session);
-    return {
-      message: next.message,
-      session,
-      done: next.done,
-      waitingForAnswer: !next.done && !next.askToContinue,
-    };
-  }
-
-  // 2. בדיקה אם רוצה לעצור
-  if (isPostponement(lowerMessage)) {
-    return await handlePostponement(session, userMessage);
-  }
-
-  // 3. ניסיון לפרסר תשובות לשאלות
+  // 1. 🔑 קודם כל - אם יש שאלות ממתינות, זו תשובה לשאלה!
+  // (לא נתפוס "כן" כאישור להתחלה אם יש שאלה פתוחה)
   if (session.pendingQuestions.length > 0) {
     const parseResult = parseAnswers(userMessage, session.pendingQuestions);
     
@@ -918,14 +907,14 @@ export async function handleUserResponse(
       session.currentIndex += parseResult.answers.length;
       session.totalClassified += parseResult.answers.length;
       session.questionsAskedInBatch += parseResult.answers.length;
-      session.pendingQuestions = [];
+      session.pendingQuestions = [];  // 🔑 חשוב! מנקה את השאלות הממתינות
       
       // קבלת השאלות הבאות
       const next = getNextQuestionBatch(session);
       await saveClassificationSession(session.userId, session);
       
-      // תגובה ידידותית
-      const responses = ['רשמתי! ✓', 'מעולה! 👍', 'הבנתי! ✓', 'נחמד! רשום 📝'];
+      // תגובה קצרה ולעניין
+      const responses = ['רשמתי.', 'הבנתי.', 'נרשם.', 'אוקיי.'];
       const randomResponse = responses[Math.floor(Math.random() * responses.length)];
       
       return {
@@ -935,6 +924,24 @@ export async function handleUserResponse(
         waitingForAnswer: !next.done && !next.askToContinue,
       };
     }
+  }
+
+  // 2. בדיקה אם רוצה לעצור
+  if (isPostponement(lowerMessage)) {
+    return await handlePostponement(session, userMessage);
+  }
+
+  // 3. בדיקה אם זה אישור להתחיל/להמשיך (רק אם אין שאלות פתוחות!)
+  if (isConfirmation(lowerMessage)) {
+    session.questionsAskedInBatch = 0;  // reset counter
+    const next = getNextQuestionBatch(session);
+    await saveClassificationSession(session.userId, session);
+    return {
+      message: next.message,
+      session,
+      done: next.done,
+      waitingForAnswer: !next.done && !next.askToContinue,
+    };
   }
 
   // 4. לא הבנתי - ביקוש הבהרה

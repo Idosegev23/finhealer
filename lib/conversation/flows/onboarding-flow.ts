@@ -15,6 +15,69 @@ import { createClient } from '@/lib/supabase/server';
 import { chatWithGPT5Fast } from '@/lib/ai/gpt5-client';
 
 // ============================================================================
+// AI-Generated Personalized Responses
+// ============================================================================
+
+/**
+ * 🆕 יצירת ברכה אישית דינמית - לא אותו דבר כל פעם!
+ */
+async function generatePersonalGreeting(name: string): Promise<string> {
+  try {
+    const response = await chatWithGPT5Fast(
+      `השם: ${name}`,
+      `אתה מאמן פיננסי ישראלי בשם φ. 
+צור ברכה קצרה ואותנטית למשתמש חדש (3-6 מילים בלבד).
+אל תגיד "שם יפה" או משהו גנרי.
+תהיה אמיתי וחם - כמו שמישהו באמת היה אומר.
+דוגמאות טובות: "נעים להכיר!", "שמח שהצטרפת!", "בוא נתחיל!", "מוכן לצאת לדרך?"
+החזר רק את הברכה, בלי גרשיים.`,
+      { userId: 'system', userName: 'Onboarding', phoneNumber: '' }
+    );
+    return response?.trim() || 'נעים להכיר!';
+  } catch {
+    // fallback אם AI לא זמין
+    const greetings = ['נעים להכיר!', 'שמח שהצטרפת!', 'בוא נתחיל!', 'מוכן לצאת לדרך?'];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }
+}
+
+/**
+ * 🆕 יצירת תגובה אישית לנתונים שהמשתמש שיתף
+ */
+async function generatePersonalResponse(data: {
+  age?: number;
+  marital_status?: string;
+  children_count?: number;
+  employment_status?: string;
+}): Promise<string> {
+  try {
+    const context = [];
+    if (data.age) context.push(`גיל: ${data.age}`);
+    if (data.marital_status) context.push(`מצב משפחתי: ${data.marital_status}`);
+    if (data.children_count !== undefined) context.push(`ילדים: ${data.children_count}`);
+    if (data.employment_status) context.push(`תעסוקה: ${data.employment_status}`);
+    
+    const response = await chatWithGPT5Fast(
+      `פרטי המשתמש:\n${context.join('\n')}`,
+      `אתה מאמן פיננסי ישראלי בשם φ.
+המשתמש שיתף פרטים אישיים. צור תגובה קצרה (משפט אחד!) שמראה שהקשבת והבנת.
+תהיה אמיתי, חם, ומעודד - לא גנרי.
+אל תחזור על הנתונים שהוא אמר.
+אל תשתמש באימוג'ים.
+דוגמאות טובות:
+- לגבי גיל 39 נשוי עם 3 ילדים: "משפחה גדולה - זה גם אתגר וגם שמחה!"
+- לגבי בן 25 רווק: "תקופה מצוינת לבנות הרגלים טובים!"
+- לגבי עצמאי: "בעצמאות יש חופש, אבל גם אחריות על התכנון."
+החזר רק את התגובה, בלי גרשיים.`,
+      { userId: 'system', userName: 'Onboarding', phoneNumber: '' }
+    );
+    return response?.trim() || 'מעולה!';
+  } catch {
+    return 'מעולה!';
+  }
+}
+
+// ============================================================================
 // AI-Powered Parser - פרסור חכם עם AI
 // ============================================================================
 
@@ -178,13 +241,17 @@ export async function handleOnboardingFlow(
 // ============================================================================
 
 function getWelcomeMessage(): string {
-  return `היי! 👋
+  return `היי,
 
-אני φ (פאי) - המאמן הפיננסי האישי שלך, ואני ממש שמח שבחרת להתחיל את המסע הזה!
+אני *φ* - המאמן הפיננסי שלך.
 
-🎯 המטרה שלי פשוטה: לעזור לך להרגיש שליטה מלאה על הכסף שלך, בלי לחץ ובלי שיפוטיות.
+החלטת לקחת אחריות על הכספים שלך - זו החלטה משמעותית.
 
-בוא נתחיל בהיכרות קצרצרה - מה השם שלך? 😊`;
+לא משנה איפה אתה עומד היום, *יחד נמצא את האיזון המושלם* בין ההכנסות להוצאות שלך.
+
+בלי שיפוטיות. בלי לחץ. רק תוצאות.
+
+בוא נתחיל - *מה השם שלך?*`;
 }
 
 // ============================================================================
@@ -214,17 +281,21 @@ export async function handleOnboardingPersonal(
     }
     
     data.full_name = name;
+    
+    // 🆕 תגובה דינמית עם AI
+    const personalGreeting = await generatePersonalGreeting(name);
+    
     return {
-      response: `נעים מאוד ${data.full_name}! 🤝
+      response: `*${data.full_name}*, ${personalGreeting}
 
-עכשיו ספר לי קצת על עצמך -
-גיל, מצב משפחתי, ואם יש ילדים.
+עכשיו אני צריך להכיר אותך קצת יותר -
+זה יעזור לי להתאים את העצות בדיוק בשבילך.
 
-💡 אתה יכול לכתוב הכל במשפט אחד, למשל:
-"בן 35, נשוי, 2 ילדים"
-או לענות בנפרד - מה שנוח לך!
+ספר לי על עצמך:
+גיל, מצב משפחתי, ילדים.
 
-אז... ספר לי 😊`,
+אפשר הכל במשפט אחד, למשל:
+*"בן 35, נשוי, 2 ילדים"*`,
       nextStep: 'collect_personal_info',
       completed: false,
     };
@@ -280,12 +351,14 @@ export async function handleOnboardingPersonal(
     let gotSomething = parsed.age || parsed.marital_status || parsed.children_count !== undefined || parsed.employment_status;
     
     if (gotSomething) {
-      response = 'תפסתי! ✅\n\n';
-      if (parsed.age) response += `• גיל: ${parsed.age}\n`;
-      if (parsed.marital_status) response += `• מצב משפחתי: ${formatMaritalStatus(parsed.marital_status)}\n`;
-      if (parsed.children_count !== undefined) response += `• ילדים: ${parsed.children_count}\n`;
-      if (parsed.employment_status) response += `• תעסוקה: ${formatEmployment(parsed.employment_status)}\n`;
-      response += '\n';
+      // 🆕 תגובה אישית מ-AI
+      const personalResponse = await generatePersonalResponse({
+        age: parsed.age,
+        marital_status: parsed.marital_status,
+        children_count: parsed.children_count,
+        employment_status: parsed.employment_status,
+      });
+      response = `${personalResponse}\n\n`;
     }
     
     // שאל על מה שחסר
@@ -294,7 +367,7 @@ export async function handleOnboardingPersonal(
     } else if (stillMissing.includes('מצב משפחתי')) {
       response += 'מה המצב המשפחתי שלך? (רווק/נשוי/גרוש/אלמן)';
     } else if (stillMissing.includes('מספר ילדים')) {
-      response += 'כמה ילדים יש לכם? (מספר או "אין")';
+      response += 'כמה ילדים יש לכם?';
     } else if (stillMissing.includes('סוג תעסוקה')) {
       response += 'מה סוג התעסוקה שלך?\n• שכיר\n• עצמאי\n• משולב (גם וגם)';
     }
@@ -309,36 +382,36 @@ export async function handleOnboardingPersonal(
   // 🎉 יש את כל המידע! עבור לשלב הבא
   await savePersonalInfo(context.userId, data);
   
-  const summary = `מעולה ${data.full_name}! יש לי את כל מה שצריך 🎉
+  // 🆕 תגובה אישית מ-AI
+  const personalSummary = await generatePersonalResponse({
+    age: data.age,
+    marital_status: data.marital_status,
+    children_count: data.children_count,
+    employment_status: data.employment_status,
+  });
+  
+  const summary = `*מעולה ${data.full_name}!*
 
-📋 סיכום:
-• גיל: ${data.age}
-• מצב משפחתי: ${formatMaritalStatus(data.marital_status!)}
-${data.children_count && data.children_count > 0 ? `• ילדים: ${data.children_count}\n` : ''}• תעסוקה: ${formatEmployment(data.employment_status!)}
+${personalSummary}
 
-עכשיו מגיע החלק המעניין! 📊
+---
+
+עכשיו מגיע החלק המעניין.
 
 כדי שאוכל לתת לך תמונה מדויקת של המצב הפיננסי שלך,
 אני צריך לראות את התנועות בחשבון.
 
-📄 *מה צריך?*
+*מה צריך?*
 דוח בנק של 3 החודשים האחרונים
 
-⭐ *טיפ!* יש לך גם דוחות כוללים?
-• *דוח מסלקה פנסיונית* - כל הפנסיות במכה אחת!
-• *דוח הר הביטוח* - כל הביטוחים במקום אחד!
-(אפשר להוציא אותם בחינם דרך האתרים הממשלתיים)
+*טיפ:* יש לך גם דוחות כוללים?
+• דוח מסלקה פנסיונית - כל הפנסיות במכה אחת
+• דוח הר הביטוח - כל הביטוחים במקום אחד
 
-🔒 *למה זה בטוח?*
-• אני לא שומר את הקובץ
-• רק קורא את התנועות ומוחק
-• המידע שלך מוצפן ומאובטח
+*איך שולחים?*
+פשוט שלח לי את הקובץ פה - PDF או תמונה.
 
-📱 *איך שולחים?*
-פשוט שלח לי את הקובץ פה בWhatsApp!
-(PDF או תמונה - מה שנוח לך)
-
-מוכן? שלח לי את הדוח הראשון! 🚀`;
+מוכן?`;
 
   return {
     response: summary,
