@@ -154,17 +154,32 @@ export function OnboardingSelector() {
       
       setSendingWelcome(true);
 
-      // 2. Send WhatsApp welcome message
+      // 2. Send WhatsApp welcome message (AI-generated!)
       if (waOptIn && phoneFormatted) {
         try {
-          const welcomeMessage = `שלום,
+          // 🧠 קבל הודעת פתיחה מ-AI
+          let welcomeMessage: string;
+          try {
+            const welcomeResponse = await fetch('/api/wa/welcome');
+            const welcomeData = await welcomeResponse.json();
+            welcomeMessage = welcomeData.message;
+          } catch {
+            // Fallback אם AI נכשל
+            welcomeMessage = `שלום,
 
-אני *φ* (פי) - המאמן הפיננסי שלך.
+אני *φ (פאי)* - המאמן הפיננסי שלך.
 
-אני כאן כדי לעזור לך להשיג *שליטה מלאה* על הכסף שלך.
-לא משנה מאיפה אתה מתחיל - ביחד נגיע לאיזון.
+הסימן φ מייצג את *היחס הזהב* - האיזון המושלם במתמטיקה.
+וזה בדיוק מה שנעשה ביחד: נמצא את *האיזון המושלם* בכסף שלך.
 
-מה השם שלך?`;
+*איך זה עובד?*
+תשלח לי דוחות בנק, אני אנתח אותם בשבילך, ויחד נבנה תמונה ברורה של המצב הפיננסי. בלי לחץ, בלי שיפוטיות - בקצב שלך.
+
+בסוף התהליך תרגיש *שליטה מלאה* על הכסף שלך.
+
+אבל קודם כל, בוא נכיר -
+*מה השם שלך?*`;
+          }
 
           const waResponse = await fetch('/api/wa/send', {
             method: 'POST',
