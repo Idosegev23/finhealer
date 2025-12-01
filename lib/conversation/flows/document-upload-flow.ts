@@ -84,14 +84,12 @@ function formatDateRange(start: string | null, end: string | null): string {
   const lastDayOfEndMonth = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate();
   const isEndOfMonth = endDay >= lastDayOfEndMonth - 2; // טולרנס של כמה ימים
   
+  // פורמט תאריך נקי
+  const formatFullDate = (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+  
   // אם זה לא חודשים מלאים - הצג תאריכים מדויקים
   if (!isStartOfMonth || !isEndOfMonth) {
-    const formatDate = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
-    
-    if (startDate.getFullYear() === endDate.getFullYear()) {
-      return `${formatDate(startDate)} עד ${formatDate(endDate)}/${startDate.getFullYear()}`;
-    }
-    return `${formatDate(startDate)}/${startDate.getFullYear()} עד ${formatDate(endDate)}/${endDate.getFullYear()}`;
+    return `${formatFullDate(startDate)} - ${formatFullDate(endDate)}`;
   }
   
   // חודשים מלאים - הצג רק שמות חודשים
