@@ -12,6 +12,7 @@
 import { updateContext, loadContext } from '../context-manager';
 import { scheduleReminder as scheduleFollowUp } from '../follow-up-manager';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getHistoryForOpenAI } from '../history-manager';
 
 // ============================================================================
 // Database Categories
@@ -966,6 +967,10 @@ export async function handleUserResponse(
     const parseResult = parseAnswers(userMessage, session.pendingQuestions);
     
     if (parseResult.success) {
+      // שמור את פרטי התנועה לתגובה דינמית
+      const lastAnswer = parseResult.answers[parseResult.answers.length - 1];
+      const pendingQ = session.pendingQuestions.find(q => q.transactionId === lastAnswer.transactionId);
+      
       // עדכון התנועות בDB
       for (const answer of parseResult.answers) {
         await updateTransactionCategory(supabase, session.userId, answer.transactionId, answer.category, answer.isInternal);
@@ -981,12 +986,33 @@ export async function handleUserResponse(
       const next = getNextQuestionBatch(session);
       await saveClassificationSession(session.userId, session);
       
-      // תגובה קצרה ולעניין
-      const responses = ['רשמתי.', 'הבנתי.', 'נרשם.', 'אוקיי.'];
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      // 🆕 תגובה דינמית וטבעית
+      const currentList = session.currentPhase === 'income' 
+        ? session.incomeToClassify 
+        : session.expensesToClassify;
+      const remainingCount = currentList.length - session.currentIndex;
+      
+      let responseMessage: string;
+      if (next.done) {
+        responseMessage = next.message;
+      } else {
+        responseMessage = await generateSmartResponse(
+          session.userId,
+          {
+            transactionId: lastAnswer.transactionId,
+            category: lastAnswer.category,
+            vendor: pendingQ?.vendor,
+            amount: pendingQ?.amount,
+          },
+          session.totalClassified,
+          remainingCount,
+          next.message,
+          session.currentPhase as 'income' | 'expenses'
+        );
+      }
       
       return {
-        message: `${randomResponse}\n\n${next.message}`,
+        message: responseMessage,
         session,
         done: next.done,
         waitingForAnswer: !next.done && !next.askToContinue,
@@ -1072,6 +1098,72 @@ async function parseUserIntentWithAI(
     return 'unclear';
   } catch {
     return 'unclear';
+  }
+}
+
+/**
+ * 🆕 יצירת תגובה דינמית אחרי סיווג תנועה
+ * תגובה טבעית שמתייחסת למה שסווג ומתקדמת לשאלה הבאה
+ */
+async function generateSmartResponse(
+  userId: string,
+  classifiedAnswer: { transactionId: string; category: string; vendor?: string; amount?: number },
+  totalClassified: number,
+  remainingCount: number,
+  nextQuestion: string,
+  phase: 'income' | 'expenses'
+): Promise<string> {
+  const { chatWithGPT5Fast } = await import('@/lib/ai/gpt5-client');
+  
+  try {
+    // טעינת היסטוריית שיחה
+    const history = await getHistoryForOpenAI(userId, 5);
+    
+    const response = await chatWithGPT5Fast(
+      `פרטי הסיווג האחרון:
+- סכום: ${classifiedAnswer.amount?.toLocaleString('he-IL') || 'לא ידוע'} ₪
+- ספק: ${classifiedAnswer.vendor || 'לא ידוע'}
+- סווג כ: ${classifiedAnswer.category}
+- עברנו על: ${totalClassified} תנועות
+- נשארו: ${remainingCount} ${phase === 'income' ? 'הכנסות' : 'הוצאות'}
+- השאלה הבאה: ${nextQuestion}`,
+      `אתה מאמן פיננסי בשם φ שעובר עם המשתמש על תנועות פיננסיות.
+המשתמש סיווג תנועה. צור תגובה קצרה (מילה או שתיים מקסימום) ואז עבור ישר לשאלה הבאה.
+
+דוגמאות לתגובות טבעיות:
+- "מעולה." / "סבבה." / "אוקי." / "יופי." / "👍" / "בסדר."
+
+חוקים:
+1. תגובה קצרה ביותר - מילה או שתיים, או אימוג'י אחד
+2. אחר כך שורה ריקה והשאלה הבאה
+3. לא לחזור על מה שהמשתמש אמר
+4. טבעי כמו שיחה בין חברים
+
+החזר רק את התגובה והשאלה, בפורמט:
+[תגובה קצרה]
+
+[השאלה הבאה]`,
+      { userId, userName: 'Classification', phoneNumber: '' },
+      history
+    );
+    
+    // אם ה-AI החזיר תשובה טובה
+    if (response && response.length > 0) {
+      // בדוק שיש את השאלה הבאה בתגובה
+      if (response.includes(classifiedAnswer.vendor || '') || response.length > 200) {
+        // AI הוסיף יותר מדי - נחזור לפשוט
+        return `👍\n\n${nextQuestion}`;
+      }
+      return response.trim();
+    }
+    
+    // fallback
+    return `👍\n\n${nextQuestion}`;
+  } catch {
+    // fallback פשוט
+    const quickResponses = ['👍', 'מעולה.', 'יופי.', 'סבבה.', 'אוקי.'];
+    const randomResponse = quickResponses[Math.floor(Math.random() * quickResponses.length)];
+    return `${randomResponse}\n\n${nextQuestion}`;
   }
 }
 
