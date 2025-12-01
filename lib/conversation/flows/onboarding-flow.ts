@@ -24,20 +24,25 @@ import { chatWithGPT5Fast } from '@/lib/ai/gpt5-client';
 async function generatePersonalGreeting(name: string): Promise<string> {
   try {
     const response = await chatWithGPT5Fast(
-      `השם: ${name}`,
+      `השם של המשתמש: ${name}`,
       `אתה מאמן פיננסי ישראלי בשם φ. 
-צור ברכה קצרה ואותנטית למשתמש חדש (3-6 מילים בלבד).
+משתמש חדש הצטרף ושלח את השם שלו.
+צור ברכה קצרה ואותנטית (משפט אחד קצר).
+התחל עם השם שלו ואז ברכה קצרה.
 אל תגיד "שם יפה" או משהו גנרי.
-תהיה אמיתי וחם - כמו שמישהו באמת היה אומר.
-דוגמאות טובות: "נעים להכיר!", "שמח שהצטרפת!", "בוא נתחיל!", "מוכן לצאת לדרך?"
-החזר רק את הברכה, בלי גרשיים.`,
+תהיה אמיתי וחם.
+דוגמאות טובות: 
+- "גדי, נעים להכיר!"
+- "יוסי, שמח שהצטרפת!"
+- "דנה, בואי נתחיל!"
+החזר רק את הברכה, בלי גרשיים, בלי סימני פיסוק מיותרים.`,
       { userId: 'system', userName: 'Onboarding', phoneNumber: '' }
     );
-    return response?.trim() || 'נעים להכיר!';
+    return response?.trim() || `${name}, נעים להכיר!`;
   } catch {
     // fallback אם AI לא זמין
-    const greetings = ['נעים להכיר!', 'שמח שהצטרפת!', 'בוא נתחיל!', 'מוכן לצאת לדרך?'];
-    return greetings[Math.floor(Math.random() * greetings.length)];
+    const greetings = ['נעים להכיר!', 'שמח שהצטרפת!', 'בוא נתחיל!'];
+    return `${name}, ${greetings[Math.floor(Math.random() * greetings.length)]}`;
   }
 }
 
@@ -241,17 +246,14 @@ export async function handleOnboardingFlow(
 // ============================================================================
 
 function getWelcomeMessage(): string {
-  return `היי,
+  return `שלום,
 
-אני *φ* - המאמן הפיננסי שלך.
+אני *φ* (פי) - המאמן הפיננסי שלך.
 
-החלטת לקחת אחריות על הכספים שלך - זו החלטה משמעותית.
+אני כאן כדי לעזור לך להשיג *שליטה מלאה* על הכסף שלך.
+לא משנה מאיפה אתה מתחיל - ביחד נגיע לאיזון.
 
-לא משנה איפה אתה עומד היום, *יחד נמצא את האיזון המושלם* בין ההכנסות להוצאות שלך.
-
-בלי שיפוטיות. בלי לחץ. רק תוצאות.
-
-בוא נתחיל - *מה השם שלך?*`;
+מה השם שלך?`;
 }
 
 // ============================================================================
@@ -282,20 +284,16 @@ export async function handleOnboardingPersonal(
     
     data.full_name = name;
     
-    // 🆕 תגובה דינמית עם AI
+    // 🆕 תגובה דינמית עם AI (כבר כוללת את השם)
     const personalGreeting = await generatePersonalGreeting(name);
     
     return {
-      response: `*${data.full_name}*, ${personalGreeting}
+      response: `${personalGreeting}
 
-עכשיו אני צריך להכיר אותך קצת יותר -
-זה יעזור לי להתאים את העצות בדיוק בשבילך.
+עכשיו אני צריך להכיר אותך קצת יותר.
 
-ספר לי על עצמך:
-גיל, מצב משפחתי, ילדים.
-
-אפשר הכל במשפט אחד, למשל:
-*"בן 35, נשוי, 2 ילדים"*`,
+ספר לי על עצמך - גיל, מצב משפחתי, ילדים.
+אפשר הכל במשפט אחד.`,
       nextStep: 'collect_personal_info',
       completed: false,
     };
