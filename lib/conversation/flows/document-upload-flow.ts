@@ -74,9 +74,27 @@ function formatDateRange(start: string | null, end: string | null): string {
   const startDate = new Date(start);
   const endDate = new Date(end);
   
+  const startDay = startDate.getDate();
+  const endDay = endDate.getDate();
   const startMonth = HEBREW_MONTHS[startDate.getMonth()];
   const endMonth = HEBREW_MONTHS[endDate.getMonth()];
   
+  // בדיקה אם זה תקופה מלאה (מ-1 לחודש עד סוף החודש)
+  const isStartOfMonth = startDay <= 3; // נותנים טולרנס של כמה ימים
+  const lastDayOfEndMonth = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate();
+  const isEndOfMonth = endDay >= lastDayOfEndMonth - 2; // טולרנס של כמה ימים
+  
+  // אם זה לא חודשים מלאים - הצג תאריכים מדויקים
+  if (!isStartOfMonth || !isEndOfMonth) {
+    const formatDate = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
+    
+    if (startDate.getFullYear() === endDate.getFullYear()) {
+      return `${formatDate(startDate)} עד ${formatDate(endDate)}/${startDate.getFullYear()}`;
+    }
+    return `${formatDate(startDate)}/${startDate.getFullYear()} עד ${formatDate(endDate)}/${endDate.getFullYear()}`;
+  }
+  
+  // חודשים מלאים - הצג רק שמות חודשים
   if (startDate.getFullYear() === endDate.getFullYear()) {
     if (startDate.getMonth() === endDate.getMonth()) {
       return `${startMonth} ${startDate.getFullYear()}`;
@@ -85,6 +103,44 @@ function formatDateRange(start: string | null, end: string | null): string {
   }
   
   return `${startMonth} ${startDate.getFullYear()} - ${endMonth} ${endDate.getFullYear()}`;
+}
+
+/**
+ * פורמט תקופה קצר למסמכים חסרים
+ */
+function formatPeriodShort(start: string | null, end: string | null): string {
+  if (!start) return '';
+  
+  const startDate = new Date(start);
+  const endDate = end ? new Date(end) : null;
+  
+  const startDay = startDate.getDate();
+  const isStartOfMonth = startDay <= 3;
+  
+  // אם יש גם תאריך סיום
+  if (endDate) {
+    const endDay = endDate.getDate();
+    const lastDayOfEndMonth = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate();
+    const isEndOfMonth = endDay >= lastDayOfEndMonth - 2;
+    
+    // תקופה חלקית - הצג תאריכים
+    if (!isStartOfMonth || !isEndOfMonth) {
+      const formatDate = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
+      return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+    }
+    
+    // חודשים מלאים
+    if (startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear()) {
+      return `${HEBREW_MONTHS[startDate.getMonth()]} ${startDate.getFullYear()}`;
+    }
+    return `${HEBREW_MONTHS[startDate.getMonth()]} - ${HEBREW_MONTHS[endDate.getMonth()]} ${endDate.getFullYear()}`;
+  }
+  
+  // רק תאריך התחלה
+  if (!isStartOfMonth) {
+    return `מ-${startDay}/${startDate.getMonth() + 1}/${startDate.getFullYear()}`;
+  }
+  return `${HEBREW_MONTHS[startDate.getMonth()]} ${startDate.getFullYear()}`;
 }
 
 // ============================================================================
@@ -165,10 +221,11 @@ export function buildDocumentAnalysisMessage(
         line += ` - ${doc.details.employer}`;
       }
       
-      // 🆕 הוסף תקופה אם יש
-      const docPeriod = doc.period_start || doc.details?.period_start;
-      if (docPeriod) {
-        line += ` - ${formatMonthHebrew(docPeriod)}`;
+      // 🆕 הוסף תקופה אם יש (כולל תאריכים מדויקים אם לא חודש מלא)
+      const docPeriodStart = doc.period_start || doc.details?.period_start;
+      const docPeriodEnd = doc.period_end || doc.details?.period_end;
+      if (docPeriodStart) {
+        line += ` - ${formatPeriodShort(docPeriodStart, docPeriodEnd || null)}`;
       }
       
       parts.push(line);
