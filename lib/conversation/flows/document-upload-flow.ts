@@ -32,11 +32,15 @@ export interface MissingDocument {
   type: 'credit' | 'payslip' | 'mortgage' | 'loan' | 'insurance' | 'pension';
   description: string;
   priority: 'high' | 'medium' | 'low';
+  period_start?: string;  // 🆕 תאריך תחילת התקופה
+  period_end?: string;    // 🆕 תאריך סיום התקופה
   details?: {
     card_last_4?: string;
     employer?: string;
     provider?: string;
     amount?: number;
+    period_start?: string;  // 🆕 גם ב-details לתאימות
+    period_end?: string;
   };
 }
 
@@ -159,6 +163,12 @@ export function buildDocumentAnalysisMessage(
       }
       if (doc.details?.employer) {
         line += ` - ${doc.details.employer}`;
+      }
+      
+      // 🆕 הוסף תקופה אם יש
+      const docPeriod = doc.period_start || doc.details?.period_start;
+      if (docPeriod) {
+        line += ` - ${formatMonthHebrew(docPeriod)}`;
       }
       
       parts.push(line);

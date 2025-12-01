@@ -1152,10 +1152,14 @@ export async function POST(request: NextRequest) {
           
           console.log(`📅 Document period: ${periodStart?.toISOString().split('T')[0] || 'unknown'} - ${periodEnd?.toISOString().split('T')[0] || 'unknown'}`);
           
-          // שמירת תקופה למסמך uploaded_statements אם יש כזה
+          // שמירת תקופה למסמך uploaded_statements
+          let savedDocumentId: string | null = null;
+          
           if (periodStart && periodEnd) {
-            // יצירת רשומת מסמך אם לא קיימת
-            const { data: docRecord } = await (supabase as any)
+            console.log(`📄 Saving document with period: ${periodStart.toISOString().split('T')[0]} - ${periodEnd.toISOString().split('T')[0]}`);
+            
+            // יצירת רשומת מסמך
+            const { data: docRecord, error: docError } = await (supabase as any)
               .from('uploaded_statements')
               .insert({
                 user_id: userData.id,
@@ -1170,19 +1174,43 @@ export async function POST(request: NextRequest) {
               .select('id')
               .single();
             
-            if (docRecord?.id) {
+            if (docError) {
+              console.error('❌ Error saving document:', docError);
+            } else if (docRecord?.id) {
+              savedDocumentId = docRecord.id;
+              console.log(`✅ Document saved with id: ${savedDocumentId}`);
+              
               // עדכון תנועות עם document_id
               await (supabase as any)
                 .from('transactions')
                 .update({ document_id: docRecord.id })
                 .eq('batch_id', pendingBatchId);
             }
+          } else {
+            console.warn('⚠️ No period detected - document will not be saved');
           }
           
           // בדיקת כיסוי תקופות - האם יש 3 חודשים?
+          // 🆕 נחכה רגע לוודא שה-DB עודכן
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           const periodCoverage = await getUserPeriodCoverage(userData.id);
           
-          console.log(`📊 Period coverage: ${periodCoverage.totalMonths} months, missing: ${periodCoverage.missingMonths.join(', ')}`);
+          // 🆕 אם המסמך החדש לא נשמר אבל יש לנו תקופה - נחשב ידנית
+          let actualCoverage = periodCoverage;
+          if (periodStart && periodEnd && periodCoverage.totalMonths === 0) {
+            console.log('⚠️ Document not in coverage yet - calculating manually');
+            const { calculateCoverage } = await import('@/lib/documents/period-tracker');
+            actualCoverage = calculateCoverage([{
+              start: periodStart,
+              end: periodEnd,
+              source: 'bank' as const,
+              documentType,
+              uploadedAt: new Date(),
+            }]);
+          }
+          
+          console.log(`📊 Period coverage: ${actualCoverage.totalMonths} months, covered: ${actualCoverage.coveredMonths.join(', ')}, missing: ${actualCoverage.missingMonths.join(', ')}`);
           
           // 🆕 Import classification session manager
           const { 
@@ -1254,7 +1282,7 @@ export async function POST(request: NextRequest) {
           
           let combinedMessage = buildDocumentAnalysisMessage(
             analysisResult as any,
-            periodCoverage,
+            actualCoverage,
             isFirstDocument
           );
           
@@ -1296,7 +1324,7 @@ export async function POST(request: NextRequest) {
             console.log(`📋 Saved ${ocrData.missing_documents.length} missing documents requests`);
           }
           
-          console.log(`✅ Document processed: ${allTransactions.length} transactions, coverage: ${periodCoverage.totalMonths} months`)
+          console.log(`✅ Document processed: ${allTransactions.length} transactions, coverage: ${actualCoverage.totalMonths} months`)
           
         } catch (pdfError: any) {
           console.error('❌ PDF Error:', pdfError);
