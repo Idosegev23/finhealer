@@ -366,14 +366,13 @@ const PHI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'generate_chart',
-      description: 'צור גרף או אינפוגרפיקה ויזואלית. שימושי לתצוגת התפלגות הוצאות, מגמות, ציון φ, או סיכום חודשי',
+      description: 'צור גרף או אינפוגרפיקה ויזואלית בהתאמה אישית. אתה יכול לבקש כל סוג גרף שתרצה!',
       parameters: {
         type: 'object',
         properties: {
           chart_type: {
             type: 'string',
-            enum: ['pie', 'trend', 'phi_score', 'monthly_infographic', 'comparison', 'goal_progress'],
-            description: 'סוג הגרף: pie=עוגה, trend=מגמות, phi_score=ציון φ, monthly_infographic=סיכום חודשי',
+            description: 'סוג הגרף: pie, bar, trend, comparison, phi_score, infographic, או כל סוג אחר',
           },
           title: {
             type: 'string',

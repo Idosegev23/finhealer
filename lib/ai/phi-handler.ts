@@ -58,8 +58,10 @@ export async function handleWithPhi(
     console.log('[φ Handler] 🎨 Starting chart generation:', chartAction.data);
     try {
       const result = await handleChartGeneration(
-        chartAction.data.chartType as ChartType,
-        userId
+        chartAction.data.chartType as string,
+        userId,
+        chartAction.data.title as string | undefined,
+        chartAction.data.description as string | undefined
       );
       console.log('[φ Handler] Chart generation result:', result ? 'SUCCESS' : 'FAILED');
       if (result) {
@@ -179,28 +181,175 @@ export async function migrateToPhiContext(
 // ============================================================================
 
 /**
- * יצירת גרף לפי סוג ונתוני המשתמש
+ * יצירת גרף דינאמי לפי בקשת ה-AI
  */
 async function handleChartGeneration(
-  chartType: ChartType,
-  userId: string
+  chartType: string,
+  userId: string,
+  title?: string,
+  description?: string
 ): Promise<GeneratedImage | null> {
   const supabase = createServiceClient();
   
-  console.log(`[φ Handler] Generating ${chartType} chart for user ${userId}`);
+  console.log(`[φ Handler] Generating dynamic chart: ${chartType} for user ${userId}`);
 
-  switch (chartType) {
-    case 'pie':
-      return await generatePieChartForUser(userId, supabase);
-    case 'trend':
-      return await generateTrendChartForUser(userId, supabase);
-    case 'phi_score':
-      return await generatePhiScoreForUser(userId, supabase);
-    case 'monthly_infographic':
-      return await generateMonthlyInfographicForUser(userId, supabase);
-    default:
-      console.warn(`[φ Handler] Unknown chart type: ${chartType}`);
-      return null;
+  // טען נתוני המשתמש
+  const userData = await loadUserFinancialData(userId, supabase);
+  
+  if (!userData) {
+    console.log('[φ Handler] No financial data found');
+    return null;
+  }
+  
+  // בנה prompt דינאמי לפי סוג הגרף ותיאור
+  const prompt = buildDynamicChartPrompt(chartType, userData, title, description);
+  
+  console.log('[φ Handler] Sending to Gemini with prompt length:', prompt.length);
+  
+  // שלח ל-Gemini
+  return await generateChartWithGemini(prompt, `${chartType}_chart.png`);
+}
+
+/**
+ * טוען נתוני פיננסים של המשתמש
+ */
+async function loadUserFinancialData(
+  userId: string,
+  supabase: ReturnType<typeof createServiceClient>
+) {
+  // 3 חודשים אחרונים
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('amount, type, category, vendor, tx_date, status')
+    .eq('user_id', userId)
+    .eq('status', 'confirmed')
+    .gte('tx_date', threeMonthsAgo.toISOString())
+    .order('tx_date', { ascending: false });
+    
+  if (!transactions || transactions.length === 0) {
+    return null;
+  }
+  
+  // חישוב סטטיסטיקות
+  const totalIncome = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+    
+  const totalExpenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+    
+  // קיבוץ לפי קטגוריה
+  const categoryTotals: Record<string, number> = {};
+  transactions
+    .filter(t => t.type === 'expense')
+    .forEach(t => {
+      const cat = t.category || 'אחר';
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(t.amount);
+    });
+    
+  // קיבוץ לפי חודש
+  const monthlyData: Record<string, { income: number; expenses: number }> = {};
+  transactions.forEach(t => {
+    const month = new Date(t.tx_date).toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+    if (!monthlyData[month]) {
+      monthlyData[month] = { income: 0, expenses: 0 };
+    }
+    if (t.type === 'income') {
+      monthlyData[month].income += Number(t.amount);
+    } else {
+      monthlyData[month].expenses += Number(t.amount);
+    }
+  });
+  
+  return {
+    totalIncome,
+    totalExpenses,
+    balance: totalIncome - totalExpenses,
+    categoryTotals,
+    monthlyData,
+    transactionCount: transactions.length,
+  };
+}
+
+/**
+ * בונה prompt דינאמי ל-Gemini
+ */
+function buildDynamicChartPrompt(
+  chartType: string,
+  data: NonNullable<Awaited<ReturnType<typeof loadUserFinancialData>>>,
+  title?: string,
+  description?: string
+): string {
+  const formatMoney = (n: number) => n.toLocaleString('he-IL');
+  
+  // בניית תיאור הנתונים
+  const categoriesText = Object.entries(data.categoryTotals)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 8)
+    .map(([cat, amount]) => `- ${cat}: ${formatMoney(amount)} ₪`)
+    .join('\n');
+    
+  const monthlyText = Object.entries(data.monthlyData)
+    .map(([month, d]) => `- ${month}: הכנסות ${formatMoney(d.income)} ₪, הוצאות ${formatMoney(d.expenses)} ₪`)
+    .join('\n');
+  
+  const basePrompt = `צור אינפוגרפיקה/גרף בעברית עבור משתמש ישראלי.
+
+🎨 *סגנון עיצוב:*
+- מינימליסטי ומודרני
+- צבעי מותג φ (Phi): זהב #A96B48, כהה #2E3440, רקע בהיר #ECEFF4
+- כלול את סמל φ בפינה
+- טקסט בעברית, RTL
+- ברור וקריא
+
+📊 *סוג הגרף המבוקש:* ${chartType}
+${title ? `📌 *כותרת:* ${title}` : ''}
+${description ? `📝 *תיאור:* ${description}` : ''}
+
+💰 *הנתונים הפיננסיים:*
+- סה"כ הכנסות: ${formatMoney(data.totalIncome)} ₪
+- סה"כ הוצאות: ${formatMoney(data.totalExpenses)} ₪
+- יתרה: ${formatMoney(data.balance)} ₪
+
+📈 *התפלגות הוצאות לפי קטגוריה:*
+${categoriesText}
+
+📅 *נתונים חודשיים:*
+${monthlyText}
+
+צור תמונה ויזואלית יפה שמציגה את הנתונים בצורה ברורה ומעוצבת.`;
+
+  return basePrompt;
+}
+
+/**
+ * שולח prompt ל-Gemini ומקבל תמונה
+ */
+async function generateChartWithGemini(
+  prompt: string,
+  filename: string
+): Promise<GeneratedImage | null> {
+  try {
+    const result = await generateChart('pie', { 
+      title: 'Dynamic Chart',
+      categories: [],
+      customPrompt: prompt 
+    });
+    
+    if (result) {
+      return {
+        ...result,
+        filename,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('[φ Handler] Gemini generation error:', error);
+    return null;
   }
 }
 

@@ -41,6 +41,8 @@ export type ChartType =
 export interface GeneratedImage {
   base64: string;
   mimeType: string;
+  filename?: string;
+  description?: string;
 }
 
 export interface ChartOptions {
@@ -173,13 +175,30 @@ export async function generateGoalProgressChart(
 }
 
 /**
+ * Generate chart from custom prompt (dynamic)
+ */
+export async function generateChartFromPrompt(
+  prompt: string,
+  options?: ChartOptions
+): Promise<GeneratedImage | null> {
+  console.log('[Gemini] 🎨 Generating chart from custom prompt...');
+  return generateImageFromPrompt(prompt, { aspectRatio: '1:1', ...options });
+}
+
+/**
  * Main function to generate any type of chart
  */
 export async function generateChart(
-  type: ChartType,
+  type: ChartType | string,
   data: Record<string, unknown>,
   options?: ChartOptions
 ): Promise<GeneratedImage | null> {
+  // 🆕 אם יש customPrompt, השתמש בו ישירות
+  if (data.customPrompt) {
+    console.log('[Gemini] Using custom prompt for chart generation');
+    return generateChartFromPrompt(data.customPrompt as string, options);
+  }
+  
   switch (type) {
     case 'pie':
       return generatePieChart(
@@ -217,8 +236,12 @@ export async function generateChart(
       );
 
     default:
-      console.error(`Unknown chart type: ${type}`);
-      return null;
+      // 🆕 Fallback: אם סוג לא מוכר, נסה ליצור prompt גנרי
+      console.log(`[Gemini] Unknown chart type "${type}", using fallback`);
+      const fallbackPrompt = `צור גרף ${type} בעברית. כותרת: ${data.title || 'גרף פיננסי'}. 
+      ${data.description || ''}
+      סגנון: מינימליסטי, צבעי מותג φ (זהב #A96B48, כהה #2E3440)`;
+      return generateChartFromPrompt(fallbackPrompt, options);
   }
 }
 
