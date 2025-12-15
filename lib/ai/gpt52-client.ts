@@ -389,11 +389,13 @@ async function thinkWithPhiFallback(
   userMessage: string,
   context: PhiContext
 ): Promise<PhiResponse> {
+  console.log('[GPT-5.2 Fallback] Conversation history length:', context.conversationHistory?.length || 0);
+  
   const contextMessage = buildContextMessage(context);
   
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: 'system', content: PHI_SYSTEM_PROMPT },
-    ...context.conversationHistory.map(msg => ({
+    ...(context.conversationHistory || []).map(msg => ({
       role: msg.role as 'user' | 'assistant',
       content: msg.content,
     })),

@@ -750,12 +750,18 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
     .single();
 
   // טען היסטוריית שיחה
-  const { data: messages } = await supabase
+  const { data: messages, error: messagesError } = await supabase
     .from('wa_messages')
     .select('direction, content, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(20);
+
+  if (messagesError) {
+    console.error('[φ Brain] Error loading messages:', messagesError);
+  } else {
+    console.log('[φ Brain] Messages loaded:', messages?.length || 0, 'messages');
+  }
 
   const conversationHistory = (messages || [])
     .reverse()
