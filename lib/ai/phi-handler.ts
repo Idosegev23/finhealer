@@ -52,12 +52,16 @@ export async function handleWithPhi(
   // 4. בדוק אם צריך לייצר גרף
   let imageToSend: GeneratedImage | undefined;
   const chartAction = response.actions.find(a => a.type === 'generate_chart');
+  console.log('[φ Handler] Chart action found:', chartAction ? 'YES' : 'NO');
+  
   if (chartAction && chartAction.data) {
+    console.log('[φ Handler] 🎨 Starting chart generation:', chartAction.data);
     try {
       const result = await handleChartGeneration(
         chartAction.data.chartType as ChartType,
         userId
       );
+      console.log('[φ Handler] Chart generation result:', result ? 'SUCCESS' : 'FAILED');
       if (result) {
         imageToSend = result;
       }

@@ -716,6 +716,17 @@ export async function executeActions(
             .eq('id', context.userId);
         }
         break;
+        
+      case 'generate_chart':
+        // יצירת גרף מטופלת ב-phi-handler.ts לא כאן
+        // רק מוודאים שה-action מוכר
+        console.log('[φ Brain] generate_chart action queued, will be handled by phi-handler');
+        break;
+        
+      case 'request_document':
+        // בקשת מסמך - רק logging כרגע
+        console.log('[φ Brain] request_document:', action.data);
+        break;
     }
   }
 }
@@ -752,12 +763,12 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
       content: msg.content,
     }));
 
-  // טען תנועות pending
+  // טען תנועות ממתינות לאישור (proposed = pending)
   const { data: pendingTx } = await supabase
     .from('transactions')
-    .select('id, vendor, amount, type, tx_date, status')
+    .select('id, vendor, amount, type, tx_date, status, category')
     .eq('user_id', userId)
-    .eq('status', 'pending')
+    .eq('status', 'proposed')
     .order('tx_date', { ascending: false })
     .limit(50);
 
@@ -775,7 +786,7 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
     const totalExpenses = stats
       .filter(t => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0);
-    const pendingCount = stats.filter(t => t.status === 'pending').length;
+    const pendingCount = stats.filter(t => t.status === 'proposed').length;
     const confirmedCount = stats.filter(t => t.status === 'confirmed').length;
 
     financial = {
@@ -787,7 +798,7 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
     };
   }
 
-  return {
+  const context: PhiContext = {
     userId,
     userName: user?.full_name || '',
     phone: user?.phone || '',
@@ -801,6 +812,16 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
       type: tx.type as 'income' | 'expense',
     })),
   };
+  
+  console.log('[φ Brain] Context loaded:', {
+    userName: context.userName,
+    phase: context.currentPhase,
+    historyLength: context.conversationHistory?.length || 0,
+    pendingTx: context.pendingTransactions?.length || 0,
+    financial: context.financial ? 'loaded' : 'none',
+  });
+  
+  return context;
 }
 
 export default {
