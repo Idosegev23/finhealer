@@ -81,16 +81,19 @@ export interface PhiContext {
 export interface PhiAction {
   type: 
     | 'send_message'      // שלח הודעה למשתמש
+    | 'send_image'        // שלח תמונה/גרף
     | 'classify_transaction'  // סווג תנועה
     | 'bulk_approve'      // אשר תנועות בבת אחת
     | 'ask_classification' // שאל על סיווג
     | 'save_pattern'      // שמור pattern למידה
     | 'move_to_phase'     // עבור לשלב הבא
     | 'request_document'  // בקש מסמך
+    | 'generate_chart'    // צור גרף/תמונה
     | 'complete_session'; // סיום
   
   data?: Record<string, unknown>;
   message?: string;
+  imageBase64?: string;
 }
 
 export interface PhiResponse {
@@ -359,6 +362,32 @@ const PHI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'generate_chart',
+      description: 'צור גרף או אינפוגרפיקה ויזואלית. שימושי לתצוגת התפלגות הוצאות, מגמות, ציון φ, או סיכום חודשי',
+      parameters: {
+        type: 'object',
+        properties: {
+          chart_type: {
+            type: 'string',
+            enum: ['pie', 'trend', 'phi_score', 'monthly_infographic', 'comparison', 'goal_progress'],
+            description: 'סוג הגרף: pie=עוגה, trend=מגמות, phi_score=ציון φ, monthly_infographic=סיכום חודשי',
+          },
+          title: {
+            type: 'string',
+            description: 'כותרת הגרף בעברית',
+          },
+          description: {
+            type: 'string',
+            description: 'תיאור קצר למשתמש על מה הגרף מציג',
+          },
+        },
+        required: ['chart_type'],
+      },
+    },
+  },
 ];
 
 // ============================================================================
@@ -579,6 +608,17 @@ function parsePhiResponse(
             data: {
               documentType: args.document_type,
               reason: args.reason,
+            },
+          });
+          break;
+          
+        case 'generate_chart':
+          actions.push({
+            type: 'generate_chart',
+            data: {
+              chartType: args.chart_type,
+              title: args.title,
+              description: args.description,
             },
           });
           break;

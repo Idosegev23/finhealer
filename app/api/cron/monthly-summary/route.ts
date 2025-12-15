@@ -8,7 +8,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { sendWhatsAppMessage } from "@/lib/greenapi/client";
+import { sendWhatsAppMessage, sendWhatsAppImage } from "@/lib/greenapi/client";
+import { generateChartForUser } from "@/lib/ai/phi-handler";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,11 +47,28 @@ export async function GET(request: NextRequest) {
         const summary = await generateMonthlySummary(user.id, user.full_name);
         
         if (summary) {
+          // שלח הודעת טקסט
           await sendWhatsAppMessage(user.phone, summary);
           sentCount++;
           
-          // Rate limiting - 100ms between messages
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // נסה ליצור אינפוגרפיקה ויזואלית
+          try {
+            const infographic = await generateChartForUser(user.id, 'monthly_infographic');
+            if (infographic) {
+              await sendWhatsAppImage(
+                user.phone, 
+                infographic.base64, 
+                '📊 הסיכום החודשי שלך בגרף אחד'
+              );
+              console.log(`[Cron] Infographic sent to user ${user.id}`);
+            }
+          } catch (chartError) {
+            // לא קריטי - ממשיכים גם בלי גרף
+            console.warn(`[Cron] Chart generation failed for ${user.id}:`, chartError);
+          }
+          
+          // Rate limiting - 500ms between users (יותר זמן כי יש 2 הודעות)
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       } catch (error) {
         console.error(`[Cron] Error for user ${user.id}:`, error);

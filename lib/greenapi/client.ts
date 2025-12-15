@@ -14,6 +14,13 @@ interface SendButtonsParams {
   buttons: Array<{ buttonId: string; buttonText: string }>;
 }
 
+interface SendImageParams {
+  phoneNumber: string;
+  imageBase64: string;
+  caption?: string;
+  mimeType?: string;
+}
+
 export class GreenAPIClient {
   private instanceId: string;
   private token: string;
@@ -128,6 +135,91 @@ export class GreenAPIClient {
   }
 
   /**
+   * שליחת תמונה עם base64
+   */
+  async sendImage({ phoneNumber, imageBase64, caption, mimeType = 'image/png' }: SendImageParams) {
+    const url = `${this.baseUrl}/sendFileByUpload/${this.token}`;
+    const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
+
+    try {
+      // המרת base64 ל-blob
+      const byteCharacters = atob(imageBase64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mimeType });
+
+      // יצירת FormData
+      const formData = new FormData();
+      formData.append('chatId', `${normalizedPhone}@c.us`);
+      formData.append('file', blob, `chart_${Date.now()}.png`);
+      if (caption) {
+        formData.append('caption', caption);
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        // Fallback: נסה עם sendFileByUrl
+        return await this.sendImageBase64Fallback(normalizedPhone, imageBase64, caption, mimeType);
+      }
+
+      const data = await response.json();
+      console.log(`✅ GreenAPI image sent to ${normalizedPhone}@c.us:`, data.idMessage);
+      return data;
+    } catch (error) {
+      console.error('❌ GreenAPI image error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * שליחת תמונה - fallback עם base64 ישיר
+   */
+  private async sendImageBase64Fallback(
+    normalizedPhone: string,
+    imageBase64: string,
+    caption?: string,
+    mimeType: string = 'image/png'
+  ) {
+    const url = `${this.baseUrl}/sendFileByUrl/${this.token}`;
+    
+    // בניית data URL
+    const dataUrl = `data:${mimeType};base64,${imageBase64}`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chatId: `${normalizedPhone}@c.us`,
+          urlFile: dataUrl,
+          fileName: `phi_chart_${Date.now()}.png`,
+          caption: caption || '',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`GreenAPI fallback error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ GreenAPI image (fallback) sent to ${normalizedPhone}@c.us:`, data.idMessage);
+      return data;
+    } catch (error) {
+      console.error('❌ GreenAPI image fallback error:', error);
+      throw error;
+    }
+  }
+
+  /**
    * הורדת קובץ מ-WhatsApp (תמונה/קבלה)
    */
   async downloadFile(downloadUrl: string): Promise<Blob> {
@@ -179,6 +271,19 @@ export function getGreenAPIClient(): GreenAPIClient {
 export async function sendWhatsAppMessage(phoneNumber: string, message: string) {
   const client = getGreenAPIClient();
   return client.sendMessage({ phoneNumber, message });
+}
+
+/**
+ * Convenience function to send WhatsApp image
+ */
+export async function sendWhatsAppImage(
+  phoneNumber: string, 
+  imageBase64: string, 
+  caption?: string,
+  mimeType?: string
+) {
+  const client = getGreenAPIClient();
+  return client.sendImage({ phoneNumber, imageBase64, caption, mimeType });
 }
 
 
