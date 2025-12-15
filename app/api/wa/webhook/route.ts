@@ -344,13 +344,19 @@ export async function POST(request: NextRequest) {
         
         try {
           // שמירת הודעה נכנסת
-          await supabase.from('wa_messages').insert({
+          const { error: insertError } = await supabase.from('wa_messages').insert({
             user_id: userData.id,
             direction: 'incoming',
             content: text,
             message_type: 'text',
             status: 'delivered',
           });
+          
+          if (insertError) {
+            console.error('❌ Failed to save incoming message:', insertError);
+          } else {
+            console.log('✅ Incoming message saved to wa_messages');
+          }
           
           // 🆕 שימוש ב-handleWithPhi שמטפל בהכל כולל גרפים
           const result = await handleWithPhi(userData.id, text, phoneNumber);
@@ -361,8 +367,8 @@ export async function POST(request: NextRequest) {
             const preparingMsg = CHART_PREPARING_MESSAGES[
               Math.floor(Math.random() * CHART_PREPARING_MESSAGES.length)
             ];
-            await greenAPI.sendMessage({
-              phoneNumber,
+      await greenAPI.sendMessage({
+        phoneNumber,
               message: preparingMsg,
             });
             console.log('🎨 Sent chart preparing message');
