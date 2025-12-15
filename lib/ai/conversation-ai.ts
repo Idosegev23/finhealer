@@ -265,6 +265,15 @@ export async function askAboutTransaction(
   const amountStr = transaction.amount.toLocaleString('he-IL');
   const prefix = transaction.type === 'income' ? 'מ' : 'ב';
   
+  // 🆕 בחירת סגנון אקראי לגיוון
+  const styles = [
+    { opener: '', closer: '?' },
+    { opener: 'מה לגבי ', closer: '?' },
+    { opener: '', closer: ' - יודע/ת?' },
+    { opener: 'ו', closer: '?' },
+  ];
+  const style = styles[Math.floor(Math.random() * styles.length)];
+  
   const systemPrompt = `אתה φ - מאמן פיננסי ישראלי. שאל על תנועה פיננסית.
 
 ⚠️ חובה! השאלה חייבת לכלול:
@@ -278,13 +287,23 @@ ${transaction.suggestedCategory ? `יש הצעת סיווג: ${transaction.sugge
 ${isHalfway ? '- חצי דרך!' : ''}
 ${isAlmostDone ? `- נשארו ${remaining}!` : ''}
 
-📝 פורמט השאלה:
-אם יש הצעה: "${amountStr} ₪ ${prefix}*${transaction.vendor}* (${transaction.date}) - זה *${transaction.suggestedCategory || 'X'}*?"
-אם אין הצעה: "${amountStr} ₪ ${prefix}*${transaction.vendor}* (${transaction.date}) - מה זה?"
+🎨 סגנון לשאלה הזו: ${style.opener}..${style.closer}
 
-אפשר לשנות קצת את הניסוח, אבל *חובה* לכלול סכום + ספק + תאריך!
-${isHalfway ? `אפשר להוסיף: "${userName}, חצי דרך!"` : ''}
-${isAlmostDone ? `אפשר להוסיף: "עוד ${remaining} ונסיים!"` : ''}
+📝 פורמט השאלה - גוון!:
+בסיסי: "${amountStr} ₪ ${prefix}*${transaction.vendor}* (${transaction.date})"
+אם יש הצעה, הוסף: "זה *${transaction.suggestedCategory || 'X'}*?"
+אם אין הצעה, שאל: "מה זה?"
+
+🎲 וריאציות אפשריות (בחר אחת!):
+- "${amountStr} ₪ ${prefix}*${transaction.vendor}* - ${transaction.suggestedCategory || 'מה זה'}?"
+- "*${transaction.vendor}*, ${amountStr} ₪ (${transaction.date}) - ${transaction.suggestedCategory ? transaction.suggestedCategory + '?' : 'מה זה?'}"
+- "${style.opener}${amountStr} ₪ ${prefix}*${transaction.vendor}*${style.closer}"
+${isHalfway ? `- "${userName}, חצי דרך! 🎯 ${amountStr} ₪ ${prefix}*${transaction.vendor}* - מה זה?"` : ''}
+${isAlmostDone ? `- "עוד ${remaining}! ${amountStr} ₪ ${prefix}*${transaction.vendor}*?"` : ''}
+
+❌ אסור:
+- לחזור על אותו ניסוח מההודעות האחרונות
+- להשתמש ב-** (שתי כוכביות) - רק * אחת
 
 החזר רק את השאלה (שורה-שתיים מקסימום).`;
 
@@ -325,10 +344,13 @@ export async function respondAndContinue(
   },
   progress?: { done: number; total: number }
 ): Promise<string> {
+  // 🆕 תגובות מגוונות יותר
+  const quickPositive = ['👍', 'יופי!', 'מעולה!', 'סבבה', '✓', 'תודה!', 'רשמתי!', '👌'];
+  const quickEmoji = ['👍', '✓', '👌', '💪'];
+  
   // אם אין תנועה הבאה, רק תגובה קצרה
   if (!nextTransaction) {
-    const quickResponses = ['👍', 'יופי!', 'מעולה!', 'סבבה'];
-    return quickResponses[Math.floor(Math.random() * quickResponses.length)];
+    return quickPositive[Math.floor(Math.random() * quickPositive.length)];
   }
   
   const history = await getHistoryForOpenAI(userId, 5);
@@ -337,14 +359,24 @@ export async function respondAndContinue(
   const prefix = nextTransaction.type === 'income' ? 'מ' : 'ב';
   const remaining = progress ? progress.total - progress.done : 0;
   
+  // 🆕 בחירת סגנון תגובה
+  const responseEmoji = quickEmoji[Math.floor(Math.random() * quickEmoji.length)];
+  
   const systemPrompt = `אתה φ - מאמן פיננסי ישראלי.
 
 המשתמש סיווג תנועה כ: "${classifiedAs}"
 
 📝 משימה:
-1. תגובה קצרה (מילה אחת: "👍" / "יופי" / "מעולה" / "סבבה")
+1. תגובה קצרה וטבעית (לא יותר מ-2 מילים!)
 2. שורה ריקה
 3. שאלה על התנועה הבאה
+
+🎨 תגובות אפשריות (בחר אחת!):
+- "${responseEmoji}"
+- "יופי ${responseEmoji}"
+- "סבבה"
+- "רשמתי"
+- "אוקי"
 
 ⚠️ השאלה הבאה חייבת לכלול:
 - סכום: ${amountStr} ₪
@@ -355,11 +387,16 @@ ${nextTransaction.suggestedCategory ? `- הצעה: ${nextTransaction.suggestedCa
 ${progress ? `התקדמות: ${progress.done}/${progress.total}` : ''}
 ${remaining <= 3 && remaining > 0 ? `נשארו רק ${remaining}!` : ''}
 
-📝 פורמט:
-יופי 👍
+📝 פורמט לדוגמה:
+${responseEmoji}
 
 ${amountStr} ₪ ${prefix}*${nextTransaction.vendor}* (${nextTransaction.date})
-${nextTransaction.suggestedCategory ? `זה *${nextTransaction.suggestedCategory}*?` : 'מה זה?'}
+${nextTransaction.suggestedCategory ? `*${nextTransaction.suggestedCategory}*?` : 'מה זה?'}
+
+❌ אסור:
+- לחזור על אותו ניסוח
+- להשתמש ב-** (שתי כוכביות)
+- להיות ארוך מדי
 
 החזר רק את התגובה והשאלה.`;
 

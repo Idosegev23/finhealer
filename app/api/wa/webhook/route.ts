@@ -51,6 +51,29 @@ const PROCESSING_STAGES = [
   "✨ מסיים ניתוח...",
 ];
 
+// 🆕 Quick feedback messages - פידבק מיידי על קליטת הודעה
+const QUICK_CONFIRMATIONS = ['👍', 'קיבלתי', '✓'];
+const QUICK_ACKNOWLEDGMENTS = ['💪', '⚡', '🎯'];
+
+/**
+ * 🆕 בודק אם ההודעה צריכה פידבק מיידי
+ */
+function getQuickFeedback(userMessage: string): string | null {
+  const lowerMessage = userMessage.toLowerCase().trim();
+  
+  // אישורים מהירים לא צריכים פידבק (התגובה תהיה מספיק מהירה)
+  if (lowerMessage === 'כן' || lowerMessage === 'אשר' || lowerMessage === 'לא') {
+    return null;
+  }
+  
+  // הודעות ארוכות יותר (תיקונים, שאלות) מקבלות פידבק
+  if (userMessage.length > 10) {
+    return QUICK_CONFIRMATIONS[Math.floor(Math.random() * QUICK_CONFIRMATIONS.length)];
+  }
+  
+  return null;
+}
+
 /**
  * שליחת טיפ אקראי בזמן עיבוד
  */
@@ -325,10 +348,19 @@ export async function POST(request: NextRequest) {
         const session = await loadClassificationSession(userData.id);
         
         if (session) {
+          // 🆕 שליחת פידבק מיידי - "קיבלתי!"
+          const quickFeedback = getQuickFeedback(text);
+          if (quickFeedback) {
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: quickFeedback,
+            });
+          }
+          
           const result = await handleUserResponse(session, text, supabase);
           
-      await greenAPI.sendMessage({
-        phoneNumber,
+          await greenAPI.sendMessage({
+            phoneNumber,
             message: result.message,
           });
           

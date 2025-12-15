@@ -71,11 +71,30 @@ async function getTransactionsForExport(
     return [];
   }
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data || []).map((tx: any) => ({
-    ...tx,
-    category_name: tx.budget_categories?.name || '',
-  }));
+  return (data || []).map((tx) => {
+    const txData = tx as unknown as {
+      id: string;
+      tx_date: string;
+      vendor: string | null;
+      description: string | null;
+      amount: number;
+      type: 'income' | 'expense';
+      status: string;
+      is_recurring?: boolean;
+      budget_categories?: { name: string } | null;
+    };
+    return {
+      id: txData.id,
+      tx_date: txData.tx_date,
+      vendor: txData.vendor,
+      description: txData.description,
+      amount: txData.amount,
+      type: txData.type,
+      status: txData.status,
+      is_recurring: txData.is_recurring,
+      category_name: txData.budget_categories?.name || '',
+    };
+  });
 }
 
 async function getCategoriesForExport(userId: string): Promise<Category[]> {

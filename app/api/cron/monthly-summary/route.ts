@@ -125,8 +125,8 @@ async function generateMonthlySummary(
   // Category breakdown (top 3)
   const byCategory: Record<string, number> = {};
   for (const t of transactions.filter(t => t.type === "expense")) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const catName = (t as any).budget_categories?.name || "אחר";
+    const txWithCategory = t as unknown as { amount: number; type: string; vendor: string; budget_categories?: { name: string } };
+    const catName = txWithCategory.budget_categories?.name || "אחר";
     byCategory[catName] = (byCategory[catName] || 0) + t.amount;
   }
   
