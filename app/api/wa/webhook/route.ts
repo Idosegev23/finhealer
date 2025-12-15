@@ -227,10 +227,21 @@ export async function POST(request: NextRequest) {
     if (payload.typeWebhook === 'outgoingMessageStatus') {
       return NextResponse.json({ status: 'ignored', reason: 'outgoing message' });
     }
+    
+    // 🛡️ התעלם מהודעות שנשלחו מהבוט עצמו (מניעת לופ!)
+    if (payload.typeWebhook === 'outgoingAPIMessageReceived') {
+      return NextResponse.json({ status: 'ignored', reason: 'our own message' });
+    }
 
     // רק הודעות נכנסות
     if (payload.typeWebhook !== 'incomingMessageReceived') {
       return NextResponse.json({ status: 'ignored', reason: 'not incoming message' });
+    }
+    
+    // 🛡️ בדיקה נוספת - אם זה הודעה מהבוט עצמו
+    if (payload.messageData?.fromMe === true) {
+      console.log('🛡️ Ignoring message from self (fromMe=true)');
+      return NextResponse.json({ status: 'ignored', reason: 'message from self' });
     }
 
     // חילוץ מספר טלפון
