@@ -209,12 +209,36 @@ interface GreenAPIWebhookPayload {
   };
 }
 
+// 🛡️ Cache למניעת עיבוד כפול (in-memory, יתאפס בכל deploy)
+const processedMessages = new Set<string>();
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServiceClient();
     const payload: GreenAPIWebhookPayload = await request.json();
 
     console.log('📱 GreenAPI Webhook received:', payload.typeWebhook);
+
+    // 🛡️ בדיקה ראשונה - התעלם מכל מה שלא הודעה נכנסת
+    if (payload.typeWebhook !== 'incomingMessageReceived') {
+      console.log('🛡️ Ignoring non-incoming message:', payload.typeWebhook);
+      return NextResponse.json({ status: 'ignored', reason: payload.typeWebhook });
+    }
+    
+    // 🛡️ בדיקת כפילויות לפי idMessage
+    const messageId = payload.idMessage;
+    if (messageId && processedMessages.has(messageId)) {
+      console.log('🛡️ Duplicate message ignored:', messageId);
+      return NextResponse.json({ status: 'ignored', reason: 'duplicate' });
+    }
+    if (messageId) {
+      processedMessages.add(messageId);
+      // נקה הודעות ישנות (שמור רק 1000 אחרונות)
+      if (processedMessages.size > 1000) {
+        const first = processedMessages.values().next().value;
+        if (first) processedMessages.delete(first);
+      }
+    }
 
     // אימות webhook (אופציונלי - תלוי ב-GreenAPI setup)
     const webhookSecret = process.env.GREEN_API_WEBHOOK_SECRET;
@@ -223,17 +247,15 @@ export async function POST(request: NextRequest) {
       // TODO: implement signature verification if needed
     }
 
-    // התעלם מהודעות יוצאות ומסוגים לא רלוונטיים
-    if (payload.typeWebhook === 'outgoingMessageStatus') {
-      return NextResponse.json({ status: 'ignored', reason: 'outgoing message' });
-    }
-    
-    // 🛡️ התעלם מהודעות שנשלחו מהבוט עצמו (מניעת לופ!)
-    if (payload.typeWebhook === 'outgoingAPIMessageReceived') {
-      return NextResponse.json({ status: 'ignored', reason: 'our own message' });
+    // 🛡️ בדיקה נוספת - אם זה הודעה מהבוט עצמו
+    if (payload.messageData?.fromMe === true) {
+      console.log('🛡️ Ignoring message from self (fromMe=true)');
+      return NextResponse.json({ status: 'ignored', reason: 'message from self' });
     }
 
-    // רק הודעות נכנסות
+    // (הבדיקות הישנות הוסרו כי הבדיקה הראשונה כבר מכסה אותן)
+
+    // רק הודעות נכנסות - כבר בדקנו למעלה
     if (payload.typeWebhook !== 'incomingMessageReceived') {
       return NextResponse.json({ status: 'ignored', reason: 'not incoming message' });
     }
@@ -294,7 +316,7 @@ export async function POST(request: NextRequest) {
     }
 
     const messageType = payload.messageData?.typeMessage;
-    const messageId = payload.idMessage;
+    // messageId כבר הוגדר למעלה
 
     // שמירת ההודעה בטבלה
     const waMessageData = {
