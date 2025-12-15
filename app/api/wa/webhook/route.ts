@@ -11,6 +11,16 @@ import { updateContext, loadContext } from '@/lib/conversation/context-manager';
 // 🆕 AI Orchestrator - Feature Flag
 const USE_PHI_BRAIN = process.env.USE_PHI_BRAIN === 'true';
 import { thinkAndRespond, executeActions, loadPhiContext } from '@/lib/ai/phi-brain';
+import { handleWithPhi } from '@/lib/ai/phi-handler';
+
+// 🆕 הודעות מכינות לפני יצירת גרף
+const CHART_PREPARING_MESSAGES = [
+  '🎨 שניה, מכין לך משהו יפה...',
+  '📊 רגע, מציירים את הנתונים שלך...',
+  '✨ מכין תמונה מיוחדת בשבילך...',
+  '🖼️ עובד על הויזואליזציה...',
+  '🎯 שניה, מארגן את המספרים בתמונה...',
+];
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -342,36 +352,62 @@ export async function POST(request: NextRequest) {
             status: 'delivered',
           });
           
-          // AI חושב ומחליט
-          const context = await loadPhiContext(userData.id);
-          const response = await thinkAndRespond(text, context);
+          // 🆕 שימוש ב-handleWithPhi שמטפל בהכל כולל גרפים
+          const result = await handleWithPhi(userData.id, text, phoneNumber);
           
-          // ביצוע פעולות
-          if (response.actions.length > 0) {
-            await executeActions(response.actions, context);
-            console.log('[φ Brain] Executed:', response.actions.map(a => a.type));
-          }
-          
-          // שליחת תשובה
-          if (response.message) {
+          // בדיקה אם צריך לייצר גרף - שליחת הודעת הכנה
+          const hasChartAction = result.actions.some(a => a.type === 'generate_chart');
+          if (hasChartAction) {
+            const preparingMsg = CHART_PREPARING_MESSAGES[
+              Math.floor(Math.random() * CHART_PREPARING_MESSAGES.length)
+            ];
             await greenAPI.sendMessage({
               phoneNumber,
-              message: response.message,
+              message: preparingMsg,
+            });
+            console.log('🎨 Sent chart preparing message');
+          }
+          
+          // שליחת תשובת טקסט
+          if (result.message) {
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: result.message,
             });
             
             // שמירת הודעה יוצאת
             await supabase.from('wa_messages').insert({
               user_id: userData.id,
               direction: 'outgoing',
-              content: response.message,
+              content: result.message,
               message_type: 'text',
               status: 'delivered',
             });
           }
           
+          // 🆕 שליחת תמונה אם יש
+          if (result.imageToSend) {
+            console.log('📊 Sending generated chart image...');
+            try {
+              await greenAPI.sendImage({
+                phoneNumber,
+                imageBase64: result.imageToSend.base64,
+                caption: result.imageToSend.description || 'הנה הגרף שלך! 📊',
+              });
+              console.log('✅ Chart image sent successfully');
+            } catch (imageError) {
+              console.error('❌ Failed to send chart image:', imageError);
+              await greenAPI.sendMessage({
+                phoneNumber,
+                message: 'סליחה, לא הצלחתי לייצר את הגרף 😅 נסה שוב בבקשה',
+              });
+            }
+          }
+          
           return NextResponse.json({
             status: 'phi_brain_response',
-            actions: response.actions.length,
+            actions: result.actions.length,
+            hasChart: !!result.imageToSend,
           });
         } catch (phiError) {
           console.error('[φ Brain] Error, falling back to legacy:', phiError);
