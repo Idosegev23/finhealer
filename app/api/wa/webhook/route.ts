@@ -8,6 +8,10 @@ import { EXPENSE_CATEGORIES_SYSTEM_PROMPT } from '@/lib/ai/expense-categories-pr
 import { processMessage } from '@/lib/conversation/orchestrator';
 import { updateContext, loadContext } from '@/lib/conversation/context-manager';
 
+// 🆕 AI Orchestrator - Feature Flag
+const USE_PHI_BRAIN = process.env.USE_PHI_BRAIN === 'true';
+import { thinkAndRespond, executeActions, loadPhiContext } from '@/lib/ai/phi-brain';
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -324,6 +328,58 @@ export async function POST(request: NextRequest) {
 
       const greenAPI = getGreenAPIClient();
       
+      // 🧠 AI-First Mode - כשהפלאג מופעל, AI מנהל את הכל
+      if (USE_PHI_BRAIN) {
+        console.log('🧠 Using φ Brain AI Orchestrator');
+        
+        try {
+          // שמירת הודעה נכנסת
+          await supabase.from('wa_messages').insert({
+            user_id: userData.id,
+            direction: 'incoming',
+            content: text,
+            message_type: 'text',
+            status: 'delivered',
+          });
+          
+          // AI חושב ומחליט
+          const context = await loadPhiContext(userData.id);
+          const response = await thinkAndRespond(text, context);
+          
+          // ביצוע פעולות
+          if (response.actions.length > 0) {
+            await executeActions(response.actions, context);
+            console.log('[φ Brain] Executed:', response.actions.map(a => a.type));
+          }
+          
+          // שליחת תשובה
+          if (response.message) {
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: response.message,
+            });
+            
+            // שמירת הודעה יוצאת
+            await supabase.from('wa_messages').insert({
+              user_id: userData.id,
+              direction: 'outgoing',
+              content: response.message,
+              message_type: 'text',
+              status: 'delivered',
+            });
+          }
+          
+          return NextResponse.json({
+            status: 'phi_brain_response',
+            actions: response.actions.length,
+          });
+        } catch (phiError) {
+          console.error('[φ Brain] Error, falling back to legacy:', phiError);
+          // ממשיך לקוד הישן במקרה של שגיאה
+        }
+      }
+      
+      // 🔄 Legacy Mode - הקוד הקיים
       // 🆕 בדיקה אם זה אישור/ביטול תנועות ממתינות
       const lowerText = text.toLowerCase().trim();
       const isApproval = lowerText === 'אשר' || lowerText === 'אשר הכל' || lowerText === 'כן' || lowerText === 'אישור';
