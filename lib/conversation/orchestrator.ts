@@ -424,6 +424,53 @@ async function handleGeneralConversation(
   userContext: UserContext,
   context: any
 ): Promise<ConversationResponse> {
+  // 🆕 בדוק אם זו פקודת עריכת סיווג
+  try {
+    const { handleEditClassificationMessage, detectEditCommand } = await import("./flows/edit-classification-flow");
+    const editCommand = detectEditCommand(message);
+    
+    if (editCommand.type !== null) {
+      // בדוק אם יש עריכה ממתינה בקונטקסט (ב-metadata)
+      const pendingEdit = context?.metadata?.pendingEditVendor 
+        ? { vendor: context.metadata.pendingEditVendor as string }
+        : undefined;
+      
+      const editResult = await handleEditClassificationMessage(
+        userContext.userId,
+        message,
+        pendingEdit
+      );
+      
+      if (editResult) {
+        // אם צריך קטגוריה - שמור בקונטקסט
+        if (editResult.requiresCategory && editResult.vendorToEdit) {
+          const { updateContext } = await import("./context-manager");
+          await updateContext(userContext.userId, {
+            metadata: { ...context?.metadata, pendingEditVendor: editResult.vendorToEdit },
+          });
+        } else if (context?.metadata?.pendingEditVendor) {
+          // נקה את ה-pending edit
+          const { updateContext } = await import("./context-manager");
+          const { pendingEditVendor: _, ...restMetadata } = context.metadata;
+          await updateContext(userContext.userId, {
+            metadata: restMetadata,
+          });
+        }
+        
+        return {
+          message: editResult.message,
+          metadata: {
+            intent: 'edit_classification',
+            confidence: 1.0,
+            stateChanged: editResult.success,
+          },
+        };
+      }
+    }
+  } catch (error) {
+    console.error("[Orchestrator] Edit classification error:", error);
+  }
+  
   // 🆕 טעינת היסטוריית שיחה לקונטקסט
   const history = await getHistoryForOpenAI(userContext.userId, 10);
   

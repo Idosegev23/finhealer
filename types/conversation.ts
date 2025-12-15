@@ -54,6 +54,7 @@ export interface ConversationContext {
   pendingQuestions: Question[];
   waitingForDocument?: DocumentType;
   previousResponseId?: string;
+  metadata?: Record<string, unknown>;  // 🆕 שדה גמיש לנתונים נוספים
 }
 
 export interface Question {
