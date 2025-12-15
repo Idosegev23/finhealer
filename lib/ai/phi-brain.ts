@@ -54,6 +54,8 @@ export interface PhiContext {
     vendor: string;
     amount: number;
     type: 'income' | 'expense';
+    date: string;
+    category?: string;
   }>;
   
   // היסטוריית שיחה
@@ -63,7 +65,7 @@ export interface PhiContext {
   }>;
   
   // patterns שנלמדו
-  learnedPatterns?: Map<string, string>;
+  learnedPatterns?: Record<string, string>;
   
   // מצב ספציפי
   classificationProgress?: {
@@ -809,6 +811,8 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
       vendor: tx.vendor || '',
       amount: tx.amount,
       type: tx.type as 'income' | 'expense',
+      date: tx.tx_date || new Date().toISOString(),
+      category: tx.category,
     })),
   };
   

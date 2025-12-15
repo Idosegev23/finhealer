@@ -26,9 +26,10 @@ const getGeminiClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-// Model configuration
-const IMAGE_MODEL = 'gemini-2.5-flash-preview-05-20'; // Using flash for faster generation
-const PRO_IMAGE_MODEL = 'gemini-2.0-flash-preview-image-generation'; // For higher quality when needed
+// Model configuration - Updated Dec 2025
+// See: https://ai.google.dev/gemini-api/docs/image-generation
+// Nano Banana Pro = Gemini 3 Pro Image Preview - יצירת תמונות מתקדמת באיכות גבוהה
+const IMAGE_MODEL = 'gemini-3-pro-image-preview';
 
 export type ChartType =
   | 'pie'
@@ -59,7 +60,7 @@ async function generateImageFromPrompt(
 ): Promise<GeneratedImage | null> {
   try {
     const client = getGeminiClient();
-    const model = options.useProModel ? PRO_IMAGE_MODEL : IMAGE_MODEL;
+    const model = IMAGE_MODEL; // Always use Nano Banana Pro (gemini-3-pro-image-preview)
 
     console.log(`🎨 Generating image with ${model}...`);
     console.log(`📝 Prompt length: ${prompt.length} chars`);
