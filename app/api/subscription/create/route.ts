@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         phone: phone === '0000000000' ? null : cleanPhone, // null אם זמני
         wa_opt_in: waOptIn !== undefined ? waOptIn : true,
         subscription_status: 'active',
-        phase: 'reflection', // יתחיל תמיד מ-reflection
+        current_phase: 'onboarding', // יתחיל תמיד מ-onboarding (אח"כ ב-WhatsApp)
         created_at: existingUser ? undefined : new Date().toISOString(),
       }, {
         onConflict: 'id',
