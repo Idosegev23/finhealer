@@ -533,7 +533,7 @@ ${transactionContext.suggestedCategory ? `הצעה: ${transactionContext.suggest
 }
 
 /**
- * 🎉 הודעת פתיחה ראשונה - קצרה, ממוקדת, משדרת ביטחון
+ * 🎉 הודעת פתיחה ראשונה - הסברית, משדרת ביטחון
  */
 export async function generateWelcomeMessage(): Promise<string> {
   // הודעה קבועה ומדויקת - לא מייצרים עם AI כי רוצים שליטה מלאה
@@ -541,13 +541,19 @@ export async function generateWelcomeMessage(): Promise<string> {
 
 אני *φ (פאי)* - המאמן הפיננסי האישי שלך.
 
+*מה נעשה ביחד?*
+נבנה תמונה ברורה של הכסף שלך - בלי לחץ, בלי שיפוטיות. רק אתה והמספרים.
+
 *איך זה עובד?*
-תשלח לי דוחות בנק, אני אנתח אותם בשבילך, וביחד נבנה תמונה ברורה של הכסף שלך.
+1️⃣ תשלח לי דוחות בנק (PDF)
+2️⃣ אני אנתח ואסווג את התנועות
+3️⃣ ביחד נבין לאן הכסף הולך
+4️⃣ נבנה תוכנית שעובדת *בשבילך*
 
-*למה זה שונה?*
-אני לא שופט, לא מטיף - רק עוזר לך להבין ולהרגיש שליטה.
+*למה אני שונה?*
+אני לא אגיד לך "אל תקנה קפה" - אני אעזור לך להבין את ההרגלים שלך ולקבל החלטות מתוך מודעות.
 
-בוא נכיר - מה השם שלך?`;
+בוא נתחיל - מה השם שלך?`;
 }
 
 export default {
