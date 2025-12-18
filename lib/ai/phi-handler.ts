@@ -31,85 +31,212 @@ export interface PhiHandlerResult {
 
 /**
  * טיפול בהודעת טקסט עם AI Orchestrator
+ * 
+ * Agent Loop פשוט:
+ * 1. הודעה נכנסת
+ * 2. AI מבין ומחליט (tool calls + הודעה)
+ * 3. מבצעים את הפעולות
+ * 4. אם אין הודעה - AI ממשיך עד שמחזיר הודעה
+ * 5. שולחים את ההודעה למשתמש
  */
 export async function handleWithPhi(
   userId: string,
   userMessage: string,
   phoneNumber: string
 ): Promise<PhiHandlerResult> {
-  console.log('[φ Handler] Processing message with AI Orchestrator');
+  console.log('[φ Handler] 🧠 AI processing message...');
 
   // 1. טען context מלא
-  const context = await loadPhiContext(userId);
+  let context = await loadPhiContext(userId);
   
-  // 2. תן ל-AI (GPT-5.2 / Responses API) לחשוב ולהחליט
-  const response = await thinkWithPhi(userMessage, context);
+  // 2. Agent Loop - ממשיך עד שיש הודעה סופית
+  let finalMessage = '';
+  let allActions: PhiAction[] = [];
+  let imageToSend: GeneratedImage | undefined;
+  let iterations = 0;
+  const MAX_ITERATIONS = 3; // מניעת לולאה אינסופית
   
-  // 3. בצע את הפעולות שה-AI החליט עליהן
-  if (response.actions.length > 0) {
-    await executePhiActions(response.actions, context);
-  }
-  
-  // 3.5 אם אין הודעה אבל יש פעולות - בקש מה-AI לייצר הודעה
-  let finalMessage = response.message;
-  if (!finalMessage && response.actions.length > 0) {
-    console.log('[φ Handler] No message from AI, requesting follow-up message...');
+  while (!finalMessage && iterations < MAX_ITERATIONS) {
+    iterations++;
+    console.log(`[φ Handler] Iteration ${iterations}...`);
     
-    // בנה תיאור של מה שבוצע
-    const actionsSummary = response.actions
-      .map(a => {
-        if (a.type === 'save_user_name') return `שמרתי את השם: ${a.data?.name}`;
-        if (a.type === 'request_document') return `ביקשתי מסמך: ${a.data?.document_type}`;
-        if (a.type === 'classify_transaction') return `סיווגתי תנועה`;
-        return `ביצעתי: ${a.type}`;
-      })
-      .join(', ');
-    
-    // קריאה נוספת ל-AI לייצר הודעה למשתמש
-    const followUpResponse = await thinkWithPhi(
-      `[מערכת] הפעולות הבאות בוצעו בהצלחה: ${actionsSummary}. עכשיו תן הודעה קצרה וחמה למשתמש שמסכמת מה קרה ומה הצעד הבא. אל תקרא לשום tool - רק החזר הודעת טקסט!`,
-      { ...context, userName: (response.actions.find(a => a.type === 'save_user_name')?.data?.name as string) || context.userName }
+    // שלח ל-AI
+    const response = await thinkWithPhi(
+      iterations === 1 ? userMessage : '[המשך - צריך הודעה למשתמש]',
+      context
     );
     
-    finalMessage = followUpResponse.message || 'קיבלתי! 👍';
-    console.log('[φ Handler] Got follow-up message from AI');
-  }
-  
-  // 4. בדוק אם צריך לייצר גרף
-  let imageToSend: GeneratedImage | undefined;
-  const chartAction = response.actions.find(a => a.type === 'generate_chart');
-  console.log('[φ Handler] Chart action found:', chartAction ? 'YES' : 'NO');
-  
-  if (chartAction && chartAction.data) {
-    console.log('[φ Handler] 🎨 Starting chart generation:', chartAction.data);
-    try {
-      const result = await handleChartGeneration(
-        chartAction.data.chartType as string,
-        userId,
-        chartAction.data.title as string | undefined,
-        chartAction.data.description as string | undefined
-      );
-      console.log('[φ Handler] Chart generation result:', result ? 'SUCCESS' : 'FAILED');
-      if (result) {
-        imageToSend = result;
+    // אסוף פעולות
+    if (response.actions.length > 0) {
+      allActions.push(...response.actions);
+      
+      // בצע פעולות
+      for (const action of response.actions) {
+        console.log(`[φ Handler] Executing: ${action.type}`);
+        await executeSingleAction(action, context);
+        
+        // עדכן context אם שמרנו שם
+        if (action.type === 'save_user_name' && action.data?.name) {
+          context = { ...context, userName: action.data.name as string };
+        }
       }
-    } catch (error) {
-      console.error('[φ Handler] Chart generation error:', error);
+    }
+    
+    // בדוק אם יש הודעה
+    if (response.message) {
+      finalMessage = response.message;
+    }
+    
+    // בדוק אם צריך גרף
+    const chartAction = response.actions.find(a => a.type === 'generate_chart');
+    if (chartAction && chartAction.data && !imageToSend) {
+      console.log('[φ Handler] 🎨 Generating chart...');
+      try {
+        imageToSend = await handleChartGeneration(
+          chartAction.data.chartType as string || chartAction.data.chart_description as string,
+          userId,
+          chartAction.data.title as string | undefined,
+          chartAction.data.description as string | undefined
+        ) || undefined;
+      } catch (error) {
+        console.error('[φ Handler] Chart error:', error);
+      }
     }
   }
   
-  // 5. שמור את ההודעה ביומן
-  await saveMessage(userId, 'incoming', userMessage);
-  if (finalMessage) {
-    await saveMessage(userId, 'outgoing', finalMessage);
+  // Fallback אם עדיין אין הודעה
+  if (!finalMessage) {
+    console.log('[φ Handler] No message after iterations, using fallback');
+    finalMessage = context.userName 
+      ? `היי ${context.userName}! איך אני יכול לעזור? 😊`
+      : 'היי! אני φ - המאמן הפיננסי שלך 😊 מה שמך?';
   }
+  
+  // שמור ביומן
+  await saveMessage(userId, 'incoming', userMessage);
+  await saveMessage(userId, 'outgoing', finalMessage);
+  
+  console.log('[φ Handler] ✅ Done:', { message: finalMessage.substring(0, 50), actions: allActions.length });
   
   return {
     message: finalMessage,
-    actions: response.actions,
-    shouldWaitForResponse: response.shouldWaitForResponse,
+    actions: allActions,
+    shouldWaitForResponse: true,
     imageToSend,
   };
+}
+
+/**
+ * ביצוע פעולה בודדת
+ */
+async function executeSingleAction(action: PhiAction, context: PhiContext): Promise<void> {
+  const supabase = createServiceClient();
+  
+  switch (action.type) {
+    case 'save_user_name':
+      if (action.data?.name) {
+        await supabase
+          .from('users')
+          .update({ 
+            full_name: action.data.name,
+            current_phase: 'document_upload',
+          })
+          .eq('id', context.userId);
+        console.log(`[φ Handler] ✅ Saved name: ${action.data.name}`);
+      }
+      break;
+      
+    case 'save_transaction':
+      if (action.data) {
+        await supabase.from('transactions').insert({
+          user_id: context.userId,
+          vendor: action.data.vendor,
+          amount: action.data.amount,
+          type: action.data.tx_type,
+          category: action.data.category || 'לא מסווג',
+          tx_date: action.data.date || new Date().toISOString(),
+          source: 'manual',
+          status: 'confirmed',
+        });
+      }
+      break;
+      
+    case 'classify_transaction':
+      if (action.data?.transaction_id && action.data?.category) {
+        await supabase
+          .from('transactions')
+          .update({
+            category: action.data.category,
+            status: action.data.is_confirmed ? 'confirmed' : 'proposed',
+          })
+          .eq('id', action.data.transaction_id);
+      }
+      break;
+      
+    case 'bulk_classify':
+      if (action.data?.transaction_ids && action.data?.category) {
+        await supabase
+          .from('transactions')
+          .update({ category: action.data.category, status: 'confirmed' })
+          .in('id', action.data.transaction_ids as string[]);
+      }
+      break;
+      
+    case 'save_pattern':
+      if (action.data?.vendor && action.data?.category) {
+        await supabase.from('user_patterns').upsert({
+          user_id: context.userId,
+          vendor: action.data.vendor,
+          category: action.data.category,
+          confidence: 1.0,
+          usage_count: 1,
+        }, { onConflict: 'user_id,vendor' });
+      }
+      break;
+      
+    case 'set_budget':
+      if (action.data?.category && action.data?.amount) {
+        await supabase.from('budget_categories').upsert({
+          user_id: context.userId,
+          name: action.data.category,
+          monthly_limit: action.data.amount,
+        }, { onConflict: 'user_id,name' });
+      }
+      break;
+      
+    case 'set_goal':
+      if (action.data?.goal_name && action.data?.target_amount) {
+        await supabase.from('goals').insert({
+          user_id: context.userId,
+          name: action.data.goal_name,
+          target_amount: action.data.target_amount,
+          deadline: action.data.deadline,
+          current_amount: 0,
+          status: 'active',
+        });
+      }
+      break;
+      
+    case 'move_to_phase':
+      if (action.data?.phase) {
+        await supabase
+          .from('users')
+          .update({ current_phase: action.data.phase })
+          .eq('id', context.userId);
+      }
+      break;
+      
+    case 'request_document':
+    case 'get_financial_summary':
+    case 'calculate_phi_score':
+    case 'generate_chart':
+      // פעולות אלה מטופלות בנפרד או רק לוגים
+      console.log(`[φ Handler] Action noted: ${action.type}`);
+      break;
+      
+    default:
+      console.log(`[φ Handler] Unknown action: ${action.type}`);
+  }
 }
 
 /**
@@ -627,180 +754,6 @@ export async function generateChartForUser(
   chartType: ChartType
 ): Promise<GeneratedImage | null> {
   return handleChartGeneration(chartType, userId);
-}
-
-// ============================================================================
-// Action Execution - ביצוע פעולות שה-AI החליט עליהן
-// ============================================================================
-
-/**
- * ביצוע פעולות שה-AI החליט עליהן
- */
-async function executePhiActions(
-  actions: PhiAction[],
-  context: PhiContext
-): Promise<void> {
-  const supabase = createServiceClient();
-  
-  for (const action of actions) {
-    console.log(`[φ Handler] Executing action: ${action.type}`);
-    
-    try {
-      switch (action.type) {
-        case 'save_user_name':
-          // 🆕 שמירת שם המשתמש
-          if (action.data?.name) {
-            await supabase
-              .from('users')
-              .update({ 
-                full_name: action.data.name,
-                current_phase: 'document_upload', // העבר לשלב הבא
-              })
-              .eq('id', context.userId);
-            console.log(`[φ Handler] ✅ User name saved: ${action.data.name}`);
-          }
-          break;
-          
-        case 'save_transaction':
-          if (action.data) {
-            await supabase.from('transactions').insert({
-              user_id: context.userId,
-              vendor: action.data.vendor,
-              amount: action.data.amount,
-              type: action.data.tx_type,
-              category: action.data.category || 'לא מסווג',
-              tx_date: action.data.date || new Date().toISOString(),
-              notes: action.data.notes,
-              source: 'manual',
-              status: 'confirmed',
-            });
-            console.log(`[φ Handler] ✅ Transaction saved: ${action.data.vendor}`);
-          }
-          break;
-          
-        case 'classify_transaction':
-          if (action.data?.transaction_id && action.data?.category) {
-            // מצא category_id
-            const { data: categoryData } = await supabase
-              .from('budget_categories')
-              .select('id')
-              .eq('user_id', context.userId)
-              .eq('name', action.data.category)
-              .single();
-            
-            const updateData: Record<string, unknown> = {
-              category: action.data.category,
-              status: action.data.is_confirmed ? 'confirmed' : 'proposed',
-            };
-            
-            if (categoryData?.id) {
-              updateData.category_id = categoryData.id;
-            }
-            
-            await supabase
-              .from('transactions')
-              .update(updateData)
-              .eq('id', action.data.transaction_id);
-              
-            console.log(`[φ Handler] ✅ Transaction classified: ${action.data.transaction_id} → ${action.data.category}`);
-          }
-          break;
-          
-        case 'bulk_classify':
-          if (action.data?.transaction_ids && action.data?.category) {
-            const ids = action.data.transaction_ids as string[];
-            await supabase
-              .from('transactions')
-              .update({
-                category: action.data.category,
-                status: 'confirmed',
-              })
-              .in('id', ids);
-              
-            console.log(`[φ Handler] ✅ Bulk classified: ${ids.length} transactions → ${action.data.category}`);
-          }
-          break;
-          
-        case 'save_pattern':
-          if (action.data?.vendor && action.data?.category) {
-            await supabase.from('user_patterns').upsert({
-              user_id: context.userId,
-              vendor: action.data.vendor,
-              category: action.data.category,
-              confidence: 1.0,
-              usage_count: 1,
-            }, {
-              onConflict: 'user_id,vendor',
-            });
-            console.log(`[φ Handler] ✅ Pattern saved: ${action.data.vendor} → ${action.data.category}`);
-          }
-          break;
-          
-        case 'set_budget':
-          if (action.data?.category && action.data?.amount) {
-            await supabase.from('budget_categories').upsert({
-              user_id: context.userId,
-              name: action.data.category,
-              monthly_limit: action.data.amount,
-            }, {
-              onConflict: 'user_id,name',
-            });
-            console.log(`[φ Handler] ✅ Budget set: ${action.data.category} = ${action.data.amount}₪`);
-          }
-          break;
-          
-        case 'set_goal':
-          if (action.data?.goal_name && action.data?.target_amount) {
-            await supabase.from('goals').insert({
-              user_id: context.userId,
-              name: action.data.goal_name,
-              target_amount: action.data.target_amount,
-              deadline: action.data.deadline,
-              current_amount: 0,
-              status: 'active',
-            });
-            console.log(`[φ Handler] ✅ Goal created: ${action.data.goal_name}`);
-          }
-          break;
-          
-        case 'move_to_phase':
-          if (action.data?.phase) {
-            await supabase
-              .from('users')
-              .update({ current_phase: action.data.phase })
-              .eq('id', context.userId);
-            console.log(`[φ Handler] ✅ Phase changed to: ${action.data.phase}`);
-          }
-          break;
-          
-        case 'get_financial_summary':
-          // הסיכום הפיננסי כבר קיים ב-context.financial
-          console.log(`[φ Handler] 📊 Financial summary requested for period: ${action.data?.period}`);
-          // לא צריך לעשות כלום - ה-AI כבר קיבל את המידע ב-context
-          break;
-          
-        case 'request_document':
-          console.log(`[φ Handler] 📄 Document requested: ${action.data?.document_type}`);
-          // המידע כבר נכלל בהודעת ה-AI למשתמש
-          break;
-          
-        case 'calculate_phi_score':
-          console.log(`[φ Handler] 🎯 Phi score calculation requested`);
-          // TODO: implement phi score calculation
-          break;
-          
-        case 'generate_chart':
-          // הטיפול בגרף נעשה בנפרד ב-handleWithPhi
-          console.log(`[φ Handler] 📊 Chart generation queued: ${action.data?.chart_description}`);
-          break;
-          
-        default:
-          console.log(`[φ Handler] ⚠️ Unknown action type: ${action.type}`);
-      }
-    } catch (error) {
-      console.error(`[φ Handler] ❌ Error executing action ${action.type}:`, error);
-    }
-  }
 }
 
 export default {
