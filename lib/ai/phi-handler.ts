@@ -46,28 +46,33 @@ export async function handleWithPhi(
   const response = await thinkWithPhi(userMessage, context);
   
   // 3. בצע את הפעולות שה-AI החליט עליהן
-  let savedUserName: string | null = null;
   if (response.actions.length > 0) {
-    // בדוק אם יש שמירת שם - נצטרך את זה להודעת ברירת מחדל
-    const saveNameAction = response.actions.find(a => a.type === 'save_user_name');
-    if (saveNameAction?.data?.name) {
-      savedUserName = saveNameAction.data.name as string;
-    }
     await executePhiActions(response.actions, context);
   }
   
-  // 3.5 אם אין הודעה אבל יש פעולה - צור הודעת ברירת מחדל
+  // 3.5 אם אין הודעה אבל יש פעולות - בקש מה-AI לייצר הודעה
   let finalMessage = response.message;
   if (!finalMessage && response.actions.length > 0) {
-    // בדוק איזו פעולה בוצעה וצור הודעה מתאימה
-    if (savedUserName) {
-      finalMessage = `נעים מאוד *${savedUserName}*! 😊 אני φ - המאמן הפיננסי שלך.\n\nשלח לי דוח עו״ש מהבנק (PDF) של 3 חודשים אחרונים ונתחיל לבנות את התמונה הפיננסית שלך 📊`;
-    } else if (response.actions.find(a => a.type === 'request_document')) {
-      finalMessage = `שלח לי דוח עו״ש מהבנק (PDF) של 3 חודשים אחרונים ונתחיל 📊`;
-    } else {
-      finalMessage = `קיבלתי! 👍`;
-    }
-    console.log('[φ Handler] Generated default message for action');
+    console.log('[φ Handler] No message from AI, requesting follow-up message...');
+    
+    // בנה תיאור של מה שבוצע
+    const actionsSummary = response.actions
+      .map(a => {
+        if (a.type === 'save_user_name') return `שמרתי את השם: ${a.data?.name}`;
+        if (a.type === 'request_document') return `ביקשתי מסמך: ${a.data?.document_type}`;
+        if (a.type === 'classify_transaction') return `סיווגתי תנועה`;
+        return `ביצעתי: ${a.type}`;
+      })
+      .join(', ');
+    
+    // קריאה נוספת ל-AI לייצר הודעה למשתמש
+    const followUpResponse = await thinkWithPhi(
+      `[מערכת] הפעולות הבאות בוצעו בהצלחה: ${actionsSummary}. עכשיו תן הודעה קצרה וחמה למשתמש שמסכמת מה קרה ומה הצעד הבא. אל תקרא לשום tool - רק החזר הודעת טקסט!`,
+      { ...context, userName: (response.actions.find(a => a.type === 'save_user_name')?.data?.name as string) || context.userName }
+    );
+    
+    finalMessage = followUpResponse.message || 'קיבלתי! 👍';
+    console.log('[φ Handler] Got follow-up message from AI');
   }
   
   // 4. בדוק אם צריך לייצר גרף
