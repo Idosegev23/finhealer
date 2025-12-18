@@ -18,16 +18,18 @@ export async function GET() {
   } catch (error) {
     console.error('[WelcomeAPI] Error:', error);
     
-    // Fallback message
-    const fallbackMessage = `היי, טוב שבאת.
+    // Fallback message - אותה הודעה בדיוק כמו בפונקציה הראשית
+    const fallbackMessage = `היי! 👋
 
-אני *φ (פאי)* - המאמן הפיננסי שלך.
+אני *φ (פאי)* - המאמן הפיננסי האישי שלך.
 
-כמו שהיחס הזהב יוצר הרמוניה במתמטיקה, ביחד נמצא את *ההרמוניה בכסף* שלך.
+*איך זה עובד?*
+תשלח לי דוחות בנק, אני אנתח אותם בשבילך, וביחד נבנה תמונה ברורה של הכסף שלך.
 
-תשלח לי דוחות, אני אנתח, וביחד נבנה תמונה ברורה. בלי שיפוטיות, בקצב שלך.
+*למה זה שונה?*
+אני לא שופט, לא מטיף - רק עוזר לך להבין ולהרגיש שליטה.
 
-מה השם שלך?`;
+בוא נכיר - מה השם שלך?`;
     
     return NextResponse.json({ 
       success: true, 
