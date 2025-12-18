@@ -46,8 +46,28 @@ export async function handleWithPhi(
   const response = await thinkWithPhi(userMessage, context);
   
   // 3. בצע את הפעולות שה-AI החליט עליהן
+  let savedUserName: string | null = null;
   if (response.actions.length > 0) {
+    // בדוק אם יש שמירת שם - נצטרך את זה להודעת ברירת מחדל
+    const saveNameAction = response.actions.find(a => a.type === 'save_user_name');
+    if (saveNameAction?.data?.name) {
+      savedUserName = saveNameAction.data.name as string;
+    }
     await executePhiActions(response.actions, context);
+  }
+  
+  // 3.5 אם אין הודעה אבל יש פעולה - צור הודעת ברירת מחדל
+  let finalMessage = response.message;
+  if (!finalMessage && response.actions.length > 0) {
+    // בדוק איזו פעולה בוצעה וצור הודעה מתאימה
+    if (savedUserName) {
+      finalMessage = `נעים מאוד *${savedUserName}*! 😊 אני φ - המאמן הפיננסי שלך.\n\nשלח לי דוח עו״ש מהבנק (PDF) של 3 חודשים אחרונים ונתחיל לבנות את התמונה הפיננסית שלך 📊`;
+    } else if (response.actions.find(a => a.type === 'request_document')) {
+      finalMessage = `שלח לי דוח עו״ש מהבנק (PDF) של 3 חודשים אחרונים ונתחיל 📊`;
+    } else {
+      finalMessage = `קיבלתי! 👍`;
+    }
+    console.log('[φ Handler] Generated default message for action');
   }
   
   // 4. בדוק אם צריך לייצר גרף
@@ -75,12 +95,12 @@ export async function handleWithPhi(
   
   // 5. שמור את ההודעה ביומן
   await saveMessage(userId, 'incoming', userMessage);
-  if (response.message) {
-    await saveMessage(userId, 'outgoing', response.message);
+  if (finalMessage) {
+    await saveMessage(userId, 'outgoing', finalMessage);
   }
   
   return {
-    message: response.message,
+    message: finalMessage,
     actions: response.actions,
     shouldWaitForResponse: response.shouldWaitForResponse,
     imageToSend,
