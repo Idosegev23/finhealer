@@ -780,10 +780,27 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
 
   const conversationHistory = (messages || [])
     .reverse()
-    .map(msg => ({
-      role: (msg.direction === 'outgoing' ? 'assistant' : 'user') as 'user' | 'assistant',
-      content: (msg.payload as { text?: string })?.text || '',
-    }))
+    .map(msg => {
+      const payload = msg.payload as Record<string, unknown>;
+      // תמיכה בפורמטים שונים של payload
+      let content = '';
+      if (payload?.message) {
+        // הודעה יוצאת מ-wa/send
+        content = payload.message as string;
+      } else if (payload?.text) {
+        // הודעה נכנסת עם text
+        content = payload.text as string;
+      } else if (payload?.messageData) {
+        // הודעה נכנסת מ-GreenAPI webhook
+        const messageData = payload.messageData as Record<string, unknown>;
+        content = (messageData.textMessage as string) || 
+                  ((messageData.fileMessageData as Record<string, unknown>)?.caption as string) || '';
+      }
+      return {
+        role: (msg.direction === 'outgoing' ? 'assistant' : 'user') as 'user' | 'assistant',
+        content,
+      };
+    })
     .filter(msg => msg.content); // סנן הודעות ריקות
 
   // טען תנועות ממתינות לאישור (proposed = pending)
