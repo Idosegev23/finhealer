@@ -75,9 +75,24 @@ export interface PhiContext {
     lowConfidenceCount: number;
   };
   
-  // מסמכים
-  documentsReceived?: number;
-  missingDocuments?: string[];
+  // 🆕 מסמכים חסרים וכיסוי תקופות - מידע קריטי!
+  missingDocuments?: Array<{
+    type: string; // credit, payslip, mortgage, loan, insurance, pension
+    description: string;
+    priority: string;
+    card_last_4?: string;
+    period_start?: string;
+    period_end?: string;
+    expected_amount?: number;
+  }>;
+  periodCoverage?: {
+    totalMonths: number;
+    targetMonths: number;
+    coveredMonths: string[];
+    missingMonths: string[];
+    oldestDate?: string;
+    newestDate?: string;
+  };
 }
 
 export interface PhiAction {
@@ -806,6 +821,57 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
     };
   }
 
+  // 🆕 טען מסמכים חסרים
+  const { data: missingDocs } = await supabase
+    .from('missing_documents')
+    .select('document_type, description, priority, card_last_4, period_start, period_end, expected_amount')
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .order('priority', { ascending: false })
+    .limit(10);
+
+  // 🆕 חשב כיסוי תקופות מהתנועות
+  const { data: dateRange } = await supabase
+    .from('transactions')
+    .select('tx_date')
+    .eq('user_id', userId)
+    .order('tx_date', { ascending: true });
+
+  let periodCoverage;
+  if (dateRange && dateRange.length > 0) {
+    const dates = dateRange.map(d => d.tx_date).filter(Boolean);
+    const oldestDate = dates[0];
+    const newestDate = dates[dates.length - 1];
+    
+    // חשב חודשים מכוסים
+    const coveredMonthsSet = new Set<string>();
+    dates.forEach(d => {
+      const date = new Date(d);
+      coveredMonthsSet.add(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+    });
+    
+    // חשב חודשים חסרים (3 חודשים אחרונים)
+    const targetMonths = 3;
+    const now = new Date();
+    const allTargetMonths: string[] = [];
+    for (let i = 0; i < targetMonths; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      allTargetMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    
+    const coveredMonths = Array.from(coveredMonthsSet);
+    const missingMonths = allTargetMonths.filter(m => !coveredMonthsSet.has(m));
+    
+    periodCoverage = {
+      totalMonths: coveredMonthsSet.size,
+      targetMonths,
+      coveredMonths,
+      missingMonths,
+      oldestDate,
+      newestDate,
+    };
+  }
+
   const context: PhiContext = {
     userId,
     userName: user?.full_name || '',
@@ -821,6 +887,17 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
       date: tx.tx_date || new Date().toISOString(),
       category: tx.category,
     })),
+    // 🆕 מידע על מסמכים חסרים וכיסוי תקופות
+    missingDocuments: (missingDocs || []).map(doc => ({
+      type: doc.document_type,
+      description: doc.description || '',
+      priority: doc.priority === 10 ? 'high' : doc.priority >= 5 ? 'medium' : 'low',
+      card_last_4: doc.card_last_4,
+      period_start: doc.period_start,
+      period_end: doc.period_end,
+      expected_amount: doc.expected_amount,
+    })),
+    periodCoverage,
   };
   
   console.log('[φ Brain] Context loaded:', {
@@ -829,6 +906,8 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
     historyLength: context.conversationHistory?.length || 0,
     pendingTx: context.pendingTransactions?.length || 0,
     financial: context.financial ? 'loaded' : 'none',
+    missingDocs: context.missingDocuments?.length || 0,
+    periodCoverage: context.periodCoverage ? `${context.periodCoverage.totalMonths}/${context.periodCoverage.targetMonths} months` : 'none',
   });
   
   return context;

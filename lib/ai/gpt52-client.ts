@@ -41,6 +41,25 @@ export interface PhiContext {
     category?: string;
   }>;
   learnedPatterns?: Record<string, string>; // vendor -> category
+  
+  // 🆕 מסמכים חסרים וכיסוי תקופות
+  missingDocuments?: Array<{
+    type: string; // credit, payslip, mortgage, loan, insurance, pension
+    description: string;
+    priority: string;
+    card_last_4?: string;
+    period_start?: string;
+    period_end?: string;
+    expected_amount?: number;
+  }>;
+  periodCoverage?: {
+    totalMonths: number;
+    targetMonths: number;
+    coveredMonths: string[];
+    missingMonths: string[];
+    oldestDate?: string;
+    newestDate?: string;
+  };
 }
 
 export interface PhiResponse {
@@ -559,6 +578,34 @@ function buildContextMessage(context: PhiContext): string {
     Object.entries(context.learnedPatterns).slice(0, 10).forEach(([vendor, category]) => {
       parts.push(`- ${vendor} → ${category}`);
     });
+  }
+
+  // 🆕 כיסוי תקופות - מידע קריטי!
+  if (context.periodCoverage) {
+    const pc = context.periodCoverage;
+    parts.push(`
+## כיסוי תקופות
+- יש לי נתונים של: ${pc.totalMonths} חודשים מתוך ${pc.targetMonths} נדרשים
+- תקופה: ${pc.oldestDate || 'לא ידוע'} עד ${pc.newestDate || 'לא ידוע'}
+- חודשים שמכוסים: ${pc.coveredMonths.join(', ') || 'אין'}
+- *חודשים חסרים*: ${pc.missingMonths.join(', ') || 'אין - הכל מכוסה!'}`);
+  }
+
+  // 🆕 מסמכים חסרים - חשוב מאוד!
+  if (context.missingDocuments && context.missingDocuments.length > 0) {
+    parts.push(`
+## מסמכים חסרים (צריך לבקש מהמשתמש):`);
+    context.missingDocuments.forEach(doc => {
+      let docDesc = `- *${doc.type}*: ${doc.description}`;
+      if (doc.card_last_4) docDesc += ` (כרטיס ****${doc.card_last_4})`;
+      if (doc.period_start && doc.period_end) docDesc += ` לתקופה ${doc.period_start} - ${doc.period_end}`;
+      if (doc.expected_amount) docDesc += ` (סכום: ${doc.expected_amount.toLocaleString('he-IL')} ₪)`;
+      docDesc += ` [${doc.priority}]`;
+      parts.push(docDesc);
+    });
+    
+    parts.push(`
+**⚠️ חשוב:** בקש מהמשתמש את המסמכים החסרים כדי לקבל תמונה פיננסית מלאה!`);
   }
 
   return parts.join('\n');
