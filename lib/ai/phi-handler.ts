@@ -622,6 +622,20 @@ async function executePhiActions(
     
     try {
       switch (action.type) {
+        case 'save_user_name':
+          // 🆕 שמירת שם המשתמש
+          if (action.data?.name) {
+            await supabase
+              .from('users')
+              .update({ 
+                full_name: action.data.name,
+                current_phase: 'document_upload', // העבר לשלב הבא
+              })
+              .eq('id', context.userId);
+            console.log(`[φ Handler] ✅ User name saved: ${action.data.name}`);
+          }
+          break;
+          
         case 'save_transaction':
           if (action.data) {
             await supabase.from('transactions').insert({
