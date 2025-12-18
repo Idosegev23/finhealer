@@ -376,13 +376,14 @@ export async function POST(request: NextRequest) {
         console.log('🧠 Using φ Brain AI Orchestrator');
         
         try {
-          // שמירת הודעה נכנסת
+          // שמירת הודעה נכנסת - payload מכיל את כל המידע
           const { error: insertError } = await supabase.from('wa_messages').insert({
             user_id: userData.id,
             direction: 'incoming',
-            content: text,
-            message_type: 'text',
+            msg_type: 'text',
+            payload: { text, messageId, timestamp: new Date().toISOString() },
             status: 'delivered',
+            provider_msg_id: messageId,
           });
           
           if (insertError) {
@@ -418,8 +419,8 @@ export async function POST(request: NextRequest) {
             await supabase.from('wa_messages').insert({
               user_id: userData.id,
               direction: 'outgoing',
-              content: result.message,
-              message_type: 'text',
+              msg_type: 'text',
+              payload: { text: result.message, timestamp: new Date().toISOString() },
               status: 'delivered',
             });
           }

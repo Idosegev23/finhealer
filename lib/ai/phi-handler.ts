@@ -734,6 +734,22 @@ async function executePhiActions(
           }
           break;
           
+        case 'get_financial_summary':
+          // הסיכום הפיננסי כבר קיים ב-context.financial
+          console.log(`[φ Handler] 📊 Financial summary requested for period: ${action.data?.period}`);
+          // לא צריך לעשות כלום - ה-AI כבר קיבל את המידע ב-context
+          break;
+          
+        case 'request_document':
+          console.log(`[φ Handler] 📄 Document requested: ${action.data?.document_type}`);
+          // המידע כבר נכלל בהודעת ה-AI למשתמש
+          break;
+          
+        case 'calculate_phi_score':
+          console.log(`[φ Handler] 🎯 Phi score calculation requested`);
+          // TODO: implement phi score calculation
+          break;
+          
         case 'generate_chart':
           // הטיפול בגרף נעשה בנפרד ב-handleWithPhi
           console.log(`[φ Handler] 📊 Chart generation queued: ${action.data?.chart_description}`);

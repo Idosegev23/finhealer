@@ -749,10 +749,10 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
     .eq('id', userId)
     .single();
 
-  // טען היסטוריית שיחה
+  // טען היסטוריית שיחה - payload מכיל את התוכן
   const { data: messages, error: messagesError } = await supabase
     .from('wa_messages')
-    .select('direction, content, created_at')
+    .select('direction, payload, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(20);
@@ -767,8 +767,9 @@ export async function loadPhiContext(userId: string): Promise<PhiContext> {
     .reverse()
     .map(msg => ({
       role: (msg.direction === 'outgoing' ? 'assistant' : 'user') as 'user' | 'assistant',
-      content: msg.content,
-    }));
+      content: (msg.payload as { text?: string })?.text || '',
+    }))
+    .filter(msg => msg.content); // סנן הודעות ריקות
 
   // טען תנועות ממתינות לאישור (proposed = pending)
   const { data: pendingTx } = await supabase
