@@ -10,7 +10,8 @@ import { updateContext, loadContext } from '@/lib/conversation/context-manager';
 
 // 🆕 AI Orchestrator - Feature Flag
 const USE_PHI_BRAIN = process.env.USE_PHI_BRAIN === 'true';
-import { thinkAndRespond, executeActions, loadPhiContext } from '@/lib/ai/phi-brain';
+// Legacy phi-brain replaced by gpt52-client
+import { thinkWithPhi as thinkAndRespond, loadPhiContext } from '@/lib/ai/gpt52-client';
 import { handleWithPhi } from '@/lib/ai/phi-handler';
 
 // 🆕 הודעות מכינות לפני יצירת גרף

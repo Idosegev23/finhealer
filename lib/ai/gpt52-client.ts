@@ -79,9 +79,100 @@ export interface PhiAction {
 }
 
 // ============================================================================
-// System Prompt - הלב של הבינה המלאכותית
+// System Prompts - פרומפט קצר לכל שלב (Hybrid Architecture)
 // ============================================================================
 
+/**
+ * בארכיטקטורה החדשה:
+ * - Onboarding = State Machine קשיח (AI רק מנסח)
+ * - אחרי Onboarding = AI גמיש (Full AI)
+ * 
+ * לכן יש שני סוגי prompts:
+ * 1. SIMPLE_PROMPTS - לשלבי Onboarding (AI רק מנסח את הטקסט)
+ * 2. FULL_PROMPT - לאחרי Onboarding (AI מחליט הכל)
+ */
+
+// Prompts פשוטים לשלבי Onboarding - AI רק מנסח, לא מחליט
+export const SIMPLE_PROMPTS = {
+  // ברכת שם - אחרי שהמשתמש נתן שם
+  greet_name: `אתה φ (פי) - מאמן פיננסי ישראלי חם ואנושי.
+המשתמש זה עתה אמר לך את שמו: {{NAME}}
+משימתך: כתוב הודעת ברכה חמה והדרכה לשלב הבא.
+
+הודעתך חייבת לכלול:
+1. ברכה אישית עם השם
+2. הסבר שהצעד הראשון הוא לשלוח דוח עו״ש מהבנק (PDF)
+3. עידוד קצר
+
+דוגמה:
+"נעים מאוד *{{NAME}}*! 😊
+
+מעולה, אז בוא נתחיל.
+
+*הצעד הראשון:* שלח לי דוח עו״ש מהבנק שלך (PDF) של 3 חודשים אחרונים.
+אני אנתח את התנועות ונבנה את התמונה הפיננסית שלך 📊"
+
+כללים:
+- עברית טבעית וחמה
+- מקסימום 4-5 שורות
+- אימוג'י במידה
+- בולד = כוכבית אחת: *כך*`,
+
+  // בקשת מסמך - כשצריך לבקש מסמך
+  request_document: `אתה φ (פי) - מאמן פיננסי ישראלי.
+משימתך: בקש מהמשתמש {{DOCUMENT_TYPE}}.
+
+אם זה דוח בנק ראשון:
+"בוא נתחיל! 📊
+שלח לי דוח עו״ש מהבנק (PDF) של 3 חודשים אחרונים.
+זה יעזור לי להבין את התמונה הפיננסית שלך."
+
+אם זה דוח אשראי:
+"כדי לקבל תמונה מלאה, אני צריך גם את דוח האשראי שלך.
+שלח לי PDF של דוח כרטיס האשראי האחרון 💳"
+
+כללים:
+- קצר וברור
+- עידוד קל
+- לא ללחוץ`,
+
+  // אישור קבלת מסמך
+  document_received: `אתה φ (פי) - מאמן פיננסי ישראלי.
+קיבלת מסמך מהמשתמש {{NAME}}.
+{{DOCUMENT_INFO}}
+
+משימתך: כתוב הודעה קצרה שמאשרת קבלה ומעדכנת שאתה מנתח.
+
+דוגמה:
+"קיבלתי! 📄
+אני מנתח את הדוח... זה ייקח כמה שניות ⏳"
+
+כללים:
+- קצר מאוד (שורה-שתיים)
+- אימוג'י רלוונטי`,
+
+  // תחילת סיווג
+  start_classification: `אתה φ (פי) - מאמן פיננסי ישראלי.
+יש {{COUNT}} תנועות לסיווג עבור {{NAME}}.
+
+משימתך: הצג את התנועה הראשונה ושאל איך לסווג.
+
+דוגמה:
+"מצאתי {{COUNT}} תנועות! 🔍
+
+*התנועה הראשונה:*
+{{AMOUNT}} ₪ ב-*{{VENDOR}}*
+({{DATE}})
+
+זה *{{SUGGESTED_CATEGORY}}*?"
+
+כללים:
+- תנועה אחת בכל פעם
+- הצע קטגוריה אם אפשר
+- קצר וברור`,
+};
+
+// הפרומפט המלא - לאחרי Onboarding (AI גמיש)
 const PHI_SYSTEM_PROMPT = `אתה φ (פי) - מאמן פיננסי אישי ישראלי.
 
 ## מי אתה
@@ -732,10 +823,265 @@ function buildContextMessage(context: PhiContext): string {
 }
 
 // ============================================================================
+// Simple Prompt Function - לשלבי Onboarding
+// ============================================================================
+
+/**
+ * פונקציה פשוטה לניסוח הודעות בשלבי Onboarding
+ * AI רק מנסח את הטקסט - לא מחליט!
+ */
+export async function generateSimpleMessage(
+  promptKey: keyof typeof SIMPLE_PROMPTS,
+  variables: Record<string, string>
+): Promise<string> {
+  let prompt = SIMPLE_PROMPTS[promptKey];
+  
+  // החלפת משתנים
+  for (const [key, value] of Object.entries(variables)) {
+    prompt = prompt.replace(new RegExp(`{{${key}}}`, 'g'), value);
+  }
+  
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini', // מודל קל וזול לניסוח
+      messages: [
+        { role: 'system', content: prompt },
+        { role: 'user', content: 'כתוב את ההודעה' },
+      ],
+      max_tokens: 300,
+      temperature: 0.7,
+    });
+    
+    return completion.choices[0].message.content || '';
+  } catch (error) {
+    console.error('[Simple Prompt] Error:', error);
+    // Fallback - טקסט קבוע
+    return getFallbackMessage(promptKey, variables);
+  }
+}
+
+/**
+ * הודעות fallback קבועות במקרה של שגיאה
+ */
+function getFallbackMessage(
+  promptKey: keyof typeof SIMPLE_PROMPTS,
+  variables: Record<string, string>
+): string {
+  switch (promptKey) {
+    case 'greet_name':
+      return `נעים מאוד *${variables.NAME}*! 😊\n\n*הצעד הראשון:* שלח לי דוח עו״ש מהבנק (PDF) של 3 חודשים אחרונים 📊`;
+    case 'request_document':
+      return `בוא נתחיל! 📊\nשלח לי ${variables.DOCUMENT_TYPE} בבקשה.`;
+    case 'document_received':
+      return `קיבלתי! 📄 אני מנתח את המסמך...`;
+    case 'start_classification':
+      return `מצאתי ${variables.COUNT} תנועות! 🔍\n\nבוא נסווג אותן יחד.`;
+    default:
+      return 'היי! איך אפשר לעזור? 😊';
+  }
+}
+
+// ============================================================================
+// Context Loader - נפגש מ-phi-brain.ts
+// ============================================================================
+
+/**
+ * טוען את כל ה-context הנדרש ל-AI
+ */
+export async function loadPhiContext(userId: string): Promise<PhiContext> {
+  const { createServiceClient } = await import('@/lib/supabase/server');
+  const supabase = createServiceClient();
+
+  // טען פרטי משתמש
+  const { data: user } = await supabase
+    .from('users')
+    .select('id, phone, full_name, current_phase')
+    .eq('id', userId)
+    .single();
+
+  // טען היסטוריית שיחה - payload מכיל את התוכן
+  const { data: messages, error: messagesError } = await supabase
+    .from('wa_messages')
+    .select('direction, payload, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (messagesError) {
+    console.error('[φ Context] Error loading messages:', messagesError);
+  } else {
+    console.log('[φ Context] Messages loaded:', messages?.length || 0, 'messages');
+  }
+
+  const conversationHistory = (messages || [])
+    .reverse()
+    .map(msg => {
+      const payload = msg.payload as Record<string, unknown>;
+      // תמיכה בפורמטים שונים של payload
+      let content = '';
+      if (payload?.message) {
+        // הודעה יוצאת מ-wa/send
+        content = payload.message as string;
+      } else if (payload?.text) {
+        // הודעה נכנסת עם text
+        content = payload.text as string;
+      } else if (payload?.messageData) {
+        // הודעה נכנסת מ-GreenAPI webhook
+        const messageData = payload.messageData as Record<string, unknown>;
+        content = (messageData.textMessage as string) || 
+                  ((messageData.fileMessageData as Record<string, unknown>)?.caption as string) || '';
+      }
+      return {
+        role: (msg.direction === 'outgoing' ? 'assistant' : 'user') as 'user' | 'assistant',
+        content,
+      };
+    })
+    .filter(msg => msg.content); // סנן הודעות ריקות
+
+  // טען תנועות ממתינות לאישור (proposed = pending)
+  const { data: pendingTx } = await supabase
+    .from('transactions')
+    .select('id, vendor, amount, type, tx_date, status, category')
+    .eq('user_id', userId)
+    .eq('status', 'proposed')
+    .order('tx_date', { ascending: false })
+    .limit(50);
+
+  // טען סטטיסטיקות
+  const { data: stats } = await supabase
+    .from('transactions')
+    .select('amount, type, status')
+    .eq('user_id', userId);
+
+  let financialData: PhiContext['financialData'];
+  if (stats && stats.length > 0) {
+    const totalIncome = stats
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalExpenses = stats
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    const pendingCount = stats.filter(t => t.status === 'proposed').length;
+
+    // קיבוץ לפי קטגוריה
+    const categories: Record<string, number> = {};
+    stats
+      .filter(t => t.type === 'expense')
+      .forEach(t => {
+        const cat = (t as unknown as { category?: string }).category || 'אחר';
+        categories[cat] = (categories[cat] || 0) + Number(t.amount);
+      });
+
+    financialData = {
+      totalIncome,
+      totalExpenses,
+      balance: totalIncome - totalExpenses,
+      pendingTransactions: pendingCount,
+      categories,
+      monthlyTrends: [], // ימולא בהמשך
+    };
+  }
+
+  // 🆕 טען מסמכים חסרים
+  const { data: missingDocs } = await supabase
+    .from('missing_documents')
+    .select('document_type, description, priority, card_last_4, period_start, period_end, expected_amount')
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .order('priority', { ascending: false })
+    .limit(10);
+
+  // 🆕 חשב כיסוי תקופות מהתנועות
+  const { data: dateRange } = await supabase
+    .from('transactions')
+    .select('tx_date')
+    .eq('user_id', userId)
+    .order('tx_date', { ascending: true });
+
+  let periodCoverage: PhiContext['periodCoverage'];
+  if (dateRange && dateRange.length > 0) {
+    const dates = dateRange.map(d => d.tx_date).filter(Boolean);
+    const oldestDate = dates[0];
+    const newestDate = dates[dates.length - 1];
+    
+    // חשב חודשים מכוסים
+    const coveredMonthsSet = new Set<string>();
+    dates.forEach(d => {
+      const date = new Date(d);
+      coveredMonthsSet.add(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+    });
+    
+    // חשב חודשים חסרים (3 חודשים אחרונים)
+    const targetMonths = 3;
+    const now = new Date();
+    const allTargetMonths: string[] = [];
+    for (let i = 0; i < targetMonths; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      allTargetMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    
+    const coveredMonths = Array.from(coveredMonthsSet);
+    const missingMonths = allTargetMonths.filter(m => !coveredMonthsSet.has(m));
+    
+    periodCoverage = {
+      totalMonths: coveredMonthsSet.size,
+      targetMonths,
+      coveredMonths,
+      missingMonths,
+      oldestDate,
+      newestDate,
+    };
+  }
+
+  const context: PhiContext = {
+    userId,
+    userName: user?.full_name || '',
+    phone: user?.phone || '',
+    currentPhase: user?.current_phase || 'onboarding',
+    conversationHistory,
+    financialData,
+    pendingTransactions: (pendingTx || []).map(tx => ({
+      id: tx.id,
+      vendor: tx.vendor || '',
+      amount: tx.amount,
+      type: tx.type as 'income' | 'expense',
+      date: tx.tx_date || new Date().toISOString(),
+      category: tx.category,
+    })),
+    // 🆕 מידע על מסמכים חסרים וכיסוי תקופות
+    missingDocuments: (missingDocs || []).map(doc => ({
+      type: doc.document_type,
+      description: doc.description || '',
+      priority: doc.priority === 10 ? 'high' : doc.priority >= 5 ? 'medium' : 'low',
+      card_last_4: doc.card_last_4,
+      period_start: doc.period_start,
+      period_end: doc.period_end,
+      expected_amount: doc.expected_amount,
+    })),
+    periodCoverage,
+  };
+  
+  console.log('[φ Context] Context loaded:', {
+    userName: context.userName,
+    phase: context.currentPhase,
+    historyLength: context.conversationHistory?.length || 0,
+    pendingTx: context.pendingTransactions?.length || 0,
+    financial: context.financialData ? 'loaded' : 'none',
+    missingDocs: context.missingDocuments?.length || 0,
+    periodCoverage: context.periodCoverage ? `${context.periodCoverage.totalMonths}/${context.periodCoverage.targetMonths} months` : 'none',
+  });
+  
+  return context;
+}
+
+// ============================================================================
 // Export
 // ============================================================================
 
 export default {
   thinkWithPhi,
+  generateSimpleMessage,
+  loadPhiContext,
+  SIMPLE_PROMPTS,
 };
 

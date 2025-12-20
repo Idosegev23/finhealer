@@ -8,7 +8,8 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { NextRequest, NextResponse } from 'next/server';
-import { thinkAndRespond, executeActions, loadPhiContext } from '@/lib/ai/phi-brain';
+// Legacy phi-brain replaced by gpt52-client
+import { thinkWithPhi as thinkAndRespond, loadPhiContext } from '@/lib/ai/gpt52-client';
 
 // ============================================================================
 // Webhook Handler

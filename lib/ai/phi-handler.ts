@@ -1,11 +1,12 @@
 /**
- * φ Handler - מטפל בהודעות WhatsApp עם AI-first approach
+ * φ Handler - Hybrid State Machine + AI
  * 
- * כל ההחלטות מתקבלות ע"י AI עם context מלא
+ * עקרון מפתח:
+ * - Onboarding = קשיח (State Machine מחליט על הפעולה, AI רק מנסח)
+ * - אחרי Onboarding = גמיש (AI מחליט הכל)
  */
 
-import { thinkWithPhi, type PhiContext, type PhiAction, type PhiResponse } from './gpt52-client';
-import { loadPhiContext } from './phi-brain';
+import { thinkWithPhi, loadPhiContext, type PhiContext, type PhiAction, type PhiResponse } from './gpt52-client';
 import { createServiceClient } from '@/lib/supabase/server';
 import {
   generateChart,
@@ -18,6 +19,14 @@ import type {
   PhiScoreData,
   MonthlySummaryData,
 } from './chart-prompts';
+import {
+  PhiStateManager,
+  loadStateContext,
+  saveStateContext,
+  saveUserName,
+  type ConversationPhase,
+  type StateAction,
+} from '@/lib/conversation/state-manager';
 
 // Feature flag - האם להשתמש ב-AI Orchestrator
 const USE_AI_ORCHESTRATOR = process.env.USE_AI_ORCHESTRATOR === 'true';
@@ -30,39 +39,141 @@ export interface PhiHandlerResult {
 }
 
 /**
- * טיפול בהודעת טקסט עם AI Orchestrator
+ * טיפול בהודעת טקסט - Hybrid State Machine + AI
  * 
- * Agent Loop פשוט:
- * 1. הודעה נכנסת
- * 2. AI מבין ומחליט (tool calls + הודעה)
- * 3. מבצעים את הפעולות
- * 4. אם אין הודעה - AI ממשיך עד שמחזיר הודעה
- * 5. שולחים את ההודעה למשתמש
+ * Flow:
+ * 1. טען state context
+ * 2. בדוק אם state קשיח (onboarding) או גמיש
+ * 3. אם קשיח → State Machine מחליט, AI רק מנסח
+ * 4. אם גמיש → AI מחליט הכל
  */
 export async function handleWithPhi(
   userId: string,
   userMessage: string,
   phoneNumber: string
 ): Promise<PhiHandlerResult> {
-  console.log('[φ Handler] 🧠 AI processing message...');
+  console.log('[φ Handler] 🧠 Processing message...');
 
-  // 1. טען context מלא
+  // 1. טען state context
+  const stateCtx = await loadStateContext(userId);
+  console.log(`[φ Handler] State: ${stateCtx.currentState}, User: ${stateCtx.userName || 'unknown'}`);
+  
+  // 2. צור State Manager
+  const stateManager = new PhiStateManager(stateCtx);
+  
+  // 3. עבד את ההודעה לפי ה-state
+  const transition = stateManager.processMessage(userMessage);
+  console.log(`[φ Handler] Transition: ${stateCtx.currentState} → ${transition.newState}, Action: ${transition.action.type}`);
+  
+  // 4. בצע את הפעולה
+  let finalMessage = '';
+  let allActions: PhiAction[] = [];
+  let imageToSend: GeneratedImage | undefined;
+  
+  switch (transition.action.type) {
+    case 'send_message':
+      // הודעה קבועה מה-State Machine
+      finalMessage = transition.action.message;
+      break;
+      
+    case 'save_name':
+      // שמור שם ושלח הודעת הדרכה
+      await saveUserName(userId, transition.action.name);
+      finalMessage = getNameReceivedMessage(transition.action.name);
+      allActions.push({ type: 'save_user_name', data: { name: transition.action.name } });
+      break;
+      
+    case 'request_document':
+      finalMessage = `📄 שלח לי דוח עו״ש מהבנק (PDF) של 3 חודשים אחרונים.\n\n💡 *טיפ:* אפשר להוריד מהאפליקציה או מאתר הבנק`;
+      break;
+      
+    case 'start_classification':
+      // התחל תהליך סיווג
+      finalMessage = `מעולה! 🎯\n\nיש לי ${stateCtx.pendingTransactionCount} תנועות לסיווג.\nבוא נעבור עליהן ביחד.\n\nמוכן להתחיל?`;
+      break;
+      
+    case 'ai_decide':
+      // AI מחליט - השתמש בלוגיקה המקורית
+      const result = await handleWithAI(userId, userMessage, transition.aiPrompt);
+      finalMessage = result.message;
+      allActions = result.actions;
+      imageToSend = result.imageToSend;
+      break;
+      
+    case 'none':
+      // אין פעולה מיוחדת - AI מחליט
+      const aiResult = await handleWithAI(userId, userMessage, stateManager.getAIPrompt());
+      finalMessage = aiResult.message;
+      allActions = aiResult.actions;
+      imageToSend = aiResult.imageToSend;
+      break;
+  }
+  
+  // 5. שמור state חדש
+  if (transition.newState !== stateCtx.currentState) {
+    await saveStateContext(userId, transition.newState);
+    console.log(`[φ Handler] State saved: ${transition.newState}`);
+  }
+  
+  // 6. שמור הודעות ביומן
+  await saveMessage(userId, 'incoming', userMessage);
+  await saveMessage(userId, 'outgoing', finalMessage);
+  
+  console.log('[φ Handler] ✅ Done:', { message: finalMessage.substring(0, 50), actions: allActions.length });
+  
+  return {
+    message: finalMessage,
+    actions: allActions,
+    shouldWaitForResponse: true,
+    imageToSend,
+  };
+}
+
+/**
+ * הודעה אחרי קבלת שם - קבועה ומובנית
+ */
+function getNameReceivedMessage(name: string): string {
+  return `נעים מאוד *${name}*! 😊
+
+מעולה, אז בוא נתחיל.
+
+*הצעד הראשון:*
+שלח לי דוח עו״ש מהבנק שלך (PDF) של 3 חודשים אחרונים.
+
+אני אנתח את התנועות ונתחיל לבנות את התמונה הפיננסית שלך 📊
+
+💡 *טיפ:* אפשר להוריד את הדוח מהאפליקציה או מהאתר של הבנק`;
+}
+
+/**
+ * טיפול עם AI - לשימוש כש-State Machine מחליט שAI צריך לענות
+ */
+async function handleWithAI(
+  userId: string,
+  userMessage: string,
+  customPrompt?: string
+): Promise<{ message: string; actions: PhiAction[]; imageToSend?: GeneratedImage }> {
+  // טען context מלא
   let context = await loadPhiContext(userId);
   
-  // 2. Agent Loop - ממשיך עד שיש הודעה סופית
+  // הוסף prompt מיוחד אם יש
+  let messageToSend = userMessage;
+  if (customPrompt) {
+    messageToSend = `[הנחיה: ${customPrompt}]\n\nהודעת המשתמש: ${userMessage}`;
+  }
+  
+  // Agent Loop
   let finalMessage = '';
   let allActions: PhiAction[] = [];
   let imageToSend: GeneratedImage | undefined;
   let iterations = 0;
-  const MAX_ITERATIONS = 3; // מניעת לולאה אינסופית
+  const MAX_ITERATIONS = 3;
   
   while (!finalMessage && iterations < MAX_ITERATIONS) {
     iterations++;
-    console.log(`[φ Handler] Iteration ${iterations}...`);
     
-    // שלח ל-AI
     const response = await thinkWithPhi(
-      iterations === 1 ? userMessage : '[המשך - צריך הודעה למשתמש]',
+      iterations === 1 ? messageToSend : '[המשך - צריך הודעה למשתמש]',
       context
     );
     
@@ -70,27 +181,23 @@ export async function handleWithPhi(
     if (response.actions.length > 0) {
       allActions.push(...response.actions);
       
-      // בצע פעולות
       for (const action of response.actions) {
         console.log(`[φ Handler] Executing: ${action.type}`);
         await executeSingleAction(action, context);
         
-        // עדכן context אם שמרנו שם
         if (action.type === 'save_user_name' && action.data?.name) {
           context = { ...context, userName: action.data.name as string };
         }
       }
     }
     
-    // בדוק אם יש הודעה
     if (response.message) {
       finalMessage = response.message;
     }
     
-    // בדוק אם צריך גרף
+    // בדוק גרף
     const chartAction = response.actions.find(a => a.type === 'generate_chart');
     if (chartAction && chartAction.data && !imageToSend) {
-      console.log('[φ Handler] 🎨 Generating chart...');
       try {
         imageToSend = await handleChartGeneration(
           chartAction.data.chartType as string || chartAction.data.chart_description as string,
@@ -104,26 +211,14 @@ export async function handleWithPhi(
     }
   }
   
-  // Fallback אם עדיין אין הודעה
+  // Fallback
   if (!finalMessage) {
-    console.log('[φ Handler] No message after iterations, using fallback');
     finalMessage = context.userName 
       ? `היי ${context.userName}! איך אני יכול לעזור? 😊`
-      : 'היי! אני φ - המאמן הפיננסי שלך 😊 מה שמך?';
+      : 'היי! מה שמך? 😊';
   }
   
-  // שמור ביומן
-  await saveMessage(userId, 'incoming', userMessage);
-  await saveMessage(userId, 'outgoing', finalMessage);
-  
-  console.log('[φ Handler] ✅ Done:', { message: finalMessage.substring(0, 50), actions: allActions.length });
-  
-  return {
-    message: finalMessage,
-    actions: allActions,
-    shouldWaitForResponse: true,
-    imageToSend,
-  };
+  return { message: finalMessage, actions: allActions, imageToSend };
 }
 
 /**
@@ -277,6 +372,8 @@ export function shouldUsePhiOrchestrator(): boolean {
 
 /**
  * שמירת הודעה ביומן
+ * 
+ * wa_messages משתמש ב-payload (JSONB) לשמירת תוכן ההודעה
  */
 async function saveMessage(
   userId: string,
@@ -286,17 +383,24 @@ async function saveMessage(
   const supabase = createServiceClient();
   
   try {
-    await supabase
+    const { error } = await supabase
       .from('wa_messages')
       .insert({
         user_id: userId,
         direction,
-        content,
+        // payload הוא JSONB - שמור את התוכן בתוכו
+        payload: { text: content },
         message_type: 'text',
         status: 'delivered',
       });
+      
+    if (error) {
+      console.error('[φ Handler] Error saving message:', error);
+    } else {
+      console.log(`[φ Handler] ✅ Message saved: ${direction} - ${content.substring(0, 50)}...`);
+    }
   } catch (error) {
-    console.error('[φ Handler] Error saving message:', error);
+    console.error('[φ Handler] Exception saving message:', error);
   }
 }
 
