@@ -88,8 +88,25 @@ export async function handleWithPhi(
       break;
       
     case 'start_classification':
-      // התחל תהליך סיווג
-      finalMessage = `מעולה! 🎯\n\nיש לי ${stateCtx.pendingTransactionCount} תנועות לסיווג.\nבוא נעבור עליהן ביחד.\n\nמוכן להתחיל?`;
+      // התחל תהליך סיווג - הצג את התנועה הראשונה מיד!
+      const classificationResult = await handleWithAI(
+        userId, 
+        userMessage, 
+        `המשתמש ${stateCtx.userName || 'חבר'} רוצה להתחיל לסווג תנועות!
+יש ${stateCtx.pendingTransactionCount} תנועות ממתינות.
+הצג את התנועה הראשונה והצע קטגוריה לסיווג.
+תציג תנועה אחת בכל פעם, בפורמט:
+"*התנועה הראשונה:*
+💳 AMOUNT ₪ ב-*VENDOR*
+(DATE)
+
+זה *CATEGORY*?"
+
+אם יש תנועות דומות, אפשר להציע לסווג אותן ביחד.`
+      );
+      finalMessage = classificationResult.message || `מעולה! 🎯\n\nיש לי ${stateCtx.pendingTransactionCount} תנועות לסיווג.\nבוא נתחיל!`;
+      allActions = classificationResult.actions;
+      imageToSend = classificationResult.imageToSend;
       break;
       
     case 'ai_decide':

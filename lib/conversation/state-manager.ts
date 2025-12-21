@@ -161,12 +161,26 @@ const STATE_DEFINITIONS: Record<OnboardingState | 'flexible', StateDefinition> =
     aiPrompt: `אנחנו מחכים שהמשתמש ישלח מסמך. אם הוא כותב משהו - ענה בקצרה והזכר שאתה מחכה לדוח בנק.`,
     
     onMessage: (ctx, message) => {
-      // כל הודעת טקסט בזמן המתנה למסמך
+      const lowerMessage = message.trim().toLowerCase();
+      
+      // 🆕 אם המשתמש כותב "נמשיך" ויש תנועות ממתינות - התחל סיווג!
+      const continueKeywords = ['נמשיך', 'להמשיך', 'המשך', 'קדימה', 'יאללה', 'בוא נתחיל', 'מתחילים'];
+      const wantsToContinue = continueKeywords.some(kw => lowerMessage.includes(kw));
+      
+      if (wantsToContinue && ctx.hasPendingTransactions) {
+        return {
+          newState: 'classification',
+          action: { type: 'start_classification' },
+        };
+      }
+      
+      // כל הודעת טקסט אחרת בזמן המתנה למסמך
       return {
         newState: 'waiting_for_document',
         action: { type: 'ai_decide' },
         aiPrompt: `המשתמש ${ctx.userName || 'חבר'} כתב: "${message}"
-אנחנו מחכים למסמך ראשון שלו. ענה על מה שהוא אמר בקצרה והזכר לו לשלוח דוח עו״ש.`,
+אנחנו מחכים למסמך. יש ${ctx.pendingTransactionCount} תנועות ממתינות לסיווג.
+${ctx.hasPendingTransactions ? 'אם הוא רוצה להמשיך לסווג - תתחיל לסווג.' : 'הזכר לו לשלוח דוח עו״ש.'}`,
       };
     },
     
@@ -212,10 +226,29 @@ const STATE_DEFINITIONS: Record<OnboardingState | 'flexible', StateDefinition> =
     isRigid: false,  // כאן AI יותר גמיש
     aiPrompt: `אנחנו בשלב סיווג תנועות. עזור למשתמש לסווג את התנועות שלו.`,
     
-    onMessage: (ctx, message) => ({
-      newState: 'classification',
-      action: { type: 'ai_decide' },
-    }),
+    onMessage: (ctx, message) => {
+      const lowerMessage = message.trim().toLowerCase();
+      
+      // זיהוי "נמשיך" או "מתחילים" - התחל להציג תנועות
+      const startKeywords = ['נמשיך', 'להמשיך', 'המשך', 'קדימה', 'יאללה', 'בוא נתחיל', 'מתחילים', 'כן', 'מוכן'];
+      const wantsToStart = startKeywords.some(kw => lowerMessage.includes(kw));
+      
+      if (wantsToStart && ctx.hasPendingTransactions) {
+        return {
+          newState: 'classification',
+          action: { type: 'start_classification' },
+        };
+      }
+      
+      // AI יטפל בשאר
+      return {
+        newState: 'classification',
+        action: { type: 'ai_decide' },
+        aiPrompt: `המשתמש ${ctx.userName || 'חבר'} כתב: "${message}"
+יש ${ctx.pendingTransactionCount} תנועות ממתינות לסיווג.
+עזור לו לסווג - הצג תנועה והצע קטגוריה.`,
+      };
+    },
     
     onDocument: (ctx) => ({
       newState: 'document_received',
@@ -441,16 +474,16 @@ export async function loadStateContext(userId: string): Promise<StateContext> {
   
   // טען ספירת מסמכים
   const { count: docCount } = await supabase
-    .from('uploaded_documents')
+    .from('uploaded_statements')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId);
   
-  // טען ספירת תנועות ממתינות
+  // טען ספירת תנועות ממתינות (status = proposed)
   const { count: pendingCount } = await supabase
     .from('transactions')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('status', 'pending');
+    .eq('status', 'proposed');
   
   // קביעת ה-state
   let currentState: ConversationPhase = 'start';
