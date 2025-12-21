@@ -407,7 +407,7 @@ async function saveMessage(
         direction,
         // payload הוא JSONB - שמור את התוכן בתוכו
         payload: { text: content },
-        message_type: 'text',
+        msg_type: 'text',
         status: 'delivered',
       });
       

@@ -1372,12 +1372,18 @@ export async function POST(request: NextRequest) {
           // 🆕 שמירת התנועות ב-pending לסיווג אינטראקטיבי
           const pendingBatchId = `batch_${Date.now()}_${userData.id.substring(0, 8)}`;
           const insertedIds: string[] = [];
+          const insertErrors: any[] = [];
+          
+          console.log(`💾 Saving ${allTransactions.length} transactions with batch_id: ${pendingBatchId}`);
           
           for (const tx of allTransactions) {
             const txDate = tx.date || new Date().toISOString().split('T')[0];
             const txType = tx.type || 'expense';
+            // 🔧 FIX: category חובה - נשתמש בקטגוריה מה-AI או ברירת מחדל
+            const category = tx.expense_category || tx.income_category || tx.category || 
+              (txType === 'income' ? 'הכנסה אחרת' : 'הוצאה אחרת');
             
-            const { data: inserted } = await (supabase as any)
+            const { data: inserted, error: insertError } = await (supabase as any)
               .from('transactions')
               .insert({
                 user_id: userData.id,
@@ -1386,24 +1392,31 @@ export async function POST(request: NextRequest) {
                 vendor: tx.vendor,
                 date: txDate,
                 tx_date: txDate,
-                category: tx.category || 'other',
+                category: category,
                 expense_category: tx.expense_category || tx.income_category || null,
                 expense_type: tx.expense_type || (txType === 'income' ? null : 'variable'),
                 payment_method: tx.payment_method || (documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
                 source: 'ocr',
-                status: 'pending',
+                status: 'proposed', // 🔧 FIX: שונה מ-pending ל-proposed (תואם לסיווג)
                 notes: tx.notes || tx.description || '',
                 original_description: tx.description || '',
-                auto_categorized: !!tx.expense_category,  // true רק אם יש כבר קטגוריה
+                auto_categorized: !!tx.expense_category,
                 confidence_score: tx.confidence || 0.5,
                 batch_id: pendingBatchId,
               })
               .select('id')
               .single();
             
-            if (inserted?.id) {
+            if (insertError) {
+              insertErrors.push({ vendor: tx.vendor, error: insertError.message });
+            } else if (inserted?.id) {
               insertedIds.push(inserted.id);
             }
+          }
+          
+          console.log(`✅ Saved ${insertedIds.length}/${allTransactions.length} transactions`);
+          if (insertErrors.length > 0) {
+            console.error(`❌ ${insertErrors.length} transaction insert errors:`, insertErrors.slice(0, 3));
           }
           
           // חישוב סיכומים
@@ -1437,6 +1450,7 @@ export async function POST(request: NextRequest) {
               .insert({
                 user_id: userData.id,
                 file_name: fileName,
+                file_url: downloadUrl, // 🔧 FIX: חובה - URL המסמך המקורי
                 file_type: documentType === 'credit' ? 'credit_statement' : 'bank_statement',
                 document_type: documentType,
                 status: 'completed',
@@ -1458,6 +1472,16 @@ export async function POST(request: NextRequest) {
                 .from('transactions')
                 .update({ document_id: docRecord.id })
                 .eq('batch_id', pendingBatchId);
+              
+              // 🔧 FIX: עדכון ה-state ל-classification אחרי קבלת מסמך
+              await (supabase as any)
+                .from('users')
+                .update({ 
+                  onboarding_state: 'classification',
+                  current_phase: 'classification'
+                })
+                .eq('id', userData.id);
+              console.log(`✅ User state updated to classification`);
             }
           } else {
             console.warn('⚠️ No period detected - document will not be saved');
