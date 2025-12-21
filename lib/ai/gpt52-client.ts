@@ -60,6 +60,14 @@ export interface PhiContext {
     oldestDate?: string;
     newestDate?: string;
   };
+  // מידע על התקדמות סיווג
+  classificationProgress?: {
+    done: number;
+    total: number;
+    highConfidenceCount: number;
+    lowConfidenceCount: number;
+  };
+  classificationSession?: Record<string, unknown>;
 }
 
 export interface PhiResponse {

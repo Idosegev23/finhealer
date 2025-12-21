@@ -8,8 +8,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { NextRequest, NextResponse } from 'next/server';
-// Legacy phi-brain replaced by gpt52-client
-import { thinkWithPhi as thinkAndRespond, loadPhiContext } from '@/lib/ai/gpt52-client';
+import { handleWithPhi } from '@/lib/ai/phi-handler';
 
 // ============================================================================
 // Webhook Handler
@@ -60,6 +59,7 @@ export async function POST(request: NextRequest) {
         .insert({
           phone: phoneNumber,
           current_phase: 'onboarding',
+          onboarding_state: 'start',
         })
         .select()
         .single();
@@ -69,13 +69,15 @@ export async function POST(request: NextRequest) {
       }
 
       // הודעת פתיחה למשתמש חדש
-      const context = await loadPhiContext(newUser.id);
-      const response = await thinkAndRespond('משתמש חדש מצטרף', context);
+      const welcomeMessage = getDefaultWelcome();
       
       await greenAPI.sendMessage({
         phoneNumber,
-        message: response.message || getDefaultWelcome(),
+        message: welcomeMessage,
       });
+
+      // שמור הודעה יוצאת
+      await saveMessage(supabase, newUser.id, 'outgoing', welcomeMessage);
 
       return NextResponse.json({ status: 'new_user', message: 'Welcome sent' });
     }
@@ -90,49 +92,50 @@ export async function POST(request: NextRequest) {
       // שמירת הודעה נכנסת
       await saveMessage(supabase, userData.id, 'incoming', text);
 
-      // 🧠 AI חושב ומחליט
-      const context = await loadPhiContext(userData.id);
-      const response = await thinkAndRespond(text, context);
+      // 🧠 השתמש ב-Hybrid State Machine + AI Handler
+      const result = await handleWithPhi(userData.id, text, phoneNumber);
 
-      // ביצוע פעולות
-      if (response.actions.length > 0) {
-        await executeActions(response.actions, context);
-        console.log('[φ Webhook] Executed actions:', response.actions.map(a => a.type));
+      // שליחת תמונה אם יש
+      if (result.imageToSend) {
+        await greenAPI.sendImage({
+          phoneNumber,
+          imageBase64: result.imageToSend.base64,
+          caption: result.imageToSend.description || '',
+          mimeType: result.imageToSend.mimeType,
+        });
       }
 
-      // שליחת תשובה
-      if (response.message) {
+      // שליחת תשובה טקסטואלית
+      if (result.message) {
         await greenAPI.sendMessage({
           phoneNumber,
-          message: response.message,
+          message: result.message,
         });
 
         // שמירת הודעה יוצאת
-        await saveMessage(supabase, userData.id, 'outgoing', response.message);
+        await saveMessage(supabase, userData.id, 'outgoing', result.message);
       }
 
       return NextResponse.json({
         status: 'success',
-        actions: response.actions.map(a => a.type),
-        waitingForResponse: response.shouldWaitForResponse,
+        actions: result.actions.map(a => a.type),
+        waitingForResponse: result.shouldWaitForResponse,
       });
     }
 
     // טיפול במסמכים (PDF/תמונה)
     if (messageType === 'documentMessage' || messageType === 'imageMessage') {
-      const context = await loadPhiContext(userData.id);
+      const docType = messageType === 'documentMessage' ? 'מסמך' : 'תמונה';
       
       // הודעה שקיבלנו מסמך
-      const docType = messageType === 'documentMessage' ? 'מסמך' : 'תמונה';
-      const response = await thinkAndRespond(
-        `המשתמש שלח ${docType}. עדכן אותו שקיבלת ושאתה מתחיל לנתח.`,
-        context
-      );
+      const ackMessage = `קיבלתי את ה${docType}! 📄 מתחיל לנתח...`;
 
       await greenAPI.sendMessage({
         phoneNumber,
-        message: response.message || `קיבלתי את ה${docType}! 📄 מתחיל לנתח...`,
+        message: ackMessage,
       });
+
+      await saveMessage(supabase, userData.id, 'outgoing', ackMessage);
 
       // כאן יתווסף הטיפול במסמך בפועל
       // TODO: Process document with existing logic
@@ -165,8 +168,8 @@ async function saveMessage(
     await supabase.from('wa_messages').insert({
       user_id: userId,
       direction,
-      content,
-      message_type: 'text',
+      payload: { text: content }, // wa_messages uses JSONB payload, not content
+      msg_type: 'text',
       status: 'delivered',
     });
   } catch (error) {
