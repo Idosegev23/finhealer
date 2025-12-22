@@ -42,12 +42,16 @@ export interface PhiAction {
 }
 
 // ============================================================================
-// OpenAI Client
+// OpenAI Client - Using GPT-5.2 with Responses API
 // ============================================================================
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// GPT-5.2 הוא המודל החדש ביותר עם Responses API
+const MODEL = 'gpt-5.2';
+const FALLBACK_MODEL = 'gpt-4o';
 
 // ============================================================================
 // Main Handler - AI-First Approach
@@ -135,22 +139,49 @@ export async function handleWithPhi(
 }
 
 // ============================================================================
-// AI Call
+// AI Call - GPT-5.2 Responses API with fallback to GPT-4o
 // ============================================================================
 
 async function callAI(systemPrompt: string, userMessage: string): Promise<string> {
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage },
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.7,
-    max_tokens: 1000,
-  });
-  
-  return completion.choices[0]?.message?.content || '{}';
+  try {
+    // נסה GPT-5.2 עם Responses API
+    console.log('[φ Handler] Calling GPT-5.2 with Responses API...');
+    
+    const response = await openai.responses.create({
+      model: MODEL,
+      instructions: systemPrompt,
+      input: userMessage,
+      text: {
+        format: {
+          type: 'json_object',
+        },
+      },
+    });
+    
+    console.log('[φ Handler] GPT-5.2 response received');
+    
+    // חילוץ התוכן מהתגובה
+    const content = response.output_text || '';
+    return content;
+    
+  } catch (error) {
+    console.warn('[φ Handler] GPT-5.2 failed, falling back to GPT-4o:', (error as Error).message);
+    
+    // Fallback ל-GPT-4o עם Chat Completions API
+    const completion = await openai.chat.completions.create({
+      model: FALLBACK_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+      max_tokens: 1000,
+    });
+    
+    console.log('[φ Handler] GPT-4o fallback response received');
+    return completion.choices[0]?.message?.content || '{}';
+  }
 }
 
 // ============================================================================
