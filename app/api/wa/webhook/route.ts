@@ -343,27 +343,24 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // טיפול בלחיצה על כפתור
+    // 🆕 טיפול בלחיצה על כפתור - מעביר ל-Rigid Router
     if (messageType === 'buttonsResponseMessage') {
       const buttonId = payload.messageData?.buttonsResponseMessage?.buttonId || '';
       const buttonText = payload.messageData?.buttonsResponseMessage?.buttonText || '';
       
       console.log('🔘 Button pressed:', buttonId, buttonText);
 
-      // טיפול לפי סוג הכפתור
-      if (buttonId.startsWith('confirm_')) {
-        const transactionId = buttonId.replace('confirm_', '');
-        await handleConfirmTransaction(supabase, userData.id, transactionId, phoneNumber);
-      } else if (buttonId.startsWith('edit_')) {
-        const transactionId = buttonId.replace('edit_', '');
-        await handleEditTransaction(supabase, userData.id, transactionId, phoneNumber);
-      } else if (buttonId.startsWith('category_')) {
-        const [_, transactionId, categoryId] = buttonId.split('_');
-        await handleCategorySelection(supabase, userData.id, transactionId, categoryId, phoneNumber);
-      } else if (buttonId.startsWith('split_')) {
-        const transactionId = buttonId.replace('split_', '');
-        await handleSplitTransaction(supabase, userData.id, transactionId, phoneNumber);
-      }
+      // 🎯 מעביר ל-Rigid Router כטקסט רגיל
+      // הכפתורים שולחים: cat_מזון_וסופר, skip
+      const { routeMessage } = await import('@/lib/conversation/rigid-router');
+      const result = await routeMessage(userData.id, phoneNumber, buttonId);
+      
+      console.log(`[Router] Button result: success=${result.success}`);
+      
+      return NextResponse.json({
+        status: 'button_response',
+        success: result.success,
+      });
     }
     // טיפול לפי סוג הודעה - עם Orchestrator! 🤖
     else if (messageType === 'textMessage') {
@@ -409,8 +406,8 @@ export async function POST(request: NextRequest) {
         } catch (routerError) {
           console.error('[Rigid Router] Error:', routerError);
           // שליחת הודעת שגיאה למשתמש
-          await greenAPI.sendMessage({
-            phoneNumber,
+      await greenAPI.sendMessage({
+        phoneNumber,
             message: 'סליחה, משהו השתבש 😅 נסה שוב בבקשה',
           });
           return NextResponse.json({ status: 'error', error: String(routerError) });
