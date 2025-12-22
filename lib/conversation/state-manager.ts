@@ -465,10 +465,10 @@ function getNameReceivedMessage(name: string): string {
 export async function loadStateContext(userId: string): Promise<StateContext> {
   const supabase = createServiceClient();
   
-  // טען מידע על המשתמש
+  // טען מידע על המשתמש - בודק גם name וגם full_name
   const { data: user } = await supabase
     .from('users')
-    .select('full_name, current_phase, onboarding_state')
+    .select('name, full_name, current_phase, onboarding_state')
     .eq('id', userId)
     .single();
   
@@ -488,10 +488,14 @@ export async function loadStateContext(userId: string): Promise<StateContext> {
   // קביעת ה-state
   let currentState: ConversationPhase = 'start';
   
+  // בדיקת שם - יכול להיות ב-full_name או ב-name
+  const userName = user?.full_name || user?.name || undefined;
+  const hasName = !!userName && userName.trim().length > 0;
+  
   if (user?.onboarding_state) {
     // יש state שמור
     currentState = user.onboarding_state as ConversationPhase;
-  } else if (user?.full_name) {
+  } else if (hasName) {
     // יש שם - נבדוק מסמכים
     if ((docCount || 0) > 0) {
       if ((pendingCount || 0) > 0) {
@@ -507,10 +511,12 @@ export async function loadStateContext(userId: string): Promise<StateContext> {
     currentState = 'waiting_for_name';
   }
   
+  console.log(`[StateManager] Loaded state: ${currentState}, userName: ${userName || 'none'}, hasDocuments: ${(docCount || 0) > 0}`);
+  
   return {
     userId,
     currentState,
-    userName: user?.full_name || undefined,
+    userName,
     hasDocuments: (docCount || 0) > 0,
     hasPendingTransactions: (pendingCount || 0) > 0,
     pendingTransactionCount: pendingCount || 0,
@@ -538,9 +544,11 @@ export async function saveStateContext(
 export async function saveUserName(userId: string, name: string): Promise<void> {
   const supabase = createServiceClient();
   
+  // שומר בשתי העמודות לתאימות לאחור
   await supabase
     .from('users')
     .update({ 
+      name: name,
       full_name: name,
       onboarding_state: 'waiting_for_document',
     })

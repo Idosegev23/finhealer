@@ -372,9 +372,10 @@ export async function POST(request: NextRequest) {
 
       const greenAPI = getGreenAPIClient();
       
-      // 🧠 AI-First Mode - כשהפלאג מופעל, AI מנהל את הכל
-      if (USE_PHI_BRAIN) {
-        console.log('🧠 Using φ Brain AI Orchestrator');
+      // 🧠 AI-First Mode - ALWAYS use State Machine + AI (φ Brain)
+      // USE_PHI_BRAIN flag is deprecated - we always use φ Brain now
+      {
+        console.log('🧠 Using φ Brain State Machine + AI Orchestrator');
         
         try {
           // שמירת הודעה נכנסת - payload מכיל את כל המידע

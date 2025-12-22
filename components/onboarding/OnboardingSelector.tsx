@@ -154,31 +154,33 @@ export function OnboardingSelector() {
       
       setSendingWelcome(true);
 
-      // 2. Send WhatsApp welcome message (AI-generated!)
+      // 2. Send WhatsApp welcome message (dynamic based on user state!)
       if (waOptIn && phoneFormatted) {
         try {
-          // 🧠 קבל הודעת פתיחה מ-AI
+          // 🧠 קבל הודעת פתיחה מתאימה ל-state המשתמש
           let welcomeMessage: string;
           try {
-            const welcomeResponse = await fetch('/api/wa/welcome');
+            // 🆕 שולח את הטלפון כדי לקבל הודעה מותאמת
+            const welcomeResponse = await fetch(`/api/wa/welcome?phone=${encodeURIComponent(phoneFormatted)}`);
             const welcomeData = await welcomeResponse.json();
             welcomeMessage = welcomeData.message;
+            console.log(`📨 Welcome message type: hasName=${welcomeData.hasName}, state=${welcomeData.state}`);
           } catch {
-            // Fallback אם AI נכשל
-            welcomeMessage = `שלום,
+            // Fallback אם נכשל
+            welcomeMessage = `היי! 👋
 
-אני *φ (פאי)* - המאמן הפיננסי שלך.
+אני *φ (פאי)* - המאמן הפיננסי האישי שלך.
 
-הסימן φ מייצג את *היחס הזהב* - האיזון המושלם במתמטיקה.
-וזה בדיוק מה שנעשה ביחד: נמצא את *האיזון המושלם* בכסף שלך.
+*מה נעשה ביחד?*
+נבנה תמונה ברורה של הכסף שלך - בלי לחץ, בלי שיפוטיות. רק אתה והמספרים.
 
 *איך זה עובד?*
-תשלח לי דוחות בנק, אני אנתח אותם בשבילך, ויחד נבנה תמונה ברורה של המצב הפיננסי. בלי לחץ, בלי שיפוטיות - בקצב שלך.
+1️⃣ תשלח לי דוחות בנק (PDF)
+2️⃣ אני אנתח ואסווג את התנועות
+3️⃣ ביחד נבין לאן הכסף הולך
+4️⃣ נבנה תוכנית שעובדת *בשבילך*
 
-בסוף התהליך תרגיש *שליטה מלאה* על הכסף שלך.
-
-אבל קודם כל, בוא נכיר -
-*מה השם שלך?*`;
+בוא נתחיל - *מה השם שלך?*`;
           }
 
           const waResponse = await fetch('/api/wa/send', {

@@ -65,17 +65,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 🆕 בדיקה האם יש שם מGoogle OAuth
+    const nameFromOAuth = user.user_metadata?.name || user.user_metadata?.full_name || '';
+    const hasNameFromOAuth = nameFromOAuth && nameFromOAuth.trim().length > 0;
+    
     // יצור/עדכן משתמש ב-users table (נוצר רק אחרי תשלום מוצלח!)
+    // 🆕 אם יש שם מOAuth → מתחיל מ-waiting_for_document, אחרת מ-waiting_for_name
     const { error: upsertUserError } = await supabaseAdmin
       .from('users')
       .upsert({
         id: user.id,
         email: user.email,
-        name: user.user_metadata?.name || user.email?.split('@')[0] || '',
+        name: nameFromOAuth || user.email?.split('@')[0] || '',
+        full_name: hasNameFromOAuth ? nameFromOAuth : null, // 🆕 שמור גם ב-full_name
         phone: phone === '0000000000' ? null : cleanPhone, // null אם זמני
         wa_opt_in: waOptIn !== undefined ? waOptIn : true,
         subscription_status: 'active',
-        current_phase: 'onboarding', // יתחיל תמיד מ-onboarding (אח"כ ב-WhatsApp)
+        current_phase: 'onboarding',
+        onboarding_state: hasNameFromOAuth ? 'waiting_for_document' : 'waiting_for_name', // 🆕
         created_at: existingUser ? undefined : new Date().toISOString(),
       }, {
         onConflict: 'id',
