@@ -96,6 +96,17 @@ function buildContextJson(context: PhiFullContext, currentState: string): string
     contextObj.learned_patterns = context.learnedPatterns;
   }
   
+  // Add recently skipped transactions (for memory)
+  if (context.recentlySkipped && context.recentlySkipped.length > 0) {
+    contextObj.recently_skipped = context.recentlySkipped;
+    contextObj.skip_count = context.recentlySkipped.length;
+  }
+  
+  // Add last bot message (for understanding "כן" = same as before)
+  if (context.lastBotMessage) {
+    contextObj.last_bot_message = context.lastBotMessage.substring(0, 300);
+  }
+  
   // Add recent messages (last 10 for context)
   if (context.recentMessages.length > 0) {
     contextObj.recent_messages = context.recentMessages.slice(-10).map(m => ({

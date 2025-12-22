@@ -235,8 +235,22 @@ async function executeActions(
           
         case 'skip_transaction':
           if (action.id) {
-            // Mark as skipped by setting a special status or just move on
-            console.log(`[φ Handler] ⏭️ Skipped: ${action.id} (${action.reason || 'user request'})`);
+            // קבע סטטוס לפי הסיבה
+            const skipStatus = action.reason === 'needs_credit_details' 
+              ? 'needs_credit_detail'
+              : 'skipped';
+            
+            // עדכן את התנועה ב-DB!
+            await supabase
+              .from('transactions')
+              .update({
+                status: skipStatus,
+                notes: action.reason || 'user_skip',
+              })
+              .eq('id', action.id)
+              .eq('user_id', userId);
+            
+            console.log(`[φ Handler] ⏭️ Skipped: ${action.id} → ${skipStatus}`);
             executed.push({ type: action.type, id: action.id, reason: action.reason });
           }
           break;

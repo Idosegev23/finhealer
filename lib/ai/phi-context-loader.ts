@@ -63,6 +63,19 @@ export interface PhiFullContext {
     hasEnough: boolean;
     missingMonths: string[];
   };
+  
+  // Recently skipped transactions (for memory)
+  recentlySkipped: Array<{
+    vendor: string;
+    amount: number;
+    reason: string;
+  }>;
+  
+  // Last bot message (for understanding context like "לדלג?")
+  lastBotMessage: string | null;
+  
+  // Last user message (for understanding "כן" = same as before)
+  lastUserMessage: string | null;
 }
 
 export interface PendingTransaction {
@@ -96,6 +109,7 @@ export async function loadFullContext(userId: string): Promise<PhiFullContext> {
     patternsResult,
     missingDocsResult,
     docsResult,
+    skippedTxResult,
   ] = await Promise.all([
     // 1. User data
     supabase
@@ -146,6 +160,15 @@ export async function loadFullContext(userId: string): Promise<PhiFullContext> {
       .select('period_start, period_end')
       .eq('user_id', userId)
       .eq('status', 'completed'),
+    
+    // 8. Recently skipped transactions (for memory)
+    supabase
+      .from('transactions')
+      .select('vendor, amount, notes')
+      .eq('user_id', userId)
+      .in('status', ['skipped', 'needs_credit_detail'])
+      .order('updated_at', { ascending: false })
+      .limit(10),
   ]);
   
   // Process user data
@@ -263,6 +286,17 @@ export async function loadFullContext(userId: string): Promise<PhiFullContext> {
   }
   const missingMonths = requiredMonths.filter(m => !coveredMonths.has(m));
   
+  // Process recently skipped transactions
+  const recentlySkipped = (skippedTxResult.data || []).map(tx => ({
+    vendor: tx.vendor || 'לא ידוע',
+    amount: Math.abs(tx.amount),
+    reason: tx.notes || 'skipped',
+  }));
+  
+  // Get last bot message and last user message for context
+  const lastBotMessage = messages.filter(m => m.role === 'assistant').slice(-1)[0]?.content || null;
+  const lastUserMessage = messages.filter(m => m.role === 'user').slice(-1)[0]?.content || null;
+  
   return {
     user: {
       id: userId,
@@ -288,6 +322,9 @@ export async function loadFullContext(userId: string): Promise<PhiFullContext> {
       hasEnough: coveredMonths.size >= 3,
       missingMonths,
     },
+    recentlySkipped,
+    lastBotMessage,
+    lastUserMessage,
   };
 }
 
