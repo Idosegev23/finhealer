@@ -214,8 +214,8 @@ export async function routeMessage(
   // STATE: waiting_for_document
   // ============================================
   if (ctx.state === 'waiting_for_document') {
-    // בדוק אם יש תנועות ממתינות והמשתמש רוצה להמשיך
-    if (matchesCommand(message, CONTINUE_COMMANDS) && ctx.pendingTransactionsCount > 0) {
+    // 🆕 כפתור "נתחיל לסווג" או "נמשיך"
+    if ((message === 'start_classify' || matchesCommand(message, CONTINUE_COMMANDS)) && ctx.pendingTransactionsCount > 0) {
       // עבור לסיווג
       await supabase
         .from('users')
@@ -224,6 +224,16 @@ export async function routeMessage(
       
       // הצג תנועה ראשונה עם כפתורים
       return await showNextTransaction(ctx, true);
+    }
+    
+    // 🆕 כפתורים "יש עוד דוח" - פשוט אישור
+    if (message === 'add_bank' || message === 'add_credit') {
+      const docType = message === 'add_bank' ? 'דוח בנק' : 'דוח אשראי';
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `📄 מעולה! שלח לי את ה${docType}.`,
+      });
+      return { success: true };
     }
     
     // הודעת עידוד לשלוח מסמך
@@ -280,18 +290,43 @@ export async function routeMessage(
   // STATE: monitoring
   // ============================================
   if (ctx.state === 'monitoring') {
-    // סיכום
-    if (matchesCommand(message, SUMMARY_COMMANDS)) {
+    // 🆕 כפתור/פקודה סיכום
+    if (message === 'summary' || matchesCommand(message, SUMMARY_COMMANDS)) {
       return await showSummary(ctx);
     }
     
-    // שאלות אחרות - כאן נשתמש ב-AI (TODO)
+    // 🆕 כפתור הוספת מסמך - חזור ל-waiting_for_document
+    if (message === 'add_doc') {
+      await supabase
+        .from('users')
+        .update({ onboarding_state: 'waiting_for_document' })
+        .eq('id', userId);
+      
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `📄 מעולה! שלח לי את המסמך.`,
+      });
+      return { success: true, newState: 'waiting_for_document' };
+    }
+    
+    // 🆕 כפתור שאלה
+    if (message === 'ask') {
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `❓ מה תרצה לדעת?\n\nלמשל:\n• "כמה הוצאתי על אוכל?"\n• "מה היתרה שלי?"\n• "איפה אני מבזבז הכי הרבה?"`,
+      });
+      return { success: true };
+    }
+    
+    // שאלות טבעיות - חיפוש קטגוריה
+    if (message.includes('כמה') || message.includes('הוצאתי')) {
+      return await answerCategoryQuestion(ctx, message);
+    }
+    
+    // ברירת מחדל
     await greenAPI.sendMessage({
       phoneNumber,
-      message: `📊 אני במצב ניטור.\n\n` +
-        `• כתוב *"סיכום"* לסטטוס\n` +
-        `• שלח *מסמך* להוספה\n` +
-        `• שאל אותי שאלות על הכסף שלך`,
+      message: `📊 אני כאן לעזור!\n\n• שלח *מסמך* להוספה\n• שאל "כמה הוצאתי על X?"\n• כתוב "סיכום"`,
     });
     
     return { success: true };
@@ -457,6 +492,55 @@ async function skipTransaction(ctx: RouterContext): Promise<RouterResult> {
   return await showNextTransaction(newCtx, false);
 }
 
+async function answerCategoryQuestion(ctx: RouterContext, question: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // חפש קטגוריה בשאלה
+  const categories = EXPENSE_CATEGORIES.map(c => c.name.toLowerCase());
+  const questionLower = question.toLowerCase();
+  
+  let matchedCategory: string | null = null;
+  for (const cat of EXPENSE_CATEGORIES) {
+    if (questionLower.includes(cat.name.toLowerCase())) {
+      matchedCategory = cat.name;
+      break;
+    }
+    // חפש גם לפי keywords
+    for (const kw of cat.keywords) {
+      if (questionLower.includes(kw.toLowerCase())) {
+        matchedCategory = cat.name;
+        break;
+      }
+    }
+    if (matchedCategory) break;
+  }
+  
+  if (!matchedCategory) {
+    // לא מצאנו קטגוריה - הצג סיכום כללי
+    return await showSummary(ctx);
+  }
+  
+  // חפש סכום לקטגוריה
+  const { data: txs } = await supabase
+    .from('transactions')
+    .select('amount')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'confirmed')
+    .eq('type', 'expense')
+    .ilike('category', `%${matchedCategory}%`);
+  
+  const total = (txs || []).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const cat = EXPENSE_CATEGORIES.find(c => c.name === matchedCategory);
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phoneNumber,
+    message: `${cat?.emoji || '💸'} *${matchedCategory}*\n\nהוצאת ${total.toLocaleString('he-IL')} ₪`,
+  });
+  
+  return { success: true };
+}
+
 async function showSummary(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
@@ -506,12 +590,23 @@ async function showSummary(ctx: RouterContext): Promise<RouterResult> {
       `💚 הכנסות: ${totalIncome.toLocaleString('he-IL')} ₪\n` +
       `💸 הוצאות: ${totalExpenses.toLocaleString('he-IL')} ₪\n` +
       `${balanceEmoji} יתרה: ${balance.toLocaleString('he-IL')} ₪\n\n` +
-      (topCategories ? `*הקטגוריות הגדולות:*\n${topCategories}\n\n` : '') +
-      `🎯 *עכשיו אני מכיר את התמונה!*\n` +
-      `• שלח עוד מסמכים להשלמה\n` +
-      `• כתוב "סיכום" לסטטוס\n` +
-      `• שאל אותי שאלות`,
+      (topCategories ? `*הקטגוריות הגדולות:*\n${topCategories}` : ''),
   });
+  
+  // 🆕 כפתורים לפעולות הבאות
+  try {
+    await greenAPI.sendButtons({
+      phoneNumber: ctx.phoneNumber,
+      message: '*מה עכשיו?*',
+      buttons: [
+        { buttonId: 'add_doc', buttonText: '📄 להוסיף מסמך' },
+        { buttonId: 'summary', buttonText: '📊 סיכום מפורט' },
+        { buttonId: 'ask', buttonText: '❓ לשאול שאלה' },
+      ],
+    });
+  } catch (btnError) {
+    console.error('⚠️ Failed to send summary buttons:', btnError);
+  }
   
   return { success: true, newState: 'monitoring' };
 }

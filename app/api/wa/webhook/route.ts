@@ -1602,9 +1602,21 @@ export async function POST(request: NextRequest) {
             message: combinedMessage,
           });
           
-          // 🆕 לא מתחילים סיווג אוטומטי - מחכים שהמשתמש יכתוב "נמשיך"
-          // זה נותן למשתמש שליטה ואפשרות לשלוח עוד מסמכים קודם
-          console.log(`📝 Session saved. User can write "נמשיך" to start classification.`);
+          // 🆕 שליחת כפתורים לבחירת המשך
+          try {
+            await greenAPI.sendButtons({
+              phoneNumber,
+              message: '*מה עכשיו?*',
+              buttons: [
+                { buttonId: 'add_bank', buttonText: '📄 עוד דוח בנק' },
+                { buttonId: 'add_credit', buttonText: '💳 דוח אשראי' },
+                { buttonId: 'start_classify', buttonText: '▶️ נתחיל לסווג!' },
+              ],
+            });
+            console.log('📱 Sent action buttons after document analysis');
+          } catch (btnError) {
+            console.error('⚠️ Failed to send buttons, user can type "נמשיך":', btnError);
+          }
           
           // 🆕 שמירת מסמכים חסרים ב-DB לבקשה עתידית
           if (ocrData.missing_documents && ocrData.missing_documents.length > 0) {
