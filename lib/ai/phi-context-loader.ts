@@ -48,6 +48,9 @@ export interface PhiFullContext {
     transactionCount: number;
   } | null;
   
+  // Category totals (for monitoring queries like "כמה הוצאתי על אוכל?")
+  categoryTotals: Record<string, number>;
+  
   // Learned patterns (vendor -> category)
   learnedPatterns: Record<string, string>;
   
@@ -134,10 +137,10 @@ export async function loadFullContext(userId: string): Promise<PhiFullContext> {
       .eq('status', 'proposed')
       .order('tx_date', { ascending: false }),
     
-    // 4. Confirmed transactions (for summary)
+    // 4. Confirmed transactions (for summary and category totals)
     supabase
       .from('transactions')
-      .select('amount, type')
+      .select('amount, type, category')
       .eq('user_id', userId)
       .eq('status', 'confirmed'),
     
@@ -229,8 +232,10 @@ export async function loadFullContext(userId: string): Promise<PhiFullContext> {
   const totalPending = pendingTransactions.length;
   const currentTransaction = pendingTransactions.length > 0 ? pendingTransactions[0] : null;
   
-  // Calculate financial summary
+  // Calculate financial summary and category totals
   let financialSummary = null;
+  const categoryTotals: Record<string, number> = {};
+  
   if (confirmedTxResult.data && confirmedTxResult.data.length > 0) {
     const confirmed = confirmedTxResult.data;
     const totalIncome = confirmed
@@ -246,6 +251,14 @@ export async function loadFullContext(userId: string): Promise<PhiFullContext> {
       balance: totalIncome - totalExpenses,
       transactionCount: confirmed.length,
     };
+    
+    // Calculate category totals (expenses only)
+    confirmed
+      .filter(tx => tx.type === 'expense' && tx.category)
+      .forEach(tx => {
+        const cat = tx.category || 'אחר';
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(tx.amount);
+      });
   }
   
   // Process learned patterns
@@ -315,6 +328,7 @@ export async function loadFullContext(userId: string): Promise<PhiFullContext> {
     },
     pendingTransactions,
     financialSummary,
+    categoryTotals,
     learnedPatterns,
     missingDocuments,
     periodCoverage: {

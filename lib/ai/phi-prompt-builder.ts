@@ -91,6 +91,11 @@ function buildContextJson(context: PhiFullContext, currentState: string): string
     };
   }
   
+  // Add category totals for monitoring queries (כמה הוצאתי על X?)
+  if (context.categoryTotals && Object.keys(context.categoryTotals).length > 0) {
+    contextObj.category_totals = context.categoryTotals;
+  }
+  
   // Add learned patterns (for auto-suggest)
   if (Object.keys(context.learnedPatterns).length > 0) {
     contextObj.learned_patterns = context.learnedPatterns;

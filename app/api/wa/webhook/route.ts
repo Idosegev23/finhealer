@@ -1483,6 +1483,57 @@ export async function POST(request: NextRequest) {
                 })
                 .eq('id', userData.id);
               console.log(`✅ User state updated to classification`);
+              
+              // 🆕 קישור דוח אשראי לתנועות שדולגו
+              if (documentType === 'credit') {
+                // חלץ 4 ספרות אחרונות של הכרטיס מהתנועות החדשות
+                const cardLast4Set = new Set<string>();
+                for (const tx of allTransactions) {
+                  // חפש מספרי כרטיס בvendor או בdescription
+                  const text = `${tx.vendor || ''} ${tx.description || ''}`;
+                  const cardMatch = text.match(/\d{4}$/);
+                  if (cardMatch) {
+                    cardLast4Set.add(cardMatch[0]);
+                  }
+                  // גם חפש פורמט ****1234
+                  const starMatch = text.match(/\*{4}(\d{4})/);
+                  if (starMatch) {
+                    cardLast4Set.add(starMatch[1]);
+                  }
+                }
+                
+                if (cardLast4Set.size > 0) {
+                  const cardNumbers = Array.from(cardLast4Set);
+                  console.log(`💳 Found credit card numbers: ${cardNumbers.join(', ')}`);
+                  
+                  // מצא תנועות שדולגו כי חיכו לפירוט אשראי
+                  for (const cardLast4 of cardNumbers) {
+                    const { data: skippedTx, error: skipErr } = await (supabase as any)
+                      .from('transactions')
+                      .select('id, vendor, amount')
+                      .eq('user_id', userData.id)
+                      .eq('status', 'needs_credit_detail')
+                      .or(`vendor.ilike.%${cardLast4}%,vendor.ilike.%ויזה ${cardLast4}%,vendor.ilike.%visa ${cardLast4}%`);
+                    
+                    if (!skipErr && skippedTx && skippedTx.length > 0) {
+                      console.log(`🔗 Found ${skippedTx.length} skipped transactions for card ${cardLast4}`);
+                      
+                      // עדכן אותן ל-status: linked_to_credit (לא צריך לסווג שוב - הפירוט כבר יש)
+                      await (supabase as any)
+                        .from('transactions')
+                        .update({ 
+                          status: 'confirmed',
+                          notes: `קושר לדוח אשראי ${cardLast4}`,
+                        })
+                        .eq('user_id', userData.id)
+                        .eq('status', 'needs_credit_detail')
+                        .or(`vendor.ilike.%${cardLast4}%,vendor.ilike.%ויזה ${cardLast4}%,vendor.ilike.%visa ${cardLast4}%`);
+                      
+                      console.log(`✅ Linked ${skippedTx.length} transactions to credit statement`);
+                    }
+                  }
+                }
+              }
             }
           } else {
             console.warn('⚠️ No period detected - document will not be saved');
