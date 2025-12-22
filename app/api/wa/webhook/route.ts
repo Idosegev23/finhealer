@@ -372,13 +372,12 @@ export async function POST(request: NextRequest) {
 
       const greenAPI = getGreenAPIClient();
       
-      // 🧠 AI-First Mode - ALWAYS use State Machine + AI (φ Brain)
-      // USE_PHI_BRAIN flag is deprecated - we always use φ Brain now
+      // 🆕 RIGID ROUTER - לוגיקה קשיחה בלי AI להחלטות
       {
-        console.log('🧠 Using φ Brain State Machine + AI Orchestrator');
+        console.log('🎯 Using Rigid Router (deterministic logic)');
         
         try {
-          // שמירת הודעה נכנסת - payload מכיל את כל המידע
+          // שמירת הודעה נכנסת
           const { error: insertError } = await supabase.from('wa_messages').insert({
             user_id: userData.id,
             direction: 'incoming',
@@ -394,66 +393,27 @@ export async function POST(request: NextRequest) {
             console.log('✅ Incoming message saved to wa_messages');
           }
           
-          // 🆕 שימוש ב-handleWithPhi שמטפל בהכל כולל גרפים
-          const result = await handleWithPhi(userData.id, text, phoneNumber);
+          // 🎯 קריאה ל-Rigid Router - לוגיקה קשיחה
+          const { routeMessage } = await import('@/lib/conversation/rigid-router');
+          const result = await routeMessage(userData.id, phoneNumber, text);
           
-          // בדיקה אם צריך לייצר גרף - שליחת הודעת הכנה
-          const hasChartAction = result.actions.some(a => a.type === 'generate_chart');
-          if (hasChartAction) {
-            const preparingMsg = CHART_PREPARING_MESSAGES[
-              Math.floor(Math.random() * CHART_PREPARING_MESSAGES.length)
-            ];
-      await greenAPI.sendMessage({
-        phoneNumber,
-              message: preparingMsg,
-            });
-            console.log('🎨 Sent chart preparing message');
-          }
+          console.log(`[Router] Result: success=${result.success}, newState=${result.newState || 'unchanged'}`);
           
-          // שליחת תשובת טקסט
-          if (result.message) {
-            await greenAPI.sendMessage({
-              phoneNumber,
-              message: result.message,
-            });
-            
-            // שמירת הודעה יוצאת
-            await supabase.from('wa_messages').insert({
-              user_id: userData.id,
-              direction: 'outgoing',
-              msg_type: 'text',
-              payload: { text: result.message, timestamp: new Date().toISOString() },
-              status: 'delivered',
-            });
-          }
-          
-          // 🆕 שליחת תמונה אם יש
-          if (result.imageToSend) {
-            console.log('📊 Sending generated chart image...');
-            try {
-              await greenAPI.sendImage({
-                phoneNumber,
-                imageBase64: result.imageToSend.base64,
-                caption: result.imageToSend.description || 'הנה הגרף שלך! 📊',
-              });
-              console.log('✅ Chart image sent successfully');
-            } catch (imageError) {
-              console.error('❌ Failed to send chart image:', imageError);
-              await greenAPI.sendMessage({
-                phoneNumber,
-                message: 'סליחה, לא הצלחתי לייצר את הגרף 😅 נסה שוב בבקשה',
-              });
-            }
-          }
+          // הודעות נשלחות ישירות מה-router, אין צורך לשלוח כאן
           
           return NextResponse.json({
-            status: 'phi_brain_response',
-            actions: result.actions.length,
-            hasChart: !!result.imageToSend,
+            status: 'rigid_router_response',
+            success: result.success,
+            newState: result.newState || null,
           });
-        } catch (phiError) {
-          console.error('[φ Brain] Error, falling back to legacy:', phiError);
-          // ממשיך לקוד הישן במקרה של שגיאה
+        } catch (routerError) {
+          console.error('[Rigid Router] Error:', routerError);
+          // שליחת הודעת שגיאה למשתמש
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: 'סליחה, משהו השתבש 😅 נסה שוב בבקשה',
+          });
+          return NextResponse.json({ status: 'error', error: String(routerError) });
         }
       }
       
