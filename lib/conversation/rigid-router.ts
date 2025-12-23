@@ -292,9 +292,22 @@ export async function routeMessage(
       return await classifyTransaction(ctx, ctx.currentTransaction.suggestedCategory);
     }
     
-    // בחירה מספרית מהצעות קודמות (1, 2, 3)
+    // בחירה מספרית מהצעות קודמות (1-10)
     const numChoice = parseInt(message.trim());
-    if (!isNaN(numChoice) && numChoice >= 1 && numChoice <= 3) {
+    if (!isNaN(numChoice) && numChoice >= 1 && numChoice <= 10) {
+      // קודם בדוק אם יש בחירת קבוצות
+      const groupSuggestions = recentSuggestions.get(ctx.userId + '_groups');
+      if (groupSuggestions && groupSuggestions[numChoice - 1]) {
+        const selectedGroup = groupSuggestions[numChoice - 1].name;
+        // מצא תת-קבוצות בקבוצה הראשית
+        const subGroups = SUPER_GROUPS[selectedGroup as keyof typeof SUPER_GROUPS];
+        if (subGroups && subGroups.length > 0) {
+          // הצג תת-קטגוריות מהקבוצה הראשונה
+          return await showCategoriesInGroup(ctx, subGroups[0]);
+        }
+      }
+      
+      // אחרת, בדוק הצעות רגילות
       const suggestions = recentSuggestions.get(ctx.userId);
       if (suggestions && suggestions[numChoice - 1]) {
         return await classifyTransaction(ctx, suggestions[numChoice - 1].name);
@@ -323,37 +336,30 @@ export async function routeMessage(
     
     // אם במצב חיפוש - הצג תוצאות כהצעות
     if (ctx.isInSearchMode) {
-      const topMatches = findTopMatches(message, 3);
+      const topMatches = findTopMatches(message, 5);
       if (topMatches.length > 0) {
-        // Store suggestions and show as buttons
+        // Store suggestions for number selection
         recentSuggestions.set(ctx.userId, topMatches.map(s => ({ id: s.id, name: s.name })));
         
+        const list = topMatches.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
         try {
-          await greenAPI.sendInteractiveButtons({
-            phoneNumber,
-            message: `🔍 מצאתי ${topMatches.length} קטגוריות:`,
-            buttons: [
-              ...topMatches.slice(0, 2).map(cat => ({
-                buttonId: cat.id,
-                buttonText: `✅ ${cat.name.substring(0, 20)}`,
-              })),
-              { buttonId: 'other', buttonText: '🔍 חיפוש אחר' },
-            ],
-          });
-        } catch (btnError) {
-          // Fallback to text
-          const list = topMatches.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
           await greenAPI.sendMessage({
             phoneNumber,
-            message: `🔍 מצאתי:\n${list}\n\nכתוב מספר (1-3) לבחירה.`,
+            message: `🔍 מצאתי ${topMatches.length} קטגוריות:\n\n${list}\n\n💡 כתוב מספר לבחירה (1-${topMatches.length})`,
           });
+        } catch (e) {
+          console.error('Failed to send search results:', e);
         }
         return { success: true };
       } else {
-        await greenAPI.sendMessage({
-          phoneNumber,
-          message: `🤷 לא מצאתי "${message}".\n\nנסה מילה אחרת או כתוב "דלג".`,
-        });
+        try {
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: `🤷 לא מצאתי "${message}".\n\nנסה מילה אחרת או כתוב "דלג".`,
+          });
+        } catch (e) {
+          console.error('Failed to send no-match message:', e);
+        }
         return { success: true };
       }
     }
@@ -448,12 +454,17 @@ async function suggestCategories(
   
   const message = `🤔 לא מצאתי "${userInput}" בדיוק.\n\n` +
     `אולי התכוונת ל:\n${suggestionList}\n\n` +
-    `כתוב את המספר (1, 2, 3) או "רשימה" לרשימה מלאה.`;
+    `💡 כתוב מספר (1-${suggestions.length}) לבחירה`;
   
-  await greenAPI.sendMessage({
-    phoneNumber: ctx.phoneNumber,
-    message,
-  });
+  try {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phoneNumber,
+      message,
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to send suggestions:', error?.message);
+    return { success: false };
+  }
   
   return { success: true };
 }
@@ -472,10 +483,15 @@ async function showHelpMessage(ctx: RouterContext, userInput: string): Promise<R
     `• לכתוב "דלג" לדלג על התנועה הזו\n\n` +
     `📌 *התנועה:* ${tx.amount.toLocaleString('he-IL')} ₪ | ${tx.vendor}`;
   
-  await greenAPI.sendMessage({
-    phoneNumber: ctx.phoneNumber,
-    message,
-  });
+  try {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phoneNumber,
+      message,
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to send help message:', error?.message);
+    return { success: false };
+  }
   
   return { success: true };
 }
@@ -505,73 +521,29 @@ async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promis
   
   message += `${typeEmoji} ${counter}\n\n`;
   message += `*${tx.amount.toLocaleString('he-IL')} ₪* | ${tx.vendor}\n`;
-  message += `📅 ${tx.date}`;
+  message += `📅 ${tx.date}\n\n`;
   
-  // Build buttons (max 3 for WhatsApp)
-  const buttons: Array<{ buttonId: string; buttonText: string }> = [];
-  
-  // 1. כפתור הצעה (אם יש)
+  // TEXT-ONLY approach (buttons are disabled by GreenAPI)
   if (suggested) {
-    buttons.push({
-      buttonId: `cat_${suggested.id || 'suggested'}`,
-      buttonText: `✅ ${suggested.name.substring(0, 20)}`,
-    });
+    message += `💡 *הצעה:* ${suggested.name}\n`;
+    message += `   כתוב *"כן"* לאישור\n\n`;
   }
   
-  // 2. כפתור "אחר" (חיפוש)
-  buttons.push({
-    buttonId: 'other',
-    buttonText: '🔍 אחר',
-  });
-  
-  // 3. כפתור דלג
-  buttons.push({
-    buttonId: 'skip',
-    buttonText: '⏭️ דלג',
-  });
+  message += `📝 *אפשרויות:*\n`;
+  message += `• כתוב שם קטגוריה (למשל: "מזון", "דלק", "ייעוץ")\n`;
+  message += `• כתוב *"דלג"* לדלג`;
   
   // Clear search mode when showing new transaction
   searchModeUsers.delete(ctx.userId);
   
-  // ניסיון לשלוח עם כפתורים אינטראקטיביים (API חדש)
   try {
-    await greenAPI.sendInteractiveButtons({
+    await greenAPI.sendMessage({
       phoneNumber: ctx.phoneNumber,
       message,
-      footer: suggested ? `💡 נראה לי: ${suggested.name}` : undefined,
-      buttons: buttons.slice(0, 3),
     });
-    console.log('✅ Interactive buttons sent successfully');
   } catch (error: any) {
-    // Fallback if interactive buttons fail - try old buttons
-    console.warn('⚠️ Interactive buttons failed, trying legacy:', error?.message);
-    
-    try {
-      await greenAPI.sendButtons({
-        phoneNumber: ctx.phoneNumber,
-        message,
-        buttons: buttons.slice(0, 3),
-      });
-      console.log('✅ Legacy buttons sent successfully');
-    } catch (legacyError: any) {
-      // Final fallback - text message
-      console.error('❌ All buttons failed, using text:', legacyError?.message);
-      
-      let textMessage = message + '\n\n';
-      if (suggested) {
-        textMessage += `💡 נראה לי: *${suggested.name}*\n\n`;
-      }
-      textMessage += '📝 *אפשרויות:*\n';
-      if (suggested) {
-        textMessage += `• כתוב "כן" לאישור\n`;
-      }
-      textMessage += `• כתוב שם קטגוריה\n`;
-      textMessage += `• כתוב "דלג" לדלג`;
-      
-      await greenAPI.sendMessage({
-        phoneNumber: ctx.phoneNumber,
-        message: textMessage
-    });
+    console.error('❌ Failed to send transaction message:', error?.message);
+    return { success: false };
   }
   
   return { success: true };
@@ -580,25 +552,31 @@ async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promis
 async function showFullCategoryList(ctx: RouterContext): Promise<RouterResult> {
   const greenAPI = getGreenAPIClient();
   
-  // בניית סקשנים לפי SUPER_GROUPS
-  const sections = Object.entries(SUPER_GROUPS).map(([superGroup, subGroups]) => {
-    return {
-      title: superGroup,
-      rows: subGroups.map(subGroup => ({
-        rowId: `group_${subGroup.replace(/ /g, '_')}`,
-        title: `📂 ${subGroup}`,
-        description: 'פתח רשימה'
-      }))
-    };
+  // TEXT-ONLY: הצג את הקבוצות הראשיות
+  let message = `📂 *קטגוריות לבחירה:*\n\n`;
+  
+  // הצג את הקבוצות הראשיות עם מספרים
+  const groups = Object.keys(SUPER_GROUPS);
+  groups.forEach((group, i) => {
+    message += `${i + 1}. ${group}\n`;
   });
-
-  await greenAPI.sendListMessage({
-    phoneNumber: ctx.phoneNumber,
-    message: 'בחר קבוצת קטגוריות:',
-    buttonText: 'פתח רשימה מלאה',
-    title: 'קטגוריות הוצאות',
-    sections: sections
-  });
+  
+  message += `\n💡 כתוב מספר (1-${groups.length}) לראות תת-קטגוריות`;
+  message += `\nאו כתוב ישירות שם קטגוריה`;
+  
+  // שמור את הקבוצות לבחירה
+  const groupsForSelection = groups.map((g, i) => ({ id: `group_${i}`, name: g }));
+  recentSuggestions.set(ctx.userId + '_groups', groupsForSelection);
+  
+  try {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phoneNumber,
+      message,
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to send category list:', error?.message);
+    return { success: false };
+  }
 
   return { success: true };
 }
@@ -610,35 +588,42 @@ async function showCategoriesInGroup(ctx: RouterContext, groupName: string): Pro
   const categories = getCategoriesByGroup(groupName);
   
   if (categories.length === 0) {
-    await greenAPI.sendMessage({
-      phoneNumber: ctx.phoneNumber,
-      message: 'לא נמצאו קטגוריות בקבוצה זו. נסה שוב.'
-    });
+    try {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phoneNumber,
+        message: 'לא נמצאו קטגוריות בקבוצה זו. נסה שוב.'
+      });
+    } catch (e) {
+      console.error('Failed to send message:', e);
+    }
     return await showNextTransaction(ctx, false);
   }
 
-  // בניית List Message עם הקטגוריות
-  // חלוקה לסקשנים אם יש יותר מ-10 (וואטסאפ מגביל)
-  // אבל בקבוצה בודדת בדרך כלל אין יותר מ-20
-  // List Message יכול להכיל עד 10 סקשנים וסה"כ פריטים.
-  // אם יש הרבה, נחלק ל-2 סקשנים
+  // TEXT-ONLY: הצג את הקטגוריות ברשימה ממוספרת
+  let message = `📂 *${groupName}:*\n\n`;
   
-  const sections = [{
-    title: groupName,
-    rows: categories.map(c => ({
-      rowId: c.id,
-      title: c.name,
-      description: ''
-    }))
-  }];
-
-  await greenAPI.sendListMessage({
-    phoneNumber: ctx.phoneNumber,
-    message: `בחר קטגוריה מתוך *${groupName}*:`,
-    buttonText: 'בחר קטגוריה',
-    title: groupName,
-    sections: sections
+  categories.slice(0, 10).forEach((cat, i) => {
+    message += `${i + 1}. ${cat.name}\n`;
   });
+  
+  if (categories.length > 10) {
+    message += `...ועוד ${categories.length - 10} קטגוריות\n`;
+  }
+  
+  message += `\n💡 כתוב מספר או שם קטגוריה`;
+  
+  // שמור לבחירה מספרית
+  recentSuggestions.set(ctx.userId, categories.slice(0, 10).map(c => ({ id: c.id, name: c.name })));
+
+  try {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phoneNumber,
+      message,
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to send categories in group:', error?.message);
+    return { success: false };
+  }
 
   return { success: true };
 }
@@ -805,10 +790,15 @@ async function answerCategoryQuestion(ctx: RouterContext, question: string): Pro
   
   const total = (txs || []).reduce((sum, t) => sum + Math.abs(t.amount), 0);
   
-  await greenAPI.sendMessage({
-    phoneNumber: ctx.phoneNumber,
-    message: `💸 *${matched.name}*\n\nהוצאת ${total.toLocaleString('he-IL')} ₪`,
-  });
+  try {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phoneNumber,
+      message: `💸 *${matched.name}*\n\nהוצאת ${total.toLocaleString('he-IL')} ₪`,
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to send category answer:', error?.message);
+    return { success: false };
+  }
   
   return { success: true };
 }
@@ -855,29 +845,23 @@ async function showSummary(ctx: RouterContext): Promise<RouterResult> {
     .update({ onboarding_state: 'monitoring' })
     .eq('id', ctx.userId);
   
-  await greenAPI.sendMessage({
-    phoneNumber: ctx.phoneNumber,
-    message: `🎉 *סיימנו לסווג!*\n\n` +
-      `📊 *הסיכום שלך:*\n` +
-      `💚 הכנסות: ${totalIncome.toLocaleString('he-IL')} ₪\n` +
-      `💸 הוצאות: ${totalExpenses.toLocaleString('he-IL')} ₪\n` +
-      `${balanceEmoji} יתרה: ${balance.toLocaleString('he-IL')} ₪\n\n` +
-      (topCategories ? `*הקטגוריות הגדולות:*\n${topCategories}` : ''),
-  });
-  
-  // 🆕 כפתורים לפעולות הבאות
   try {
-    await greenAPI.sendButtons({
+    await greenAPI.sendMessage({
       phoneNumber: ctx.phoneNumber,
-      message: '*מה עכשיו?*',
-      buttons: [
-        { buttonId: 'add_doc', buttonText: '📄 להוסיף מסמך' },
-        { buttonId: 'summary', buttonText: '📊 סיכום מפורט' },
-        { buttonId: 'ask', buttonText: '❓ לשאול שאלה' },
-      ],
+      message: `🎉 *סיימנו לסווג!*\n\n` +
+        `📊 *הסיכום שלך:*\n` +
+        `💚 הכנסות: ${totalIncome.toLocaleString('he-IL')} ₪\n` +
+        `💸 הוצאות: ${totalExpenses.toLocaleString('he-IL')} ₪\n` +
+        `${balanceEmoji} יתרה: ${balance.toLocaleString('he-IL')} ₪\n\n` +
+        (topCategories ? `*הקטגוריות הגדולות:*\n${topCategories}\n\n` : '') +
+        `📝 *מה עכשיו?*\n` +
+        `• שלח מסמך נוסף לניתוח\n` +
+        `• כתוב "סיכום" לסיכום מפורט\n` +
+        `• שאל "כמה הוצאתי על X?"`,
     });
-  } catch (btnError) {
-    console.error('⚠️ Failed to send summary buttons:', btnError);
+  } catch (error: any) {
+    console.error('❌ Failed to send summary:', error?.message);
+    return { success: false };
   }
   
   return { success: true, newState: 'monitoring' };

@@ -98,11 +98,11 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'cat_141', name: 'קייטנות', group: 'חינוך', type: 'special', keywords: [] },
 
   // --- ייעוץ ---
-  { id: 'cat_34', name: 'יועץ עסקי / פיננסי', group: 'ייעוץ', type: 'fixed', keywords: [] },
-  { id: 'cat_35', name: 'רואה חשבון', group: 'ייעוץ', type: 'fixed', keywords: [] },
-  { id: 'cat_36', name: 'ייעוץ משפטי שוטף', group: 'ייעוץ', type: 'fixed', keywords: [] },
-  { id: 'cat_37', name: 'הנהלת חשבונות', group: 'ייעוץ', type: 'fixed', keywords: [] },
-  { id: 'cat_38', name: 'שכר טרחה שוטף', group: 'ייעוץ', type: 'fixed', keywords: [] },
+  { id: 'cat_34', name: 'יועץ עסקי / פיננסי', group: 'ייעוץ', type: 'fixed', keywords: ['ייעוץ', 'יועץ', 'פיננסי', 'עסקי', 'שירותי ייעוץ', 'ייעוץ עסקי'] },
+  { id: 'cat_35', name: 'רואה חשבון', group: 'ייעוץ', type: 'fixed', keywords: ['רואה חשבון', 'רוח', 'חשבונאות', 'הנהח'] },
+  { id: 'cat_36', name: 'ייעוץ משפטי שוטף', group: 'ייעוץ', type: 'fixed', keywords: ['משפטי', 'עורך דין', 'עוד'] },
+  { id: 'cat_37', name: 'הנהלת חשבונות', group: 'ייעוץ', type: 'fixed', keywords: ['הנהלת חשבונות', 'הנהח', 'ניהול חשבונות'] },
+  { id: 'cat_38', name: 'שכר טרחה שוטף', group: 'ייעוץ', type: 'fixed', keywords: ['שכר טרחה', 'טרחה'] },
 
   // --- לימודים ---
   { id: 'cat_85', name: 'קורסים ולמידה אישית', group: 'לימודים', type: 'fixed', keywords: [] },
@@ -114,9 +114,9 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'cat_145', name: 'הדרכות צוות מיוחד', group: 'לימודים', type: 'special', keywords: [] },
 
   // --- מזון ---
-  { id: 'cat_104', name: 'מזון ומשקאות', group: 'מזון', type: 'variable', keywords: [] },
-  { id: 'cat_105', name: 'קניות סופר', group: 'מזון', type: 'variable', keywords: [] },
-  { id: 'cat_106', name: 'מסעדות', group: 'מזון', type: 'variable', keywords: [] },
+  { id: 'cat_104', name: 'מזון ומשקאות', group: 'מזון', type: 'variable', keywords: ['מזון', 'אוכל', 'שתייה', 'משקאות', 'משקה'] },
+  { id: 'cat_105', name: 'קניות סופר', group: 'מזון', type: 'variable', keywords: ['סופר', 'סופרמרקט', 'רמי לוי', 'שופרסל', 'ויקטורי', 'מגה', 'יוחננוף', 'קניות'] },
+  { id: 'cat_106', name: 'מסעדות', group: 'מזון', type: 'variable', keywords: ['מסעדה', 'מסעדות', 'אכילה בחוץ', 'טייק אווי', 'משלוחים', 'וולט', 'תן ביס'] },
 
   // --- מיסים ---
   { id: 'cat_32', name: 'מס הכנסה', group: 'מיסים', type: 'fixed', keywords: [] },
@@ -183,13 +183,13 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'cat_72', name: 'הלוואה מכרטיס אשראי עסקי', group: 'פיננסים', type: 'fixed', keywords: [] },
 
   // --- רכב ---
-  { id: 'cat_73', name: 'טסט לרכב', group: 'רכב', type: 'fixed', keywords: [] },
-  { id: 'cat_74', name: 'תשלומי רישוי רכב', group: 'רכב', type: 'fixed', keywords: [] },
-  { id: 'cat_90', name: 'תחבורה ציבורית', group: 'רכב', type: 'variable', keywords: [] },
-  { id: 'cat_91', name: 'דלק', group: 'רכב', type: 'variable', keywords: [] },
-  { id: 'cat_92', name: 'חניה', group: 'רכב', type: 'variable', keywords: [] },
-  { id: 'cat_93', name: 'כביש 6 / כבישי אגרה', group: 'רכב', type: 'variable', keywords: [] },
-  { id: 'cat_94', name: 'טיפולי רכב / מוסך', group: 'רכב', type: 'variable', keywords: [] },
+  { id: 'cat_73', name: 'טסט לרכב', group: 'רכב', type: 'fixed', keywords: ['טסט', 'בדיקה שנתית', 'רישוי'] },
+  { id: 'cat_74', name: 'תשלומי רישוי רכב', group: 'רכב', type: 'fixed', keywords: ['רישוי', 'אגרת רישוי'] },
+  { id: 'cat_90', name: 'תחבורה ציבורית', group: 'רכב', type: 'variable', keywords: ['אוטובוס', 'רכבת', 'רב קו', 'רב-קו', 'תחבורה'] },
+  { id: 'cat_91', name: 'דלק', group: 'רכב', type: 'variable', keywords: ['דלק', 'בנזין', 'סולר', 'תדלוק', 'פז', 'סונול', 'דלק'] },
+  { id: 'cat_92', name: 'חניה', group: 'רכב', type: 'variable', keywords: ['חניה', 'חניון', 'פנגו', 'סלופארק'] },
+  { id: 'cat_93', name: 'כביש 6 / כבישי אגרה', group: 'רכב', type: 'variable', keywords: ['כביש 6', 'אגרה', 'כרמל', 'מנהרות', 'מהיר לן'] },
+  { id: 'cat_94', name: 'טיפולי רכב / מוסך', group: 'רכב', type: 'variable', keywords: ['מוסך', 'טיפול רכב', 'תיקון רכב', 'שמן', 'צמיגים'] },
 
   // --- שיווק ---
   { id: 'cat_100', name: 'שיווק ופרסום', group: 'שיווק', type: 'variable', keywords: [] },
@@ -198,12 +198,12 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'cat_103', name: 'הדפסות ודפוס', group: 'שיווק', type: 'variable', keywords: [] },
 
   // --- שירותים ---
-  { id: 'cat_124', name: 'שירותים כלליים', group: 'שירותים', type: 'variable', keywords: [] },
-  { id: 'cat_125', name: 'שירותי תיקונים', group: 'שירותים', type: 'variable', keywords: [] },
-  { id: 'cat_126', name: 'שירותי ניקיון', group: 'שירותים', type: 'variable', keywords: [] },
-  { id: 'cat_127', name: 'שירותי גינון', group: 'שירותים', type: 'variable', keywords: [] },
-  { id: 'cat_128', name: 'שירותים מקצועיים', group: 'שירותים', type: 'variable', keywords: [] },
-  { id: 'cat_129', name: 'שירותי מחשוב', group: 'שירותים', type: 'variable', keywords: [] },
+  { id: 'cat_124', name: 'שירותים כלליים', group: 'שירותים', type: 'variable', keywords: ['שירות', 'שירותים'] },
+  { id: 'cat_125', name: 'שירותי תיקונים', group: 'שירותים', type: 'variable', keywords: ['תיקון', 'תיקונים', 'שרברב', 'חשמלאי'] },
+  { id: 'cat_126', name: 'שירותי ניקיון', group: 'שירותים', type: 'variable', keywords: ['ניקיון', 'עוזרת בית', 'מנקה'] },
+  { id: 'cat_127', name: 'שירותי גינון', group: 'שירותים', type: 'variable', keywords: ['גינון', 'גנן', 'גינה'] },
+  { id: 'cat_128', name: 'שירותים מקצועיים', group: 'שירותים', type: 'variable', keywords: ['שירותי ייעוץ', 'מקצועי', 'פרילנס'] },
+  { id: 'cat_129', name: 'שירותי מחשוב', group: 'שירותים', type: 'variable', keywords: ['מחשוב', 'IT', 'טכנאי מחשבים'] },
 
   // --- תקשורת ---
   { id: 'cat_21', name: 'אינטרנט ביתי', group: 'תקשורת', type: 'fixed', keywords: [] },
@@ -240,23 +240,36 @@ export function findBestMatch(text: string): CategoryDef | null {
   if (exact) return exact;
 
   // 2. חיפוש keyword מדויק
-  const keywordMatch = CATEGORIES.find(c => c.keywords.some(k => k === t));
-  if (keywordMatch) return keywordMatch;
+  const keywordExact = CATEGORIES.find(c => c.keywords.some(k => k.toLowerCase() === t));
+  if (keywordExact) return keywordExact;
   
-  // 3. חיפוש חלקי - הטקסט מכיל את שם הקטגוריה או להיפך
+  // 3. חיפוש לפי קבוצה - אם המשתמש כתב שם קבוצה, החזר קטגוריה ראשונה
+  const groupExact = CATEGORIES.find(c => c.group.toLowerCase() === t);
+  if (groupExact) return groupExact;
+  
+  // 4. חיפוש חלקי בkeywords
+  const keywordPartial = CATEGORIES.find(c => 
+    c.keywords.some(k => k.toLowerCase().includes(t) || t.includes(k.toLowerCase()))
+  );
+  if (keywordPartial) return keywordPartial;
+  
+  // 5. חיפוש חלקי - הטקסט מכיל את שם הקטגוריה או להיפך
   const partialMatch = CATEGORIES.find(c => 
     c.name.toLowerCase().includes(t) || t.includes(c.name.toLowerCase())
   );
   if (partialMatch) return partialMatch;
   
-  // 4. חיפוש לפי קבוצה - אם המשתמש כתב שם קבוצה, החזר קטגוריה ראשונה
-  const groupMatch = CATEGORIES.find(c => c.group.toLowerCase() === t);
-  if (groupMatch) return groupMatch;
-  
-  // 5. חיפוש מילים בתוך שם הקטגוריה (fuzzy)
+  // 6. חיפוש מילים בתוך שם הקטגוריה או keywords (fuzzy)
   const words = t.split(/\s+/).filter(w => w.length > 2);
   if (words.length > 0) {
     for (const word of words) {
+      // חפש במילות מפתח קודם
+      const keywordWordMatch = CATEGORIES.find(c => 
+        c.keywords.some(k => k.toLowerCase().includes(word))
+      );
+      if (keywordWordMatch) return keywordWordMatch;
+      
+      // אחר כך בשם ובקבוצה
       const wordMatch = CATEGORIES.find(c => 
         c.name.toLowerCase().includes(word) || 
         c.group.toLowerCase().includes(word)
@@ -280,22 +293,32 @@ export function findTopMatches(text: string, limit: number = 3): CategoryDef[] {
     let score = 0;
     const name = cat.name.toLowerCase();
     const group = cat.group.toLowerCase();
+    const keywords = cat.keywords.map(k => k.toLowerCase());
     
     // התאמה מדויקת
     if (name === t) score += 100;
+    
+    // התאמה מדויקת בkeywords
+    if (keywords.some(k => k === t)) score += 90;
+    
+    // קבוצה מדויקת
+    if (group === t) score += 80;
     
     // שם מכיל את הטקסט
     if (name.includes(t)) score += 50;
     if (t.includes(name)) score += 40;
     
+    // keyword מכיל את הטקסט
+    if (keywords.some(k => k.includes(t) || t.includes(k))) score += 45;
+    
     // קבוצה מכילה את הטקסט
-    if (group === t) score += 30;
     if (group.includes(t)) score += 20;
     
     // התאמת מילים בודדות
     for (const word of words) {
       if (name.includes(word)) score += 10;
       if (group.includes(word)) score += 5;
+      if (keywords.some(k => k.includes(word))) score += 15;
     }
     
     return { cat, score };
