@@ -37,6 +37,18 @@ interface SendListParams {
   }>;
 }
 
+// New Interactive Buttons API (Beta) - works unlike the deprecated sendButtons
+interface SendInteractiveButtonsParams {
+  phoneNumber: string;
+  message: string;
+  header?: string;
+  footer?: string;
+  buttons: Array<{
+    buttonId: string;
+    buttonText: string;
+  }>;
+}
+
 export class GreenAPIClient {
   private instanceId: string;
   private token: string;
@@ -150,6 +162,62 @@ export class GreenAPIClient {
       return data;
     } catch (error: any) {
       console.error('❌ GreenAPI buttons error:', error?.message || error);
+      throw error;
+    }
+  }
+
+  /**
+   * שליחת כפתורים אינטראקטיביים (API חדש - Beta)
+   * משתמש ב-SendInteractiveButtons עם type: 'reply'
+   * @see https://greenapi.com/en/docs/api/sending/SendInteractiveButtons/
+   */
+  async sendInteractiveButtons({ phoneNumber, message, header, footer, buttons }: SendInteractiveButtonsParams) {
+    const url = `${this.baseUrl}/SendInteractiveButtons/${this.token}`;
+    const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
+
+    // Build buttons with type: 'reply' for clickable response buttons
+    const formattedButtons = buttons.slice(0, 3).map((btn, index) => ({
+      type: 'reply',
+      buttonId: btn.buttonId || `btn_${index}`,
+      buttonText: btn.buttonText.substring(0, 25), // Max 25 chars per WhatsApp docs
+    }));
+
+    const payload = {
+      chatId: `${normalizedPhone}@c.us`,
+      header: header || '',
+      body: message,
+      footer: footer || 'Phi φ',
+      buttons: formattedButtons,
+    };
+
+    console.log('📱 Sending interactive buttons:', JSON.stringify(payload, null, 2));
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      
+      // Check for errors in response body
+      if (data.error) {
+        console.error('❌ SendInteractiveButtons error:', data.error);
+        throw new Error(data.error);
+      }
+
+      if (!response.ok) {
+        console.error('❌ SendInteractiveButtons HTTP error:', response.status, data);
+        throw new Error(`GreenAPI error: ${response.status} - ${JSON.stringify(data)}`);
+      }
+
+      console.log(`✅ Interactive buttons sent to ${normalizedPhone}@c.us:`, data.idMessage);
+      return data;
+    } catch (error: any) {
+      console.error('❌ SendInteractiveButtons error:', error?.message || error);
       throw error;
     }
   }

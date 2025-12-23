@@ -25,7 +25,10 @@ export interface RouterContext {
   state: UserState;
   userName: string | null;
   pendingTransactionsCount: number;
+  totalTransactions: number;       // Total including already classified
+  currentIndex: number;            // 1-based position in classification
   currentTransaction: PendingTransaction | null;
+  isInSearchMode?: boolean;        // True when user clicked "Other" and is searching
 }
 
 export interface PendingTransaction {
@@ -56,6 +59,9 @@ const LIST_COMMANDS = ['רשימה', 'רשימה מלאה', 'תפריט', 'קט�
 // Cache for recent suggestions (simple in-memory, resets on deploy)
 const recentSuggestions = new Map<string, { id: string; name: string }[]>();
 
+// Track users in search mode (clicked "Other" button)
+const searchModeUsers = new Map<string, boolean>();
+
 function matchesCommand(text: string, commands: string[]): boolean {
   const normalized = text.trim().toLowerCase();
   return commands.some(cmd => normalized.includes(cmd.toLowerCase()));
@@ -75,7 +81,7 @@ export async function loadRouterContext(userId: string, phoneNumber: string): Pr
     .eq('id', userId)
     .single();
   
-  // Load pending transactions
+  // Load pending transactions (proposed status)
   const { data: pendingTx } = await supabase
     .from('transactions')
     .select('id, amount, vendor, tx_date, type, expense_category')
@@ -83,14 +89,60 @@ export async function loadRouterContext(userId: string, phoneNumber: string): Pr
     .eq('status', 'proposed')
     .order('tx_date', { ascending: false });
   
-  const currentTransaction = pendingTx && pendingTx.length > 0 ? {
-    id: pendingTx[0].id,
-    amount: Math.abs(pendingTx[0].amount),
-    vendor: pendingTx[0].vendor || 'לא ידוע',
-    date: pendingTx[0].tx_date,
-    type: pendingTx[0].type as 'income' | 'expense',
-    suggestedCategory: pendingTx[0].expense_category || null,
-  } : null;
+  // Count total transactions in current batch (for progress indicator)
+  const { count: totalInBatch } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .in('status', ['proposed', 'confirmed', 'skipped', 'needs_credit_detail']);
+  
+  const pendingCount = pendingTx?.length || 0;
+  const totalTransactions = totalInBatch || pendingCount;
+  const classifiedCount = totalTransactions - pendingCount;
+  const currentIndex = classifiedCount + 1; // 1-based
+  
+  // Build current transaction with pattern-based suggestion
+  let currentTransaction: PendingTransaction | null = null;
+  
+  if (pendingTx && pendingTx.length > 0) {
+    const tx = pendingTx[0];
+    const vendor = tx.vendor || 'לא ידוע';
+    
+    // Check user_patterns for this vendor (learned from previous classifications)
+    let suggestedCategory = tx.expense_category || null;
+    
+    if (!suggestedCategory && vendor !== 'לא ידוע') {
+      const { data: pattern } = await supabase
+        .from('user_patterns')
+        .select('category')
+        .eq('user_id', userId)
+        .eq('vendor', vendor.toLowerCase())
+        .single();
+      
+      if (pattern?.category) {
+        suggestedCategory = pattern.category;
+        console.log(`📚 Found pattern for "${vendor}": ${suggestedCategory}`);
+      }
+    }
+    
+    // If still no suggestion, try AI-based matching from categories
+    if (!suggestedCategory) {
+      const aiMatch = findBestMatch(vendor);
+      if (aiMatch) {
+        suggestedCategory = aiMatch.name;
+        console.log(`🤖 AI matched "${vendor}" to: ${suggestedCategory}`);
+      }
+    }
+    
+    currentTransaction = {
+      id: tx.id,
+      amount: Math.abs(tx.amount),
+      vendor: vendor,
+      date: tx.tx_date,
+      type: tx.type as 'income' | 'expense',
+      suggestedCategory,
+    };
+  }
   
   // Determine state
   let state: UserState = 'waiting_for_name';
@@ -102,13 +154,19 @@ export async function loadRouterContext(userId: string, phoneNumber: string): Pr
     state = pendingTx && pendingTx.length > 0 ? 'classification' : 'waiting_for_document';
   }
   
+  // Check if user is in search mode
+  const isInSearchMode = searchModeUsers.get(userId) || false;
+  
   return {
     userId,
     phoneNumber,
     state,
     userName,
-    pendingTransactionsCount: pendingTx?.length || 0,
+    pendingTransactionsCount: pendingCount,
+    totalTransactions,
+    currentIndex,
     currentTransaction,
+    isInSearchMode,
   };
 }
 
@@ -214,12 +272,22 @@ export async function routeMessage(
       return await skipTransaction(ctx);
     }
 
+    // כפתור "אחר" - כניסה למצב חיפוש
+    if (message === 'other' || message === 'search') {
+      searchModeUsers.set(ctx.userId, true);
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `🔍 *מצב חיפוש*\n\nכתוב שם קטגוריה או מילת חיפוש.\nלמשל: "ביטוח", "רכב", "מזון"\n\n💡 או כתוב "דלג" לדלג.`,
+      });
+      return { success: true };
+    }
+
     // בקשה לרשימה מלאה
     if (message === 'full_list' || matchesCommand(message, LIST_COMMANDS)) {
       return await showFullCategoryList(ctx);
     }
     
-    // אישור קטגוריה מוצעת
+    // אישור קטגוריה מוצעת (כפתור או טקסט "כן")
     if (matchesCommand(message, YES_COMMANDS) && ctx.currentTransaction.suggestedCategory) {
       return await classifyTransaction(ctx, ctx.currentTransaction.suggestedCategory);
     }
@@ -251,6 +319,43 @@ export async function routeMessage(
       // fallback לניסיון פענוח שם מהטקסט (אם זה לא ID אלא שם)
       const categoryName = message.replace('cat_', '').replace(/_/g, ' ');
       return await classifyTransaction(ctx, categoryName);
+    }
+    
+    // אם במצב חיפוש - הצג תוצאות כהצעות
+    if (ctx.isInSearchMode) {
+      const topMatches = findTopMatches(message, 3);
+      if (topMatches.length > 0) {
+        // Store suggestions and show as buttons
+        recentSuggestions.set(ctx.userId, topMatches.map(s => ({ id: s.id, name: s.name })));
+        
+        try {
+          await greenAPI.sendInteractiveButtons({
+            phoneNumber,
+            message: `🔍 מצאתי ${topMatches.length} קטגוריות:`,
+            buttons: [
+              ...topMatches.slice(0, 2).map(cat => ({
+                buttonId: cat.id,
+                buttonText: `✅ ${cat.name.substring(0, 20)}`,
+              })),
+              { buttonId: 'other', buttonText: '🔍 חיפוש אחר' },
+            ],
+          });
+        } catch (btnError) {
+          // Fallback to text
+          const list = topMatches.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: `🔍 מצאתי:\n${list}\n\nכתוב מספר (1-3) לבחירה.`,
+          });
+        }
+        return { success: true };
+      } else {
+        await greenAPI.sendMessage({
+          phoneNumber,
+          message: `🤷 לא מצאתי "${message}".\n\nנסה מילה אחרת או כתוב "דלג".`,
+        });
+        return { success: true };
+      }
     }
     
     // חיפוש קטגוריה בהודעה (טקסט חופשי)
@@ -383,79 +488,89 @@ async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promis
   }
   
   const tx = ctx.currentTransaction;
-  const emoji = tx.type === 'income' ? '💚' : '💸';
-  const suggested = findBestMatch(tx.vendor); // שימוש בלוגיקה החדשה לחיפוש
+  const typeEmoji = tx.type === 'income' ? '💚' : '💸';
+  const typeLabel = tx.type === 'income' ? 'הכנסה' : 'הוצאה';
   
-  // בניית הודעה
+  // Use suggestion from context (includes patterns + AI matching)
+  const suggested = tx.suggestedCategory 
+    ? getCategoryByName(tx.suggestedCategory) || { id: 'suggested', name: tx.suggestedCategory }
+    : null;
+  
+  // בניית הודעה עם מונה וסוג
+  const counter = `*${typeLabel} ${ctx.currentIndex} מתוך ${ctx.totalTransactions}*`;
+  
   let message = isFirst 
     ? `🎯 *מתחילים לסווג!*\n\n`
     : ``;
   
-  message += `${emoji} *${tx.amount.toLocaleString('he-IL')} ₪* | ${tx.vendor}\n`;
-  message += `📅 ${tx.date}\n\n`;
+  message += `${typeEmoji} ${counter}\n\n`;
+  message += `*${tx.amount.toLocaleString('he-IL')} ₪* | ${tx.vendor}\n`;
+  message += `📅 ${tx.date}`;
   
-  if (suggested) {
-    message += `💡 נראה לי כמו *${suggested.name}*\n`;
-    message += `זה נכון?`;
-  } else {
-    message += `מה הקטגוריה?`;
-  }
-  
-  // Build buttons (Hybrid Flow)
-  const buttons = [];
+  // Build buttons (max 3 for WhatsApp)
+  const buttons: Array<{ buttonId: string; buttonText: string }> = [];
   
   // 1. כפתור הצעה (אם יש)
   if (suggested) {
     buttons.push({
-      buttonId: suggested.id, // e.g. cat_104
-      buttonText: `✅ ${suggested.name.substring(0, 18)}` // הגבלת אורך
-    });
-  } else {
-    // או קטגוריות פופולריות אם אין זיהוי (מזון, תחבורה)
-    const defaults = [getCategoryByName('קניות סופר'), getCategoryByName('מסעדות')];
-    defaults.forEach(c => {
-      if(c) buttons.push({ buttonId: c.id, buttonText: c.name.substring(0, 20) });
+      buttonId: `cat_${suggested.id || 'suggested'}`,
+      buttonText: `✅ ${suggested.name.substring(0, 20)}`,
     });
   }
   
-  // 2. כפתור רשימה מלאה
+  // 2. כפתור "אחר" (חיפוש)
   buttons.push({
-    buttonId: 'full_list',
-    buttonText: '📂 רשימה מלאה'
+    buttonId: 'other',
+    buttonText: '🔍 אחר',
   });
   
   // 3. כפתור דלג
   buttons.push({
     buttonId: 'skip',
-    buttonText: '⏭️ דלג'
+    buttonText: '⏭️ דלג',
   });
   
-  // ניסיון לשלוח עם כפתורים
+  // Clear search mode when showing new transaction
+  searchModeUsers.delete(ctx.userId);
+  
+  // ניסיון לשלוח עם כפתורים אינטראקטיביים (API חדש)
   try {
-    const btnResult = await greenAPI.sendButtons({
+    await greenAPI.sendInteractiveButtons({
       phoneNumber: ctx.phoneNumber,
       message,
+      footer: suggested ? `💡 נראה לי: ${suggested.name}` : undefined,
       buttons: buttons.slice(0, 3),
     });
-    console.log('✅ Buttons sent successfully:', btnResult?.idMessage);
+    console.log('✅ Interactive buttons sent successfully');
   } catch (error: any) {
-    // Fallback if buttons fail - שלח הודעה רגילה עם הוראות
-    console.error('❌ Buttons failed, using text fallback:', error?.message || error);
+    // Fallback if interactive buttons fail - try old buttons
+    console.warn('⚠️ Interactive buttons failed, trying legacy:', error?.message);
     
-    // בניית הודעה טקסטואלית עם אפשרויות
-    let textMessage = message + '\n\n';
-    textMessage += '📝 *אפשרויות:*\n';
-    
-    if (suggested) {
-      textMessage += `• כתוב "${suggested.name}" לאישור\n`;
-    }
-    textMessage += `• כתוב שם קטגוריה (למשל: "מזון", "דלק")\n`;
-    textMessage += `• כתוב "רשימה" לכל הקטגוריות\n`;
-    textMessage += `• כתוב "דלג" לדלג`;
-    
-    await greenAPI.sendMessage({
-      phoneNumber: ctx.phoneNumber,
-      message: textMessage
+    try {
+      await greenAPI.sendButtons({
+        phoneNumber: ctx.phoneNumber,
+        message,
+        buttons: buttons.slice(0, 3),
+      });
+      console.log('✅ Legacy buttons sent successfully');
+    } catch (legacyError: any) {
+      // Final fallback - text message
+      console.error('❌ All buttons failed, using text:', legacyError?.message);
+      
+      let textMessage = message + '\n\n';
+      if (suggested) {
+        textMessage += `💡 נראה לי: *${suggested.name}*\n\n`;
+      }
+      textMessage += '📝 *אפשרויות:*\n';
+      if (suggested) {
+        textMessage += `• כתוב "כן" לאישור\n`;
+      }
+      textMessage += `• כתוב שם קטגוריה\n`;
+      textMessage += `• כתוב "דלג" לדלג`;
+      
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phoneNumber,
+        message: textMessage
     });
   }
   
@@ -536,24 +651,52 @@ async function classifyTransaction(ctx: RouterContext, category: string): Promis
     return await showSummary(ctx);
   }
   
-  // Update transaction
-  await supabase
+  const txId = ctx.currentTransaction.id;
+  const vendor = ctx.currentTransaction.vendor;
+  
+  console.log(`📝 Classifying transaction ${txId} as "${category}"`);
+  
+  // Update transaction with error handling
+  const { data: updatedTx, error: updateError } = await supabase
     .from('transactions')
     .update({
       status: 'confirmed',
       category: category,
       expense_category: category,
     })
-    .eq('id', ctx.currentTransaction.id);
+    .eq('id', txId)
+    .select('id, status')
+    .single();
   
-  // Save pattern for future
-  await supabase
+  if (updateError) {
+    console.error(`❌ Failed to classify transaction ${txId}:`, updateError);
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phoneNumber,
+      message: `⚠️ אופס, משהו השתבש. נסה שוב.`,
+    });
+    return { success: false };
+  }
+  
+  console.log(`✅ Transaction ${txId} classified as "${category}":`, updatedTx);
+  
+  // Save pattern for future (ignore errors - not critical)
+  const { error: patternError } = await supabase
     .from('user_patterns')
     .upsert({
       user_id: ctx.userId,
-      vendor: ctx.currentTransaction.vendor.toLowerCase(),
+      vendor: vendor.toLowerCase(),
       category: category,
     }, { onConflict: 'user_id,vendor' });
+  
+  if (patternError) {
+    console.warn(`⚠️ Failed to save pattern for "${vendor}":`, patternError);
+    // Don't fail the operation - pattern saving is nice-to-have
+  } else {
+    console.log(`📚 Saved pattern: "${vendor}" → "${category}"`);
+  }
+  
+  // Clear search mode if active
+  searchModeUsers.delete(ctx.userId);
   
   // Reload context and show next
   const newCtx = await loadRouterContext(ctx.userId, ctx.phoneNumber);
@@ -588,14 +731,31 @@ async function skipTransaction(ctx: RouterContext): Promise<RouterResult> {
   
   // Check if it's a credit card charge
   const isCredit = /visa|mastercard|ויזה|מסטרקארד|אשראי|\d{4}$/i.test(tx.vendor);
+  const newStatus = isCredit ? 'needs_credit_detail' : 'skipped';
   
-  await supabase
+  console.log(`⏭️ Skipping transaction ${tx.id} (${isCredit ? 'credit' : 'regular'})`);
+  
+  const { error: skipError } = await supabase
     .from('transactions')
     .update({
-      status: isCredit ? 'needs_credit_detail' : 'skipped',
+      status: newStatus,
       notes: isCredit ? 'צריך פירוט אשראי' : 'דילוג משתמש',
     })
     .eq('id', tx.id);
+  
+  if (skipError) {
+    console.error(`❌ Failed to skip transaction ${tx.id}:`, skipError);
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phoneNumber,
+      message: `⚠️ אופס, משהו השתבש. נסה שוב.`,
+    });
+    return { success: false };
+  }
+  
+  console.log(`✅ Transaction ${tx.id} skipped with status: ${newStatus}`);
+  
+  // Clear search mode if active
+  searchModeUsers.delete(ctx.userId);
   
   // Reload context and show next
   const newCtx = await loadRouterContext(ctx.userId, ctx.phoneNumber);
