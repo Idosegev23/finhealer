@@ -350,12 +350,11 @@ export async function POST(request: NextRequest) {
       
       console.log('🔘 Button pressed:', buttonId, buttonText);
 
-      // 🎯 מעביר ל-Rigid Router כטקסט רגיל
-      // הכפתורים שולחים: cat_מזון_וסופר, skip
-      const { routeMessage } = await import('@/lib/conversation/rigid-router');
+      // 🎯 מעביר ל-φ Router כטקסט רגיל
+      const { routeMessage } = await import('@/lib/conversation/phi-router');
       const result = await routeMessage(userData.id, phoneNumber, buttonId);
       
-      console.log(`[Router] Button result: success=${result.success}`);
+      console.log(`[φ Router] Button result: success=${result.success}`);
       
       return NextResponse.json({
         status: 'button_response',
@@ -390,11 +389,11 @@ export async function POST(request: NextRequest) {
             console.log('✅ Incoming message saved to wa_messages');
           }
           
-          // 🎯 קריאה ל-Rigid Router - לוגיקה קשיחה
-          const { routeMessage } = await import('@/lib/conversation/rigid-router');
+          // 🎯 קריאה ל-φ Router - לוגיקה נקייה וקשיחה
+          const { routeMessage } = await import('@/lib/conversation/phi-router');
           const result = await routeMessage(userData.id, phoneNumber, text);
           
-          console.log(`[Router] Result: success=${result.success}, newState=${result.newState || 'unchanged'}`);
+          console.log(`[φ Router] Result: success=${result.success}, newState=${result.newState || 'unchanged'}`);
           
           // הודעות נשלחות ישירות מה-router, אין צורך לשלוח כאן
           

@@ -2778,17 +2778,22 @@ async function sendWhatsAppNotification(userId: string, itemsCount: number, docT
       return;
     }
 
+    // 🆕 Use φ Router for bank/credit documents
+    if (docType.includes('credit') || docType.includes('bank')) {
+      const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+      await onDocumentProcessed(userId, user.phone);
+      console.log(`✅ φ Router notification sent to ${user.phone}`);
+      return;
+    }
+
+    // Other document types - send simple message
     const greenAPI = getGreenAPIClient();
     const userName = user.name || 'שלום';
+    const url = 'https://finhealer.vercel.app/dashboard';
     
-    // Customize message based on document type
     let message = '';
-    let url = 'https://finhealer.vercel.app/dashboard';
     
-    if (docType.includes('credit') || docType.includes('bank')) {
-      url = 'https://finhealer.vercel.app/dashboard/expenses/pending';
-      message = `היי ${userName}! 🎉\n\nסיימתי לעבד את הדוח שהעלית.\nמצאתי ${itemsCount} תנועות שממתינות לאישור שלך.\n\n👉 היכנס לאתר כדי לאשר: ${url}\n\nתודה! 💙`;
-    } else if (docType.includes('loan') || docType.includes('mortgage')) {
+    if (docType.includes('loan') || docType.includes('mortgage')) {
       message = `היי ${userName}! 🏦\n\nסיימתי לעבד את דוח ההלוואות.\nמצאתי ${itemsCount} הלוואות/מסלולים.\n\n👉 צפה בפירוט: ${url}\n\nתודה! 💙`;
     } else if (docType.includes('insurance')) {
       message = `היי ${userName}! 🛡️\n\nסיימתי לעבד את דוח הביטוחים.\nמצאתי ${itemsCount} פוליסות ביטוח.\n\n👉 צפה בפירוט: ${url}\n\nתודה! 💙`;

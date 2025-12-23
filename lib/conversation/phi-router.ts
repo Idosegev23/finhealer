@@ -1,0 +1,764 @@
+/**
+ * φ Router - Clean conversation router
+ * 
+ * States:
+ * - waiting_for_name: צריך שם מהמשתמש
+ * - waiting_for_document: מחכה למסמך PDF
+ * - classification_income: מסווגים הכנסות
+ * - classification_expense: מסווגים הוצאות  
+ * - monitoring: סיימנו, משיבים על שאלות
+ */
+
+import { createServiceClient } from '@/lib/supabase/server';
+import { getGreenAPIClient } from '@/lib/greenapi/client';
+import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categories';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+type UserState = 
+  | 'waiting_for_name'
+  | 'waiting_for_document'
+  | 'classification_income'
+  | 'classification_expense'
+  | 'monitoring';
+
+interface Transaction {
+  id: string;
+  amount: number;
+  vendor: string;
+  date: string;
+  type: 'income' | 'expense';
+  category?: string;
+}
+
+interface TransactionGroup {
+  vendor: string;
+  transactions: Transaction[];
+  totalAmount: number;
+}
+
+interface RouterContext {
+  userId: string;
+  phone: string;
+  state: UserState;
+  userName: string | null;
+}
+
+interface RouterResult {
+  success: boolean;
+  newState?: UserState;
+}
+
+// ============================================================================
+// Main Router
+// ============================================================================
+
+export async function routeMessage(
+  userId: string, 
+  phone: string, 
+  message: string
+): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  const msg = message.trim();
+  
+  console.log(`[φ Router] userId=${userId}, message="${msg}"`);
+  
+  // Load user
+  const { data: user } = await supabase
+    .from('users')
+    .select('name, full_name, onboarding_state')
+    .eq('id', userId)
+    .single();
+  
+  const userName = user?.full_name || user?.name || null;
+  const state = (user?.onboarding_state || 'waiting_for_name') as UserState;
+  
+  const ctx: RouterContext = { userId, phone, state, userName };
+  
+  console.log(`[φ Router] state=${state}, userName=${userName}`);
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: waiting_for_name
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'waiting_for_name') {
+    // שמור את השם
+    await supabase
+      .from('users')
+      .update({ 
+        name: msg, 
+        full_name: msg,
+        onboarding_state: 'waiting_for_document' 
+      })
+      .eq('id', userId);
+    
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `נעים להכיר, ${msg}! 😊\n\n` +
+        `📄 שלח לי דוח בנק (PDF) ואני אנתח את התנועות שלך.`,
+    });
+    
+    return { success: true, newState: 'waiting_for_document' };
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: waiting_for_document
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'waiting_for_document') {
+    // אם המשתמש רוצה להתחיל לסווג
+    if (isCommand(msg, ['נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג'])) {
+      return await startClassification(ctx);
+    }
+    
+    // אחרת - מחכים למסמך
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `📄 מחכה לדוח בנק!\n\nשלח לי קובץ PDF ואני אנתח אותו.`,
+    });
+    
+    return { success: true };
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: classification_income
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'classification_income') {
+    return await handleClassificationResponse(ctx, msg, 'income');
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: classification_expense
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'classification_expense') {
+    return await handleClassificationResponse(ctx, msg, 'expense');
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: monitoring
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'monitoring') {
+    // שאלה על קטגוריה
+    const categoryMatch = findBestMatch(msg);
+    if (categoryMatch) {
+      return await answerCategoryQuestion(ctx, categoryMatch.name);
+    }
+    
+    // סיכום
+    if (isCommand(msg, ['סיכום', 'מצב', 'סטטוס'])) {
+      return await showFinalSummary(ctx);
+    }
+    
+    // ברירת מחדל
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `איך אני יכול לעזור? 😊\n\n` +
+        `• שלח מסמך לניתוח\n` +
+        `• שאל "כמה הוצאתי על X?"\n` +
+        `• כתוב "סיכום" לראות את המצב`,
+    });
+    
+    return { success: true };
+  }
+  
+  return { success: false };
+}
+
+// ============================================================================
+// Classification Logic
+// ============================================================================
+
+async function startClassification(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // ספור הכנסות והוצאות
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('id, type')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'proposed');
+  
+  const incomeCount = transactions?.filter(t => t.type === 'income').length || 0;
+  const expenseCount = transactions?.filter(t => t.type === 'expense').length || 0;
+  
+  if (incomeCount === 0 && expenseCount === 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `אין תנועות לסיווג! 🤷\n\nשלח לי דוח בנק חדש.`,
+    });
+    return { success: true };
+  }
+  
+  // הודעת פתיחה
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `🎯 *בוא נעבור על התנועות ביחד!*\n\n` +
+      `יש לך ${incomeCount} הכנסות ו-${expenseCount} הוצאות.\n\n` +
+      (incomeCount > 0 ? `נתחיל עם ההכנסות 💚` : `נתחיל עם ההוצאות 💸`),
+  });
+  
+  // עדכן state והצג תנועה ראשונה
+  const newState = incomeCount > 0 ? 'classification_income' : 'classification_expense';
+  
+  await supabase
+    .from('users')
+    .update({ onboarding_state: newState })
+    .eq('id', ctx.userId);
+  
+  // הצג תנועה ראשונה
+  await showNextTransaction({ ...ctx, state: newState }, newState === 'classification_income' ? 'income' : 'expense');
+  
+  return { success: true, newState };
+}
+
+async function handleClassificationResponse(
+  ctx: RouterContext, 
+  msg: string,
+  type: 'income' | 'expense'
+): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // קבל תנועה נוכחית
+  const { data: currentTx } = await supabase
+    .from('transactions')
+    .select('id, amount, vendor, tx_date, type, expense_category')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'proposed')
+    .eq('type', type)
+    .order('tx_date', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!currentTx) {
+    // אין יותר תנועות מסוג זה
+    return await moveToNextPhase(ctx, type);
+  }
+  
+  // פקודת דילוג
+  if (isCommand(msg, ['דלג', 'תדלג', 'הבא', 'skip'])) {
+    // בדוק אם זה אשראי
+    const isCredit = /visa|mastercard|ויזה|מסטרקארד|אשראי|\d{4}$/i.test(currentTx.vendor);
+    
+    await supabase
+      .from('transactions')
+      .update({ 
+        status: isCredit ? 'needs_credit_detail' : 'skipped',
+        notes: isCredit ? 'ממתין לדוח פירוט אשראי' : 'דילוג משתמש'
+      })
+      .eq('id', currentTx.id);
+    
+    if (isCredit) {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `⏭️ זה חיוב כרטיס אשראי - צריך דוח פירוט לסווג.\n` +
+          `שלח לי דוח אשראי אחרי שנסיים.`,
+      });
+    }
+    
+    return await showNextTransaction(ctx, type);
+  }
+  
+  // אישור הצעה (כן / 1)
+  if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes'])) {
+    const suggestions = await getSuggestionsFromCache(ctx.userId);
+    if (suggestions && suggestions[0]) {
+      // If it's expense grouping, classify all in group
+      if (type === 'expense') {
+        const groupIds = await getCurrentGroupFromCache(ctx.userId);
+        if (groupIds && groupIds.length > 0) {
+          return await classifyGroup(ctx, groupIds, suggestions[0], type);
+        }
+      }
+      return await classifyTransaction(ctx, currentTx.id, suggestions[0], type);
+    }
+  }
+  
+  // בחירה מספרית (1, 2, 3)
+  const numChoice = parseInt(msg);
+  if (!isNaN(numChoice) && numChoice >= 1 && numChoice <= 3) {
+    const suggestions = await getSuggestionsFromCache(ctx.userId);
+    if (suggestions && suggestions[numChoice - 1]) {
+      // If it's expense grouping and choice is 1, classify all in group
+      if (type === 'expense' && numChoice === 1) {
+        const groupIds = await getCurrentGroupFromCache(ctx.userId);
+        if (groupIds && groupIds.length > 0) {
+          return await classifyGroup(ctx, groupIds, suggestions[numChoice - 1], type);
+        }
+      }
+      return await classifyTransaction(ctx, currentTx.id, suggestions[numChoice - 1], type);
+    }
+  }
+  
+  // ניסיון התאמה לקטגוריה
+  const match = findBestMatch(msg);
+  if (match) {
+    return await classifyTransaction(ctx, currentTx.id, match.name, type);
+  }
+  
+  // לא מצאנו - הצע אפשרויות
+  const topMatches = findTopMatches(msg, 3);
+  if (topMatches.length > 0) {
+    await saveSuggestionsToCache(ctx.userId, topMatches.map(m => m.name));
+    
+    const list = topMatches.map((m, i) => `${i + 1}. ${m.name}`).join('\n');
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🤔 לא מצאתי "${msg}".\n\nאולי התכוונת ל:\n${list}\n\nכתוב מספר (1-3) או נסה שוב.`,
+    });
+    return { success: true };
+  }
+  
+  // באמת לא מצאנו כלום
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `🤷 לא הצלחתי למצוא קטגוריה.\n\nנסה מילה אחרת או כתוב "דלג".`,
+  });
+  
+  return { success: true };
+}
+
+async function classifyTransaction(
+  ctx: RouterContext,
+  txId: string,
+  category: string,
+  type: 'income' | 'expense'
+): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // שמור
+  const { error } = await supabase
+    .from('transactions')
+    .update({ 
+      status: 'confirmed',
+      category,
+      expense_category: type === 'expense' ? category : null,
+      income_category: type === 'income' ? category : null,
+    })
+    .eq('id', txId);
+  
+  if (error) {
+    console.error('[φ Router] Failed to classify:', error);
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ משהו השתבש. נסה שוב.`,
+    });
+    return { success: false };
+  }
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `✅ *${category}*`,
+  });
+  
+  // הצג תנועה הבאה
+  return await showNextTransaction(ctx, type);
+}
+
+async function classifyGroup(
+  ctx: RouterContext,
+  txIds: string[],
+  category: string,
+  type: 'income' | 'expense'
+): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // סווג את כל התנועות בקבוצה
+  const { error } = await supabase
+    .from('transactions')
+    .update({ 
+      status: 'confirmed',
+      category,
+      expense_category: type === 'expense' ? category : null,
+      income_category: type === 'income' ? category : null,
+    })
+    .in('id', txIds);
+  
+  if (error) {
+    console.error('[φ Router] Failed to classify group:', error);
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ משהו השתבש. נסה שוב.`,
+    });
+    return { success: false };
+  }
+  
+  const count = txIds.length;
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: count > 1 
+      ? `✅ *${category}* (${count} תנועות)`
+      : `✅ *${category}*`,
+  });
+  
+  // הצג קבוצה הבאה
+  return await showNextTransaction(ctx, type);
+}
+
+async function showNextTransaction(
+  ctx: RouterContext,
+  type: 'income' | 'expense'
+): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // בהוצאות - קבץ לפי ספק
+  if (type === 'expense') {
+    return await showNextExpenseGroup(ctx);
+  }
+  
+  // בהכנסות - אחת אחת
+  const { data: nextTx } = await supabase
+    .from('transactions')
+    .select('id, amount, vendor, tx_date, expense_category')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'proposed')
+    .eq('type', 'income')
+    .order('tx_date', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!nextTx) {
+    return await moveToNextPhase(ctx, 'income');
+  }
+  
+  // ספור כמה נשארו
+  const { count } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId)
+    .eq('status', 'proposed')
+    .eq('type', 'income');
+  
+  const remaining = count || 0;
+  
+  // הצעת קטגוריה
+  const suggestion = nextTx.expense_category || findBestMatch(nextTx.vendor)?.name;
+  
+  let message = `💚 *${nextTx.vendor}*\n`;
+  message += `${Math.abs(nextTx.amount).toLocaleString('he-IL')} ₪ | ${nextTx.tx_date}\n\n`;
+  
+  if (suggestion) {
+    message += `💡 נראה כמו: *${suggestion}*\n`;
+    message += `כתוב "כן" לאשר, או כתוב קטגוריה אחרת.`;
+  } else {
+    message += `מה הקטגוריה?`;
+  }
+  
+  message += `\n\n(נשארו ${remaining})`;
+  
+  // שמור הצעה לאישור מהיר
+  if (suggestion) {
+    await saveSuggestionsToCache(ctx.userId, [suggestion]);
+  }
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message,
+  });
+  
+  return { success: true };
+}
+
+async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // קבל את כל ההוצאות הממתינות
+  const { data: expenses } = await supabase
+    .from('transactions')
+    .select('id, amount, vendor, tx_date, expense_category')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'proposed')
+    .eq('type', 'expense')
+    .order('tx_date', { ascending: false });
+  
+  if (!expenses || expenses.length === 0) {
+    return await moveToNextPhase(ctx, 'expense');
+  }
+  
+  // בדוק אם התנועה הראשונה היא אשראי - דלג אוטומטית
+  const firstTx = expenses[0];
+  const isCredit = /visa|mastercard|ויזה|מסטרקארד|אשראי|כרטיס.*\d{4}$/i.test(firstTx.vendor);
+  
+  if (isCredit) {
+    await supabase
+      .from('transactions')
+      .update({ 
+        status: 'needs_credit_detail',
+        notes: 'ממתין לדוח פירוט אשראי'
+      })
+      .eq('id', firstTx.id);
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `⏭️ *${firstTx.vendor}* - ${Math.abs(firstTx.amount).toLocaleString('he-IL')} ₪\n` +
+        `זה חיוב אשראי - צריך דוח פירוט. דילגתי.`,
+    });
+    
+    // המשך לבאה
+    return await showNextExpenseGroup(ctx);
+  }
+  
+  // קבץ לפי ספק
+  const vendor = firstTx.vendor;
+  const vendorTxs = expenses.filter(e => e.vendor === vendor);
+  const totalAmount = vendorTxs.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  // ספור כמה קבוצות נשארו
+  const uniqueVendors = new Set(expenses.map(e => e.vendor));
+  const groupsRemaining = uniqueVendors.size;
+  
+  // הצעת קטגוריה
+  const suggestion = firstTx.expense_category || findBestMatch(vendor)?.name;
+  
+  let message = '';
+  
+  if (vendorTxs.length === 1) {
+    // תנועה בודדת
+    message = `💸 *${vendor}*\n`;
+    message += `${totalAmount.toLocaleString('he-IL')} ₪ | ${firstTx.tx_date}\n\n`;
+  } else {
+    // קבוצה
+    message = `💸 *${vendor}* (${vendorTxs.length} תנועות)\n`;
+    message += `סה"כ: ${totalAmount.toLocaleString('he-IL')} ₪\n\n`;
+    
+    // הצג עד 3 תנועות
+    vendorTxs.slice(0, 3).forEach(t => {
+      message += `   • ${Math.abs(t.amount).toLocaleString('he-IL')} ₪ (${t.tx_date.slice(5)})\n`;
+    });
+    if (vendorTxs.length > 3) {
+      message += `   ...ועוד ${vendorTxs.length - 3}\n`;
+    }
+    message += '\n';
+  }
+  
+  if (suggestion) {
+    message += `💡 נראה כמו: *${suggestion}*\n`;
+    message += `כתוב "כן" לאשר${vendorTxs.length > 1 ? ' את כולן' : ''}, או כתוב קטגוריה אחרת.`;
+  } else {
+    message += `מה הקטגוריה?`;
+  }
+  
+  message += `\n\n(${groupsRemaining} קבוצות נשארו)`;
+  
+  // שמור מזהי התנועות ב-cache לסיווג קבוצתי
+  await saveCurrentGroupToCache(ctx.userId, vendorTxs.map(t => t.id));
+  
+  if (suggestion) {
+    await saveSuggestionsToCache(ctx.userId, [suggestion]);
+  }
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message,
+  });
+  
+  return { success: true };
+}
+
+async function moveToNextPhase(
+  ctx: RouterContext,
+  completedType: 'income' | 'expense'
+): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  if (completedType === 'income') {
+    // בדוק אם יש הוצאות
+    const { count } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', ctx.userId)
+      .eq('status', 'proposed')
+      .eq('type', 'expense');
+    
+    if (count && count > 0) {
+      await supabase
+        .from('users')
+        .update({ onboarding_state: 'classification_expense' })
+        .eq('id', ctx.userId);
+      
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `✅ *סיימנו את ההכנסות!*\n\nעכשיו נעבור על ההוצאות 💸`,
+      });
+      
+      return await showNextExpenseGroup({ ...ctx, state: 'classification_expense' });
+    }
+  }
+  
+  // סיימנו הכל!
+  return await showFinalSummary(ctx);
+}
+
+async function showFinalSummary(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // עדכן state
+  await supabase
+    .from('users')
+    .update({ onboarding_state: 'monitoring' })
+    .eq('id', ctx.userId);
+  
+  // חשב סיכומים
+  const { data: confirmed } = await supabase
+    .from('transactions')
+    .select('amount, type, category')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'confirmed');
+  
+  const totalIncome = (confirmed || [])
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  const totalExpenses = (confirmed || [])
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  const balance = totalIncome - totalExpenses;
+  const balanceEmoji = balance >= 0 ? '✨' : '📉';
+  
+  // קטגוריות גדולות
+  const categoryTotals: Record<string, number> = {};
+  (confirmed || [])
+    .filter(t => t.type === 'expense' && t.category)
+    .forEach(t => {
+      categoryTotals[t.category] = (categoryTotals[t.category] || 0) + Math.abs(t.amount);
+    });
+  
+  const topCategories = Object.entries(categoryTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([cat, amount]) => `• ${cat}: ${amount.toLocaleString('he-IL')} ₪`)
+    .join('\n');
+  
+  // ספור ממתינים לפירוט
+  const { count: pendingCredit } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId)
+    .eq('status', 'needs_credit_detail');
+  
+  let message = `🎉 *סיימנו לסווג!*\n\n`;
+  message += `📊 *הסיכום שלך:*\n`;
+  message += `💚 הכנסות: ${totalIncome.toLocaleString('he-IL')} ₪\n`;
+  message += `💸 הוצאות: ${totalExpenses.toLocaleString('he-IL')} ₪\n`;
+  message += `${balanceEmoji} יתרה: ${balance.toLocaleString('he-IL')} ₪\n\n`;
+  
+  if (topCategories) {
+    message += `*הקטגוריות הגדולות:*\n${topCategories}\n\n`;
+  }
+  
+  if (pendingCredit && pendingCredit > 0) {
+    message += `⏳ ${pendingCredit} חיובי אשראי ממתינים לדוח פירוט\n\n`;
+  }
+  
+  message += `*מה עכשיו?*\n`;
+  message += `• שלח עוד מסמך\n`;
+  message += `• שאל "כמה הוצאתי על X?"`;
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message,
+  });
+  
+  return { success: true, newState: 'monitoring' };
+}
+
+async function answerCategoryQuestion(ctx: RouterContext, category: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  const { data: txs } = await supabase
+    .from('transactions')
+    .select('amount')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'confirmed')
+    .ilike('category', `%${category}%`);
+  
+  const total = (txs || []).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const count = txs?.length || 0;
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `📊 *${category}*\n\n` +
+      `${count} תנועות\n` +
+      `סה"כ: ${total.toLocaleString('he-IL')} ₪`,
+  });
+  
+  return { success: true };
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function isCommand(msg: string, commands: string[]): boolean {
+  const lower = msg.toLowerCase().trim();
+  return commands.some(cmd => lower === cmd || lower.includes(cmd));
+}
+
+// Simple in-memory cache (resets on deploy)
+const suggestionsCache = new Map<string, string[]>();
+const groupCache = new Map<string, string[]>();
+
+async function saveSuggestionsToCache(userId: string, suggestions: string[]): Promise<void> {
+  suggestionsCache.set(userId, suggestions);
+}
+
+async function getSuggestionsFromCache(userId: string): Promise<string[] | null> {
+  return suggestionsCache.get(userId) || null;
+}
+
+async function saveCurrentGroupToCache(userId: string, txIds: string[]): Promise<void> {
+  groupCache.set(userId, txIds);
+}
+
+async function getCurrentGroupFromCache(userId: string): Promise<string[] | null> {
+  return groupCache.get(userId) || null;
+}
+
+// ============================================================================
+// Document Processing Hook
+// ============================================================================
+
+/**
+ * Called after document processing completes
+ */
+export async function onDocumentProcessed(userId: string, phone: string): Promise<void> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // ספור תנועות
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('id, type, amount')
+    .eq('user_id', userId)
+    .eq('status', 'proposed');
+  
+  const incomeCount = transactions?.filter(t => t.type === 'income').length || 0;
+  const expenseCount = transactions?.filter(t => t.type === 'expense').length || 0;
+  const totalIncome = transactions?.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
+  const totalExpenses = transactions?.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
+  
+  const message = `📊 *קיבלתי את הדוח!*\n\n` +
+    `📝 ${incomeCount + expenseCount} תנועות\n` +
+    `💚 ${incomeCount} הכנסות (${totalIncome.toLocaleString('he-IL')} ₪)\n` +
+    `💸 ${expenseCount} הוצאות (${totalExpenses.toLocaleString('he-IL')} ₪)\n\n` +
+    `*מה עכשיו?*\n` +
+    `• יש לי עוד דוח בנק\n` +
+    `• יש לי דוח אשראי\n` +
+    `• נתחיל לסווג`;
+  
+  await greenAPI.sendMessage({
+    phoneNumber: phone,
+    message,
+  });
+}
+
