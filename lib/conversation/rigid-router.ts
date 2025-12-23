@@ -199,6 +199,11 @@ export async function loadRouterContext(userId: string, phoneNumber: string): Pr
   // Check if user is in search mode
   const isInSearchMode = searchModeUsers.get(userId) || false;
   
+  console.log(`[Router Context] userId=${userId}, state=${state}, pendingTx=${pendingCount}, groups=${groups.length}`);
+  if (groups.length > 0) {
+    console.log(`[Router Context] First group: vendor="${groups[0].vendor}", txCount=${groups[0].count}, suggested=${groups[0].suggestedCategory}`);
+  }
+  
   return {
     userId,
     phoneNumber,
@@ -308,6 +313,11 @@ export async function routeMessage(
     // אין יותר קבוצות → סיכום
     if (!ctx.currentGroup) {
       return await showSummary(ctx);
+    }
+    
+    // 🆕 "נמשיך" / "המשך" - הצג את התנועה הנוכחית (שימושי אם המשתמש רוצה לראות שוב)
+    if (matchesCommand(message, CONTINUE_COMMANDS)) {
+      return await showNextTransaction(ctx, false);
     }
     
     // דילוג
@@ -546,7 +556,10 @@ async function showHelpMessage(ctx: RouterContext, userInput: string): Promise<R
 async function showNextGroup(ctx: RouterContext, isFirst: boolean): Promise<RouterResult> {
   const greenAPI = getGreenAPIClient();
   
+  console.log(`[showNextGroup] isFirst=${isFirst}, hasGroup=${!!ctx.currentGroup}, groupIndex=${ctx.currentGroupIndex}, totalGroups=${ctx.totalGroups}`);
+  
   if (!ctx.currentGroup) {
+    console.log('[showNextGroup] No current group, showing summary');
     return await showSummary(ctx);
   }
   
