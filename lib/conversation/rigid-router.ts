@@ -26,8 +26,9 @@ export interface RouterContext {
   userName: string | null;
   pendingTransactionsCount: number;
   totalTransactions: number;       // Total including already classified
-  currentIndex: number;            // 1-based position in classification
-  currentTransaction: PendingTransaction | null;
+  totalGroups: number;             // Number of vendor groups
+  currentGroupIndex: number;       // 1-based position in groups
+  currentGroup: TransactionGroup | null;
   isInSearchMode?: boolean;        // True when user clicked "Other" and is searching
 }
 
@@ -38,6 +39,15 @@ export interface PendingTransaction {
   date: string;
   type: 'income' | 'expense';
   suggestedCategory: string | null;
+}
+
+export interface TransactionGroup {
+  vendor: string;
+  transactions: PendingTransaction[];
+  totalAmount: number;
+  type: 'income' | 'expense' | 'mixed';
+  suggestedCategory: string | null;
+  count: number;
 }
 
 export interface RouterResult {
@@ -98,51 +108,83 @@ export async function loadRouterContext(userId: string, phoneNumber: string): Pr
   
   const pendingCount = pendingTx?.length || 0;
   const totalTransactions = totalInBatch || pendingCount;
-  const classifiedCount = totalTransactions - pendingCount;
-  const currentIndex = classifiedCount + 1; // 1-based
   
-  // Build current transaction with pattern-based suggestion
-  let currentTransaction: PendingTransaction | null = null;
+  // Load user patterns for suggestions
+  const { data: userPatterns } = await supabase
+    .from('user_patterns')
+    .select('vendor, category')
+    .eq('user_id', userId);
+  
+  const patternMap = new Map<string, string>();
+  userPatterns?.forEach(p => patternMap.set(p.vendor.toLowerCase(), p.category));
+  
+  // Group transactions by vendor
+  const vendorGroups = new Map<string, PendingTransaction[]>();
   
   if (pendingTx && pendingTx.length > 0) {
-    const tx = pendingTx[0];
-    const vendor = tx.vendor || 'לא ידוע';
-    
-    // Check user_patterns for this vendor (learned from previous classifications)
-    let suggestedCategory = tx.expense_category || null;
-    
-    if (!suggestedCategory && vendor !== 'לא ידוע') {
-      const { data: pattern } = await supabase
-        .from('user_patterns')
-        .select('category')
-        .eq('user_id', userId)
-        .eq('vendor', vendor.toLowerCase())
-        .single();
+    for (const tx of pendingTx) {
+      const vendor = tx.vendor || 'לא ידוע';
+      const vendorKey = vendor.toLowerCase().trim();
       
-      if (pattern?.category) {
-        suggestedCategory = pattern.category;
-        console.log(`📚 Found pattern for "${vendor}": ${suggestedCategory}`);
+      // Get suggestion for this vendor
+      let suggestedCategory = tx.expense_category || null;
+      
+      if (!suggestedCategory && patternMap.has(vendorKey)) {
+        suggestedCategory = patternMap.get(vendorKey) || null;
       }
-    }
-    
-    // If still no suggestion, try AI-based matching from categories
-    if (!suggestedCategory) {
-      const aiMatch = findBestMatch(vendor);
-      if (aiMatch) {
-        suggestedCategory = aiMatch.name;
-        console.log(`🤖 AI matched "${vendor}" to: ${suggestedCategory}`);
+      
+      if (!suggestedCategory && vendor !== 'לא ידוע') {
+        const aiMatch = findBestMatch(vendor);
+        if (aiMatch) {
+          suggestedCategory = aiMatch.name;
+        }
       }
+      
+      const pendingTransaction: PendingTransaction = {
+        id: tx.id,
+        amount: Math.abs(tx.amount),
+        vendor: vendor,
+        date: tx.tx_date,
+        type: tx.type as 'income' | 'expense',
+        suggestedCategory,
+      };
+      
+      if (!vendorGroups.has(vendorKey)) {
+        vendorGroups.set(vendorKey, []);
+      }
+      vendorGroups.get(vendorKey)!.push(pendingTransaction);
     }
-    
-    currentTransaction = {
-      id: tx.id,
-      amount: Math.abs(tx.amount),
-      vendor: vendor,
-      date: tx.tx_date,
-      type: tx.type as 'income' | 'expense',
-      suggestedCategory,
-    };
   }
+  
+  // Convert to array and sort: larger groups first, then by suggestion confidence
+  const groups: TransactionGroup[] = Array.from(vendorGroups.entries())
+    .map(([vendorKey, transactions]) => {
+      const vendor = transactions[0].vendor;
+      const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
+      const types = new Set(transactions.map(t => t.type));
+      const type = types.size === 1 ? transactions[0].type : 'mixed';
+      const suggestedCategory = transactions[0].suggestedCategory;
+      
+      return {
+        vendor,
+        transactions,
+        totalAmount,
+        type,
+        suggestedCategory,
+        count: transactions.length,
+      };
+    })
+    .sort((a, b) => {
+      // 1. Groups with suggestions first
+      if (a.suggestedCategory && !b.suggestedCategory) return -1;
+      if (!a.suggestedCategory && b.suggestedCategory) return 1;
+      // 2. Larger groups first
+      return b.count - a.count;
+    });
+  
+  // Count classified groups (approximation based on transaction count)
+  const classifiedCount = totalTransactions - pendingCount;
+  const currentGroupIndex = groups.length > 0 ? 1 : 0;
   
   // Determine state
   let state: UserState = 'waiting_for_name';
@@ -164,8 +206,9 @@ export async function loadRouterContext(userId: string, phoneNumber: string): Pr
     userName,
     pendingTransactionsCount: pendingCount,
     totalTransactions,
-    currentIndex,
-    currentTransaction,
+    totalGroups: groups.length,
+    currentGroupIndex,
+    currentGroup: groups.length > 0 ? groups[0] : null,
     isInSearchMode,
   };
 }
@@ -262,14 +305,14 @@ export async function routeMessage(
   // STATE: classification
   // ============================================
   if (ctx.state === 'classification') {
-    // אין יותר תנועות → סיכום
-    if (!ctx.currentTransaction) {
+    // אין יותר קבוצות → סיכום
+    if (!ctx.currentGroup) {
       return await showSummary(ctx);
     }
     
     // דילוג
     if (matchesCommand(message, SKIP_COMMANDS) || message === 'skip') {
-      return await skipTransaction(ctx);
+      return await skipGroup(ctx);
     }
 
     // כפתור "אחר" - כניסה למצב חיפוש
@@ -288,8 +331,8 @@ export async function routeMessage(
     }
     
     // אישור קטגוריה מוצעת (כפתור או טקסט "כן")
-    if (matchesCommand(message, YES_COMMANDS) && ctx.currentTransaction.suggestedCategory) {
-      return await classifyTransaction(ctx, ctx.currentTransaction.suggestedCategory);
+    if (matchesCommand(message, YES_COMMANDS) && ctx.currentGroup.suggestedCategory) {
+      return await classifyGroup(ctx, ctx.currentGroup.suggestedCategory);
     }
     
     // בחירה מספרית מהצעות קודמות (1-10)
@@ -442,8 +485,8 @@ async function suggestCategories(
 ): Promise<RouterResult> {
   const greenAPI = getGreenAPIClient();
   
-  const tx = ctx.currentTransaction;
-  if (!tx) return await showSummary(ctx);
+  const group = ctx.currentGroup;
+  if (!group) return await showSummary(ctx);
   
   // שמור את ההצעות ב-cache לבחירה מספרית
   recentSuggestions.set(ctx.userId, suggestions.map(s => ({ id: s.id, name: s.name })));
@@ -473,15 +516,19 @@ async function suggestCategories(
 async function showHelpMessage(ctx: RouterContext, userInput: string): Promise<RouterResult> {
   const greenAPI = getGreenAPIClient();
   
-  const tx = ctx.currentTransaction;
-  if (!tx) return await showSummary(ctx);
+  const group = ctx.currentGroup;
+  if (!group) return await showSummary(ctx);
+  
+  const txInfo = group.count > 1
+    ? `${group.count} תנועות מ-${group.vendor} (${group.totalAmount.toLocaleString('he-IL')} ₪)`
+    : `${group.transactions[0].amount.toLocaleString('he-IL')} ₪ | ${group.vendor}`;
   
   const message = `🤷 לא הבנתי "${userInput}".\n\n` +
     `💡 נסה:\n` +
     `• לכתוב שם קטגוריה (למשל: "מזון", "דלק", "ביטוח")\n` +
     `• לכתוב "רשימה" לראות את כל הקטגוריות\n` +
-    `• לכתוב "דלג" לדלג על התנועה הזו\n\n` +
-    `📌 *התנועה:* ${tx.amount.toLocaleString('he-IL')} ₪ | ${tx.vendor}`;
+    `• לכתוב "דלג" לדלג\n\n` +
+    `📌 *הקבוצה:* ${txInfo}`;
   
   try {
     await greenAPI.sendMessage({
@@ -496,44 +543,61 @@ async function showHelpMessage(ctx: RouterContext, userInput: string): Promise<R
   return { success: true };
 }
 
-async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promise<RouterResult> {
+async function showNextGroup(ctx: RouterContext, isFirst: boolean): Promise<RouterResult> {
   const greenAPI = getGreenAPIClient();
   
-  if (!ctx.currentTransaction) {
+  if (!ctx.currentGroup) {
     return await showSummary(ctx);
   }
   
-  const tx = ctx.currentTransaction;
-  const typeEmoji = tx.type === 'income' ? '💚' : '💸';
-  const typeLabel = tx.type === 'income' ? 'הכנסה' : 'הוצאה';
+  const group = ctx.currentGroup;
+  const typeEmoji = group.type === 'income' ? '💚' : (group.type === 'expense' ? '💸' : '🔄');
+  const typeLabel = group.type === 'income' ? 'הכנסות' : (group.type === 'expense' ? 'הוצאות' : 'תנועות');
   
   // Use suggestion from context (includes patterns + AI matching)
-  const suggested = tx.suggestedCategory 
-    ? getCategoryByName(tx.suggestedCategory) || { id: 'suggested', name: tx.suggestedCategory }
+  const suggested = group.suggestedCategory 
+    ? getCategoryByName(group.suggestedCategory) || { id: 'suggested', name: group.suggestedCategory }
     : null;
   
-  // בניית הודעה עם מונה וסוג
-  const counter = `*${typeLabel} ${ctx.currentIndex} מתוך ${ctx.totalTransactions}*`;
+  // בניית הודעה - קבוצה או תנועה בודדת
+  const progress = `[${ctx.currentGroupIndex}/${ctx.totalGroups}]`;
   
   let message = isFirst 
-    ? `🎯 *מתחילים לסווג!*\n\n`
+    ? `🎯 *מתחילים לסווג!*\n${ctx.pendingTransactionsCount} תנועות ב-${ctx.totalGroups} קבוצות\n\n`
     : ``;
   
-  message += `${typeEmoji} ${counter}\n\n`;
-  message += `*${tx.amount.toLocaleString('he-IL')} ₪* | ${tx.vendor}\n`;
-  message += `📅 ${tx.date}\n\n`;
+  if (group.count === 1) {
+    // תנועה בודדת - הצג כרגיל
+    const tx = group.transactions[0];
+    message += `${typeEmoji} ${progress} *${group.vendor}*\n\n`;
+    message += `*${tx.amount.toLocaleString('he-IL')} ₪*\n`;
+    message += `📅 ${tx.date}\n\n`;
+  } else {
+    // קבוצה - הצג סיכום
+    message += `📦 ${progress} *${group.vendor}* (${group.count} ${typeLabel})\n\n`;
+    
+    // הצג עד 5 תנועות
+    const displayTx = group.transactions.slice(0, 5);
+    displayTx.forEach(tx => {
+      message += `   • ${tx.amount.toLocaleString('he-IL')} ₪ (${tx.date.slice(5)})\n`;
+    });
+    if (group.count > 5) {
+      message += `   ...ועוד ${group.count - 5} תנועות\n`;
+    }
+    message += `\n💰 *סה"כ: ${group.totalAmount.toLocaleString('he-IL')} ₪*\n\n`;
+  }
   
   // TEXT-ONLY approach (buttons are disabled by GreenAPI)
   if (suggested) {
     message += `💡 *הצעה:* ${suggested.name}\n`;
-    message += `   כתוב *"כן"* לאישור\n\n`;
+    message += `   כתוב *"כן"* לסווג ${group.count > 1 ? 'את כולן' : ''}\n\n`;
   }
   
   message += `📝 *אפשרויות:*\n`;
-  message += `• כתוב שם קטגוריה (למשל: "מזון", "דלק", "ייעוץ")\n`;
+  message += `• כתוב שם קטגוריה\n`;
   message += `• כתוב *"דלג"* לדלג`;
   
-  // Clear search mode when showing new transaction
+  // Clear search mode when showing new group
   searchModeUsers.delete(ctx.userId);
   
   try {
@@ -542,11 +606,16 @@ async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promis
       message,
     });
   } catch (error: any) {
-    console.error('❌ Failed to send transaction message:', error?.message);
+    console.error('❌ Failed to send group message:', error?.message);
     return { success: false };
   }
   
   return { success: true };
+}
+
+// Backwards compatibility alias
+async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promise<RouterResult> {
+  return showNextGroup(ctx, isFirst);
 }
 
 async function showFullCategoryList(ctx: RouterContext): Promise<RouterResult> {
@@ -628,20 +697,21 @@ async function showCategoriesInGroup(ctx: RouterContext, groupName: string): Pro
   return { success: true };
 }
 
-async function classifyTransaction(ctx: RouterContext, category: string): Promise<RouterResult> {
+async function classifyGroup(ctx: RouterContext, category: string): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  if (!ctx.currentTransaction) {
+  if (!ctx.currentGroup) {
     return await showSummary(ctx);
   }
   
-  const txId = ctx.currentTransaction.id;
-  const vendor = ctx.currentTransaction.vendor;
+  const group = ctx.currentGroup;
+  const txIds = group.transactions.map(t => t.id);
+  const vendor = group.vendor;
   
-  console.log(`📝 Classifying transaction ${txId} as "${category}"`);
+  console.log(`📝 Classifying ${txIds.length} transactions from "${vendor}" as "${category}"`);
   
-  // Update transaction with error handling
+  // Update ALL transactions in the group
   const { data: updatedTx, error: updateError } = await supabase
     .from('transactions')
     .update({
@@ -649,12 +719,11 @@ async function classifyTransaction(ctx: RouterContext, category: string): Promis
       category: category,
       expense_category: category,
     })
-    .eq('id', txId)
-    .select('id, status')
-    .single();
+    .in('id', txIds)
+    .select('id, status');
   
   if (updateError) {
-    console.error(`❌ Failed to classify transaction ${txId}:`, updateError);
+    console.error(`❌ Failed to classify group "${vendor}":`, updateError);
     await greenAPI.sendMessage({
       phoneNumber: ctx.phoneNumber,
       message: `⚠️ אופס, משהו השתבש. נסה שוב.`,
@@ -662,7 +731,7 @@ async function classifyTransaction(ctx: RouterContext, category: string): Promis
     return { success: false };
   }
   
-  console.log(`✅ Transaction ${txId} classified as "${category}":`, updatedTx);
+  console.log(`✅ ${txIds.length} transactions classified as "${category}"`);
   
   // Save pattern for future (ignore errors - not critical)
   const { error: patternError } = await supabase
@@ -675,7 +744,6 @@ async function classifyTransaction(ctx: RouterContext, category: string): Promis
   
   if (patternError) {
     console.warn(`⚠️ Failed to save pattern for "${vendor}":`, patternError);
-    // Don't fail the operation - pattern saving is nice-to-have
   } else {
     console.log(`📚 Saved pattern: "${vendor}" → "${category}"`);
   }
@@ -687,49 +755,65 @@ async function classifyTransaction(ctx: RouterContext, category: string): Promis
   const newCtx = await loadRouterContext(ctx.userId, ctx.phoneNumber);
   
   if (newCtx.pendingTransactionsCount === 0) {
+    const confirmMsg = group.count > 1 
+      ? `✅ ${group.count} תנועות סווגו כ-${category}!`
+      : `✅ ${category}!`;
     await greenAPI.sendMessage({
       phoneNumber: ctx.phoneNumber,
-      message: `✅ ${category}!`,
+      message: confirmMsg,
     });
     return await showSummary(newCtx);
   }
   
-  // Combine confirmation with next transaction
-  const remaining = newCtx.pendingTransactionsCount;
+  // Combine confirmation with next group
+  const remainingGroups = newCtx.totalGroups;
+  const confirmMsg = group.count > 1 
+    ? `✅ ${group.count} תנועות → ${category} (נשארו ${remainingGroups} קבוצות)`
+    : `✅ ${category}! (נשארו ${remainingGroups} קבוצות)`;
+  
   await greenAPI.sendMessage({
     phoneNumber: ctx.phoneNumber,
-    message: `✅ ${category}! (נשארו ${remaining})`,
+    message: confirmMsg,
   });
   
-  return await showNextTransaction(newCtx, false);
+  return await showNextGroup(newCtx, false);
 }
 
-async function skipTransaction(ctx: RouterContext): Promise<RouterResult> {
+// Backwards compatibility alias
+async function classifyTransaction(ctx: RouterContext, category: string): Promise<RouterResult> {
+  return classifyGroup(ctx, category);
+}
+
+async function skipGroup(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  if (!ctx.currentTransaction) {
+  if (!ctx.currentGroup) {
     return await showSummary(ctx);
   }
   
-  const tx = ctx.currentTransaction;
+  const group = ctx.currentGroup;
+  const txIds = group.transactions.map(t => t.id);
   
   // Check if it's a credit card charge
-  const isCredit = /visa|mastercard|ויזה|מסטרקארד|אשראי|\d{4}$/i.test(tx.vendor);
+  const isCredit = /visa|mastercard|ויזה|מסטרקארד|אשראי|\d{4}$/i.test(group.vendor);
   const newStatus = isCredit ? 'needs_credit_detail' : 'skipped';
   
-  console.log(`⏭️ Skipping transaction ${tx.id} (${isCredit ? 'credit' : 'regular'})`);
+  console.log(`⏭️ Skipping ${txIds.length} transactions from "${group.vendor}" (${isCredit ? 'credit' : 'regular'})`);
   
   const { error: skipError } = await supabase
     .from('transactions')
     .update({
       status: newStatus,
       notes: isCredit ? 'צריך פירוט אשראי' : 'דילוג משתמש',
+      // Mark for credit detail matching when credit statement is uploaded
+      needs_details: isCredit ? true : undefined,
+      payment_method: isCredit ? 'credit_card' : undefined,
     })
-    .eq('id', tx.id);
+    .in('id', txIds);
   
   if (skipError) {
-    console.error(`❌ Failed to skip transaction ${tx.id}:`, skipError);
+    console.error(`❌ Failed to skip group "${group.vendor}":`, skipError);
     await greenAPI.sendMessage({
       phoneNumber: ctx.phoneNumber,
       message: `⚠️ אופס, משהו השתבש. נסה שוב.`,
@@ -737,7 +821,7 @@ async function skipTransaction(ctx: RouterContext): Promise<RouterResult> {
     return { success: false };
   }
   
-  console.log(`✅ Transaction ${tx.id} skipped with status: ${newStatus}`);
+  console.log(`✅ ${txIds.length} transactions skipped with status: ${newStatus}`);
   
   // Clear search mode if active
   searchModeUsers.delete(ctx.userId);
@@ -749,23 +833,28 @@ async function skipTransaction(ctx: RouterContext): Promise<RouterResult> {
     if (isCredit) {
       await greenAPI.sendMessage({
         phoneNumber: ctx.phoneNumber,
-        message: `⏭️ דילגנו!\n\n💳 זה נראה כמו חיוב אשראי.\nשלח דוח כרטיס אשראי לפירוט.`,
+        message: `⏭️ דילגנו על ${group.count} תנועות!\n\n💳 זה נראה כמו חיוב אשראי.\nשלח דוח כרטיס אשראי לפירוט.`,
       });
     }
     return await showSummary(newCtx);
   }
   
-  const remaining = newCtx.pendingTransactionsCount;
-  const skipMsg = isCredit 
-    ? `⏭️ דילגנו (אשראי - צריך פירוט)`
+  const remainingGroups = newCtx.totalGroups;
+  const skipMsg = group.count > 1
+    ? `⏭️ דילגנו על ${group.count} תנועות`
     : `⏭️ דילגנו!`;
   
   await greenAPI.sendMessage({
     phoneNumber: ctx.phoneNumber,
-    message: `${skipMsg} (נשארו ${remaining})`,
+    message: `${skipMsg} (נשארו ${remainingGroups} קבוצות)`,
   });
   
-  return await showNextTransaction(newCtx, false);
+  return await showNextGroup(newCtx, false);
+}
+
+// Backwards compatibility alias
+async function skipTransaction(ctx: RouterContext): Promise<RouterResult> {
+  return skipGroup(ctx);
 }
 
 async function answerCategoryQuestion(ctx: RouterContext, question: string): Promise<RouterResult> {
