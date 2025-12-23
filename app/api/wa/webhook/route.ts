@@ -1517,105 +1517,10 @@ export async function POST(request: NextRequest) {
           
           console.log(`📊 Period coverage: ${actualCoverage.totalMonths} months, covered: ${actualCoverage.coveredMonths.join(', ')}, missing: ${actualCoverage.missingMonths.join(', ')}`);
           
-          // 🆕 Import classification session manager
-          const { 
-            createClassificationSession, 
-            saveClassificationSession, 
-            getInitialMessage,
-            getNextQuestionBatch 
-          } = await import('@/lib/conversation/flows/document-classification-session');
-          
-          // יצירת רשימת תנועות לסיווג
-          const transactionsToClassify = allTransactions.map((tx: any, idx: number) => ({
-            id: insertedIds[idx] || `temp_${idx}`,
-            date: tx.date || new Date().toISOString().split('T')[0],
-            vendor: tx.vendor || 'לא ידוע',
-            amount: tx.amount || 0,
-            type: (tx.type || 'expense') as 'income' | 'expense',
-            currentCategory: tx.expense_category || tx.income_category || null,
-            suggestedCategory: tx.expense_category || null,
-          }));
-          
-          // יצירת classification session
-          const session = await createClassificationSession(
-            userData.id,
-            pendingBatchId,
-            transactionsToClassify,
-            totalIncome,
-            totalExpenses,
-            ocrData.missing_documents || []  // מסמכים חסרים (כרטיסי אשראי וכו')
-          );
-          
-          // שמירת ה-session
-          await saveClassificationSession(userData.id, session);
-          
-          // 🆕 בניית הודעה טבעית וקצרה
-          const { buildDocumentAnalysisMessage } = await import('@/lib/conversation/flows/document-upload-flow');
-          
-          // בדוק אם זה המסמך הראשון
-          const { count: existingDocsCount } = await supabase
-            .from('uploaded_statements')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userData.id)
-            .eq('status', 'completed');
-          
-          const isFirstDocument = (existingDocsCount || 0) <= 1;
-          
-          // הכן את הנתונים לבניית ההודעה
-          const missingDocs = ocrData.missing_documents || [];
-          const analysisResult = {
-            totalTransactions: allTransactions.length,
-            incomeCount: incomeTransactions.length,
-            expenseCount: expenseTransactions.length,
-            totalIncome,
-            totalExpenses,
-            periodStart: periodStart?.toISOString().split('T')[0] || null,
-            periodEnd: periodEnd?.toISOString().split('T')[0] || null,
-            missingDocuments: missingDocs.map((doc: any) => ({
-              type: doc.type,
-              description: doc.description || '',
-              priority: doc.type === 'credit' ? 'high' : doc.type === 'payslip' ? 'high' : 'medium',
-              details: {
-                card_last_4: doc.card_last_4,
-                employer: doc.employer,
-                provider: doc.provider,
-                amount: doc.charge_amount || doc.salary_amount,
-              },
-            })),
-            documentType,
-          };
-          
-          let combinedMessage = buildDocumentAnalysisMessage(
-            analysisResult as any,
-            actualCoverage,
-            isFirstDocument
-          );
-          
-          // 🆕 הוסף אזהרה על חפיפה חלקית אם יש
-          if (partialOverlapWarning) {
-            combinedMessage += partialOverlapWarning;
-          }
-          
-          await greenAPI.sendMessage({
-            phoneNumber,
-            message: combinedMessage,
-          });
-          
-          // 🆕 שליחת כפתורים לבחירת המשך
-          try {
-            await greenAPI.sendButtons({
-              phoneNumber,
-              message: '*מה עכשיו?*',
-              buttons: [
-                { buttonId: 'add_bank', buttonText: '📄 עוד דוח בנק' },
-                { buttonId: 'add_credit', buttonText: '💳 דוח אשראי' },
-                { buttonId: 'start_classify', buttonText: '▶️ נתחיל לסווג!' },
-              ],
-            });
-            console.log('📱 Sent action buttons after document analysis');
-          } catch (btnError) {
-            console.error('⚠️ Failed to send buttons, user can type "נמשיך":', btnError);
-          }
+          // 🆕 שימוש ב-φ Router להודעת סיכום
+          const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+          await onDocumentProcessed(userData.id, phoneNumber);
+          console.log('✅ φ Router sent document summary message');
           
           // 🆕 שמירת מסמכים חסרים ב-DB לבקשה עתידית
           if (ocrData.missing_documents && ocrData.missing_documents.length > 0) {

@@ -20,6 +20,7 @@ import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categor
 type UserState = 
   | 'waiting_for_name'
   | 'waiting_for_document'
+  | 'classification'          // Generic classification (auto-detect income/expense)
   | 'classification_income'
   | 'classification_expense'
   | 'monitoring';
@@ -118,6 +119,34 @@ export async function routeMessage(
       message: `📄 מחכה לדוח בנק!\n\nשלח לי קובץ PDF ואני אנתח אותו.`,
     });
     
+    return { success: true };
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: classification (generic - auto-detect income/expense)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'classification') {
+    // אם המשתמש רוצה להתחיל לסווג
+    if (isCommand(msg, ['נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג', 'start_classify'])) {
+      return await startClassification(ctx);
+    }
+    
+    // אם המשתמש רוצה להוסיף עוד מסמך
+    if (isCommand(msg, ['עוד דוח', 'דוח נוסף', 'add_bank', 'add_credit'])) {
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `📄 מעולה! שלח לי את המסמך.`,
+      });
+      return { success: true };
+    }
+    
+    // ברירת מחדל - הצג הודעת עזרה
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `*מה עכשיו?*\n\n` +
+        `• כתוב *"נמשיך"* להתחיל לסווג תנועות\n` +
+        `• או שלח עוד מסמך PDF`,
+    });
     return { success: true };
   }
   
