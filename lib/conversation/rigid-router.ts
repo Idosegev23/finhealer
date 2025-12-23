@@ -162,7 +162,7 @@ export async function loadRouterContext(userId: string, phoneNumber: string): Pr
       const vendor = transactions[0].vendor;
       const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
       const types = new Set(transactions.map(t => t.type));
-      const type = types.size === 1 ? transactions[0].type : 'mixed';
+      const type: 'income' | 'expense' | 'mixed' = types.size === 1 ? transactions[0].type : 'mixed';
       const suggestedCategory = transactions[0].suggestedCategory;
       
       return {
