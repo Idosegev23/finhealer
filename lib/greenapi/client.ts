@@ -103,10 +103,26 @@ export class GreenAPIClient {
 
   /**
    * שליחת הודעה עם כפתורים
+   * Note: GreenAPI buttons require WhatsApp Business API and may not work on all instances
    */
   async sendButtons({ phoneNumber, message, buttons }: SendButtonsParams) {
     const url = `${this.baseUrl}/sendButtons/${this.token}`;
     const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
+
+    const payload = {
+      chatId: `${normalizedPhone}@c.us`,
+      message: message,
+      footer: 'Phi φ',
+      buttons: buttons.map((btn, index) => ({
+        buttonId: btn.buttonId || `btn_${index}`,
+        buttonText: {
+          displayText: btn.buttonText.substring(0, 20), // WhatsApp button text limit
+        },
+        type: 1,
+      })),
+    };
+
+    console.log('📱 Sending buttons:', JSON.stringify(payload, null, 2));
 
     try {
       const response = await fetch(url, {
@@ -114,29 +130,26 @@ export class GreenAPIClient {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          chatId: `${normalizedPhone}@c.us`,
-          message: message,
-          footer: 'FinHealer',
-          buttons: buttons.map((btn, index) => ({
-            buttonId: btn.buttonId || `btn_${index}`,
-            buttonText: {
-              displayText: btn.buttonText,
-            },
-            type: 1,
-          })),
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        throw new Error(`GreenAPI error: ${response.statusText}`);
+      const data = await response.json();
+      
+      // GreenAPI may return 200 but with an error in the body
+      if (data.error) {
+        console.error('❌ GreenAPI buttons error in response:', data.error);
+        throw new Error(data.error);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        console.error('❌ GreenAPI buttons HTTP error:', response.status, response.statusText, data);
+        throw new Error(`GreenAPI error: ${response.statusText} - ${JSON.stringify(data)}`);
+      }
+
       console.log(`✅ GreenAPI buttons sent to ${normalizedPhone}@c.us:`, data.idMessage);
       return data;
-    } catch (error) {
-      console.error('❌ GreenAPI buttons error:', error);
+    } catch (error: any) {
+      console.error('❌ GreenAPI buttons error:', error?.message || error);
       throw error;
     }
   }

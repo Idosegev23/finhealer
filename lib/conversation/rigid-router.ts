@@ -7,7 +7,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
-import { CATEGORIES, SUPER_GROUPS, findBestMatch, getCategoriesByGroup, getCategoryByName } from '@/lib/finance/categories';
+import { CATEGORIES, SUPER_GROUPS, findBestMatch, findTopMatches, getCategoriesByGroup, getCategoryByName } from '@/lib/finance/categories';
 
 // ============================================================================
 // Types
@@ -52,6 +52,9 @@ const SKIP_COMMANDS = ['דלג', 'תדלג', 'לדלג', 'דילוג', 'עבור
 const YES_COMMANDS = ['כן', 'כנ', 'נכון', 'אוקי', 'ok', 'yes', 'בסדר', 'מאשר', 'אשר'];
 const SUMMARY_COMMANDS = ['סיכום', 'מצב', 'מה המצב', 'סטטוס', 'status'];
 const LIST_COMMANDS = ['רשימה', 'רשימה מלאה', 'תפריט', 'קטגוריות'];
+
+// Cache for recent suggestions (simple in-memory, resets on deploy)
+const recentSuggestions = new Map<string, { id: string; name: string }[]>();
 
 function matchesCommand(text: string, commands: string[]): boolean {
   const normalized = text.trim().toLowerCase();
@@ -220,6 +223,15 @@ export async function routeMessage(
     if (matchesCommand(message, YES_COMMANDS) && ctx.currentTransaction.suggestedCategory) {
       return await classifyTransaction(ctx, ctx.currentTransaction.suggestedCategory);
     }
+    
+    // בחירה מספרית מהצעות קודמות (1, 2, 3)
+    const numChoice = parseInt(message.trim());
+    if (!isNaN(numChoice) && numChoice >= 1 && numChoice <= 3) {
+      const suggestions = recentSuggestions.get(ctx.userId);
+      if (suggestions && suggestions[numChoice - 1]) {
+        return await classifyTransaction(ctx, suggestions[numChoice - 1].name);
+      }
+    }
 
     // בחירה מתוך רשימת קבוצות (List Message response)
     if (message.startsWith('group_')) {
@@ -247,8 +259,15 @@ export async function routeMessage(
       return await classifyTransaction(ctx, foundCategory.name);
     }
     
-    // לא הבנו - שאל שוב
-    return await showNextTransaction(ctx, false);
+    // לא מצאנו התאמה מדויקת - נחפש הצעות קרובות
+    const topMatches = findTopMatches(message, 3);
+    if (topMatches.length > 0) {
+      // יש הצעות! נציע אותן למשתמש
+      return await suggestCategories(ctx, message, topMatches);
+    }
+    
+    // באמת לא הבנו - תן הודעה מועילה
+    return await showHelpMessage(ctx, message);
   }
   
   // ============================================
@@ -303,6 +322,58 @@ export async function routeMessage(
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+// הצעת קטגוריות קרובות למשתמש
+async function suggestCategories(
+  ctx: RouterContext, 
+  userInput: string, 
+  suggestions: { id: string; name: string; group: string }[]
+): Promise<RouterResult> {
+  const greenAPI = getGreenAPIClient();
+  
+  const tx = ctx.currentTransaction;
+  if (!tx) return await showSummary(ctx);
+  
+  // שמור את ההצעות ב-cache לבחירה מספרית
+  recentSuggestions.set(ctx.userId, suggestions.map(s => ({ id: s.id, name: s.name })));
+  
+  const suggestionList = suggestions
+    .map((s, i) => `${i + 1}. ${s.name}`)
+    .join('\n');
+  
+  const message = `🤔 לא מצאתי "${userInput}" בדיוק.\n\n` +
+    `אולי התכוונת ל:\n${suggestionList}\n\n` +
+    `כתוב את המספר (1, 2, 3) או "רשימה" לרשימה מלאה.`;
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phoneNumber,
+    message,
+  });
+  
+  return { success: true };
+}
+
+// הודעת עזרה כשלא הבנו
+async function showHelpMessage(ctx: RouterContext, userInput: string): Promise<RouterResult> {
+  const greenAPI = getGreenAPIClient();
+  
+  const tx = ctx.currentTransaction;
+  if (!tx) return await showSummary(ctx);
+  
+  const message = `🤷 לא הבנתי "${userInput}".\n\n` +
+    `💡 נסה:\n` +
+    `• לכתוב שם קטגוריה (למשל: "מזון", "דלק", "ביטוח")\n` +
+    `• לכתוב "רשימה" לראות את כל הקטגוריות\n` +
+    `• לכתוב "דלג" לדלג על התנועה הזו\n\n` +
+    `📌 *התנועה:* ${tx.amount.toLocaleString('he-IL')} ₪ | ${tx.vendor}`;
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phoneNumber,
+    message,
+  });
+  
+  return { success: true };
+}
 
 async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promise<RouterResult> {
   const greenAPI = getGreenAPIClient();
@@ -359,18 +430,32 @@ async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promis
     buttonText: '⏭️ דלג'
   });
   
+  // ניסיון לשלוח עם כפתורים
   try {
-    await greenAPI.sendButtons({
+    const btnResult = await greenAPI.sendButtons({
       phoneNumber: ctx.phoneNumber,
       message,
       buttons: buttons.slice(0, 3),
     });
-  } catch (error) {
-    // Fallback if buttons fail
-    console.error('Buttons failed:', error);
+    console.log('✅ Buttons sent successfully:', btnResult?.idMessage);
+  } catch (error: any) {
+    // Fallback if buttons fail - שלח הודעה רגילה עם הוראות
+    console.error('❌ Buttons failed, using text fallback:', error?.message || error);
+    
+    // בניית הודעה טקסטואלית עם אפשרויות
+    let textMessage = message + '\n\n';
+    textMessage += '📝 *אפשרויות:*\n';
+    
+    if (suggested) {
+      textMessage += `• כתוב "${suggested.name}" לאישור\n`;
+    }
+    textMessage += `• כתוב שם קטגוריה (למשל: "מזון", "דלק")\n`;
+    textMessage += `• כתוב "רשימה" לכל הקטגוריות\n`;
+    textMessage += `• כתוב "דלג" לדלג`;
+    
     await greenAPI.sendMessage({
       phoneNumber: ctx.phoneNumber,
-      message: message + '\n\n(השב עם שם הקטגוריה או "דלג")'
+      message: textMessage
     });
   }
   

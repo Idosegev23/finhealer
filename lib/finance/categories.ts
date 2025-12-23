@@ -229,9 +229,12 @@ export function getCategoryByName(name: string): CategoryDef | undefined {
   return CATEGORIES.find(c => c.name === name);
 }
 
-// פונקציה למציאת קטגוריה לפי טקסט חופשי (חיפוש מדויק יותר)
+// פונקציה למציאת קטגוריה לפי טקסט חופשי (חיפוש גמיש)
 export function findBestMatch(text: string): CategoryDef | null {
-  const t = text.toLowerCase();
+  if (!text || text.length < 2) return null;
+  
+  const t = text.toLowerCase().trim();
+  
   // 1. חיפוש מדויק בשם
   const exact = CATEGORIES.find(c => c.name.toLowerCase() === t);
   if (exact) return exact;
@@ -239,6 +242,68 @@ export function findBestMatch(text: string): CategoryDef | null {
   // 2. חיפוש keyword מדויק
   const keywordMatch = CATEGORIES.find(c => c.keywords.some(k => k === t));
   if (keywordMatch) return keywordMatch;
+  
+  // 3. חיפוש חלקי - הטקסט מכיל את שם הקטגוריה או להיפך
+  const partialMatch = CATEGORIES.find(c => 
+    c.name.toLowerCase().includes(t) || t.includes(c.name.toLowerCase())
+  );
+  if (partialMatch) return partialMatch;
+  
+  // 4. חיפוש לפי קבוצה - אם המשתמש כתב שם קבוצה, החזר קטגוריה ראשונה
+  const groupMatch = CATEGORIES.find(c => c.group.toLowerCase() === t);
+  if (groupMatch) return groupMatch;
+  
+  // 5. חיפוש מילים בתוך שם הקטגוריה (fuzzy)
+  const words = t.split(/\s+/).filter(w => w.length > 2);
+  if (words.length > 0) {
+    for (const word of words) {
+      const wordMatch = CATEGORIES.find(c => 
+        c.name.toLowerCase().includes(word) || 
+        c.group.toLowerCase().includes(word)
+      );
+      if (wordMatch) return wordMatch;
+    }
+  }
 
   return null;
+}
+
+// חיפוש עם ציון רלוונטיות - מחזיר את הטובים ביותר
+export function findTopMatches(text: string, limit: number = 3): CategoryDef[] {
+  if (!text || text.length < 2) return [];
+  
+  const t = text.toLowerCase().trim();
+  const words = t.split(/\s+/).filter(w => w.length > 2);
+  
+  // חישוב ציון לכל קטגוריה
+  const scored = CATEGORIES.map(cat => {
+    let score = 0;
+    const name = cat.name.toLowerCase();
+    const group = cat.group.toLowerCase();
+    
+    // התאמה מדויקת
+    if (name === t) score += 100;
+    
+    // שם מכיל את הטקסט
+    if (name.includes(t)) score += 50;
+    if (t.includes(name)) score += 40;
+    
+    // קבוצה מכילה את הטקסט
+    if (group === t) score += 30;
+    if (group.includes(t)) score += 20;
+    
+    // התאמת מילים בודדות
+    for (const word of words) {
+      if (name.includes(word)) score += 10;
+      if (group.includes(word)) score += 5;
+    }
+    
+    return { cat, score };
+  });
+  
+  return scored
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(s => s.cat);
 }
