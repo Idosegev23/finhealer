@@ -21,6 +21,22 @@ interface SendImageParams {
   mimeType?: string;
 }
 
+interface SendListParams {
+  phoneNumber: string;
+  message: string;
+  buttonText: string;
+  title: string;
+  footer?: string;
+  sections: Array<{
+    title: string;
+    rows: Array<{
+      rowId: string;
+      title: string;
+      description?: string;
+    }>;
+  }>;
+}
+
 export class GreenAPIClient {
   private instanceId: string;
   private token: string;
@@ -41,24 +57,15 @@ export class GreenAPIClient {
 
   /**
    * המרת מספר טלפון ישראלי לפורמט בינלאומי
-   * 0547667775 → 972547667775
-   * 972547667775 → 972547667775 (כבר נכון)
-   * +972547667775 → 972547667775 (הסרת +)
    */
   private normalizePhoneNumber(phone: string): string {
-    // הסרת רווחים ומקפים
     let normalized = phone.replace(/[\s\-]/g, '');
-    
-    // הסרת + אם יש
     if (normalized.startsWith('+')) {
       normalized = normalized.substring(1);
     }
-    
-    // המרה מ-05X ל-972X
     if (normalized.startsWith('0')) {
       normalized = '972' + normalized.substring(1);
     }
-    
     return normalized;
   }
 
@@ -130,6 +137,42 @@ export class GreenAPIClient {
       return data;
     } catch (error) {
       console.error('❌ GreenAPI buttons error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * שליחת הודעת רשימה (תפריט)
+   */
+  async sendListMessage({ phoneNumber, message, buttonText, title, footer, sections }: SendListParams) {
+    const url = `${this.baseUrl}/sendListMessage/${this.token}`;
+    const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chatId: `${normalizedPhone}@c.us`,
+          message: message,
+          title: title,
+          footer: footer || 'FinHealer',
+          buttonText: buttonText,
+          sections: sections
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`GreenAPI list error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ GreenAPI list message sent to ${normalizedPhone}@c.us:`, data.idMessage);
+      return data;
+    } catch (error) {
+      console.error('❌ GreenAPI list error:', error);
       throw error;
     }
   }

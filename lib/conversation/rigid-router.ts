@@ -7,6 +7,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
+import { CATEGORIES, SUPER_GROUPS, findBestMatch, getCategoriesByGroup, getCategoryByName } from '@/lib/finance/categories';
 
 // ============================================================================
 // Types
@@ -49,63 +50,12 @@ export interface RouterResult {
 const CONTINUE_COMMANDS = ['נמשיך', 'נמשיל', 'המשך', 'להמשיך', 'כן נמשיך', 'יאללה'];
 const SKIP_COMMANDS = ['דלג', 'תדלג', 'לדלג', 'דילוג', 'עבור', 'הבא', 'skip'];
 const YES_COMMANDS = ['כן', 'כנ', 'נכון', 'אוקי', 'ok', 'yes', 'בסדר', 'מאשר', 'אשר'];
-const NO_COMMANDS = ['לא', 'לא נכון', 'טעות', 'שגוי', 'wrong', 'no'];
 const SUMMARY_COMMANDS = ['סיכום', 'מצב', 'מה המצב', 'סטטוס', 'status'];
+const LIST_COMMANDS = ['רשימה', 'רשימה מלאה', 'תפריט', 'קטגוריות'];
 
 function matchesCommand(text: string, commands: string[]): boolean {
   const normalized = text.trim().toLowerCase();
   return commands.some(cmd => normalized.includes(cmd.toLowerCase()));
-}
-
-// ============================================================================
-// Category Mapping - קטגוריות קבועות
-// ============================================================================
-
-const EXPENSE_CATEGORIES = [
-  { name: 'מזון וסופר', emoji: '🍎', keywords: ['רמי לוי', 'שופרסל', 'מזון', 'סופר', 'אוכל'] },
-  { name: 'מסעדות וקפה', emoji: '☕', keywords: ['קפה', 'מסעדה', 'אוכל מוכן', 'פיצה', 'המבורגר'] },
-  { name: 'דיור ומשכנתא', emoji: '🏠', keywords: ['שכירות', 'משכנתא', 'ועד בית', 'ארנונה'] },
-  { name: 'חשבונות קבועים', emoji: '📱', keywords: ['חשמל', 'מים', 'גז', 'אינטרנט', 'סלולר', 'בזק', 'הוט', 'פרטנר'] },
-  { name: 'תחבורה ודלק', emoji: '🚗', keywords: ['דלק', 'סונול', 'פז', 'דור אלון', 'רכבת', 'אגד', 'דן'] },
-  { name: 'בריאות', emoji: '🏥', keywords: ['רופא', 'בית מרקחת', 'סופר פארם', 'קופת חולים', 'מכבי', 'כללית'] },
-  { name: 'ביגוד והנעלה', emoji: '👕', keywords: ['בגדים', 'נעליים', 'זארה', 'H&M', 'קסטרו', 'גולף'] },
-  { name: 'בילויים ופנאי', emoji: '🎬', keywords: ['קולנוע', 'הופעה', 'בילוי', 'נטפליקס', 'ספוטיפי'] },
-  { name: 'חינוך', emoji: '📚', keywords: ['גן', 'בית ספר', 'חוגים', 'קורס', 'לימודים'] },
-  { name: 'ביטוח ופנסיה', emoji: '🛡️', keywords: ['ביטוח', 'פנסיה', 'מגדל', 'הראל', 'כלל'] },
-];
-
-const INCOME_CATEGORIES = [
-  { name: 'משכורת', emoji: '💰', keywords: ['משכורת', 'שכר'] },
-  { name: 'העברה נכנסת', emoji: '🔄', keywords: ['העברה'] },
-  { name: 'הכנסה אחרת', emoji: '💵', keywords: [] },
-];
-
-function suggestCategory(vendor: string, type: 'income' | 'expense'): { name: string; emoji: string } | null {
-  const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  const vendorLower = vendor.toLowerCase();
-  
-  for (const cat of categories) {
-    for (const keyword of cat.keywords) {
-      if (vendorLower.includes(keyword.toLowerCase())) {
-        return { name: cat.name, emoji: cat.emoji };
-      }
-    }
-  }
-  
-  return null;
-}
-
-function findCategoryByText(text: string, type: 'income' | 'expense'): { name: string; emoji: string } | null {
-  const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  const textLower = text.toLowerCase();
-  
-  for (const cat of categories) {
-    if (textLower.includes(cat.name.toLowerCase()) || textLower.includes(cat.emoji)) {
-      return { name: cat.name, emoji: cat.emoji };
-    }
-  }
-  
-  return null;
 }
 
 // ============================================================================
@@ -257,29 +207,44 @@ export async function routeMessage(
     }
     
     // דילוג
-    if (matchesCommand(message, SKIP_COMMANDS)) {
+    if (matchesCommand(message, SKIP_COMMANDS) || message === 'skip') {
       return await skipTransaction(ctx);
+    }
+
+    // בקשה לרשימה מלאה
+    if (message === 'full_list' || matchesCommand(message, LIST_COMMANDS)) {
+      return await showFullCategoryList(ctx);
     }
     
     // אישור קטגוריה מוצעת
     if (matchesCommand(message, YES_COMMANDS) && ctx.currentTransaction.suggestedCategory) {
       return await classifyTransaction(ctx, ctx.currentTransaction.suggestedCategory);
     }
-    
-    // חיפוש קטגוריה בהודעה
-    const foundCategory = findCategoryByText(message, ctx.currentTransaction.type);
-    if (foundCategory) {
-      return await classifyTransaction(ctx, foundCategory.name);
+
+    // בחירה מתוך רשימת קבוצות (List Message response)
+    if (message.startsWith('group_')) {
+      const groupName = message.replace('group_', '').replace(/_/g, ' ');
+      return await showCategoriesInGroup(ctx, groupName);
     }
     
-    // בדיקה אם זה buttonId (מכפתור)
+    // בדיקה אם זה buttonId (מכפתור) או rowId (מרשימה)
     if (message.startsWith('cat_')) {
+      const categoryId = message; // e.g. cat_104
+      // מצא את השם האמיתי לפי ID
+      const catDef = CATEGORIES.find(c => c.id === categoryId);
+      if (catDef) {
+        return await classifyTransaction(ctx, catDef.name);
+      }
+      
+      // fallback לניסיון פענוח שם מהטקסט (אם זה לא ID אלא שם)
       const categoryName = message.replace('cat_', '').replace(/_/g, ' ');
       return await classifyTransaction(ctx, categoryName);
     }
     
-    if (message === 'skip') {
-      return await skipTransaction(ctx);
+    // חיפוש קטגוריה בהודעה (טקסט חופשי)
+    const foundCategory = findBestMatch(message);
+    if (foundCategory) {
+      return await classifyTransaction(ctx, foundCategory.name);
     }
     
     // לא הבנו - שאל שוב
@@ -348,7 +313,7 @@ async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promis
   
   const tx = ctx.currentTransaction;
   const emoji = tx.type === 'income' ? '💚' : '💸';
-  const suggested = suggestCategory(tx.vendor, tx.type);
+  const suggested = findBestMatch(tx.vendor); // שימוש בלוגיקה החדשה לחיפוש
   
   // בניית הודעה
   let message = isFirst 
@@ -359,41 +324,122 @@ async function showNextTransaction(ctx: RouterContext, isFirst: boolean): Promis
   message += `📅 ${tx.date}\n\n`;
   
   if (suggested) {
-    message += `💡 נראה לי כמו *${suggested.name}* ${suggested.emoji}\n`;
+    message += `💡 נראה לי כמו *${suggested.name}*\n`;
     message += `זה נכון?`;
   } else {
     message += `מה הקטגוריה?`;
   }
   
-  // Build buttons
-  const categories = tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES.slice(0, 3);
-  const buttons = categories.map(cat => ({
-    buttonId: `cat_${cat.name.replace(/ /g, '_')}`,
-    buttonText: `${cat.emoji} ${cat.name}`,
-  }));
+  // Build buttons (Hybrid Flow)
+  const buttons = [];
   
-  // Add skip button
+  // 1. כפתור הצעה (אם יש)
+  if (suggested) {
+    buttons.push({
+      buttonId: suggested.id, // e.g. cat_104
+      buttonText: `✅ ${suggested.name.substring(0, 18)}` // הגבלת אורך
+    });
+  } else {
+    // או קטגוריות פופולריות אם אין זיהוי (מזון, תחבורה)
+    const defaults = [getCategoryByName('קניות סופר'), getCategoryByName('מסעדות')];
+    defaults.forEach(c => {
+      if(c) buttons.push({ buttonId: c.id, buttonText: c.name.substring(0, 20) });
+    });
+  }
+  
+  // 2. כפתור רשימה מלאה
+  buttons.push({
+    buttonId: 'full_list',
+    buttonText: '📂 רשימה מלאה'
+  });
+  
+  // 3. כפתור דלג
   buttons.push({
     buttonId: 'skip',
-    buttonText: '⏭️ דלג',
+    buttonText: '⏭️ דלג'
   });
   
   try {
     await greenAPI.sendButtons({
       phoneNumber: ctx.phoneNumber,
       message,
-      buttons: buttons.slice(0, 3), // WhatsApp limits to 3 buttons
+      buttons: buttons.slice(0, 3),
     });
   } catch (error) {
-    // Fallback to text if buttons fail
-    console.error('Buttons failed, falling back to text:', error);
-    const buttonText = categories.map(c => `• ${c.emoji} ${c.name}`).join('\n');
+    // Fallback if buttons fail
+    console.error('Buttons failed:', error);
     await greenAPI.sendMessage({
       phoneNumber: ctx.phoneNumber,
-      message: message + `\n\n${buttonText}\n• ⏭️ דלג`,
+      message: message + '\n\n(השב עם שם הקטגוריה או "דלג")'
     });
   }
   
+  return { success: true };
+}
+
+async function showFullCategoryList(ctx: RouterContext): Promise<RouterResult> {
+  const greenAPI = getGreenAPIClient();
+  
+  // בניית סקשנים לפי SUPER_GROUPS
+  const sections = Object.entries(SUPER_GROUPS).map(([superGroup, subGroups]) => {
+    return {
+      title: superGroup,
+      rows: subGroups.map(subGroup => ({
+        rowId: `group_${subGroup.replace(/ /g, '_')}`,
+        title: `📂 ${subGroup}`,
+        description: 'פתח רשימה'
+      }))
+    };
+  });
+
+  await greenAPI.sendListMessage({
+    phoneNumber: ctx.phoneNumber,
+    message: 'בחר קבוצת קטגוריות:',
+    buttonText: 'פתח רשימה מלאה',
+    title: 'קטגוריות הוצאות',
+    sections: sections
+  });
+
+  return { success: true };
+}
+
+async function showCategoriesInGroup(ctx: RouterContext, groupName: string): Promise<RouterResult> {
+  const greenAPI = getGreenAPIClient();
+  
+  // שליפת הקטגוריות בקבוצה הזו
+  const categories = getCategoriesByGroup(groupName);
+  
+  if (categories.length === 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phoneNumber,
+      message: 'לא נמצאו קטגוריות בקבוצה זו. נסה שוב.'
+    });
+    return await showNextTransaction(ctx, false);
+  }
+
+  // בניית List Message עם הקטגוריות
+  // חלוקה לסקשנים אם יש יותר מ-10 (וואטסאפ מגביל)
+  // אבל בקבוצה בודדת בדרך כלל אין יותר מ-20
+  // List Message יכול להכיל עד 10 סקשנים וסה"כ פריטים.
+  // אם יש הרבה, נחלק ל-2 סקשנים
+  
+  const sections = [{
+    title: groupName,
+    rows: categories.map(c => ({
+      rowId: c.id,
+      title: c.name,
+      description: ''
+    }))
+  }];
+
+  await greenAPI.sendListMessage({
+    phoneNumber: ctx.phoneNumber,
+    message: `בחר קטגוריה מתוך *${groupName}*:`,
+    buttonText: 'בחר קטגוריה',
+    title: groupName,
+    sections: sections
+  });
+
   return { success: true };
 }
 
@@ -496,27 +542,9 @@ async function answerCategoryQuestion(ctx: RouterContext, question: string): Pro
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  // חפש קטגוריה בשאלה
-  const categories = EXPENSE_CATEGORIES.map(c => c.name.toLowerCase());
-  const questionLower = question.toLowerCase();
+  const matched = findBestMatch(question);
   
-  let matchedCategory: string | null = null;
-  for (const cat of EXPENSE_CATEGORIES) {
-    if (questionLower.includes(cat.name.toLowerCase())) {
-      matchedCategory = cat.name;
-      break;
-    }
-    // חפש גם לפי keywords
-    for (const kw of cat.keywords) {
-      if (questionLower.includes(kw.toLowerCase())) {
-        matchedCategory = cat.name;
-        break;
-      }
-    }
-    if (matchedCategory) break;
-  }
-  
-  if (!matchedCategory) {
+  if (!matched) {
     // לא מצאנו קטגוריה - הצג סיכום כללי
     return await showSummary(ctx);
   }
@@ -528,14 +556,13 @@ async function answerCategoryQuestion(ctx: RouterContext, question: string): Pro
     .eq('user_id', ctx.userId)
     .eq('status', 'confirmed')
     .eq('type', 'expense')
-    .ilike('category', `%${matchedCategory}%`);
+    .ilike('category', `%${matched.name}%`);
   
   const total = (txs || []).reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  const cat = EXPENSE_CATEGORIES.find(c => c.name === matchedCategory);
   
   await greenAPI.sendMessage({
     phoneNumber: ctx.phoneNumber,
-    message: `${cat?.emoji || '💸'} *${matchedCategory}*\n\nהוצאת ${total.toLocaleString('he-IL')} ₪`,
+    message: `💸 *${matched.name}*\n\nהוצאת ${total.toLocaleString('he-IL')} ₪`,
   });
   
   return { success: true };
