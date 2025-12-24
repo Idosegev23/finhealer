@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendWhatsAppMessage, sendWhatsAppImage } from "@/lib/greenapi/client";
-import { generateChartForUser } from "@/lib/ai/phi-handler";
+import { generateChartForUser } from "@/lib/ai/chart-generator";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
