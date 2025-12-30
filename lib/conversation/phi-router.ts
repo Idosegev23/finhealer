@@ -594,7 +594,8 @@ async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
   const isCredit = /visa|mastercard|ויזה|מסטרקארד|אשראי|כרטיס.*\d{4}$/i.test(firstTx.vendor);
   
   if (isCredit) {
-    await supabase
+    // עדכן סטטוס עם בדיקת שגיאה
+    const { error: updateError } = await supabase
       .from('transactions')
       .update({ 
         status: 'needs_credit_detail',
@@ -602,13 +603,45 @@ async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
       })
       .eq('id', firstTx.id);
     
-    await greenAPI.sendMessage({
-      phoneNumber: ctx.phone,
-      message: `⏭️ *${firstTx.vendor}* - ${Math.abs(firstTx.amount).toLocaleString('he-IL')} ₪\n` +
-        `זה חיוב אשראי - צריך דוח פירוט. דילגתי.`,
-    });
+    if (updateError) {
+      console.error('[φ Router] Failed to update credit transaction:', updateError);
+      // אם נכשל - סמן כ-confirmed ולא להיתקע בלולאה
+      await supabase
+        .from('transactions')
+        .update({ status: 'confirmed', notes: 'חיוב אשראי - דילג אוטומטית' })
+        .eq('id', firstTx.id);
+    }
     
-    // המשך לבאה
+    // שלח הודעה רק פעם אחת (לא בכל איטרציה)
+    // בדוק אם יש עוד תנועות אשראי ברצף
+    const creditTxs = expenses.filter(e => 
+      /visa|mastercard|ויזה|מסטרקארד|אשראי|כרטיס.*\d{4}$/i.test(e.vendor)
+    );
+    
+    if (creditTxs.length > 1) {
+      // דלג על כולם בבת אחת
+      const creditIds = creditTxs.map(t => t.id);
+      await supabase
+        .from('transactions')
+        .update({ 
+          status: 'needs_credit_detail',
+          notes: 'ממתין לדוח פירוט אשראי'
+        })
+        .in('id', creditIds);
+      
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `⏭️ דילגתי על ${creditTxs.length} חיובי אשראי.\nשלח דוח פירוט אשראי אחרי שנסיים.`,
+      });
+    } else {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `⏭️ *${firstTx.vendor}* - ${Math.abs(firstTx.amount).toLocaleString('he-IL')} ₪\n` +
+          `זה חיוב אשראי - צריך דוח פירוט. דילגתי.`,
+      });
+    }
+    
+    // המשך לבאה (התנועות כבר עודכנו)
     return await showNextExpenseGroup(ctx);
   }
   
