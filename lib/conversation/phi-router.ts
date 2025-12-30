@@ -363,6 +363,13 @@ async function handleClassificationResponse(
     : findBestMatch(msg);
   
   if (match) {
+    // בהוצאות - סווג את כל הקבוצה
+    if (type === 'expense') {
+      const groupIds = await getCurrentGroupFromCache(ctx.userId);
+      if (groupIds && groupIds.length > 0) {
+        return await classifyGroup(ctx, groupIds, match.name, type);
+      }
+    }
     return await classifyTransaction(ctx, currentTx.id, match.name, type);
   }
   
