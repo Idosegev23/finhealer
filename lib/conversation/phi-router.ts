@@ -178,9 +178,10 @@ export async function routeMessage(
         message: `📋 *הפקודות שלי:*\n\n` +
           `📄 *מסמכים:*\n` +
           `• שלח קובץ PDF לניתוח\n\n` +
-          `📊 *ניתוח:*\n` +
+          `📊 *ניתוח ותמונות:*\n` +
           `• *"סיכום"* - סיכום כללי\n` +
-          `• *"גרף"* - התפלגות הוצאות בתמונה\n` +
+          `• *"גרף"* - התפלגות הוצאות 💸\n` +
+          `• *"גרף הכנסות"* - התפלגות הכנסות 💚\n` +
           `• *"רשימה"* - רשימת קטגוריות\n\n` +
           `💰 *שאלות:*\n` +
           `• "כמה הוצאתי על [קטגוריה]?"\n` +
@@ -205,8 +206,13 @@ export async function routeMessage(
     }
     
     // גרף הוצאות
-    if (isCommand(msg, ['גרף', 'תמונה', 'chart', 'התפלגות'])) {
+    if (isCommand(msg, ['גרף', 'גרף הוצאות', 'תמונה', 'chart', 'התפלגות'])) {
       return await generateAndSendExpenseChart(ctx);
+    }
+    
+    // גרף הכנסות
+    if (isCommand(msg, ['גרף הכנסות', 'הכנסות גרף', 'income chart'])) {
+      return await generateAndSendIncomeChart(ctx);
     }
     
     // ברירת מחדל - הפנה לעזרה
@@ -931,6 +937,89 @@ async function generateAndSendExpenseChart(ctx: RouterContext): Promise<RouterRe
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `📊 *התפלגות הוצאות*\n\n${textSummary}\n\n💰 סה"כ: ${total.toLocaleString('he-IL')} ₪`,
+    });
+    
+    return { success: true };
+  }
+}
+
+async function generateAndSendIncomeChart(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // שליפת הכנסות מסווגות
+  const { data: incomes } = await supabase
+    .from('transactions')
+    .select('amount, income_category, category')
+    .eq('user_id', ctx.userId)
+    .eq('type', 'income')
+    .eq('status', 'confirmed');
+  
+  if (!incomes || incomes.length === 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: '💚 אין הכנסות מסווגות עדיין.\n\nסווג קודם כמה הכנסות!',
+    });
+    return { success: true };
+  }
+  
+  // סיכום לפי קטגוריה
+  const categoryTotals: Record<string, number> = {};
+  incomes.forEach(inc => {
+    const cat = inc.income_category || inc.category || 'אחר';
+    categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(Number(inc.amount));
+  });
+  
+  const total = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
+  
+  // צבעי Phi למנטה/ירוקים להכנסות
+  const incomeColors = ['#8FBCBB', '#88C0D0', '#81A1C1', '#5E81AC', '#A3BE8C', '#EBCB8B'];
+  
+  const categories: CategoryData[] = Object.entries(categoryTotals)
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, amount], idx) => ({
+      name,
+      amount,
+      percentage: Math.round((amount / total) * 100),
+      color: incomeColors[idx % incomeColors.length],
+    }));
+  
+  // הודעת "מכין גרף"
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: '💚 מכין גרף הכנסות...',
+  });
+  
+  try {
+    const image = await generatePieChart(
+      'התפלגות הכנסות',
+      categories,
+      { aspectRatio: '16:9' }
+    );
+    
+    if (image) {
+      await sendWhatsAppImage(
+        ctx.phone,
+        image.base64,
+        `💚 *התפלגות הכנסות*\n\n💰 סה"כ: ${total.toLocaleString('he-IL')} ₪`,
+        image.mimeType
+      );
+      
+      return { success: true };
+    } else {
+      throw new Error('No image generated');
+    }
+  } catch (error) {
+    console.error('❌ Failed to generate income chart:', error);
+    
+    // Fallback: טקסט
+    const textSummary = categories
+      .map(c => `• ${c.name}: ${c.amount.toLocaleString('he-IL')} ₪ (${c.percentage}%)`)
+      .join('\n');
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `💚 *התפלגות הכנסות*\n\n${textSummary}\n\n💰 סה"כ: ${total.toLocaleString('he-IL')} ₪`,
     });
     
     return { success: true };
