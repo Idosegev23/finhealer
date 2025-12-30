@@ -358,6 +358,13 @@ async function classifyTransaction(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
+  // קבל את התנועה כדי לשמור את הספק ללמידה
+  const { data: tx } = await supabase
+    .from('transactions')
+    .select('vendor')
+    .eq('id', txId)
+    .single();
+  
   // שמור
   const { error } = await supabase
     .from('transactions')
@@ -366,6 +373,7 @@ async function classifyTransaction(
       category,
       expense_category: type === 'expense' ? category : null,
       income_category: type === 'income' ? category : null,
+      learned_from_pattern: false, // סומן ידנית על ידי המשתמש
     })
     .eq('id', txId);
   
@@ -376,6 +384,11 @@ async function classifyTransaction(
       message: `❌ משהו השתבש. נסה שוב.`,
     });
     return { success: false };
+  }
+  
+  // 🧠 למידה - שמור את הכלל ב-user_category_rules
+  if (tx?.vendor) {
+    await learnUserRule(ctx.userId, tx.vendor, category, type);
   }
   
   await greenAPI.sendMessage({
@@ -396,6 +409,13 @@ async function classifyGroup(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
+  // קבל את הספק מהתנועה הראשונה ללמידה
+  const { data: firstTx } = await supabase
+    .from('transactions')
+    .select('vendor')
+    .eq('id', txIds[0])
+    .single();
+  
   // סווג את כל התנועות בקבוצה
   const { error } = await supabase
     .from('transactions')
@@ -404,6 +424,7 @@ async function classifyGroup(
       category,
       expense_category: type === 'expense' ? category : null,
       income_category: type === 'income' ? category : null,
+      learned_from_pattern: false, // סומן ידנית על ידי המשתמש
     })
     .in('id', txIds);
   
@@ -414,6 +435,11 @@ async function classifyGroup(
       message: `❌ משהו השתבש. נסה שוב.`,
     });
     return { success: false };
+  }
+  
+  // 🧠 למידה - שמור את הכלל ב-user_category_rules
+  if (firstTx?.vendor) {
+    await learnUserRule(ctx.userId, firstTx.vendor, category, type);
   }
   
   const count = txIds.length;
@@ -465,14 +491,17 @@ async function showNextTransaction(
   
   const remaining = count || 0;
   
-  // הצעת קטגוריה
-  const suggestion = nextTx.expense_category || findBestMatch(nextTx.vendor)?.name;
+  // 🧠 הצעת קטגוריה - קודם כללי משתמש, אחר כך כללי מערכת
+  const userRule = await getUserRuleSuggestion(ctx.userId, nextTx.vendor);
+  const suggestion = nextTx.expense_category || userRule || findBestMatch(nextTx.vendor)?.name;
+  const isLearnedSuggestion = !!userRule;
   
   let message = `💚 *${nextTx.vendor}*\n`;
   message += `${Math.abs(nextTx.amount).toLocaleString('he-IL')} ₪ | ${nextTx.tx_date}\n\n`;
   
   if (suggestion) {
-    message += `💡 נראה כמו: *${suggestion}*\n`;
+    const learnedEmoji = isLearnedSuggestion ? '🧠' : '💡';
+    message += `${learnedEmoji} נראה כמו: *${suggestion}*\n`;
     message += `כתוב "כן" לאשר, או כתוב קטגוריה אחרת.`;
   } else {
     message += `מה הקטגוריה?`;
@@ -542,8 +571,10 @@ async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
   const uniqueVendors = new Set(expenses.map(e => e.vendor));
   const groupsRemaining = uniqueVendors.size;
   
-  // הצעת קטגוריה
-  const suggestion = firstTx.expense_category || findBestMatch(vendor)?.name;
+  // 🧠 הצעת קטגוריה - קודם כללי משתמש, אחר כך כללי מערכת
+  const userRule = await getUserRuleSuggestion(ctx.userId, vendor);
+  const suggestion = firstTx.expense_category || userRule || findBestMatch(vendor)?.name;
+  const isLearnedSuggestion = !!userRule;
   
   let message = '';
   
@@ -567,7 +598,8 @@ async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
   }
   
   if (suggestion) {
-    message += `💡 נראה כמו: *${suggestion}*\n`;
+    const learnedEmoji = isLearnedSuggestion ? '🧠' : '💡';
+    message += `${learnedEmoji} נראה כמו: *${suggestion}*\n`;
     message += `כתוב "כן" לאשר${vendorTxs.length > 1 ? ' את כולן' : ''}, או כתוב קטגוריה אחרת.`;
   } else {
     message += `מה הקטגוריה?`;
@@ -751,6 +783,139 @@ async function saveCurrentGroupToCache(userId: string, txIds: string[]): Promise
 
 async function getCurrentGroupFromCache(userId: string): Promise<string[] | null> {
   return groupCache.get(userId) || null;
+}
+
+// ============================================================================
+// Learning System - כללי משתמש
+// ============================================================================
+
+/**
+ * לומד מהמשתמש - שומר כלל סיווג לספק
+ * אם הספק כבר קיים - מעדכן את המונה ואת הקטגוריה
+ */
+async function learnUserRule(
+  userId: string, 
+  vendor: string, 
+  category: string,
+  type: 'income' | 'expense'
+): Promise<void> {
+  const supabase = createServiceClient();
+  
+  // נרמל את הספק - הסר מספרים בסוף, הפוך לאותיות קטנות
+  const vendorPattern = normalizeVendor(vendor);
+  
+  if (!vendorPattern || vendorPattern.length < 2) {
+    return; // ספק קצר מדי - לא שומרים
+  }
+  
+  // בדוק אם יש כבר כלל לספק הזה
+  const { data: existingRule } = await supabase
+    .from('user_category_rules')
+    .select('id, category, learn_count')
+    .eq('user_id', userId)
+    .eq('vendor_pattern', vendorPattern)
+    .single();
+  
+  if (existingRule) {
+    // עדכן כלל קיים
+    const newLearnCount = (existingRule.learn_count || 1) + 1;
+    const autoApproved = newLearnCount >= 3; // אחרי 3 פעמים - אישור אוטומטי
+    
+    await supabase
+      .from('user_category_rules')
+      .update({
+        category,
+        learn_count: newLearnCount,
+        auto_approved: autoApproved,
+        times_used: (existingRule.times_used || 0) + 1,
+        last_used_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingRule.id);
+    
+    console.log(`🧠 [Learning] Updated rule: "${vendorPattern}" → "${category}" (count: ${newLearnCount}, auto: ${autoApproved})`);
+  } else {
+    // צור כלל חדש
+    await supabase
+      .from('user_category_rules')
+      .insert({
+        user_id: userId,
+        vendor_pattern: vendorPattern,
+        category,
+        expense_frequency: type === 'expense' ? 'temporary' : null,
+        confidence: 1.0,
+        learn_count: 1,
+        times_used: 1,
+        last_used_at: new Date().toISOString(),
+        auto_approved: false,
+      });
+    
+    console.log(`🧠 [Learning] New rule: "${vendorPattern}" → "${category}"`);
+  }
+}
+
+/**
+ * מחפש הצעה מכללי המשתמש
+ */
+async function getUserRuleSuggestion(
+  userId: string, 
+  vendor: string
+): Promise<string | null> {
+  const supabase = createServiceClient();
+  const vendorPattern = normalizeVendor(vendor);
+  
+  if (!vendorPattern || vendorPattern.length < 2) {
+    return null;
+  }
+  
+  // חפש כלל מדויק
+  const { data: exactRule } = await supabase
+    .from('user_category_rules')
+    .select('category, confidence, auto_approved')
+    .eq('user_id', userId)
+    .eq('vendor_pattern', vendorPattern)
+    .single();
+  
+  if (exactRule) {
+    console.log(`🧠 [Learning] Found exact rule: "${vendorPattern}" → "${exactRule.category}"`);
+    return exactRule.category;
+  }
+  
+  // חפש כלל דומה (contains)
+  const { data: similarRules } = await supabase
+    .from('user_category_rules')
+    .select('vendor_pattern, category, confidence')
+    .eq('user_id', userId)
+    .order('times_used', { ascending: false })
+    .limit(50);
+  
+  if (similarRules) {
+    for (const rule of similarRules) {
+      if (vendorPattern.includes(rule.vendor_pattern) || 
+          rule.vendor_pattern.includes(vendorPattern)) {
+        console.log(`🧠 [Learning] Found similar rule: "${rule.vendor_pattern}" → "${rule.category}"`);
+        return rule.category;
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * נרמול שם ספק לשמירה ככלל
+ */
+function normalizeVendor(vendor: string): string {
+  return vendor
+    .trim()
+    .toLowerCase()
+    // הסר מספרים בסוף (כמו מספרי סניף)
+    .replace(/\s*\d+\s*$/, '')
+    // הסר תווים מיוחדים
+    .replace(/[^\u0590-\u05FFa-zA-Z0-9\s]/g, '')
+    // הסר רווחים כפולים
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // ============================================================================

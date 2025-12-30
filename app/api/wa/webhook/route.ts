@@ -1045,9 +1045,11 @@ export async function POST(request: NextRequest) {
                 file_type: documentType === 'credit' ? 'credit_statement' : 'bank_statement',
                 document_type: documentType,
                 status: 'completed',
+                processed: true, // 🔧 FIX: סימון שהעיבוד הושלם
                 period_start: periodStart.toISOString().split('T')[0],
                 period_end: periodEnd.toISOString().split('T')[0],
                 transactions_extracted: allTransactions.length,
+                transactions_created: insertedIds.length, // 🔧 FIX: מספר התנועות שנוצרו בפועל
               })
               .select('id')
               .single();
