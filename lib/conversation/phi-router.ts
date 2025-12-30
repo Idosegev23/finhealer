@@ -851,10 +851,19 @@ function isCommand(msg: string, commands: string[]): boolean {
 // DB-based cache (persists across serverless invocations)
 async function saveSuggestionsToCache(userId: string, suggestions: string[]): Promise<void> {
   const supabase = createServiceClient();
+  
+  // קודם נקרא את ה-context הקיים כדי לא לדרוס את group_ids
+  const { data: existing } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+  
   await supabase
     .from('users')
     .update({ 
       classification_context: { 
+        ...existing?.classification_context,
         suggestions,
         updated_at: new Date().toISOString()
       }
