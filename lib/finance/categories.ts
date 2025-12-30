@@ -13,6 +13,7 @@ export const SUPER_GROUPS = {
   'תחבורה': ['רכב'],
   'עסק': ['משרד', 'שיווק', 'עובדים', 'ייעוץ', 'מיסים', 'עיסקי', 'משפטי', 'שירותים', 'לימודים'],
   'פיננסים': ['פיננסים', 'העברות פיננסיות'],
+  'אחר': ['אחר'],
 };
 
 // Generated from DB: expense_categories
@@ -211,6 +212,11 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'cat_23', name: 'טלפונים ניידים', group: 'תקשורת', type: 'fixed', keywords: [] },
   { id: 'cat_24', name: 'טלפונים עסקיים', group: 'תקשורת', type: 'fixed', keywords: [] },
   { id: 'cat_25', name: 'טלוויזיה (YES / HOT / סלקום)', group: 'תקשורת', type: 'fixed', keywords: [] },
+
+  // --- אחר ---
+  { id: 'cat_150', name: 'העברה פנימית', group: 'אחר', type: 'variable', keywords: ['העברה', 'העברה פנימית', 'transfer', 'העברה בנקאית'] },
+  { id: 'cat_151', name: 'העברה יוצאת', group: 'אחר', type: 'variable', keywords: ['העברה יוצאת', 'העברה החוצה', 'outgoing transfer'] },
+  { id: 'cat_152', name: 'אחר', group: 'אחר', type: 'variable', keywords: ['אחר', 'שונות', 'כללי', 'other'] },
 ];
 
 export function getCategoriesByGroup(group: string): CategoryDef[] {

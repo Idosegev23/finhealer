@@ -322,6 +322,29 @@ async function handleClassificationResponse(
     }
   }
   
+  // הצגת רשימת קטגוריות זמינות
+  if (isCommand(msg, ['רשימה', 'קטגוריות', 'איזה קטגוריות', 'אפשרויות', 'list', 'categories'])) {
+    const categories = type === 'income' ? INCOME_CATEGORIES : CATEGORIES;
+    const groups = type === 'income' 
+      ? Array.from(new Set(INCOME_CATEGORIES.map(c => c.group)))
+      : Array.from(new Set(CATEGORIES.map(c => c.group)));
+    
+    let message = type === 'income' ? '💚 *קטגוריות הכנסה:*\n\n' : '💸 *קטגוריות הוצאה:*\n\n';
+    
+    for (const group of groups.slice(0, 8)) { // Max 8 groups to avoid too long message
+      const groupCats = categories.filter(c => c.group === group).slice(0, 4);
+      message += `*${group}:* ${groupCats.map(c => c.name).join(', ')}\n`;
+    }
+    
+    message += `\n💡 כתוב את שם הקטגוריה או חלק ממנה`;
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message,
+    });
+    return { success: true };
+  }
+  
   // ניסיון התאמה לקטגוריה - משתמשים בפונקציה הנכונה לפי סוג
   const match = type === 'income' 
     ? findBestIncomeMatch(msg) 
