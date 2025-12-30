@@ -811,7 +811,7 @@ async function learnUserRule(
   // בדוק אם יש כבר כלל לספק הזה
   const { data: existingRule } = await supabase
     .from('user_category_rules')
-    .select('id, category, learn_count')
+    .select('id, category, learn_count, times_used')
     .eq('user_id', userId)
     .eq('vendor_pattern', vendorPattern)
     .single();
