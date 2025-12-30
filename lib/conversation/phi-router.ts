@@ -12,6 +12,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categories';
+import { INCOME_CATEGORIES, findBestIncomeMatch, findTopIncomeMatches } from '@/lib/finance/income-categories';
 
 // ============================================================================
 // Types
@@ -321,14 +322,20 @@ async function handleClassificationResponse(
     }
   }
   
-  // ניסיון התאמה לקטגוריה
-  const match = findBestMatch(msg);
+  // ניסיון התאמה לקטגוריה - משתמשים בפונקציה הנכונה לפי סוג
+  const match = type === 'income' 
+    ? findBestIncomeMatch(msg) 
+    : findBestMatch(msg);
+  
   if (match) {
     return await classifyTransaction(ctx, currentTx.id, match.name, type);
   }
   
-  // לא מצאנו - הצע אפשרויות
-  const topMatches = findTopMatches(msg, 3);
+  // לא מצאנו - הצע אפשרויות מהסוג הנכון
+  const topMatches = type === 'income'
+    ? findTopIncomeMatches(msg, 3)
+    : findTopMatches(msg, 3);
+    
   if (topMatches.length > 0) {
     await saveSuggestionsToCache(ctx.userId, topMatches.map(m => m.name));
     
@@ -469,7 +476,7 @@ async function showNextTransaction(
   // בהכנסות - אחת אחת
   const { data: nextTx } = await supabase
     .from('transactions')
-    .select('id, amount, vendor, tx_date, expense_category')
+    .select('id, amount, vendor, tx_date, income_category')
     .eq('user_id', ctx.userId)
     .eq('status', 'proposed')
     .eq('type', 'income')
@@ -491,9 +498,10 @@ async function showNextTransaction(
   
   const remaining = count || 0;
   
-  // 🧠 הצעת קטגוריה - קודם כללי משתמש, אחר כך כללי מערכת
+  // 🧠 הצעת קטגוריה - קודם כללי משתמש, אחר כך כללי מערכת (הכנסות!)
   const userRule = await getUserRuleSuggestion(ctx.userId, nextTx.vendor);
-  const suggestion = nextTx.expense_category || userRule || findBestMatch(nextTx.vendor)?.name;
+  const systemSuggestion = findBestIncomeMatch(nextTx.vendor)?.name;
+  const suggestion = nextTx.income_category || userRule || systemSuggestion;
   const isLearnedSuggestion = !!userRule;
   
   let message = `💚 *${nextTx.vendor}*\n`;
