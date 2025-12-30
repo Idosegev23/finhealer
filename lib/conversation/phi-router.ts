@@ -329,19 +329,31 @@ async function handleClassificationResponse(
       ? Array.from(new Set(INCOME_CATEGORIES.map(c => c.group)))
       : Array.from(new Set(CATEGORIES.map(c => c.group)));
     
-    let message = type === 'income' ? '💚 *קטגוריות הכנסה:*\n\n' : '💸 *קטגוריות הוצאה:*\n\n';
+    // שולח כמה הודעות כדי לא לחרוג מהגבלת אורך
+    const messages: string[] = [];
+    let currentMsg = type === 'income' ? '💚 *קטגוריות הכנסה:*\n\n' : '💸 *קטגוריות הוצאה:*\n\n';
     
-    for (const group of groups.slice(0, 8)) { // Max 8 groups to avoid too long message
-      const groupCats = categories.filter(c => c.group === group).slice(0, 4);
-      message += `*${group}:* ${groupCats.map(c => c.name).join(', ')}\n`;
+    for (const group of groups) {
+      const groupCats = categories.filter(c => c.group === group);
+      const groupLine = `*${group}:* ${groupCats.map(c => c.name).join(', ')}\n`;
+      
+      if (currentMsg.length + groupLine.length > 3000) {
+        messages.push(currentMsg);
+        currentMsg = groupLine;
+      } else {
+        currentMsg += groupLine;
+      }
     }
     
-    message += `\n💡 כתוב את שם הקטגוריה או חלק ממנה`;
+    currentMsg += `\n💡 כתוב את שם הקטגוריה או חלק ממנה`;
+    messages.push(currentMsg);
     
-    await greenAPI.sendMessage({
-      phoneNumber: ctx.phone,
-      message,
-    });
+    for (const m of messages) {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: m,
+      });
+    }
     return { success: true };
   }
   
