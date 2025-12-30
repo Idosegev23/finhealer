@@ -10,9 +10,10 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
-import { getGreenAPIClient } from '@/lib/greenapi/client';
+import { getGreenAPIClient, sendImage } from '@/lib/greenapi/client';
 import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categories';
 import { INCOME_CATEGORIES, findBestIncomeMatch, findTopIncomeMatches } from '@/lib/finance/income-categories';
+import { generatePieChart, type CategoryData } from '@/lib/ai/gemini-image-client';
 
 // ============================================================================
 // Types
@@ -180,13 +181,19 @@ export async function routeMessage(
       return await showFinalSummary(ctx);
     }
     
+    // גרף הוצאות
+    if (isCommand(msg, ['גרף', 'תמונה', 'chart', 'התפלגות'])) {
+      return await generateAndSendExpenseChart(ctx);
+    }
+    
     // ברירת מחדל
     await greenAPI.sendMessage({
       phoneNumber: phone,
       message: `איך אני יכול לעזור? 😊\n\n` +
         `• שלח מסמך לניתוח\n` +
         `• שאל "כמה הוצאתי על X?"\n` +
-        `• כתוב "סיכום" לראות את המצב`,
+        `• כתוב "סיכום" לראות את המצב\n` +
+        `• כתוב "גרף" לראות התפלגות הוצאות`,
     });
     
     return { success: true };
@@ -805,7 +812,8 @@ async function showFinalSummary(ctx: RouterContext): Promise<RouterResult> {
   
   message += `*מה עכשיו?*\n`;
   message += `• שלח עוד מסמך\n`;
-  message += `• שאל "כמה הוצאתי על X?"`;
+  message += `• שאל "כמה הוצאתי על X?"\n`;
+  message += `• כתוב "גרף" לראות התפלגות`;
   
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
@@ -813,6 +821,100 @@ async function showFinalSummary(ctx: RouterContext): Promise<RouterResult> {
   });
   
   return { success: true, newState: 'monitoring' };
+}
+
+/**
+ * Generate and send an expense distribution pie chart
+ */
+async function generateAndSendExpenseChart(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // הודעת המתנה
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: '🎨 מכין את הגרף שלך...',
+  });
+  
+  // קבל נתוני הוצאות מאושרות
+  const { data: expenses } = await supabase
+    .from('transactions')
+    .select('category, amount')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'confirmed')
+    .eq('type', 'expense');
+  
+  if (!expenses || expenses.length === 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: '😕 אין לי מספיק נתונים ליצירת גרף. שלח דוח בנק קודם.',
+    });
+    return { success: false };
+  }
+  
+  // קבץ לפי קטגוריות
+  const categoryTotals: Record<string, number> = {};
+  let total = 0;
+  
+  expenses.forEach(t => {
+    const cat = t.category || 'אחר';
+    categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(t.amount);
+    total += Math.abs(t.amount);
+  });
+  
+  // הכן נתונים לגרף
+  const categories: CategoryData[] = Object.entries(categoryTotals)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 8)
+    .map(([name, amount]) => ({
+      name,
+      amount,
+      percentage: Math.round((amount / total) * 100),
+    }));
+  
+  // צור את הגרף
+  const hebrewMonths = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+  const now = new Date();
+  const subtitle = `${hebrewMonths[now.getMonth()]} ${now.getFullYear()}`;
+  
+  try {
+    const image = await generatePieChart('התפלגות הוצאות', categories, {
+      subtitle,
+      note: {
+        title: 'φ',
+        text: `סה"כ: ${total.toLocaleString('he-IL')} ₪`
+      }
+    });
+    
+    if (image && image.base64) {
+      // שלח את התמונה
+      await sendImage({
+        phoneNumber: ctx.phone,
+        imageBase64: image.base64,
+        caption: `📊 התפלגות הוצאות - ${subtitle}\nסה"כ: ${total.toLocaleString('he-IL')} ₪`,
+        mimeType: image.mimeType,
+      });
+      
+      console.log('✅ Chart sent successfully');
+      return { success: true };
+    } else {
+      throw new Error('No image generated');
+    }
+  } catch (error) {
+    console.error('❌ Failed to generate chart:', error);
+    
+    // Fallback: שלח סיכום טקסטואלי
+    const textSummary = categories
+      .map(c => `• ${c.name}: ${c.amount.toLocaleString('he-IL')} ₪ (${c.percentage}%)`)
+      .join('\n');
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📊 *התפלגות הוצאות*\n\n${textSummary}\n\n💰 סה"כ: ${total.toLocaleString('he-IL')} ₪`,
+    });
+    
+    return { success: true };
+  }
 }
 
 async function answerCategoryQuestion(ctx: RouterContext, category: string): Promise<RouterResult> {
