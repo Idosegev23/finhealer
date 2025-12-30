@@ -183,6 +183,6 @@ export function getIncomeCategoriesByGroup(group: string): IncomeCategoryDef[] {
  * Get all unique income category groups
  */
 export function getIncomeGroups(): string[] {
-  return [...new Set(INCOME_CATEGORIES.map(c => c.group))];
+  return Array.from(new Set(INCOME_CATEGORIES.map(c => c.group)));
 }
 
