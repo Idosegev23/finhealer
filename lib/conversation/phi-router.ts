@@ -1057,7 +1057,16 @@ export async function onDocumentProcessed(userId: string, phone: string): Promis
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  // ספור תנועות
+  // קבל את הדוח האחרון שהועלה
+  const { data: latestDoc } = await supabase
+    .from('uploaded_statements')
+    .select('period_start, period_end, document_type, transactions_extracted')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  // ספור תנועות ממתינות
   const { data: transactions } = await supabase
     .from('transactions')
     .select('id, type, amount')
@@ -1069,10 +1078,61 @@ export async function onDocumentProcessed(userId: string, phone: string): Promis
   const totalIncome = transactions?.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
   const totalExpenses = transactions?.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
   
+  // זיהוי תקופה
+  let periodText = '';
+  if (latestDoc?.period_start && latestDoc?.period_end) {
+    const startDate = new Date(latestDoc.period_start);
+    const endDate = new Date(latestDoc.period_end);
+    const hebrewMonths = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+    
+    const startMonth = hebrewMonths[startDate.getMonth()];
+    const endMonth = hebrewMonths[endDate.getMonth()];
+    const year = endDate.getFullYear();
+    
+    if (startDate.getMonth() === endDate.getMonth()) {
+      periodText = `📅 תקופה: *${endMonth} ${year}*\n`;
+    } else {
+      periodText = `📅 תקופה: *${startMonth} - ${endMonth} ${year}*\n`;
+    }
+  }
+  
+  // חשב כמה חודשים יש בסך הכל
+  const { data: allDocs } = await supabase
+    .from('uploaded_statements')
+    .select('period_start, period_end')
+    .eq('user_id', userId)
+    .eq('status', 'completed');
+  
+  // חשב כמה חודשים שונים מכוסים
+  const coveredMonths = new Set<string>();
+  (allDocs || []).forEach(doc => {
+    if (doc.period_start && doc.period_end) {
+      const start = new Date(doc.period_start);
+      const end = new Date(doc.period_end);
+      let current = new Date(start);
+      while (current <= end) {
+        coveredMonths.add(`${current.getFullYear()}-${current.getMonth()}`);
+        current.setMonth(current.getMonth() + 1);
+      }
+    }
+  });
+  
+  const monthsCovered = coveredMonths.size;
+  const monthsNeeded = Math.max(0, 6 - monthsCovered);
+  
+  let progressText = '';
+  if (monthsCovered >= 6) {
+    progressText = `✨ יש לי ${monthsCovered} חודשים - מספיק לתמונה מלאה!`;
+  } else {
+    progressText = `📊 יש לי ${monthsCovered} חודשים. עוד ${monthsNeeded} ל-6 חודשים.`;
+  }
+  
   const message = `📊 *קיבלתי את הדוח!*\n\n` +
+    periodText +
     `📝 ${incomeCount + expenseCount} תנועות\n` +
     `💚 ${incomeCount} הכנסות (${totalIncome.toLocaleString('he-IL')} ₪)\n` +
     `💸 ${expenseCount} הוצאות (${totalExpenses.toLocaleString('he-IL')} ₪)\n\n` +
+    `${progressText}\n\n` +
     `*מה עכשיו?*\n` +
     `• יש לי עוד דוח בנק\n` +
     `• יש לי דוח אשראי\n` +
