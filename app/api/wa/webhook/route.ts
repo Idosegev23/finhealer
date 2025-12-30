@@ -686,10 +686,15 @@ export async function POST(request: NextRequest) {
       const isPDF = fileName.toLowerCase().endsWith('.pdf');
       
       if (isPDF) {
-        // 🆕 זיהוי חכם של סוג המסמך לפי ה-state וה-context
-        const currentContext = await loadContext(userData.id);
-        const currentState = currentContext?.currentState;
-        const explicitDocType = currentContext?.waitingForDocument;
+        // 🆕 זיהוי חכם של סוג המסמך לפי ה-state
+        const { data: userState } = await supabase
+          .from('users')
+          .select('onboarding_state, classification_context')
+          .eq('id', userData.id)
+          .single();
+        
+        const currentState = userState?.onboarding_state;
+        const explicitDocType = userState?.classification_context?.waitingForDocument;
         
         // 🎯 זיהוי סוג מסמך לפי:
         // 1. סוג מסמך שהוגדר במפורש ב-context (waitingForDocument)
