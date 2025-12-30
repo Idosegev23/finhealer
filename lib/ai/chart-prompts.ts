@@ -128,7 +128,7 @@ export function buildStructuredPieChartPrompt(
       },
       side_legend: {
         enabled: true,
-        position: "both_sides",
+        position: "right",
         layout: "stacked",
         items: {
           show_color_dot: true,
@@ -138,9 +138,7 @@ export function buildStructuredPieChartPrompt(
           format: "{{LABEL}} - {{VALUE}} ({{PCT}}%)"
         },
         connector_lines: {
-          enabled: true,
-          style: "thin",
-          attach_to_slices: true
+          enabled: false
         }
       },
       ...(note && {

@@ -205,14 +205,14 @@ export async function routeMessage(
       return await showFinalSummary(ctx);
     }
     
+    // גרף הכנסות - חייב להיבדק לפני גרף כי "גרף הכנסות" מכיל "גרף"
+    if (isCommand(msg, ['גרף הכנסות', 'הכנסות גרף', 'income chart'])) {
+      return await generateAndSendIncomeChart(ctx);
+    }
+    
     // גרף הוצאות
     if (isCommand(msg, ['גרף', 'גרף הוצאות', 'תמונה', 'chart', 'התפלגות'])) {
       return await generateAndSendExpenseChart(ctx);
-    }
-    
-    // גרף הכנסות
-    if (isCommand(msg, ['גרף הכנסות', 'הכנסות גרף', 'income chart'])) {
-      return await generateAndSendIncomeChart(ctx);
     }
     
     // ברירת מחדל - הפנה לעזרה
