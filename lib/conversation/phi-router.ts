@@ -10,7 +10,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
-import { getGreenAPIClient, sendImage } from '@/lib/greenapi/client';
+import { getGreenAPIClient, sendWhatsAppImage } from '@/lib/greenapi/client';
 import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categories';
 import { INCOME_CATEGORIES, findBestIncomeMatch, findTopIncomeMatches } from '@/lib/finance/income-categories';
 import { generatePieChart, type CategoryData } from '@/lib/ai/gemini-image-client';
@@ -907,12 +907,12 @@ async function generateAndSendExpenseChart(ctx: RouterContext): Promise<RouterRe
     
     if (image && image.base64) {
       // שלח את התמונה
-      await sendImage({
-        phoneNumber: ctx.phone,
-        imageBase64: image.base64,
-        caption: `📊 התפלגות הוצאות - ${subtitle}\nסה"כ: ${total.toLocaleString('he-IL')} ₪`,
-        mimeType: image.mimeType,
-      });
+      await sendWhatsAppImage(
+        ctx.phone,
+        image.base64,
+        `📊 התפלגות הוצאות - ${subtitle}\nסה"כ: ${total.toLocaleString('he-IL')} ₪`,
+        image.mimeType
+      );
       
       console.log('✅ Chart sent successfully');
       return { success: true };
