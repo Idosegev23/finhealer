@@ -13,7 +13,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient, sendWhatsAppImage } from '@/lib/greenapi/client';
 import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categories';
 import { INCOME_CATEGORIES, findBestIncomeMatch, findTopIncomeMatches } from '@/lib/finance/income-categories';
-import { generatePieChart, type CategoryData } from '@/lib/ai/gemini-image-client';
+import { generatePieChart } from '@/lib/ai/gemini-image-client';
+import type { CategoryData } from '@/lib/ai/chart-prompts';
 
 // ============================================================================
 // Types
