@@ -815,24 +815,60 @@ function isCommand(msg: string, commands: string[]): boolean {
   return commands.some(cmd => lower === cmd || lower.includes(cmd));
 }
 
-// Simple in-memory cache (resets on deploy)
-const suggestionsCache = new Map<string, string[]>();
-const groupCache = new Map<string, string[]>();
-
+// DB-based cache (persists across serverless invocations)
 async function saveSuggestionsToCache(userId: string, suggestions: string[]): Promise<void> {
-  suggestionsCache.set(userId, suggestions);
+  const supabase = createServiceClient();
+  await supabase
+    .from('users')
+    .update({ 
+      classification_context: { 
+        suggestions,
+        updated_at: new Date().toISOString()
+      }
+    })
+    .eq('id', userId);
 }
 
 async function getSuggestionsFromCache(userId: string): Promise<string[] | null> {
-  return suggestionsCache.get(userId) || null;
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+  
+  return data?.classification_context?.suggestions || null;
 }
 
 async function saveCurrentGroupToCache(userId: string, txIds: string[]): Promise<void> {
-  groupCache.set(userId, txIds);
+  const supabase = createServiceClient();
+  const { data: existing } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+  
+  await supabase
+    .from('users')
+    .update({ 
+      classification_context: {
+        ...existing?.classification_context,
+        group_ids: txIds,
+        updated_at: new Date().toISOString()
+      }
+    })
+    .eq('id', userId);
 }
 
 async function getCurrentGroupFromCache(userId: string): Promise<string[] | null> {
-  return groupCache.get(userId) || null;
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+  
+  return data?.classification_context?.group_ids || null;
 }
 
 // ============================================================================
