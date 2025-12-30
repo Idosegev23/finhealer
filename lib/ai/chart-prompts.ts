@@ -47,7 +47,188 @@ const PHI_COLORS = {
   coral: '#D08770',
   slate: '#4C566A',
   frost: '#D8DEE9',
+  // Additional harmonious colors for charts
+  chartColors: [
+    '#A96B48', // Gold (primary)
+    '#2E3440', // Dark
+    '#8FBCBB', // Mint
+    '#D08770', // Coral
+    '#5E81AC', // Blue
+    '#B48EAD', // Purple
+    '#EBCB8B', // Yellow
+    '#88C0D0', // Light blue
+  ],
 };
+
+/**
+ * Build a structured JSON prompt for Gemini Image Generation
+ * This format provides maximum consistency and control
+ */
+export function buildStructuredPieChartPrompt(
+  title: string,
+  subtitle: string,
+  categories: CategoryData[],
+  note?: { title: string; text: string }
+): string {
+  const total = categories.reduce((sum, c) => sum + c.amount, 0);
+  
+  // Assign colors if not specified
+  const slicesData = categories.slice(0, 8).map((cat, i) => ({
+    key: `slice_${i + 1}`,
+    label: cat.name,
+    value: cat.amount,
+    percentage: Math.round((cat.amount / total) * 100),
+    color_hex: cat.color || PHI_COLORS.chartColors[i % PHI_COLORS.chartColors.length],
+    emphasis: i === 0 ? 'primary' : 'normal',
+  }));
+
+  const chartSpec = {
+    goal: "Generate a clean, high-legibility pie chart infographic with side labels and percentages, with perfectly readable Hebrew text.",
+    language: {
+      ui_direction: "RTL",
+      primary_language: "he"
+    },
+    chart_spec: {
+      chart_type: "pie",
+      title: {
+        enabled: true,
+        text: title,
+        subtitle_enabled: true,
+        subtitle_text: subtitle
+      },
+      data_rules: {
+        values_are_percentages: false,
+        auto_compute_percentages: true,
+        total_hint: `${total.toLocaleString('he-IL')} ₪`,
+        rounding: {
+          enabled: true,
+          decimals: 0,
+          ensure_sum_to_100: true
+        },
+        sort_slices: {
+          enabled: true,
+          method: "descending"
+        }
+      },
+      data: slicesData.map(s => ({
+        key: s.key,
+        label: s.label,
+        value: `${s.value.toLocaleString('he-IL')} ₪`,
+        percentage: `${s.percentage}%`,
+        color_hex: s.color_hex,
+        emphasis: s.emphasis
+      })),
+      slice_labels: {
+        show_on_chart: true,
+        content: "percentage_only",
+        min_font_size_px: 22,
+        max_font_size_px: 36,
+        contrast_rule: "always_high_contrast",
+        avoid_overlap: true
+      },
+      side_legend: {
+        enabled: true,
+        position: "both_sides",
+        layout: "stacked",
+        items: {
+          show_color_dot: true,
+          show_label: true,
+          show_value: true,
+          show_percentage: true,
+          format: "{{LABEL}} - {{VALUE}} ({{PCT}}%)"
+        },
+        connector_lines: {
+          enabled: true,
+          style: "thin",
+          attach_to_slices: true
+        }
+      },
+      ...(note && {
+        annotation_blocks: {
+          enabled: true,
+          blocks: [{
+            key: "note_1",
+            position: "bottom_right",
+            title: note.title,
+            text: note.text
+          }]
+        }
+      }),
+      phi_branding: {
+        enabled: true,
+        symbol: "φ",
+        position: "bottom_right",
+        tagline: "היחס הזהב של הכסף שלך"
+      }
+    },
+    design_system: {
+      canvas: {
+        aspect_ratio: "16:9",
+        resolution: "2K",
+        background: {
+          type: "solid",
+          color_hex: "#FFFFFF"
+        },
+        safe_margins_px: 80
+      },
+      typography: {
+        font_family_preference: ["Heebo", "Arial", "Sans-Serif"],
+        title: {
+          weight: 800,
+          size_px: 56,
+          color_hex: PHI_COLORS.dark
+        },
+        subtitle: {
+          weight: 500,
+          size_px: 28,
+          color_hex: PHI_COLORS.slate
+        },
+        legend: {
+          weight: 600,
+          size_px: 26,
+          color_hex: PHI_COLORS.dark,
+          line_height: 1.25
+        }
+      },
+      styling: {
+        chart_style: "flat_clean",
+        slice_border: {
+          enabled: true,
+          color_hex: "#FFFFFF",
+          width_px: 3
+        },
+        shadow: {
+          enabled: false
+        }
+      }
+    },
+    text_constraints: {
+      must_be_perfectly_readable: true,
+      no_lorem_ipsum: true,
+      rtl_required: true,
+      all_text_in_hebrew: true
+    },
+    negative_constraints: [
+      "no watermark",
+      "no blurry text",
+      "no misspelled Hebrew",
+      "no overlapping labels",
+      "no random icons",
+      "no 3D chart effects",
+      "no gradients unless specified"
+    ]
+  };
+
+  return `Generate a pie chart image according to this specification:
+
+${JSON.stringify(chartSpec, null, 2)}
+
+IMPORTANT: Create the actual visual image, not text. The chart must have:
+- Clear Hebrew labels in RTL direction
+- The phi symbol (φ) visible in the design
+- Colors exactly as specified
+- Clean, professional look`;
+}
 
 /**
  * Build prompt for pie chart showing expense distribution

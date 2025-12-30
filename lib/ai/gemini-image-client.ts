@@ -6,6 +6,7 @@
 import { GoogleGenAI } from '@google/genai';
 import {
   buildPieChartPrompt,
+  buildStructuredPieChartPrompt,
   buildTrendPrompt,
   buildPhiScorePrompt,
   buildMonthlyInfographicPrompt,
@@ -60,16 +61,32 @@ async function generateImageFromPrompt(
 ): Promise<GeneratedImage | null> {
   try {
     const client = getGeminiClient();
-    const model = IMAGE_MODEL; // Always use Nano Banana Pro (gemini-3-pro-image-preview)
+    const model = IMAGE_MODEL; // gemini-3-pro-image-preview
 
     console.log(`🎨 Generating image with ${model}...`);
     console.log(`📝 Prompt length: ${prompt.length} chars`);
 
+    // Map aspect ratio to Gemini format
+    const aspectRatioMap: Record<string, string> = {
+      '1:1': '1:1',
+      '16:9': '16:9',
+      '3:4': '3:4',
+      '4:3': '4:3',
+      '4:5': '4:5',
+      '5:4': '5:4',
+    };
+    
+    const aspectRatio = aspectRatioMap[options.aspectRatio || '16:9'] || '16:9';
+
     const response = await client.models.generateContent({
       model,
-      contents: prompt,
+      contents: [{ text: prompt }],
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: {
+          aspectRatio: aspectRatio,
+          imageSize: '2K', // High quality
+        },
       },
     });
 
@@ -104,14 +121,20 @@ async function generateImageFromPrompt(
 
 /**
  * Generate a pie chart showing expense distribution
+ * Uses the new structured JSON prompt format for maximum consistency
  */
 export async function generatePieChart(
   title: string,
   categories: CategoryData[],
-  options?: ChartOptions
+  options?: ChartOptions & { subtitle?: string; note?: { title: string; text: string } }
 ): Promise<GeneratedImage | null> {
-  const prompt = buildPieChartPrompt(title, categories);
-  return generateImageFromPrompt(prompt, { aspectRatio: '1:1', ...options });
+  // Use the new structured prompt for better results
+  const hebrewMonths = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+  const now = new Date();
+  const subtitle = options?.subtitle || `${hebrewMonths[now.getMonth()]} ${now.getFullYear()}`;
+  
+  const prompt = buildStructuredPieChartPrompt(title, subtitle, categories, options?.note);
+  return generateImageFromPrompt(prompt, { aspectRatio: '16:9', ...options });
 }
 
 /**
