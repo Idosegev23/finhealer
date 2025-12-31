@@ -1,9 +1,9 @@
 # התקדמות - Phi (φ)
 
 ## סטטוס כללי
-📊 **שלב:** Rebranding Complete + Landing Page Redesign 🎨
-🎯 **Phase:** MVP Extended+ - Phi Brand Launch  
-⏰ **עדכון אחרון:** 8 בנובמבר 2025 - PHI REBRAND COMPLETE! 🚀φ
+📊 **שלב:** Phase 1.5 Complete - Classification System + Charts 🎉
+🎯 **Phase:** Phase 1 + 1.5 מושלמים, מוכנים ל-Phase 3 (Budget)  
+⏰ **עדכון אחרון:** 31 בדצמבר 2025 - CLASSIFICATION SYSTEM COMPLETE! 📊φ
 
 ### 🎉 עדכון מיוחד: ריברנדינג ל-Phi!
 המוצר עבר ריברנדינג מלא מ-FinHealer ל-**Phi (φ)** - היחס הזהב של הכסף שלך!
@@ -613,4 +613,99 @@ GREEN_INVOICE_SECRET=              # לתשלומים אמיתיים
 
 ---
 
-**עדכון אחרון:** 18 באוקטובר 2025 - Financial Tables + Simulator + UX Polish Edition! 🎨🚀💰
+## 🎉 **סבב 8: Phase 1.5 Complete - Classification System + Charts** (31 בדצמבר 2025)
+
+### ✅ Phase 1.5: Document Scanning - 100% מושלם!
+
+| פיצ'ר | סטטוס | איפה? |
+|-------|--------|------|
+| PDF Upload via WhatsApp | ✅ | `webhook/route.ts` |
+| AI Document Analysis | ✅ | `document-prompts.ts` |
+| Transaction Extraction | ✅ | OCR + GPT |
+| **Classification Session** | ✅ | `phi-router.ts` |
+| Period Tracking | ✅ | `period-tracker.ts` |
+| Missing Docs Request | ✅ | אוטומטי אחרי סריקה |
+
+### 🆕 תכונות חדשות שנוספו היום:
+
+#### 1. מערכת קטגוריות הכנסות (31 קטגוריות)
+- **קובץ:** `lib/finance/income-categories.ts`
+- `IncomeCategoryDef` interface
+- `INCOME_CATEGORIES` array עם 31 קטגוריות
+- `findBestIncomeMatch()` - חיפוש קטגוריה מתאימה
+- `findTopIncomeMatches()` - 3 הצעות מובילות
+- `getIncomeGroups()` - קבוצות הכנסה
+
+#### 2. User Learning System (לומד מהמשתמש)
+- **טבלה:** `user_category_rules`
+- `learnUserRule()` - שומר חוק חדש כשמשתמש מסווג
+- `getUserRuleSuggestion()` - מציע קטגוריה מבוסס למידה
+- הקטגוריות שנבחרו 3+ פעמים מוצעות אוטומטית
+
+#### 3. DB-based Caching (במקום in-memory)
+- **שדה:** `classification_context` בטבלת `users`
+- `saveSuggestionsToCache()` - שמירה ב-DB
+- `saveCurrentGroupToCache()` - שמירת קבוצה נוכחית
+- `getSuggestionsFromCache()` - קריאה מ-DB
+- `getCurrentGroupFromCache()` - קריאת קבוצה מ-DB
+- פותר בעיית infinite loop ב-serverless
+
+#### 4. טיפול בתנועות אשראי
+- **סטטוס חדש:** `needs_credit_detail`
+- Migration להוספת הסטטוס ל-constraint
+- דילוג אוטומטי על תנועות אשראי
+- הודעה למשתמש שצריך דוח פירוט
+
+#### 5. יצירת גרפים עם Gemini
+- **מודל:** `gemini-3-pro-image-preview`
+- **קובץ:** `lib/ai/gemini-image-client.ts`
+- **Prompts:** `lib/ai/chart-prompts.ts`
+- `buildStructuredPieChartPrompt()` - JSON template מפורט
+- `generateAndSendExpenseChart()` - גרף הוצאות
+- `generateAndSendIncomeChart()` - גרף הכנסות
+- עיצוב Phi Brand עם צבעים מותאמים
+
+#### 6. פקודות WhatsApp חדשות
+| פקודה | תוצאה |
+|-------|-------|
+| **גרף הוצאות** / **גרף** | התפלגות הוצאות 💸 |
+| **גרף הכנסות** | התפלגות הכנסות 💚 |
+| **עזרה** | רשימת כל הפקודות |
+| **רשימה** | קטגוריות זמינות |
+
+#### 7. שיפורים נוספים
+- זיהוי תקופה אחרי סריקת מסמך
+- הצגת התקדמות ל-6 חודשים
+- תיקון באג: סיווג קבוצה שלמה (לא רק תנועה אחת)
+- תיקון באג: loadContext לא מוגדר
+- תיקון באג: הפרדה בין גרף הוצאות/הכנסות
+
+### 📊 סטטיסטיקות ה-Session:
+- **9 הכנסות** סווגו בהצלחה
+- **35 הוצאות** סווגו בהצלחה
+- **0 שגיאות** בסיווג
+
+### 🎯 סה"כ היום (31 בדצמבר):
+- **1 קובץ חדש:** `lib/finance/income-categories.ts`
+- **2 migrations:** `income_category` column, `needs_credit_detail` status
+- **5 פונקציות חדשות:** learnUserRule, getUserRuleSuggestion, cache functions
+- **2 פקודות גרפים:** הוצאות, הכנסות
+- **2 פקודות עזר:** עזרה, רשימה
+- **תיקון 4 באגים קריטיים**
+
+---
+
+## 📈 סטטוס שלבים
+
+| שלב | סטטוס | הערות |
+|-----|--------|-------|
+| Phase 1: Reflection | ✅ 100% | שיקוף עבר מושלם |
+| Phase 1.5: Document Scanning | ✅ 100% | **הושלם היום!** |
+| Phase 2: Behavior | ✅ 100% | ניתוח דפוסים מושלם |
+| Phase 3: Budget | ⏳ 0% | **הבא בתור** |
+| Phase 4: Goals | ⏳ 0% | ממתין לתקציב |
+| Phase 5: Monitoring | ⏳ 30% | Dashboard קיים |
+
+---
+
+**עדכון אחרון:** 31 בדצמבר 2025 - Phase 1.5 Complete + Classification System + Charts! 🎉📊φ

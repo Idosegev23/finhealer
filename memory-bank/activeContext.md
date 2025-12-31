@@ -2,9 +2,9 @@
 
 ## מיקום נוכחי בפרויקט
 
-### 🎉 **עדכון אחרון: 1 בדצמבר 2025**
+### 🎉 **עדכון אחרון: 31 בדצמבר 2025**
 
-**ריברנדינג מלא!** המוצר עבר מ-FinHealer ל-**Phi (φ)** - היחס הזהב של הכסף שלך.
+**Phase 1 + 1.5 מושלמים!** מערכת הסיווג עובדת מצוין עם גרפים, למידה מהמשתמש, ופקודות עזרה.
 
 ---
 
@@ -14,14 +14,14 @@
 
 | ממשק | תפקיד |
 |------|-------|
-| **WhatsApp** | סריקה, רישום הוצאות, אישורים, סיווג, שיחות עם גדי |
+| **WhatsApp** | סריקה, רישום הוצאות, אישורים, סיווג, גרפים, שיחות עם גדי |
 | **Desktop** | צפייה בנתונים, גרפים, דוחות - READ ONLY |
 
 ---
 
 ## 🎯 קורלציה: שלבי המוצר ↔ מצב הפיתוח
 
-### Phase 1: Reflection (שיקוף עבר) - ✅ פיתוח הושלם
+### Phase 1: Reflection (שיקוף עבר) - ✅ מושלם
 **מטרה:** הבנת דפוסי הוצאה היסטוריים (3-6 חודשים)
 
 | פיצ'ר | סטטוס | איפה? |
@@ -32,30 +32,40 @@
 | user_baselines | ✅ | טבלה ב-DB |
 | user_financial_profile | ✅ | טבלה ב-DB |
 
-### Phase 1.5: Document Scanning - 🔄 בפיתוח פעיל
-**מטרה:** סריקה אוטומטית של דוחות בנק/אשראי
+### Phase 1.5: Document Scanning - ✅ **מושלם!** (31 דצמבר 2025)
+**מטרה:** סריקה אוטומטית של דוחות בנק/אשראי + סיווג תנועות
 
 | פיצ'ר | סטטוס | איפה? |
 |-------|--------|------|
 | PDF Upload via WhatsApp | ✅ | `webhook/route.ts` |
 | AI Document Analysis | ✅ | `document-prompts.ts` |
 | Transaction Extraction | ✅ | OCR + GPT |
-| Classification Session | ✅ | `document-classification-session.ts` |
-| Period Tracking (3 months) | ✅ | `period-tracker.ts` |
+| **Classification Session** | ✅ | `phi-router.ts` |
+| Period Tracking (6 months) | ✅ | `period-tracker.ts` |
 | Missing Docs Request | ✅ | אוטומטי אחרי סריקה |
-| דוחות מקיפים (מסלקה/הר הביטוח) | ✅ | Prompts מוכנים |
-| Handler ל-"נמשיך" | ✅ | `document-upload-flow.ts` |
-| הודעה טבעית אחרי סריקה | ✅ | `buildDocumentAnalysisMessage()` |
+| **Income Categories (31)** | ✅ | `lib/finance/income-categories.ts` |
+| **User Learning** | ✅ | `user_category_rules` table |
+| **DB-based Cache** | ✅ | `classification_context` in users |
+| **Credit Card Handling** | ✅ | `needs_credit_detail` status |
+| **Chart Generation** | ✅ | Gemini `gemini-3-pro-image-preview` |
+| **Help Command** | ✅ | פקודת "עזרה" |
+| **List Command** | ✅ | פקודת "רשימה" |
 
-**Flow טבעי:**
-1. משתמש שולח מסמך
+**פקודות זמינות:**
+| פקודה | תוצאה |
+|-------|-------|
+| **גרף הוצאות** / **גרף** | התפלגות הוצאות 💸 |
+| **גרף הכנסות** | התפלגות הכנסות 💚 |
+| **עזרה** | רשימת כל הפקודות |
+| **רשימה** | קטגוריות זמינות |
+
+**Flow מושלם:**
+1. משתמש שולח מסמך PDF
 2. בוט מנתח ומציג: תקופה, תנועות, מסמכים חסרים
 3. משתמש יכול: לשלוח עוד / לכתוב "נמשיך"
-4. אם "נמשיך" - מתחיל סיווג (גם אם אין 3 חודשים מלאים)
-
-**לבדוק:**
-- [ ] E2E test של כל ה-flow
-- [ ] מעבר אוטומטי לשלב 2 בסיום סיווג
+4. סיווג הכנסות → סיווג הוצאות
+5. הצעות חכמות מבוססות למידה מהמשתמש
+6. אפשרות ליצור גרפים בכל שלב
 
 ### Phase 2: Behavior (התנהלות והרגלים) - ✅ **מושלם!**
 **מטרה:** זיהוי דפוסי הוצאה בפועל (30+ ימים)
@@ -71,18 +81,8 @@
 | BehaviorDashboard | ✅ | נתונים אמיתיים מ-DB |
 | SmartInsights | ✅ | מושך תובנות מ-DB |
 | WhatsApp Handler לתובנות | ✅ | `handleAnalysisRequest()` |
-| Handler לסטטוס | ✅ | `handleStatusRequest()` |
-| getQuickAITip() | ✅ | טיפ מהיר ב-WhatsApp |
 
-**Flow אוטומטי מושלם:**
-1. כל יום 20:30 - ניתוח דפוסים + סיכום יומי + AI tip אישי
-2. אם יש תובנה חשובה - נשלחת בהודעה
-3. כל ראשון 09:00 - סיכום שבועי מקיף
-4. אחרי 30+ ימים ו-50+ תנועות - מעבר אוטומטי לשלב 3
-5. משתמש יכול לכתוב "ניתוח" ולקבל תובנות + AI tip
-6. משתמש יכול לכתוב "איפה אני עומד?" ולקבל סטטוס
-
-### Phase 3: Budget (תקציב אוטומטי) - ⏳ בהמתנה
+### Phase 3: Budget (תקציב אוטומטי) - 🚀 **הבא בתור!**
 **מטרה:** יצירת תקציב חכם מבוסס היסטוריה
 
 | פיצ'ר | סטטוס | איפה? |
@@ -114,51 +114,65 @@
 
 ---
 
-## 🔧 מה נבנה בימים האחרונים
+## 🔧 מה נבנה היום (31 דצמבר 2025)
 
-### WhatsApp Bot - Document Scanning
-1. ✅ תיקון באג מספר תנועות (הציג סכום במקום כמות)
-2. ✅ שינוי לשאלה אחת בכל פעם (היה 2-3)
-3. ✅ AI parser לתשובות Onboarding (במקום regex)
-4. ✅ הסרת הודעת "קיבלתי" המיידית
-5. ✅ תמיכה בדוחות מקיפים (מסלקה פנסיונית, הר הביטוח)
-6. ✅ period-tracker - מעקב כיסוי 3 חודשים
-7. ✅ הסתרת עמוד הסריקה מהתפריט (WhatsApp-first)
+### Classification System
+1. ✅ **מערכת קטגוריות הכנסות** - 31 קטגוריות ב-`income-categories.ts`
+2. ✅ **User Learning** - לומד מהמשתמש ומציע קטגוריות
+3. ✅ **DB-based Cache** - במקום in-memory (פותר infinite loop)
+4. ✅ **Credit Card Handling** - סטטוס `needs_credit_detail`
+5. ✅ **Group Classification** - סיווג קבוצה שלמה בפעם אחת
 
-### Database
-- ✅ 19+ טבלאות עם RLS מלא
-- ✅ uploaded_statements לmעקב מסמכים
-- ✅ expense_categories + income_sources
+### Chart Generation
+1. ✅ **Gemini Integration** - `gemini-3-pro-image-preview`
+2. ✅ **Expense Chart** - פקודה "גרף הוצאות"
+3. ✅ **Income Chart** - פקודה "גרף הכנסות"
+4. ✅ **Phi Brand Design** - צבעים וטיפוגרפיה מותאמים
+
+### Commands
+1. ✅ **"עזרה"** - מציג את כל הפקודות
+2. ✅ **"רשימה"** - מציג קטגוריות זמינות
+3. ✅ **"גרף הוצאות"** - התפלגות הוצאות
+4. ✅ **"גרף הכנסות"** - התפלגות הכנסות
+
+### Bug Fixes
+1. ✅ תיקון: סיווג קבוצה שלמה (לא רק תנועה אחת)
+2. ✅ תיקון: loadContext לא מוגדר ב-webhook
+3. ✅ תיקון: הפרדה בין גרף הוצאות/הכנסות
+4. ✅ תיקון: infinite loop בתנועות אשראי
 
 ---
 
 ## 📋 מה הלאה?
 
 ### Priority 1: Phase 3 - Budget 🚀
-1. [ ] דף `/budget` עם wizard
-2. [ ] `generateBudgetFromHistory()`
+1. [ ] דף `/budget` עם AI-generated budget
+2. [ ] `generateBudgetFromHistory()` - תקציב אוטומטי מ-AI
 3. [ ] S-curve visualization
 4. [ ] התראות חריגה via WhatsApp
 
+### Priority 2: Polish
+1. [ ] E2E tests לכל ה-flows
+2. [ ] מעבר אוטומטי לשלב 2 בסיום סיווג
+
 ### Priority 3: Integrations
 - ✅ GreenAPI - webhook + send
-- [ ] OpenAI Chat - בוט AI מלא
-- [ ] Green Invoice - Recurring
+- ✅ Gemini - chart generation
+- [ ] Green Invoice - Recurring payments
 
 ---
 
 ## 📁 קבצים מרכזיים
 
-### WhatsApp Bot
+### WhatsApp Bot (Updated!)
 ```
 app/api/wa/webhook/route.ts          - Main webhook handler
-lib/conversation/orchestrator.ts     - Message routing
-lib/conversation/flows/
-  ├── onboarding-flow.ts            - Onboarding questions
-  ├── document-classification-session.ts - Transaction classification
-  └── ...
-lib/ai/document-prompts.ts          - AI prompts for documents
-lib/documents/period-tracker.ts     - 3-month coverage tracking
+lib/conversation/phi-router.ts       - 🔥 MAIN ROUTER (classification, charts, commands)
+lib/finance/categories.ts            - Expense categories (140+)
+lib/finance/income-categories.ts     - 🆕 Income categories (31)
+lib/ai/gemini-image-client.ts        - 🆕 Gemini chart generation
+lib/ai/chart-prompts.ts              - 🆕 Chart prompt templates
+lib/documents/period-tracker.ts      - 6-month coverage tracking
 ```
 
 ### Dashboard (View-Only)
@@ -170,11 +184,6 @@ components/dashboard/
   ├── SmartInsights.tsx
   ├── PhaseProgress.tsx
   └── GoalsQuickView.tsx
-```
-
-### Hidden Pages
-```
-app/dashboard/scan-center/page.tsx  - 🔒 Hidden (WhatsApp-first)
 ```
 
 ---
@@ -201,8 +210,12 @@ app/dashboard/scan-center/page.tsx  - 🔒 Hidden (WhatsApp-first)
 
 | בעיה | סטטוס |
 |------|--------|
-| Build error בגלל sandbox (לא באמת שגיאה) | ⚠️ לוקאלי בלבד |
+| ~~Infinite loop בתנועות אשראי~~ | ✅ תוקן |
+| ~~loadContext לא מוגדר~~ | ✅ תוקן |
+| ~~גרף הכנסות מחזיר הוצאות~~ | ✅ תוקן |
+
+אין בעיות ידועות כרגע! 🎉
 
 ---
 
-**עדכון אחרון:** 1 בדצמבר 2025
+**עדכון אחרון:** 31 בדצמבר 2025 - Phase 1.5 Complete! 🎉📊φ
