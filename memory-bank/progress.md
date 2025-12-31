@@ -2,8 +2,18 @@
 
 ## סטטוס כללי
 📊 **שלב:** Phase 1.5 Complete - Classification System + Charts 🎉
-🎯 **Phase:** Phase 1 + 1.5 מושלמים, מוכנים ל-Phase 3 (Budget)  
-⏰ **עדכון אחרון:** 31 בדצמבר 2025 - CLASSIFICATION SYSTEM COMPLETE! 📊φ
+🎯 **Phase:** Phase 1 + 1.5 + 2 מושלמים, מוכנים ל-Phase 3 (Goals)  
+⏰ **עדכון אחרון:** 31 בדצמבר 2025 - עדכון זרימה: Goals → Budget! 🎯φ
+
+### ⚠️ עדכון חשוב: שינוי סדר שלבים (31 דצמבר 2025)
+**מקור:** פגישה עם גדי
+
+| לפני | אחרי |
+|------|------|
+| Phase 3: Budget | Phase 3: Goals |
+| Phase 4: Goals | Phase 4: Budget |
+
+> **הסיבה:** צריך לדעת את היעדים לפני שבונים תקציב שתומך בהם!
 
 ### 🎉 עדכון מיוחד: ריברנדינג ל-Phi!
 המוצר עבר ריברנדינג מלא מ-FinHealer ל-**Phi (φ)** - היחס הזהב של הכסף שלך!
@@ -230,33 +240,49 @@ finhealer/
 
 ## מה נותר לבנות 📋
 
-### Phase 2: Behavior Engine (שבוע 4) 🔄
-- [ ] Cron יומי לניתוח דפוסים (Edge Function)
-- [ ] פונקציה: analyzeBehavior() → behavior_insights
-- [ ] הודעות טיפים מותאמות
-- [ ] Dashboard: הצגת תובנות
-- [ ] לוגיקת מעבר ל-Phase 3 (Budget)
-
-### Phase 3: Transactions UI (שבוע 4-5)
-- [ ] דף `/transactions` - טבלה מלאה
-- [ ] Add/Edit Modal (React Hook Form + Zod)
-- [ ] Upload Receipt → OCR
-- [ ] Filters: תאריך, קטגוריה, סטטוס
-- [ ] Quick actions
+### Phase 3: Goals (יעדים) - 🚀 הבא בתור!
+- [ ] דף `/goals` מלא
+- [ ] Goals setting via WhatsApp
+- [ ] **סוגי יעדים:**
+  - יעד מכוון (סכום + תאריך)
+  - יעד כללי (כיווני)
+- [ ] UI לילדים ומטרות (child_name)
+- [ ] Progress bars ליעדים
+- [ ] **שני סוגי רשתות ביטחון:**
+  - ביטחון פיננסי (קרן חירום)
+  - ביטחון ביטוחי (כיסוי מלא)
 
 ### Phase 4: Budget Auto-Generate (שבוע 5-6)
 - [ ] דף `/budget`
 - [ ] פונקציה: generateBudgetFromHistory()
+- [ ] **פרמטרים לתקציב (מפגישה עם גדי):**
+  - ממוצע שורת הוצאה (לפי שורה, לא קטגוריה)
+  - ממוצע חודשי (מ-12 חודשים)
+  - יעד (שנקבע יחד עם לקוח)
+  - המלצה (של גדי/AI)
+- [ ] **התקציב נבנה ביחס ל:**
+  - מספר נפשות
+  - סוג מגורים
+  - רמת הכנסה
+  - גובה התחייבויות
+  - הוצאות משתנות
+  - הוצאות קבועות (שאינן התחייבויות)
+  - הוצאות מיוחדות
 - [ ] S-curve visualization (Recharts)
 - [ ] התאמות בקליקים
-- [ ] מעבר ל-Phase 4 (Goals)
-
-### Phase 5: Goals UI (שבוע 6)
-- [ ] דף `/goals` מלא
-- [ ] UI לילדים ומטרות (child_name)
-- [ ] חוקי העברת עודפים
-- [ ] Progress bars
 - [ ] מעבר ל-Phase 5 (Monitoring)
+
+### תהליך מקביל: איחוד הלוואות
+- [ ] זיהוי הלוואות בדוחות הבנק
+- [ ] שאלה: "רוצה שגדי יבדוק אפשרות לאיחוד?"
+- [ ] אם כן → בקשת דוח הלוואות
+- [ ] שליחה כליד לגדי עם כל הפרטים
+
+### Phase 5: Monitoring UI (שבוע 6)
+- [ ] סריקת הוצאות שוטפת
+- [ ] הודעות סטטוס יעדים
+- [ ] דוחות חודשיים/שנתיים
+- [ ] התראות חכמות via WhatsApp
 
 ### Phase 6: Integrations (שבוע 7-8)
 - [ ] **GreenAPI**: webhook + send
@@ -695,17 +721,17 @@ GREEN_INVOICE_SECRET=              # לתשלומים אמיתיים
 
 ---
 
-## 📈 סטטוס שלבים
+## 📈 סטטוס שלבים (סדר חדש!)
 
 | שלב | סטטוס | הערות |
 |-----|--------|-------|
 | Phase 1: Reflection | ✅ 100% | שיקוף עבר מושלם |
-| Phase 1.5: Document Scanning | ✅ 100% | **הושלם היום!** |
+| Phase 1.5: Document Scanning | ✅ 100% | סריקה וסיווג מושלמים |
 | Phase 2: Behavior | ✅ 100% | ניתוח דפוסים מושלם |
-| Phase 3: Budget | ⏳ 0% | **הבא בתור** |
-| Phase 4: Goals | ⏳ 0% | ממתין לתקציב |
+| Phase 3: Goals | 🚀 0% | **הבא בתור!** (שונה!) |
+| Phase 4: Budget | ⏳ 0% | תקציב מבוסס יעדים (שונה!) |
 | Phase 5: Monitoring | ⏳ 30% | Dashboard קיים |
 
 ---
 
-**עדכון אחרון:** 31 בדצמבר 2025 - Phase 1.5 Complete + Classification System + Charts! 🎉📊φ
+**עדכון אחרון:** 31 בדצמבר 2025 - עדכון זרימה: Phase 3 = Goals, Phase 4 = Budget! 🎯φ
