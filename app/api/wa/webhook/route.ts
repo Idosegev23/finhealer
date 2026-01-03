@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import * as XLSX from 'xlsx';
 
 // 🆕 הודעות מכינות לפני יצירת גרף
 const CHART_PREPARING_MESSAGES = [
@@ -682,8 +683,10 @@ export async function POST(request: NextRequest) {
       
       const greenAPI = getGreenAPIClient();
       
-      // בדיקה אם זה PDF
-      const isPDF = fileName.toLowerCase().endsWith('.pdf');
+      // בדיקה אם זה PDF או Excel
+      const lowerName = fileName.toLowerCase();
+      const isPDF = lowerName.endsWith('.pdf');
+      const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls') || lowerName.endsWith('.csv');
       
       if (isPDF) {
         // 🆕 זיהוי חכם של סוג המסמך לפי ה-state
@@ -1202,10 +1205,263 @@ export async function POST(request: NextRequest) {
             message: 'משהו השתבש בניתוח. נסה לשלוח שוב או צלם את המסך.',
           });
         }
+      } else if (isExcel) {
+        // 🆕 טיפול בקבצי Excel (XLSX, XLS, CSV)
+        console.log(`📊 Processing Excel file: ${fileName}`);
+        
+        // זיהוי סוג המסמך מהשם
+        const { data: userState } = await supabase
+          .from('users')
+          .select('onboarding_state, classification_context')
+          .eq('id', userData.id)
+          .single();
+        
+        const currentState = userState?.onboarding_state;
+        const explicitDocType = userState?.classification_context?.waitingForDocument;
+        
+        let documentType = 'bank';
+        let documentTypeHebrew = 'דוח בנק';
+        
+        const typeLabels: Record<string, string> = {
+          'bank': 'דוח בנק',
+          'credit': 'דוח אשראי',
+          'payslip': 'תלוש משכורת',
+          'loan': 'דוח הלוואות',
+        };
+        
+        // זיהוי מהשם או מה-context
+        if (explicitDocType && explicitDocType !== 'pending_type_selection') {
+          documentType = explicitDocType;
+          documentTypeHebrew = typeLabels[explicitDocType] || explicitDocType;
+        } else if (lowerName.includes('אשראי') || lowerName.includes('credit') || 
+                   lowerName.includes('ויזה') || lowerName.includes('visa')) {
+          documentType = 'credit';
+          documentTypeHebrew = typeLabels['credit'];
+        } else if (lowerName.includes('בנק') || lowerName.includes('bank') || 
+                   lowerName.includes('עוש') || lowerName.includes('תנועות')) {
+          documentType = 'bank';
+          documentTypeHebrew = typeLabels['bank'];
+        }
+        
+        console.log(`📋 Excel document type: ${documentType}`);
+        
+        await greenAPI.sendMessage({
+          phoneNumber,
+          message: `📊 קיבלתי ${documentTypeHebrew} (Excel)!\n\nמתחיל לנתח... זה יקח כדקה.`,
+        });
+        
+        const progressUpdater = startProgressUpdates(greenAPI, phoneNumber);
+        
+        try {
+          // הורדת הקובץ
+          const excelResponse = await fetch(downloadUrl);
+          const excelBuffer = await excelResponse.arrayBuffer();
+          const buffer = Buffer.from(excelBuffer);
+          
+          console.log(`📥 Excel downloaded: ${buffer.length} bytes`);
+          
+          // קריאת ה-Excel
+          const workbook = XLSX.read(buffer, { type: 'buffer' });
+          
+          // המרה לטקסט
+          let excelText = '';
+          let totalRows = 0;
+          
+          for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            const csvData = XLSX.utils.sheet_to_csv(sheet);
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            
+            excelText += `Sheet: ${sheetName}\n`;
+            excelText += csvData + '\n\n';
+            totalRows += jsonData.length;
+            
+            console.log(`📄 Sheet "${sheetName}": ${jsonData.length} rows`);
+          }
+          
+          console.log(`✅ Excel parsed: ${workbook.SheetNames.length} sheets, ${totalRows} rows, ${excelText.length} chars`);
+          
+          // הגבלת אורך לטוקנים
+          if (excelText.length > 50000) {
+            excelText = excelText.substring(0, 50000) + '\n...(truncated)';
+            console.log('⚠️ Excel text truncated to 50000 chars');
+          }
+          
+          // שליחה ל-AI לניתוח
+          const { getPromptForDocumentType } = await import('@/lib/ai/document-prompts');
+          
+          let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
+          if (documentType === 'credit' || documentType === 'bank') {
+            const { data: categories } = await supabase
+              .from('expense_categories')
+              .select('name, expense_type, category_group')
+              .eq('is_active', true);
+            expenseCategories = categories || [];
+          }
+          
+          const prompt = getPromptForDocumentType(
+            documentType === 'credit' ? 'credit_statement' : 'bank_statement',
+            excelText,
+            expenseCategories
+          );
+          
+          console.log(`🤖 Sending Excel data to GPT-4o (${excelText.length} chars)...`);
+          
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [{
+              role: 'user',
+              content: prompt
+            }],
+            temperature: 0.1,
+            max_tokens: 16384,
+            response_format: { type: 'json_object' }
+          });
+          
+          const content = completion.choices[0]?.message?.content || '{}';
+          console.log('🎯 Excel OCR Result:', content.substring(0, 500));
+          
+          let ocrData: any;
+          try {
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            ocrData = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+          } catch {
+            ocrData = { document_type: 'bank_statement', transactions: [] };
+          }
+          
+          // טיפול בפורמטים שונים (כמו ב-PDF)
+          let allTransactions: any[] = [];
+          
+          if (Array.isArray(ocrData.transactions)) {
+            allTransactions = ocrData.transactions;
+          } else if (ocrData.transactions && typeof ocrData.transactions === 'object') {
+            const { income = [], expenses = [], loan_payments = [], savings_transfers = [] } = ocrData.transactions;
+            allTransactions = [
+              ...income.map((tx: any) => ({ ...tx, type: 'income' })),
+              ...expenses.map((tx: any) => ({ ...tx, type: 'expense' })),
+              ...loan_payments.map((tx: any) => ({ ...tx, type: 'expense', expense_category: tx.expense_category || 'החזר הלוואה' })),
+              ...savings_transfers.map((tx: any) => ({ ...tx, type: 'expense', expense_category: tx.expense_category || 'חיסכון' })),
+            ];
+          }
+          
+          console.log(`📊 Extracted ${allTransactions.length} transactions from Excel`);
+          
+          // שמירת תנועות (אותה לוגיקה כמו PDF)
+          const pendingBatchId = `excel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const insertedIds: string[] = [];
+          
+          for (const tx of allTransactions) {
+            const isIncome = tx.type === 'income' || tx.amount > 0;
+            const amount = Math.abs(tx.amount || 0);
+            
+            if (amount === 0) continue;
+            
+            const txData = {
+              user_id: userData.id,
+              type: isIncome ? 'income' : 'expense',
+              amount,
+              vendor: tx.vendor || tx.payee || tx.description || 'לא ידוע',
+              description: tx.description || tx.vendor || '',
+              tx_date: tx.date || new Date().toISOString().split('T')[0],
+              category: isIncome ? null : (tx.expense_category || tx.category || null),
+              income_category: isIncome ? (tx.income_category || tx.category || null) : null,
+              source: 'excel',
+              status: 'pending',
+              batch_id: pendingBatchId,
+              raw_data: tx,
+            };
+            
+            const { data: inserted, error: txErr } = await (supabase as any)
+              .from('transactions')
+              .insert(txData)
+              .select('id')
+              .single();
+            
+            if (!txErr && inserted) {
+              insertedIds.push(inserted.id);
+            } else if (txErr) {
+              console.error('❌ Error inserting tx:', txErr);
+            }
+          }
+          
+          console.log(`✅ Saved ${insertedIds.length}/${allTransactions.length} transactions`);
+          
+          // חישוב תקופה
+          let periodStart: Date | null = null;
+          let periodEnd: Date | null = null;
+          
+          if (ocrData.period?.start_date && ocrData.period?.end_date) {
+            periodStart = new Date(ocrData.period.start_date);
+            periodEnd = new Date(ocrData.period.end_date);
+          } else if (allTransactions.length > 0) {
+            const dates = allTransactions
+              .map(tx => new Date(tx.date))
+              .filter(d => !isNaN(d.getTime()));
+            
+            if (dates.length > 0) {
+              periodStart = new Date(Math.min(...dates.map(d => d.getTime())));
+              periodEnd = new Date(Math.max(...dates.map(d => d.getTime())));
+            }
+          }
+          
+          // שמירת המסמך
+          if (periodStart && periodEnd) {
+            const { data: docRecord, error: docError } = await (supabase as any)
+              .from('uploaded_statements')
+              .insert({
+                user_id: userData.id,
+                file_url: downloadUrl,
+                file_name: fileName,
+                file_type: documentType === 'credit' ? 'credit_statement' : 'bank_statement',
+                document_type: documentType,
+                status: 'completed',
+                processed: true,
+                period_start: periodStart.toISOString().split('T')[0],
+                period_end: periodEnd.toISOString().split('T')[0],
+                transactions_extracted: allTransactions.length,
+                transactions_created: insertedIds.length,
+              })
+              .select('id')
+              .single();
+            
+            if (!docError && docRecord?.id) {
+              console.log(`✅ Excel document saved: ${docRecord.id}`);
+              
+              await (supabase as any)
+                .from('transactions')
+                .update({ document_id: docRecord.id })
+                .eq('batch_id', pendingBatchId);
+              
+              await (supabase as any)
+                .from('users')
+                .update({ 
+                  onboarding_state: 'classification',
+                  current_phase: 'classification'
+                })
+                .eq('id', userData.id);
+            }
+          }
+          
+          progressUpdater.stop();
+          
+          // שליחת הודעת סיכום
+          const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+          await onDocumentProcessed(userData.id, phoneNumber);
+          
+          console.log(`✅ Excel processed: ${allTransactions.length} transactions`);
+          
+        } catch (excelError: any) {
+          progressUpdater.stop();
+          console.error('❌ Excel Error:', excelError);
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: 'משהו השתבש בניתוח ה-Excel 😕\n\nאפשר לנסות לשמור כ-PDF או לשלוח צילום מסך.',
+          });
+        }
       } else {
         await greenAPI.sendMessage({
           phoneNumber,
-          message: '📎 קבלתי את הקובץ!\n\nכרגע אני תומך רק בתמונות ו-PDF.\n\nאפשר לצלם את המסמך במקום?',
+          message: '📎 קיבלתי את הקובץ!\n\nאני תומך ב-PDF, Excel (XLSX/XLS/CSV) ותמונות.\n\nאפשר לשלוח בפורמט אחר?',
         });
       }
     }
