@@ -669,11 +669,11 @@ async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
         message: `⏭️ דילגתי על ${creditTxs.length} חיובי אשראי.\nשלח דוח פירוט אשראי אחרי שנסיים.`,
       });
     } else {
-      await greenAPI.sendMessage({
-        phoneNumber: ctx.phone,
-        message: `⏭️ *${firstTx.vendor}* - ${Math.abs(firstTx.amount).toLocaleString('he-IL')} ₪\n` +
-          `זה חיוב אשראי - צריך דוח פירוט. דילגתי.`,
-      });
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `⏭️ *${firstTx.vendor}* - ${Math.abs(firstTx.amount).toLocaleString('he-IL')} ₪\n` +
+        `זה חיוב אשראי - צריך דוח פירוט. דילגתי.`,
+    });
     }
     
     // המשך לבאה (התנועות כבר עודכנו)

@@ -276,12 +276,27 @@ export async function POST(request: NextRequest) {
 
     const userData = user as any;
 
+    // 🆕 אם המשתמש לא אישר עדיין WhatsApp - מאשר אוטומטית ומתחיל אונבורדינג
     if (!userData.wa_opt_in) {
-      console.log('⚠️ User has not opted in to WhatsApp:', phoneNumber);
-      return NextResponse.json({ 
-        status: 'error', 
-        message: 'User not opted in' 
-      }, { status: 403 });
+      console.log('🚀 Auto-enabling WhatsApp for user:', phoneNumber);
+      
+      // עדכון wa_opt_in ל-true
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ wa_opt_in: true })
+        .eq('id', userData.id);
+      
+      if (updateError) {
+        console.error('❌ Error enabling WhatsApp:', updateError);
+        return NextResponse.json({ 
+          status: 'error', 
+          message: 'Failed to enable WhatsApp' 
+        }, { status: 500 });
+      }
+      
+      // עדכון ה-userData המקומי
+      userData.wa_opt_in = true;
+      console.log('✅ WhatsApp auto-enabled for user');
     }
 
     const messageType = payload.messageData?.typeMessage;
