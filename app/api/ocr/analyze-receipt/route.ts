@@ -98,9 +98,13 @@ export async function POST(request: Request) {
     const response = await openai.responses.create({
       model: 'gpt-5.2-2025-12-11',
       input: [
-        { type: 'text', text: systemPrompt },
-        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-        { type: 'text', text: userPrompt }
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: systemPrompt + '\n\n' + userPrompt },
+            { type: 'input_image', image_url: `data:${mimeType};base64,${base64Image}`, detail: 'high' },
+          ]
+        }
       ],
       reasoning: { effort: 'medium' },
     });

@@ -180,9 +180,13 @@ async function analyzeImageWithAI(dataUrl: string, importType: string, source: '
     const response = await openai.responses.create({
       model: 'gpt-5.2-2025-12-11',
       input: [
-        { type: 'text', text: systemPrompt },
-        { type: 'image_url', image_url: { url: dataUrl } },
-        { type: 'text', text: userPrompt }
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: systemPrompt + '\n\n' + userPrompt },
+            { type: 'input_image', image_url: dataUrl, detail: 'high' },
+          ]
+        }
       ],
       reasoning: { effort: 'medium' },
     });

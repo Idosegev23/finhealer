@@ -212,9 +212,13 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
     const response = await openai.responses.create({
       model: 'gpt-5.2-2025-12-11',
       input: [
-        { type: 'text', text: EXPENSE_CATEGORIES_SYSTEM_PROMPT },
-        { type: 'image_url', image_url: { url: dataUrl } },
-        { type: 'text', text: userPrompt }
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: EXPENSE_CATEGORIES_SYSTEM_PROMPT + '\n\n' + userPrompt },
+            { type: 'input_image', image_url: dataUrl, detail: 'high' },
+          ]
+        }
       ],
       reasoning: { effort: 'medium' },
     });

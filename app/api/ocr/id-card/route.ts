@@ -43,11 +43,8 @@ export async function POST(request: Request) {
       appendixDataUrl = `data:${appendixImage.type};base64,${appendixBase64}`;
     }
 
-    // Use GPT-4 Vision to extract data from ID card
-    const messages: any[] = [
-      {
-        role: 'system',
-        content: `You are an OCR system specialized in Israeli ID cards (תעודת זהות). Extract all visible information accurately.
+    // 🆕 GPT-5.2 with Responses API
+    const systemPrompt = `You are an OCR system specialized in Israeli ID cards (תעודת זהות). Extract all visible information accurately.
 Return ONLY valid JSON with no additional text.
 
 For the ID card, extract:
@@ -69,52 +66,35 @@ Return format:
 {
   "idCard": { /* extracted ID card data */ },
   ${appendixImage ? '"children": [ /* array of children */ ]' : '"children": []'}
-}`
-      },
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'Extract all information from this Israeli ID card:'
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: idCardDataUrl
-            }
-          }
-        ]
-      }
+}`;
+
+    const userPrompt = appendixDataUrl 
+      ? 'Extract all information from this Israeli ID card and appendix:'
+      : 'Extract all information from this Israeli ID card:';
+
+    // Build content array with all images
+    const contentItems: Array<{ type: 'input_text'; text: string } | { type: 'input_image'; image_url: string; detail: 'high' | 'low' | 'auto' }> = [
+      { type: 'input_text', text: systemPrompt + '\n\n' + userPrompt },
+      { type: 'input_image', image_url: idCardDataUrl, detail: 'high' },
     ];
 
     // Add appendix image if exists
     if (appendixDataUrl) {
-      messages.push({
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'Extract all children information from this appendix (ספח):'
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: appendixDataUrl
-            }
-          }
-        ]
-      });
+      contentItems.push({ type: 'input_image', image_url: appendixDataUrl, detail: 'high' });
     }
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages,
-      max_tokens: 1000,
-      temperature: 0,
+    const response = await openai.responses.create({
+      model: 'gpt-5.2-2025-12-11',
+      input: [
+        {
+          role: 'user',
+          content: contentItems
+        }
+      ],
+      reasoning: { effort: 'medium' },
     });
 
-    const result = response.choices[0].message.content;
+    const result = response.output_text;
     if (!result) {
       throw new Error('No response from OCR');
     }

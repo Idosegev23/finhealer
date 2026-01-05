@@ -34,13 +34,8 @@ export async function POST(request: Request) {
     const base64 = Buffer.from(buffer).toString('base64');
     const dataUrl = `data:${statementImage.type};base64,${base64}`;
 
-    // Use GPT-4 Vision to extract loan data
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an OCR system specialized in Israeli loan payoff statements (דוח סילוקין).
+    // 🆕 GPT-5.2 with Responses API
+    const systemPrompt = `You are an OCR system specialized in Israeli loan payoff statements (דוח סילוקין).
 Extract all loan information accurately from Hebrew/English documents.
 Return ONLY valid JSON with no additional text.
 
@@ -68,29 +63,25 @@ Return format:
   "endDate": "YYYY-MM-DD or null",
   "remainingPayments": number or null,
   "loanNumber": "string or null"
-}`
-        },
+}`;
+
+    const userPrompt = 'Extract all loan information from this Israeli loan payoff statement (דוח סילוקין):';
+
+    const response = await openai.responses.create({
+      model: 'gpt-5.2-2025-12-11',
+      input: [
         {
           role: 'user',
           content: [
-            {
-              type: 'text',
-              text: 'Extract all loan information from this Israeli loan payoff statement (דוח סילוקין):'
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: dataUrl
-              }
-            }
+            { type: 'input_text', text: systemPrompt + '\n\n' + userPrompt },
+            { type: 'input_image', image_url: dataUrl, detail: 'high' },
           ]
         }
       ],
-      max_tokens: 1000,
-      temperature: 0,
+      reasoning: { effort: 'medium' },
     });
 
-    const result = response.choices[0].message.content;
+    const result = response.output_text;
     if (!result) {
       throw new Error('No response from OCR');
     }
