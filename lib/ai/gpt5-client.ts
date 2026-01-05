@@ -49,12 +49,11 @@ ${contextSummary}
 [Conversation]
 ${conversationText}`;
 
-    // Call GPT-5.1 with Responses API
+    // 🆕 Call GPT-5.2 with Responses API
     const result = await openai.responses.create({
-      model: "gpt-5.1",
+      model: "gpt-5.2-2025-12-11",
       input: fullInput,
       reasoning: { effort: reasoningEffort },
-      text: { verbosity: verbosity },
       max_output_tokens: maxOutputTokens,
       previous_response_id: previousResponseId,
     });
@@ -64,15 +63,8 @@ ${conversationText}`;
       responseId: result.id,
     };
   } catch (error: any) {
-    console.error("GPT-5.1 Error:", error);
-    
-    // Fallback to GPT-4.1 if GPT-5.1 fails
-    try {
-      return await fallbackToGPT4(conversationHistory, systemPrompt, userContext);
-    } catch (fallbackError) {
-      console.error("Fallback Error:", fallbackError);
-      throw new Error("AI service temporarily unavailable");
-    }
+    console.error("GPT-5.2 Error:", error);
+    throw new Error("AI service temporarily unavailable");
   }
 }
 
@@ -116,11 +108,11 @@ ${historySection}
 [User Message]
 ${userMessage}`;
 
+    // 🆕 GPT-5-nano for fast chat responses
     const result = await openai.responses.create({
-      model: "gpt-5.1",
+      model: "gpt-5-nano-2025-08-07",
       input: fullInput,
-      reasoning: { effort: "low" },
-      text: { verbosity: "low" },
+      reasoning: { effort: "none" },
       max_output_tokens: 200,
     });
 
@@ -160,10 +152,10 @@ ${contextSummary}
 ${conversationText}`;
 
   const result = await openai.responses.create({
-    model: "gpt-5.1",
+    // 🆕 GPT-5.2 with high reasoning for analysis
+    model: "gpt-5.2-2025-12-11",
     input: fullInput,
     reasoning: { effort: "high" },
-    text: { verbosity: "medium" },
     max_output_tokens: 1000,
     previous_response_id: previousResponseId,
   });
@@ -244,16 +236,18 @@ async function fallbackToGPT4(
     })),
   ];
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: messages,
-    max_tokens: 500,
-    temperature: 0.7,
+  // 🆕 GPT-5-nano fallback for fast chat
+  const inputText = messages.map((m) => `${m.role}: ${m.content}`).join('\n');
+  const result = await openai.responses.create({
+    model: "gpt-5-nano-2025-08-07",
+    input: inputText,
+    reasoning: { effort: "none" },
+    max_output_tokens: 500,
   });
 
   return {
-    response: completion.choices[0]?.message?.content || "",
-    responseId: completion.id,
+    response: result.output_text || "",
+    responseId: result.id,
   };
 }
 

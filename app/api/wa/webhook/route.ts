@@ -430,15 +430,10 @@ export async function POST(request: NextRequest) {
           const base64Image = Buffer.from(imageBuffer).toString('base64');
           const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
 
-          // ניתוח OCR + AI (GPT-4o Vision) עם קטגוריות מדויקות
-          console.log('🤖 Starting OCR analysis with GPT-4o Vision...');
+          // ניתוח OCR + AI (GPT-5.2 Vision) עם קטגוריות מדויקות
+          console.log('🤖 Starting OCR analysis with GPT-5.2 Vision...');
           
-          const visionResponse = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-              {
-                role: 'system',
-                content: `${EXPENSE_CATEGORIES_SYSTEM_PROMPT}
+          const systemPrompt = `${EXPENSE_CATEGORIES_SYSTEM_PROMPT}
 
 **פורמט החזרה מיוחד לקבלות:**
 {
@@ -490,28 +485,22 @@ export async function POST(request: NextRequest) {
 
 7. סווג לקטגוריה המדויקת ביותר מהרשימה
 
-8. **בדיקה כפולה:** לפני שתחזיר את ה-amount, ודא שזה באמת סכום כסף (עם נקודה עשרונית או מספר שלם) ולא מספר קבלה, מספר קופה או מזהה אחר.`
-              },
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'text',
-                    text: 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע. **שים לב מיוחד לתאריך!**\n\n**חשוב מאוד - זיהוי הסכום הנכון:**\n- זהה את הסכום ששולם בפועל - זה נמצא ליד "סה״כ כולל מע״מ" או "סה״כ" בתחתית הקבלה\n- אל תשתמש במספר הקבלה כעלות! (מספר קבלה = 36401)\n- אל תשתמש במספר הקופה כעלות! (מספר קופה = 000083)\n- דוגמה: אם רשום "מספר קופה: 000083" ו"סה״כ כולל מע״מ: 79" - הסכום הוא 79, לא 83!\n- מספר קופה/קבלה ≠ סכום כסף\n\n**חשוב מאוד - פורמט תאריכים ישראלי:**\n- תאריכים ישראליים הם בפורמט: יום.חודש.שנה (DD.MM.YY)\n- **לא** כמו בארה"ב! אם רשום "10.11.20" זה יום 10, חודש 11 (נובמבר), שנה 2020\n- החזר בפורמט ISO: "YYYY-MM-DD" (למשל: "2020-11-10")\n\nהחזר תשובה בפורמט JSON.'
-                  },
-                  {
-                    type: 'image_url',
-                    image_url: { url: `data:${mimeType};base64,${base64Image}` }
-                  }
-                ]
-              }
+8. **בדיקה כפולה:** לפני שתחזיר את ה-amount, ודא שזה באמת סכום כסף (עם נקודה עשרונית או מספר שלם) ולא מספר קבלה, מספר קופה או מזהה אחר.`;
+
+          const userPrompt = 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע. **שים לב מיוחד לתאריך!**\n\n**חשוב מאוד - זיהוי הסכום הנכון:**\n- זהה את הסכום ששולם בפועל - זה נמצא ליד "סה״כ כולל מע״מ" או "סה״כ" בתחתית הקבלה\n- אל תשתמש במספר הקבלה כעלות! (מספר קבלה = 36401)\n- אל תשתמש במספר הקופה כעלות! (מספר קופה = 000083)\n- דוגמה: אם רשום "מספר קופה: 000083" ו"סה״כ כולל מע״מ: 79" - הסכום הוא 79, לא 83!\n- מספר קופה/קבלה ≠ סכום כסף\n\n**חשוב מאוד - פורמט תאריכים ישראלי:**\n- תאריכים ישראליים הם בפורמט: יום.חודש.שנה (DD.MM.YY)\n- **לא** כמו בארה"ב! אם רשום "10.11.20" זה יום 10, חודש 11 (נובמבר), שנה 2020\n- החזר בפורמט ISO: "YYYY-MM-DD" (למשל: "2020-11-10")\n\nהחזר תשובה בפורמט JSON.';
+
+          // 🆕 GPT-5.2 with Responses API
+          const visionResponse = await openai.responses.create({
+            model: 'gpt-5.2-2025-12-11',
+            input: [
+              { type: 'text', text: systemPrompt },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+              { type: 'text', text: userPrompt }
             ],
-            temperature: 0.1,
-            max_tokens: 4000,
-            response_format: { type: 'json_object' }, // 🔥 Force valid JSON
+            reasoning: { effort: 'medium' },
           });
 
-          const aiText = visionResponse.choices[0].message.content || '{}';
+          const aiText = visionResponse.output_text || '{}';
           console.log('🎯 OCR Result:', aiText);
 
           let ocrData: any;
@@ -554,7 +543,7 @@ export async function POST(request: NextRequest) {
               metadata: {
                 document_type: ocrData.document_type,
                 source: 'whatsapp',
-                model: 'gpt-4o',
+                model: 'gpt-5.2',
                 total_items: transactions.length,
               },
             })
@@ -872,8 +861,8 @@ export async function POST(request: NextRequest) {
           let content = '';
           try {
             console.log('🔄 Trying GPT-5.1 with Responses API (direct PDF file)...');
-            const gpt51Response = await openai.responses.create({
-              model: 'gpt-5.1',
+            const gpt52Response = await openai.responses.create({
+              model: 'gpt-5.2-2025-12-11',
               input: [
               {
                 role: 'user',
@@ -887,27 +876,11 @@ export async function POST(request: NextRequest) {
               text: { verbosity: 'low' },
               max_output_tokens: 32000
             });
-            content = gpt51Response.output_text || '{}';
-            console.log('✅ GPT-5.1 succeeded');
-          } catch (gpt51Error: any) {
-            console.log(`❌ GPT-5.1 failed: ${gpt51Error.message}, trying GPT-4o...`);
-            
-            // Fallback to GPT-4o
-            const visionResponse = await openai.chat.completions.create({
-              model: 'gpt-4o',
-              messages: [{
-                role: 'user',
-                content: [
-                  { type: 'file', file: { file_id: fileUpload.id } },
-                  { type: 'text', text: prompt }
-                ]
-              }],
-            temperature: 0.1,
-              max_tokens: 16384,
-              response_format: { type: 'json_object' }
-            });
-            content = visionResponse.choices[0]?.message?.content || '{}';
-            console.log('✅ GPT-4o succeeded');
+            content = gpt52Response.output_text || '{}';
+            console.log('✅ GPT-5.2 succeeded');
+          } catch (gpt52Error: any) {
+            console.log(`❌ GPT-5.2 failed: ${gpt52Error.message}`);
+            throw gpt52Error; // No fallback - GPT-5.2 is the primary model
           }
           
           // Clean up uploaded file from OpenAI + context
@@ -1320,20 +1293,16 @@ export async function POST(request: NextRequest) {
             expenseCategories
           );
           
-          console.log(`🤖 Sending Excel data to GPT-4o (${excelText.length} chars)...`);
+          console.log(`🤖 Sending Excel data to GPT-5.2 (${excelText.length} chars)...`);
           
-          const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [{
-              role: 'user',
-              content: prompt
-            }],
-            temperature: 0.1,
-            max_tokens: 16384,
-            response_format: { type: 'json_object' }
+          // 🆕 GPT-5.2 with Responses API
+          const excelResponse = await openai.responses.create({
+            model: 'gpt-5.2-2025-12-11',
+            input: prompt,
+            reasoning: { effort: 'medium' },
           });
           
-          const content = completion.choices[0]?.message?.content || '{}';
+          const content = excelResponse.output_text || '{}';
           console.log('🎯 Excel OCR Result:', content.substring(0, 500));
           
           let ocrData: any;
@@ -1540,16 +1509,20 @@ async function handleAIChat(
       { role: 'user', content: message },
     ];
 
-    // 4. קריאה ל-OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages,
-      temperature: 0.7,
-      max_tokens: 300,
+    // 4. קריאה ל-OpenAI (GPT-5-nano for fast chat)
+    // Build combined input for Responses API
+    const systemContext = `${SYSTEM_PROMPT}\n\nהנה המידע על המשתמש:\n\n${buildContextMessage(context)}`;
+    const historyText = history.map((msg: any) => `${msg.role}: ${msg.content}`).join('\n');
+    const fullInput = `${systemContext}\n\n${historyText}\n\nuser: ${message}`;
+    
+    const chatResponse = await openai.responses.create({
+      model: 'gpt-5-nano-2025-08-07',
+      input: fullInput,
+      reasoning: { effort: 'none' }, // Fast chat - no reasoning
     });
 
-    const aiResponse = completion.choices[0]?.message?.content || 'סליחה, לא הבנתי. תנסה שוב? 🤔';
-    const tokensUsed = completion.usage?.total_tokens || 0;
+    const aiResponse = chatResponse.output_text || 'סליחה, לא הבנתי. תנסה שוב? 🤔';
+    const tokensUsed = chatResponse.usage?.total_tokens || 0;
 
     // 5. זיהוי הוצאה (אם יש)
     const detectedExpense = parseExpenseFromAI(aiResponse);
@@ -1568,7 +1541,7 @@ async function handleAIChat(
       role: 'assistant',
       content: aiResponse,
       tokens_used: tokensUsed,
-      model: 'gpt-4o',
+      model: 'gpt-5-nano',
       detected_expense: detectedExpense,
       expense_created: false,
     });

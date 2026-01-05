@@ -136,17 +136,15 @@ async function analyzeTransactionsWithAI(text: string, fileType: string) {
   );
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: EXPENSE_CATEGORIES_SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.1,
-      max_tokens: 16000,
+    // 🆕 GPT-5.2 with Responses API
+    const response = await openai.responses.create({
+      model: 'gpt-5.2-2025-12-11',
+      input: `${EXPENSE_CATEGORIES_SYSTEM_PROMPT}\n\n${userPrompt}`,
+      reasoning: { effort: 'medium' },
+      max_output_tokens: 16000,
     });
 
-    const content = response.choices[0].message.content || '{"transactions":[]}';
+    const content = response.output_text || '{"transactions":[]}';
     const result = JSON.parse(content);
     
     return result.transactions || [];
@@ -172,23 +170,15 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
     console.log(`✅ Text extracted: ${text.length} characters`);
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: EXPENSE_CATEGORIES_SYSTEM_PROMPT,
-        },
-        {
-          role: 'user',
-          content: `${userPrompt}\n\nטקסט הדוח:\n${text}`,
-        },
-      ],
-      temperature: 0.1,
-      max_tokens: 16000,
+    // 🆕 GPT-5.2 with Responses API
+    const response = await openai.responses.create({
+      model: 'gpt-5.2-2025-12-11',
+      input: `${EXPENSE_CATEGORIES_SYSTEM_PROMPT}\n\n${userPrompt}\n\nטקסט הדוח:\n${text}`,
+      reasoning: { effort: 'medium' },
+      max_output_tokens: 16000,
     });
 
-    const content = response.choices[0].message.content || '{"transactions":[]}';
+    const content = response.output_text || '{"transactions":[]}';
     const result = JSON.parse(content);
     
     return result.transactions || [];
@@ -212,32 +202,24 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
   );
 
   try {
-    console.log('🤖 Analyzing image with GPT-4o Vision...');
+    console.log('🤖 Analyzing image with GPT-5.2 Vision...');
     
     // המר את ה-Buffer ל-base64 data URL
     const base64Image = buffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
     
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: EXPENSE_CATEGORIES_SYSTEM_PROMPT,
-        },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: userPrompt },
-            { type: 'image_url', image_url: { url: dataUrl } },
-          ],
-        },
+    // 🆕 GPT-5.2 with Responses API
+    const response = await openai.responses.create({
+      model: 'gpt-5.2-2025-12-11',
+      input: [
+        { type: 'text', text: EXPENSE_CATEGORIES_SYSTEM_PROMPT },
+        { type: 'image_url', image_url: { url: dataUrl } },
+        { type: 'text', text: userPrompt }
       ],
-      temperature: 0.1,
-      max_tokens: 4000,
+      reasoning: { effort: 'medium' },
     });
 
-    const content = response.choices[0].message.content || '{"transactions":[]}';
+    const content = response.output_text || '{"transactions":[]}';
     const result = JSON.parse(content);
     
     return {

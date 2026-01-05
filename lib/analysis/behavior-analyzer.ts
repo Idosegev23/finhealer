@@ -19,16 +19,14 @@ const openai = new OpenAI({
  */
 async function generateAIResponse(prompt: string): Promise<string | null> {
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'אתה מאמן פיננסי בשם φ (פי). ענה בעברית, בקצרה ובחום.' },
-        { role: 'user', content: prompt },
-      ],
-      max_tokens: 200,
-      temperature: 0.7,
+    // 🆕 GPT-5-nano with Responses API (fast chat)
+    const response = await openai.responses.create({
+      model: 'gpt-5-nano-2025-08-07',
+      input: `[System] אתה מאמן פיננסי בשם φ (פי). ענה בעברית, בקצרה ובחום.\n\n[User] ${prompt}`,
+      reasoning: { effort: 'none' },
+      max_output_tokens: 200,
     });
-    return response.choices[0]?.message?.content || null;
+    return response.output_text || null;
   } catch (error) {
     console.error('[BehaviorAnalyzer] OpenAI error:', error);
     return null;

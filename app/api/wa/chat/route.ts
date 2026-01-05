@@ -49,31 +49,21 @@ export async function POST(request: NextRequest) {
     // היסטוריה בסדר הפוך (ישן → חדש)
     const history = (recentMessages || []).reverse();
 
-    // 3. בניית messages ל-OpenAI
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      // System prompt
-      { role: 'system', content: SYSTEM_PROMPT },
-      // Context
-      { role: 'system', content: `הנה המידע על המשתמש:\n\n${buildContextMessage(context)}` },
-      // היסטוריה
-      ...history.map(msg => ({
-        role: msg.role as 'user' | 'assistant' | 'system',
-        content: msg.content,
-      })),
-      // ההודעה החדשה
-      { role: 'user', content: message },
-    ];
+    // 3. בניית input ל-GPT-5-nano (Responses API)
+    const systemContext = `${SYSTEM_PROMPT}\n\nהנה המידע על המשתמש:\n\n${buildContextMessage(context)}`;
+    const historyText = history.map(msg => `${msg.role}: ${msg.content}`).join('\n');
+    const fullInput = `${systemContext}\n\n${historyText}\n\nuser: ${message}`;
 
-    // 4. קריאה ל-OpenAI GPT-4o
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 1000,
+    // 4. 🆕 קריאה ל-GPT-5-nano with Responses API (fast chat)
+    const chatResponse = await openai.responses.create({
+      model: 'gpt-5-nano-2025-08-07',
+      input: fullInput,
+      reasoning: { effort: 'none' }, // Fast chat - no reasoning
+      max_output_tokens: 1000,
     });
 
-    const aiResponse = completion.choices[0].message.content || 'סליחה, לא הבנתי. תנסה שוב?';
-    const tokensUsed = completion.usage?.total_tokens || 0;
+    const aiResponse = chatResponse.output_text || 'סליחה, לא הבנתי. תנסה שוב?';
+    const tokensUsed = chatResponse.usage?.total_tokens || 0;
 
     // 5. זיהוי הוצאה (אם יש)
     const detectedExpense = parseExpenseFromAI(aiResponse);
@@ -92,7 +82,7 @@ export async function POST(request: NextRequest) {
       role: 'assistant',
       content: aiResponse,
       tokens_used: tokensUsed,
-      model: 'gpt-4o',
+      model: 'gpt-5-nano',
       detected_expense: detectedExpense,
       expense_created: false,
     });

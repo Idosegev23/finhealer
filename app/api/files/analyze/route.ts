@@ -118,27 +118,23 @@ ${text.substring(0, 5000)}
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.1,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' }
+    // 🆕 GPT-5.2 with Responses API
+    const response = await openai.responses.create({
+      model: 'gpt-5.2-2025-12-11',
+      input: `${systemPrompt}\n\n${userPrompt}`,
+      reasoning: { effort: 'medium' },
     });
 
-    const content = response.choices[0]?.message?.content || '{}';
+    const content = response.output_text || '{}';
     const detected = JSON.parse(content);
     
-    console.log(`✅ GPT-4o (${source}) Analysis:`, detected);
+    console.log(`✅ GPT-5.2 (${source}) Analysis:`, detected);
 
     return NextResponse.json({
       success: true,
       detected,
       confidence: calculateConfidence(detected),
-      model: 'gpt-4o',
+      model: 'gpt-5.2',
       tokens: response.usage?.total_tokens || 0,
       source
     });
@@ -180,33 +176,27 @@ async function analyzeImageWithAI(dataUrl: string, importType: string, source: '
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: userPrompt },
-            { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }
-          ]
-        }
+    // 🆕 GPT-5.2 Vision with Responses API
+    const response = await openai.responses.create({
+      model: 'gpt-5.2-2025-12-11',
+      input: [
+        { type: 'text', text: systemPrompt },
+        { type: 'image_url', image_url: { url: dataUrl } },
+        { type: 'text', text: userPrompt }
       ],
-      temperature: 0.1,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' }
+      reasoning: { effort: 'medium' },
     });
 
-    const content = response.choices[0]?.message?.content || '{}';
+    const content = response.output_text || '{}';
     const detected = JSON.parse(content);
     
-    console.log('✅ GPT-4o Vision Analysis:', detected);
+    console.log('✅ GPT-5.2 Vision Analysis:', detected);
 
     return NextResponse.json({
       success: true,
       detected,
       confidence: calculateConfidence(detected),
-      model: 'gpt-4o-vision',
+      model: 'gpt-5.2-vision',
       tokens: response.usage?.total_tokens || 0,
       source
     });

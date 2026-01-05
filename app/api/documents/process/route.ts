@@ -466,21 +466,17 @@ async function analyzeLargePDF(buffer: Buffer, fileType: string, fileName: strin
       const chunkPrompt = getPromptForDocumentType(fileType, chunks[i], expenseCategories);
 
       const startChunk = Date.now();
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [{
-          role: 'user',
-          content: chunkPrompt
-        }],
-        temperature: 0.1,
-        max_tokens: 8000,
-        response_format: { type: 'json_object' }
+      // 🆕 GPT-5.2 with Responses API
+      const response = await openai.responses.create({
+        model: 'gpt-5.2-2025-12-11',
+        input: chunkPrompt,
+        reasoning: { effort: 'medium' },
       });
 
       const chunkDuration = ((Date.now() - startChunk) / 1000).toFixed(1);
       console.log(`✅ Chunk ${i + 1} analyzed in ${chunkDuration}s`);
 
-      const content = response.choices[0]?.message?.content || '{}';
+      const content = response.output_text || '{}';
       try {
         const chunkResult = JSON.parse(content);
         if (chunkResult.transactions) {
@@ -696,12 +692,12 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     let usedModel = '';
     let content = '';
 
-    // Try GPT-5.1 first (Responses API) - Direct PDF file analysis
+    // 🆕 GPT-5.2 with Responses API - Direct PDF file analysis
     try {
-      console.log(`🔄 Trying GPT-5.1 with Responses API (direct PDF file)...`);
+      console.log(`🔄 Trying GPT-5.2 with Responses API (direct PDF file)...`);
       
-      const gpt51Response = await openai.responses.create({
-        model: 'gpt-5.1',
+      const gpt52Response = await openai.responses.create({
+        model: 'gpt-5.2-2025-12-11',
         input: [
           {
             role: 'user',
@@ -717,35 +713,22 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
             ]
           }
         ],
-        reasoning: { effort: 'low' },   // Fast mode (minimal reasoning)
-        text: { verbosity: 'low' },     // Concise output
+        reasoning: { effort: 'medium' },
         max_output_tokens: 32000
       });
-      usedModel = 'gpt-5.1';
-      content = gpt51Response.output_text || '{}';
-      console.log(`✅ GPT-5.1 succeeded`);
-    } catch (gpt51Error: any) {
-      console.log(`❌ GPT-5.1 failed: ${gpt51Error.message}`);
-      console.error('GPT-5.1 error details:', gpt51Error);
+      usedModel = 'gpt-5.2';
+      content = gpt52Response.output_text || '{}';
+      console.log(`✅ GPT-5.2 succeeded`);
+    } catch (gpt52Error: any) {
+      console.log(`❌ GPT-5.2 failed: ${gpt52Error.message}`);
+      console.error('GPT-5.2 error details:', gpt52Error);
       
-      // Only fallback to GPT-4o if GPT-5.1 is not available (403/404)
-      // Don't fallback on timeout - let it fail and retry
-      const isAccessError = gpt51Error.message?.includes('does not have access') || 
-                           gpt51Error.message?.includes('not found') ||
-                           gpt51Error.status === 403 ||
-                           gpt51Error.status === 404;
-      
-      if (!isAccessError) {
-        // If it's a timeout or other error, re-throw it
-        throw new Error(`GPT-5.1 failed: ${gpt51Error.message}`);
-      }
-      
-      // Fallback to GPT-4o only if access denied
-      console.log('⚠️ GPT-5.1 not available, falling back to GPT-4o...');
-      const modelsToTry = [
-        'gpt-4o',      // Standard GPT-4o with max tokens
-        'gpt-4-turbo'  // Fallback
-      ];
+      // Re-throw - no fallback to older models
+      throw new Error(`GPT-5.2 failed: ${gpt52Error.message}`);
+    }
+    
+    // Legacy fallback code - kept for reference but should not be reached
+    const modelsToTry: string[] = [];
 
       for (const model of modelsToTry) {
         try {
@@ -842,7 +825,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
 async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType: string) {
   try {
-    console.log(`🖼️  Analyzing image with GPT-4o Vision (${documentType})...`);
+    console.log(`🖼️  Analyzing image with GPT-5.2 Vision (${documentType})...`);
     
     const base64Image = buffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
@@ -850,26 +833,19 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
     // Get appropriate prompt (images are usually credit/bank/receipt)
     const prompt = getPromptForDocumentType(documentType, null);
     
-    // GPT-4o Vision with JSON mode
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: dataUrl } },
-          ],
-        },
+    // 🆕 GPT-5.2 with Responses API
+    const response = await openai.responses.create({
+      model: 'gpt-5.2-2025-12-11',
+      input: [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: dataUrl } },
       ],
-      temperature: 0.1,
-      max_tokens: 4000,
-      response_format: { type: 'json_object' }, // 🔥 Force valid JSON!
+      reasoning: { effort: 'medium' },
     });
 
-    console.log(`✅ GPT-4o Vision analysis complete`);
+    console.log(`✅ GPT-5.2 Vision analysis complete`);
     
-    const content = response.choices[0].message.content || '{}';
+    const content = response.output_text || '{}';
     
     // With response_format: json_object, GPT-4o returns valid JSON directly
     try {
@@ -970,13 +946,12 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
     // Combine system message with user prompt for Responses API
     const fullPrompt = `אתה מומחה בניתוח מסמכים פיננסיים. החזר תמיד JSON תקין בלבד, ללא טקסט נוסף.\n\n${prompt}`;
     
+    // 🆕 GPT-5.2 with Responses API
     const response = await openai.responses.create({
-      model: 'gpt-5-mini-2025-08-07',
+      model: 'gpt-5.2-2025-12-11',
       input: fullPrompt,
-      reasoning: { effort: 'minimal' }, // Fast processing for structured data
-      text: { verbosity: 'low' }, // Concise JSON output
+      reasoning: { effort: 'medium' },
       max_output_tokens: 16000,
-      // response_format not supported in Responses API - rely on prompt
     });
 
     console.log(`✅ GPT-5-mini analysis complete`);
