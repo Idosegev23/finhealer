@@ -1296,13 +1296,13 @@ export async function POST(request: NextRequest) {
           console.log(`🤖 Sending Excel data to GPT-5.2 (${excelText.length} chars)...`);
           
           // 🆕 GPT-5.2 with Responses API
-          const excelResponse = await openai.responses.create({
+          const aiResponse = await openai.responses.create({
             model: 'gpt-5.2-2025-12-11',
             input: prompt,
             reasoning: { effort: 'medium' },
           });
           
-          const content = excelResponse.output_text || '{}';
+          const content = aiResponse.output_text || '{}';
           console.log('🎯 Excel OCR Result:', content.substring(0, 500));
           
           let ocrData: any;

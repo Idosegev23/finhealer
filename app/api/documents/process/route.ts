@@ -726,50 +726,6 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       // Re-throw - no fallback to older models
       throw new Error(`GPT-5.2 failed: ${gpt52Error.message}`);
     }
-    
-    // Legacy fallback code - kept for reference but should not be reached
-    const modelsToTry: string[] = [];
-
-      for (const model of modelsToTry) {
-        try {
-          console.log(`🔄 Trying model: ${model} (direct PDF file)...`);
-          
-          response = await openai.chat.completions.create({
-            model: model,
-            messages: [{
-              role: 'user',
-              content: [
-                {
-                  type: 'file',
-                  file: { file_id: fileUpload.id }
-                },
-                {
-                  type: 'text',
-                  text: prompt
-                }
-              ]
-            }],
-      temperature: 0.1,
-            max_tokens: 16384,
-            response_format: { type: 'json_object' }
-          });
-          usedModel = model;
-          content = response.choices[0]?.message?.content || '{}';
-          console.log(`✅ Successfully used model: ${model}`);
-          break;
-        } catch (modelError: any) {
-          console.log(`❌ Model ${model} failed: ${modelError.message}`);
-          if (!modelError.message.includes('does not have access') &&
-              !modelError.message.includes('not found')) {
-            throw modelError; // Re-throw if it's not an access issue
-          }
-        }
-      }
-
-      if (!content) {
-        throw new Error('All models failed to analyze the PDF');
-      }
-    }
 
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
     console.log(`✅ ${usedModel} analysis complete (${aiDuration}s)`);
