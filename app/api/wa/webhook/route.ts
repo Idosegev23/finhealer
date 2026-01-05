@@ -1334,137 +1334,45 @@ export async function POST(request: NextRequest) {
           
           console.log(`📊 Extracted ${allTransactions.length} transactions from Excel`);
           
-          // שמירת תנועות (אותה לוגיקה כמו PDF)
-          const pendingBatchId = `excel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          const insertedIds: string[] = [];
-          
-          // Helper to convert DD/MM/YYYY to YYYY-MM-DD
-          const parseDate = (dateStr: string | undefined): string => {
-            if (!dateStr) return new Date().toISOString().split('T')[0];
-            
-            // Try DD/MM/YYYY format (Israeli)
-            const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-            if (ddmmyyyy) {
-              const [, day, month, year] = ddmmyyyy;
-              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            }
-            
-            // Already YYYY-MM-DD
-            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-            
-            // Try to parse with Date
-            const parsed = new Date(dateStr);
-            if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
-            
-            return new Date().toISOString().split('T')[0];
-          };
-          
-          for (const tx of allTransactions) {
-            const isIncome = tx.type === 'income' || tx.amount > 0;
-            const amount = Math.abs(tx.amount || 0);
-            
-            if (amount === 0) continue;
-            
-            const txData = {
-              user_id: userData.id,
-              type: isIncome ? 'income' : 'expense',
-              amount,
-              vendor: tx.vendor || tx.payee || tx.description || 'לא ידוע',
-              original_description: tx.description || tx.vendor || '',
-              notes: tx.notes || tx.description || '',
-              tx_date: parseDate(tx.date),
-              category: isIncome ? null : (tx.expense_category || tx.category || null),
-              income_category: isIncome ? (tx.income_category || tx.category || null) : null,
-              expense_type: tx.expense_type || (isIncome ? null : 'variable'),
-              payment_method: tx.payment_method || (documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
-              source: 'excel',
-              status: 'pending',
-              batch_id: pendingBatchId,
-              auto_categorized: !!tx.expense_category,
-              confidence_score: tx.confidence || 0.5,
-            };
-            
-            const { data: inserted, error: txErr } = await (supabase as any)
-              .from('transactions')
-              .insert(txData)
-              .select('id')
-              .single();
-            
-            if (!txErr && inserted) {
-              insertedIds.push(inserted.id);
-            } else if (txErr) {
-              console.error('❌ Error inserting tx:', txErr);
-            }
-          }
-          
-          console.log(`✅ Saved ${insertedIds.length}/${allTransactions.length} transactions`);
-          
-          // חישוב תקופה - using parseDate helper
-          let periodStart: Date | null = null;
-          let periodEnd: Date | null = null;
-          
-          if (ocrData.period?.start_date && ocrData.period?.end_date) {
-            periodStart = new Date(parseDate(ocrData.period.start_date));
-            periodEnd = new Date(parseDate(ocrData.period.end_date));
-          } else if (ocrData.report_info?.period_start && ocrData.report_info?.period_end) {
-            periodStart = new Date(parseDate(ocrData.report_info.period_start));
-            periodEnd = new Date(parseDate(ocrData.report_info.period_end));
-          } else if (allTransactions.length > 0) {
-            const dates = allTransactions
-              .map(tx => new Date(parseDate(tx.date)))
-              .filter(d => !isNaN(d.getTime()));
-            
-            if (dates.length > 0) {
-              periodStart = new Date(Math.min(...dates.map(d => d.getTime())));
-              periodEnd = new Date(Math.max(...dates.map(d => d.getTime())));
-            }
-          }
-          
-          // שמירת המסמך
-          if (periodStart && periodEnd) {
-            const { data: docRecord, error: docError } = await (supabase as any)
-              .from('uploaded_statements')
-              .insert({
-                user_id: userData.id,
-                file_url: downloadUrl,
-                file_name: fileName,
-                file_type: documentType === 'credit' ? 'credit_statement' : 'bank_statement',
-                document_type: documentType,
-                status: 'completed',
-                processed: true,
-                period_start: periodStart.toISOString().split('T')[0],
-                period_end: periodEnd.toISOString().split('T')[0],
-                transactions_extracted: allTransactions.length,
-                transactions_created: insertedIds.length,
-              })
-              .select('id')
-              .single();
-            
-            if (!docError && docRecord?.id) {
-              console.log(`✅ Excel document saved: ${docRecord.id}`);
-              
-              await (supabase as any)
-                .from('transactions')
-                .update({ document_id: docRecord.id })
-                .eq('batch_id', pendingBatchId);
-              
-              await (supabase as any)
-                .from('users')
-                .update({ 
-                  onboarding_state: 'classification',
-                  current_phase: 'classification'
-                })
-                .eq('id', userData.id);
-            }
-          }
-          
+          // עצור עדכוני התקדמות - הניתוח הסתיים!
           progressUpdater.stop();
           
-          // שליחת הודעת סיכום
-          const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
-          await onDocumentProcessed(userData.id, phoneNumber);
+          // ספירת הכנסות והוצאות
+          const incomeCount = allTransactions.filter(tx => tx.type === 'income' || tx.amount > 0).length;
+          const expenseCount = allTransactions.filter(tx => tx.type === 'expense' || tx.amount < 0).length;
           
-          console.log(`✅ Excel processed: ${allTransactions.length} transactions`);
+          // שליחת הודעה למשתמש - הניתוח הסתיים!
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: `✅ מצוין! זיהיתי ${allTransactions.length} תנועות:\n\n` +
+              `💚 ${incomeCount} הכנסות\n` +
+              `💸 ${expenseCount} הוצאות\n\n` +
+              `מסדר את הנתונים... זה יקח כמה שניות 📊`,
+          });
+          
+          // יצירת batch ID ייחודי
+          const pendingBatchId = `excel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          // שליחת event ל-Inngest לעיבוד ברקע
+          const { inngest } = await import('@/lib/inngest/client');
+          
+          await inngest.send({
+            name: 'excel/transactions.save',
+            data: {
+              userId: userData.id,
+              phone: phoneNumber,
+              transactions: allTransactions,
+              batchId: pendingBatchId,
+              documentInfo: {
+                fileName,
+                downloadUrl,
+                documentType,
+                ocrData,
+              },
+            },
+          });
+          
+          console.log(`✅ Excel AI analysis complete, sent to Inngest for saving: ${allTransactions.length} transactions`);
           
         } catch (excelError: any) {
           progressUpdater.stop();

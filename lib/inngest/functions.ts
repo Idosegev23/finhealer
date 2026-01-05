@@ -424,3 +424,223 @@ export const processDocument = inngest.createFunction(
   }
 );
 
+// ===========================================================================
+// 🆕 פונקציה לשמירת תנועות מ-Excel ברקע
+// ===========================================================================
+export const saveExcelTransactions = inngest.createFunction(
+  { 
+    id: 'save-excel-transactions',
+    name: 'Save Excel Transactions',
+    retries: 3, // מקסימום 3 ניסיונות
+  },
+  { event: 'excel/transactions.save' },
+  async ({ event, step }) => {
+    const { userId, phone, transactions, batchId, documentInfo } = event.data;
+    
+    console.log(`🚀 [Inngest] Starting to save ${transactions.length} transactions for user ${userId}`);
+    
+    // שלב 0: בדיקת כפילויות - האם batch כבר קיים?
+    const existingCheck = await step.run('check-duplicates', async () => {
+      const supabase = await createServiceRoleClient();
+      
+      const { count } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('batch_id', batchId);
+      
+      if (count && count > 0) {
+        console.log(`⚠️ [Inngest] Batch ${batchId} already exists with ${count} transactions, skipping`);
+        return { skipped: true, existingCount: count };
+      }
+      
+      return { skipped: false, existingCount: 0 };
+    });
+    
+    if (existingCheck.skipped) {
+      return { success: true, skipped: true, reason: 'batch_already_exists' };
+    }
+    
+    // שלב 1: הכנת התנועות לשמירה
+    const preparedTransactions = await step.run('prepare-transactions', async () => {
+      // Helper to convert DD/MM/YYYY to YYYY-MM-DD
+      const parseDate = (dateStr: string | undefined): string => {
+        if (!dateStr) return new Date().toISOString().split('T')[0];
+        
+        // Try DD/MM/YYYY format (Israeli)
+        const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (ddmmyyyy) {
+          const [, day, month, year] = ddmmyyyy;
+          return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        
+        // Already YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+        
+        // Try to parse with Date
+        const parsed = new Date(dateStr);
+        if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+        
+        return new Date().toISOString().split('T')[0];
+      };
+      
+      const prepared = transactions
+        .filter((tx: any) => Math.abs(tx.amount || 0) > 0)
+        .map((tx: any) => {
+          const isIncome = tx.type === 'income' || tx.amount > 0;
+          return {
+            user_id: userId,
+            type: isIncome ? 'income' : 'expense',
+            amount: Math.abs(tx.amount || 0),
+            vendor: tx.vendor || tx.payee || tx.description || 'לא ידוע',
+            original_description: tx.description || tx.vendor || '',
+            notes: tx.notes || tx.description || '',
+            tx_date: parseDate(tx.date),
+            category: isIncome ? null : (tx.expense_category || tx.category || null),
+            income_category: isIncome ? (tx.income_category || tx.category || null) : null,
+            expense_type: tx.expense_type || (isIncome ? null : 'variable'),
+            payment_method: tx.payment_method || (documentInfo.documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
+            source: 'excel',
+            status: 'pending',
+            batch_id: batchId,
+            auto_categorized: !!tx.expense_category,
+            confidence_score: tx.confidence || 0.5,
+          };
+        });
+      
+      console.log(`📦 [Inngest] Prepared ${prepared.length} transactions for batch insert`);
+      return prepared;
+    });
+    
+    // שלב 2: Batch insert של כל התנועות
+    const insertResult = await step.run('batch-insert-transactions', async () => {
+      const supabase = await createServiceRoleClient();
+      
+      // Batch insert - הרבה יותר מהיר מאחד אחד!
+      const { data: inserted, error } = await supabase
+        .from('transactions')
+        .insert(preparedTransactions)
+        .select('id');
+      
+      if (error) {
+        console.error('❌ [Inngest] Batch insert error:', error);
+        throw new Error(`Batch insert failed: ${error.message}`);
+      }
+      
+      console.log(`✅ [Inngest] Batch inserted ${inserted?.length || 0} transactions`);
+      return { insertedCount: inserted?.length || 0, insertedIds: inserted?.map((t: any) => t.id) || [] };
+    });
+    
+    // שלב 3: חישוב תקופה ושמירת מסמך
+    const documentId = await step.run('save-document', async () => {
+      const supabase = await createServiceRoleClient();
+      const { ocrData, fileName, downloadUrl, documentType } = documentInfo;
+      
+      // Helper for date parsing (same as above)
+      const parseDate = (dateStr: string | undefined): string => {
+        if (!dateStr) return new Date().toISOString().split('T')[0];
+        const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (ddmmyyyy) {
+          const [, day, month, year] = ddmmyyyy;
+          return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+        const parsed = new Date(dateStr);
+        if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+        return new Date().toISOString().split('T')[0];
+      };
+      
+      // חישוב תקופה
+      let periodStart: string | null = null;
+      let periodEnd: string | null = null;
+      
+      if (ocrData?.period?.start_date && ocrData?.period?.end_date) {
+        periodStart = parseDate(ocrData.period.start_date);
+        periodEnd = parseDate(ocrData.period.end_date);
+      } else if (ocrData?.report_info?.period_start && ocrData?.report_info?.period_end) {
+        periodStart = parseDate(ocrData.report_info.period_start);
+        periodEnd = parseDate(ocrData.report_info.period_end);
+      } else if (transactions.length > 0) {
+        const dates = transactions
+          .map((tx: any) => new Date(parseDate(tx.date)))
+          .filter((d: Date) => !isNaN(d.getTime()));
+        
+        if (dates.length > 0) {
+          periodStart = new Date(Math.min(...dates.map((d: Date) => d.getTime()))).toISOString().split('T')[0];
+          periodEnd = new Date(Math.max(...dates.map((d: Date) => d.getTime()))).toISOString().split('T')[0];
+        }
+      }
+      
+      // שמירת המסמך
+      const { data: docRecord, error: docError } = await supabase
+        .from('uploaded_statements')
+        .insert({
+          user_id: userId,
+          file_url: downloadUrl,
+          file_name: fileName,
+          file_type: documentType === 'credit' ? 'credit_statement' : 'bank_statement',
+          document_type: documentType,
+          status: 'completed',
+          processed: true,
+          period_start: periodStart,
+          period_end: periodEnd,
+          transactions_extracted: transactions.length,
+          transactions_created: insertResult.insertedCount,
+        })
+        .select('id')
+        .single();
+      
+      if (docError) {
+        console.error('❌ [Inngest] Document save error:', docError);
+        // לא נזרוק שגיאה - התנועות כבר נשמרו
+      }
+      
+      const docId = docRecord?.id;
+      
+      if (docId) {
+        console.log(`✅ [Inngest] Document saved: ${docId}`);
+        
+        // עדכון התנועות עם document_id
+        await supabase
+          .from('transactions')
+          .update({ document_id: docId })
+          .eq('batch_id', batchId);
+      }
+      
+      return docId;
+    });
+    
+    // שלב 4: עדכון סטטוס המשתמש
+    await step.run('update-user-state', async () => {
+      const supabase = await createServiceRoleClient();
+      
+      await supabase
+        .from('users')
+        .update({ 
+          onboarding_state: 'classification',
+          current_phase: 'classification'
+        })
+        .eq('id', userId);
+      
+      console.log(`✅ [Inngest] User state updated to classification`);
+    });
+    
+    // שלב 5: שליחת הודעה למשתמש
+    await step.run('notify-user', async () => {
+      const greenAPI = getGreenAPIClient();
+      const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+      
+      await onDocumentProcessed(userId, phone);
+      
+      console.log(`✅ [Inngest] User notified via WhatsApp`);
+    });
+    
+    console.log(`🎉 [Inngest] Excel processing complete: ${insertResult.insertedCount} transactions saved`);
+    
+    return { 
+      success: true, 
+      transactionsSaved: insertResult.insertedCount,
+      documentId,
+    };
+  }
+);
+
