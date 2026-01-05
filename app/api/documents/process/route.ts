@@ -793,8 +793,13 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
     const response = await openai.responses.create({
       model: 'gpt-5.2-2025-12-11',
       input: [
-        { type: 'text', text: prompt },
-        { type: 'image_url', image_url: { url: dataUrl } },
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: prompt },
+            { type: 'input_image', image_url: dataUrl },
+          ]
+        }
       ],
       reasoning: { effort: 'medium' },
     });
