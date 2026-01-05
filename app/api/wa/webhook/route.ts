@@ -1334,6 +1334,27 @@ export async function POST(request: NextRequest) {
           const pendingBatchId = `excel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const insertedIds: string[] = [];
           
+          // Helper to convert DD/MM/YYYY to YYYY-MM-DD
+          const parseDate = (dateStr: string | undefined): string => {
+            if (!dateStr) return new Date().toISOString().split('T')[0];
+            
+            // Try DD/MM/YYYY format (Israeli)
+            const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (ddmmyyyy) {
+              const [, day, month, year] = ddmmyyyy;
+              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            
+            // Already YYYY-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+            
+            // Try to parse with Date
+            const parsed = new Date(dateStr);
+            if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+            
+            return new Date().toISOString().split('T')[0];
+          };
+          
           for (const tx of allTransactions) {
             const isIncome = tx.type === 'income' || tx.amount > 0;
             const amount = Math.abs(tx.amount || 0);
@@ -1347,7 +1368,7 @@ export async function POST(request: NextRequest) {
               vendor: tx.vendor || tx.payee || tx.description || 'לא ידוע',
               original_description: tx.description || tx.vendor || '',
               notes: tx.notes || tx.description || '',
-              tx_date: tx.date || new Date().toISOString().split('T')[0],
+              tx_date: parseDate(tx.date),
               category: isIncome ? null : (tx.expense_category || tx.category || null),
               income_category: isIncome ? (tx.income_category || tx.category || null) : null,
               expense_type: tx.expense_type || (isIncome ? null : 'variable'),
@@ -1374,16 +1395,19 @@ export async function POST(request: NextRequest) {
           
           console.log(`✅ Saved ${insertedIds.length}/${allTransactions.length} transactions`);
           
-          // חישוב תקופה
+          // חישוב תקופה - using parseDate helper
           let periodStart: Date | null = null;
           let periodEnd: Date | null = null;
           
           if (ocrData.period?.start_date && ocrData.period?.end_date) {
-            periodStart = new Date(ocrData.period.start_date);
-            periodEnd = new Date(ocrData.period.end_date);
+            periodStart = new Date(parseDate(ocrData.period.start_date));
+            periodEnd = new Date(parseDate(ocrData.period.end_date));
+          } else if (ocrData.report_info?.period_start && ocrData.report_info?.period_end) {
+            periodStart = new Date(parseDate(ocrData.report_info.period_start));
+            periodEnd = new Date(parseDate(ocrData.report_info.period_end));
           } else if (allTransactions.length > 0) {
             const dates = allTransactions
-              .map(tx => new Date(tx.date))
+              .map(tx => new Date(parseDate(tx.date)))
               .filter(d => !isNaN(d.getTime()));
             
             if (dates.length > 0) {
