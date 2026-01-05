@@ -1376,14 +1376,18 @@ export async function POST(request: NextRequest) {
               type: isIncome ? 'income' : 'expense',
               amount,
               vendor: tx.vendor || tx.payee || tx.description || 'לא ידוע',
-              description: tx.description || tx.vendor || '',
+              original_description: tx.description || tx.vendor || '',
+              notes: tx.notes || tx.description || '',
               tx_date: tx.date || new Date().toISOString().split('T')[0],
               category: isIncome ? null : (tx.expense_category || tx.category || null),
               income_category: isIncome ? (tx.income_category || tx.category || null) : null,
+              expense_type: tx.expense_type || (isIncome ? null : 'variable'),
+              payment_method: tx.payment_method || (documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
               source: 'excel',
               status: 'pending',
               batch_id: pendingBatchId,
-              raw_data: tx,
+              auto_categorized: !!tx.expense_category,
+              confidence_score: tx.confidence || 0.5,
             };
             
             const { data: inserted, error: txErr } = await (supabase as any)
