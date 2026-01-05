@@ -505,7 +505,7 @@ export async function POST(request: NextRequest) {
 
           const userPrompt = 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע. **שים לב מיוחד לתאריך!**\n\n**חשוב מאוד - זיהוי הסכום הנכון:**\n- זהה את הסכום ששולם בפועל - זה נמצא ליד "סה״כ כולל מע״מ" או "סה״כ" בתחתית הקבלה\n- אל תשתמש במספר הקבלה כעלות! (מספר קבלה = 36401)\n- אל תשתמש במספר הקופה כעלות! (מספר קופה = 000083)\n- דוגמה: אם רשום "מספר קופה: 000083" ו"סה״כ כולל מע״מ: 79" - הסכום הוא 79, לא 83!\n- מספר קופה/קבלה ≠ סכום כסף\n\n**חשוב מאוד - פורמט תאריכים ישראלי:**\n- תאריכים ישראליים הם בפורמט: יום.חודש.שנה (DD.MM.YY)\n- **לא** כמו בארה"ב! אם רשום "10.11.20" זה יום 10, חודש 11 (נובמבר), שנה 2020\n- החזר בפורמט ISO: "YYYY-MM-DD" (למשל: "2020-11-10")\n\nהחזר תשובה בפורמט JSON.';
 
-          // 🆕 GPT-5.2 with Responses API
+          // 🆕 GPT-5.2 with Responses API - effort: 'none' for fast response!
           const visionResponse = await openai.responses.create({
             model: 'gpt-5.2-2025-12-11',
             input: [
@@ -517,7 +517,8 @@ export async function POST(request: NextRequest) {
                 ]
               }
             ],
-            reasoning: { effort: 'medium' },
+            reasoning: { effort: 'none' }, // ⚡ Fast mode - no deep thinking
+            text: { verbosity: 'low' }, // ⚡ Concise output
           });
 
           const aiText = visionResponse.output_text || '{}';
@@ -1315,11 +1316,12 @@ export async function POST(request: NextRequest) {
           
           console.log(`🤖 Sending Excel data to GPT-5.2 (${excelText.length} chars)...`);
           
-          // 🆕 GPT-5.2 with Responses API
+          // 🆕 GPT-5.2 with Responses API - effort: 'none' for fast response!
           const aiResponse = await openai.responses.create({
             model: 'gpt-5.2-2025-12-11',
             input: prompt,
-            reasoning: { effort: 'medium' },
+            reasoning: { effort: 'none' }, // ⚡ Fast mode - no deep thinking
+            text: { verbosity: 'low' }, // ⚡ Concise output
           });
           
           const content = aiResponse.output_text || '{}';
