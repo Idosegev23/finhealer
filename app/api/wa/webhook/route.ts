@@ -194,15 +194,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ignored', reason: payload.typeWebhook });
     }
     
-    // 🛡️ בדיקת כפילויות לפי idMessage
+    // 🛡️ בדיקת כפילויות לפי idMessage - בדאטאבייס!
     const messageId = payload.idMessage;
+    
+    // בדיקה בדאטאבייס - זה שורד בין invocations
+    if (messageId) {
+      const { data: existingMsg } = await supabase
+        .from('wa_messages')
+        .select('id')
+        .eq('provider_msg_id', messageId)
+        .limit(1)
+        .single();
+      
+      if (existingMsg) {
+        console.log('🛡️ Duplicate message ignored (DB check):', messageId);
+        return NextResponse.json({ status: 'ignored', reason: 'duplicate' });
+      }
+    }
+    
+    // גם בדיקה in-memory לאותו invocation
     if (messageId && processedMessages.has(messageId)) {
-      console.log('🛡️ Duplicate message ignored:', messageId);
+      console.log('🛡️ Duplicate message ignored (memory):', messageId);
       return NextResponse.json({ status: 'ignored', reason: 'duplicate' });
     }
     if (messageId) {
       processedMessages.add(messageId);
-      // נקה הודעות ישנות (שמור רק 1000 אחרונות)
       if (processedMessages.size > 1000) {
         const first = processedMessages.values().next().value;
         if (first) processedMessages.delete(first);
