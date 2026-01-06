@@ -1,9 +1,9 @@
 # התקדמות - Phi (φ)
 
 ## סטטוס כללי
-📊 **שלב:** Phase 1.5 Complete - Classification System + Charts 🎉
-🎯 **Phase:** Phase 1 + 1.5 + 2 מושלמים, מוכנים ל-Phase 3 (Goals)  
-⏰ **עדכון אחרון:** 31 בדצמבר 2025 - עדכון זרימה: Goals → Budget! 🎯φ
+📊 **שלב:** Phase 4 Complete - Budget System 💰
+🎯 **Phase:** Phase 1-4 מושלמים! Goals → Budget מחובר! 
+⏰ **עדכון אחרון:** 6 בינואר 2026 - Phase 4 Budget הושלם! 💰φ
 
 ### ⚠️ עדכון חשוב: שינוי סדר שלבים (31 דצמבר 2025)
 **מקור:** פגישה עם גדי
@@ -729,8 +729,8 @@ GREEN_INVOICE_SECRET=              # לתשלומים אמיתיים
 | Phase 1.5: Document Scanning | ✅ 100% | סריקה וסיווג מושלמים |
 | Phase 2: Behavior | ✅ 100% | **מנוע ניתוח התנהגות הושלם!** |
 | Phase 3: Goals | ✅ 100% | **מערכת יעדים הושלמה!** WhatsApp + Dashboard |
-| Phase 4: Budget | 🚀 0% | **הבא בתור!** תקציב מבוסס יעדים |
-| Phase 5: Monitoring | ⏳ 30% | Dashboard קיים |
+| Phase 4: Budget | ✅ 100% | **מחובר! Goals → Budget → Monitoring** |
+| Phase 5: Monitoring | ⏳ 50% | Dashboard קיים, תקציב מחובר |
 
 ---
 
@@ -851,4 +851,47 @@ GREEN_INVOICE_SECRET=              # לתשלומים אמיתיים
 
 ---
 
-**עדכון אחרון:** 6 בינואר 2026 - Phase 3 Goals System הושלם! 🎯φ
+---
+
+## 💰 **סבב 11: Phase 4 Budget System** (6 בינואר 2026)
+
+### ✅ Budget Phase - מערכת תקציב מחוברת!
+
+#### 1. Budget State ב-phi-router.ts
+- הוספת `budget` state ל-UserState
+- `handleBudgetPhase()` - routing לפקודות תקציב
+- `calculateBudgetData()` - חישוב נתונים מתנועות
+- `createAutoBudget()` - יצירת תקציב אוטומטי עם 10% חיסכון
+- `setBudgetCategory()` - הגדרת תקציב ידני לקטגוריה
+- `finishBudget()` - סיום ומעבר ל-monitoring
+- `skipBudget()` - דילוג על תקציב
+
+#### 2. תקציב אוטומטי
+- חישוב הכנסות והוצאות מהחודש הנוכחי
+- יעד חיסכון 10% מההכנסות
+- יצירת תקציב לפי קטגוריות (95% מההיסטוריה)
+- שמירה בטבלת `budgets` + `budget_categories`
+
+#### 3. תקציב ידני
+- פורמט: "קטגוריה: סכום"
+- שמירה ב-budget_categories
+- פקודת "סיימתי" לסיום
+
+#### 4. כפתורים אינטראקטיביים
+- תקציב אוטומטי
+- הגדרה ידנית
+- דלג
+
+#### 5. זרימה מחוברת
+- Goals (סיימתי / המשך) → Budget
+- Budget (אישור / סיימתי / דלג) → Monitoring
+
+### 📊 סטטיסטיקות:
+- **+350 שורות קוד** ב-phi-router.ts
+- **7 פונקציות חדשות** לתקציב
+- **3 כפתורים אינטראקטיביים**
+- **חיבור מלא Goals → Budget → Monitoring**
+
+---
+
+**עדכון אחרון:** 6 בינואר 2026 - Phase 4 Budget System הושלם! 💰φ

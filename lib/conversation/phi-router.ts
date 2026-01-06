@@ -2494,45 +2494,134 @@ async function finishGoalsSetting(ctx: RouterContext): Promise<RouterResult> {
 interface BudgetData {
   totalIncome: number;
   totalExpenses: number;
-  categories: { name: string; amount: number; percentage: number }[];
+  categories: { name: string; amount: number; percentage: number; expenseType: string }[];
+  vendorBreakdown: { vendor: string; avgAmount: number; monthlyCount: number; category: string }[];
+  profileContext: {
+    numPeople: number;
+    housingType: string;
+    incomeLevel: string;
+    fixedExpenses: number;
+    variableExpenses: number;
+    specialExpenses: number;
+  };
 }
 
 /**
- * Calculate budget data from user transactions
+ * Calculate comprehensive budget data from user transactions (12 months)
+ * Based on Gadi's methodology:
+ * - ממוצע שורת הוצאה (by vendor, not category)
+ * - ממוצע חודשי (12 months)
+ * - יחס למספר נפשות, סוג מגורים, רמת הכנסה
  */
 async function calculateBudgetData(userId: string): Promise<BudgetData> {
   const supabase = createServiceClient();
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  
+  // Get last 12 months of data
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const startDate = twelveMonthsAgo.toISOString().split('T')[0];
   
   const { data: transactions } = await supabase
     .from('transactions')
     .select('*')
     .eq('user_id', userId)
-    .gte('date', `${currentMonth}-01`)
-    .lte('date', `${currentMonth}-31`);
+    .gte('date', startDate);
+  
+  // Get user profile for context
+  const { data: profile } = await supabase
+    .from('user_financial_profile')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+  
+  // Get dependents count
+  const { count: childrenCount } = await supabase
+    .from('children')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
   
   const income = transactions?.filter(t => t.type === 'income') || [];
   const expenses = transactions?.filter(t => t.type === 'expense') || [];
   
-  const totalIncome = income.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  const totalExpenses = expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  // Calculate monthly averages (divide by number of months with data)
+  const monthsWithData = new Set(transactions?.map(t => t.date?.substring(0, 7))).size || 1;
   
-  // Group expenses by category
-  const categoryMap: Record<string, number> = {};
+  const totalIncome = Math.round(income.reduce((sum, t) => sum + Math.abs(t.amount), 0) / monthsWithData);
+  const totalExpenses = Math.round(expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0) / monthsWithData);
+  
+  // 📊 Vendor breakdown (ממוצע שורת הוצאה)
+  const vendorMap: Record<string, { total: number; count: number; category: string }> = {};
+  expenses.forEach(t => {
+    const vendor = t.vendor || t.original_description || 'לא ידוע';
+    if (!vendorMap[vendor]) {
+      vendorMap[vendor] = { total: 0, count: 0, category: t.category || t.expense_category || 'אחר' };
+    }
+    vendorMap[vendor].total += Math.abs(t.amount);
+    vendorMap[vendor].count++;
+  });
+  
+  const vendorBreakdown = Object.entries(vendorMap)
+    .map(([vendor, data]) => ({
+      vendor,
+      avgAmount: Math.round(data.total / monthsWithData),
+      monthlyCount: Math.round(data.count / monthsWithData * 10) / 10,
+      category: data.category
+    }))
+    .sort((a, b) => b.avgAmount - a.avgAmount)
+    .slice(0, 20); // Top 20 vendors
+  
+  // 📁 Group by category with expense type (קבועות/משתנות/מיוחדות)
+  const categoryMap: Record<string, { amount: number; type: string }> = {};
   expenses.forEach(t => {
     const cat = t.category || t.expense_category || 'אחר';
-    categoryMap[cat] = (categoryMap[cat] || 0) + Math.abs(t.amount);
+    const expType = t.expense_frequency || t.expense_type || 'variable';
+    if (!categoryMap[cat]) {
+      categoryMap[cat] = { amount: 0, type: expType };
+    }
+    categoryMap[cat].amount += Math.abs(t.amount);
   });
   
   const categories = Object.entries(categoryMap)
-    .map(([name, amount]) => ({
+    .map(([name, data]) => ({
       name,
-      amount,
-      percentage: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0
+      amount: Math.round(data.amount / monthsWithData),
+      percentage: totalExpenses > 0 ? Math.round((data.amount / monthsWithData / totalExpenses) * 100) : 0,
+      expenseType: data.type
     }))
     .sort((a, b) => b.amount - a.amount);
   
-  return { totalIncome, totalExpenses, categories };
+  // 🏠 Calculate expense types totals
+  const fixedExpenses = categories
+    .filter(c => c.expenseType === 'fixed')
+    .reduce((sum, c) => sum + c.amount, 0);
+  
+  const variableExpenses = categories
+    .filter(c => c.expenseType === 'variable' || c.expenseType === 'temporary')
+    .reduce((sum, c) => sum + c.amount, 0);
+  
+  const specialExpenses = categories
+    .filter(c => c.expenseType === 'special' || c.expenseType === 'one_time')
+    .reduce((sum, c) => sum + c.amount, 0);
+  
+  // 👨‍👩‍👧‍👦 Profile context
+  const numPeople = 1 + (profile?.marital_status === 'married' ? 1 : 0) + (childrenCount || 0);
+  const housingType = profile?.owns_home ? 'בעלות' : 'שכירות';
+  const incomeLevel = totalIncome > 20000 ? 'גבוהה' : totalIncome > 10000 ? 'בינונית' : 'נמוכה';
+  
+  return { 
+    totalIncome, 
+    totalExpenses, 
+    categories,
+    vendorBreakdown,
+    profileContext: {
+      numPeople,
+      housingType,
+      incomeLevel,
+      fixedExpenses,
+      variableExpenses,
+      specialExpenses
+    }
+  };
 }
 
 /**
@@ -2596,15 +2685,24 @@ async function handleBudgetPhase(ctx: RouterContext, msg: string): Promise<Route
 
 /**
  * Create automatic budget based on history
+ * מתודולוגיית גדי:
+ * - ממוצע 12 חודשים
+ * - יחס למספר נפשות, סוג מגורים
+ * - הפרדה לקבועות/משתנות/מיוחדות
  */
 async function createAutoBudget(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  const { totalIncome, totalExpenses, categories } = await calculateBudgetData(ctx.userId);
+  const budgetData = await calculateBudgetData(ctx.userId);
+  const { totalIncome, totalExpenses, categories, vendorBreakdown, profileContext } = budgetData;
   
-  // יצירת תקציב לפי קטגוריות + 10% חיסכון
-  const savingsTarget = Math.round(totalIncome * 0.1);
+  // 🎯 יעד חיסכון לפי רמת הכנסה
+  let savingsPercent = 0.10; // ברירת מחדל 10%
+  if (profileContext.incomeLevel === 'גבוהה') savingsPercent = 0.15;
+  if (profileContext.incomeLevel === 'נמוכה') savingsPercent = 0.05;
+  
+  const savingsTarget = Math.round(totalIncome * savingsPercent);
   const availableBudget = totalIncome - savingsTarget;
   
   // יצירת/עדכון תקציב ראשי
@@ -2676,22 +2774,75 @@ async function createAutoBudget(ctx: RouterContext): Promise<RouterResult> {
     }
   }
   
-  // בנה הודעה עם התקציב
-  let budgetMsg = `✨ *התקציב שלך מוכן!*\n\n`;
-  budgetMsg += `📊 *סיכום:*\n`;
-  budgetMsg += `• הכנסות: ₪${totalIncome.toLocaleString('he-IL')}\n`;
-  budgetMsg += `• יעד חיסכון (10%): ₪${savingsTarget.toLocaleString('he-IL')}\n`;
-  budgetMsg += `• תקציב זמין: ₪${availableBudget.toLocaleString('he-IL')}\n\n`;
-  
-  budgetMsg += `💰 *תקציב לפי קטגוריות:*\n`;
-  categories.slice(0, 5).forEach(cat => {
-    const budget = Math.round(cat.amount * 0.95);
-    budgetMsg += `• ${cat.name}: ₪${budget.toLocaleString('he-IL')}\n`;
-  });
+  // 📨 הודעה 1: סיכום כללי ופרופיל
+  let msg1 = `✨ *התקציב שלך מוכן!*\n\n`;
+  msg1 += `👨‍👩‍👧‍👦 *הפרופיל שלך:*\n`;
+  msg1 += `• ${profileContext.numPeople} נפשות\n`;
+  msg1 += `• ${profileContext.housingType}\n`;
+  msg1 += `• רמת הכנסה: ${profileContext.incomeLevel}\n\n`;
+  msg1 += `📊 *ממוצע חודשי (12 חודשים):*\n`;
+  msg1 += `• הכנסות: ₪${totalIncome.toLocaleString('he-IL')}\n`;
+  msg1 += `• הוצאות: ₪${totalExpenses.toLocaleString('he-IL')}\n`;
+  msg1 += `• יתרה: ₪${(totalIncome - totalExpenses).toLocaleString('he-IL')}`;
   
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
-    message: budgetMsg,
+    message: msg1,
+  });
+  
+  // 📨 הודעה 2: פירוט לפי סוג הוצאה
+  let msg2 = `📁 *הוצאות לפי סוג:*\n\n`;
+  msg2 += `🔒 *קבועות:* ₪${profileContext.fixedExpenses.toLocaleString('he-IL')}\n`;
+  const fixedCats = categories.filter(c => c.expenseType === 'fixed').slice(0, 3);
+  fixedCats.forEach(c => { msg2 += `   • ${c.name}: ₪${c.amount.toLocaleString('he-IL')}\n`; });
+  
+  msg2 += `\n🔄 *משתנות:* ₪${profileContext.variableExpenses.toLocaleString('he-IL')}\n`;
+  const varCats = categories.filter(c => c.expenseType === 'variable' || c.expenseType === 'temporary').slice(0, 3);
+  varCats.forEach(c => { msg2 += `   • ${c.name}: ₪${c.amount.toLocaleString('he-IL')}\n`; });
+  
+  if (profileContext.specialExpenses > 0) {
+    msg2 += `\n⭐ *מיוחדות:* ₪${profileContext.specialExpenses.toLocaleString('he-IL')}`;
+  }
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: msg2,
+  });
+  
+  // 📨 הודעה 3: Top vendors (ממוצע שורת הוצאה)
+  if (vendorBreakdown.length > 0) {
+    let msg3 = `💳 *הוצאות עיקריות (ממוצע חודשי):*\n\n`;
+    vendorBreakdown.slice(0, 8).forEach(v => {
+      msg3 += `• ${v.vendor}: ₪${v.avgAmount.toLocaleString('he-IL')}\n`;
+    });
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: msg3,
+    });
+  }
+  
+  // 📨 הודעה 4: יעד והמלצה
+  const savingsPercentDisplay = Math.round(savingsPercent * 100);
+  let msg4 = `🎯 *היעד שלך:*\n\n`;
+  msg4 += `• יעד חיסכון (${savingsPercentDisplay}%): ₪${savingsTarget.toLocaleString('he-IL')}/חודש\n`;
+  msg4 += `• תקציב זמין: ₪${availableBudget.toLocaleString('he-IL')}/חודש\n\n`;
+  msg4 += `💡 *המלצת φ:*\n`;
+  
+  // המלצות מותאמות
+  if (totalExpenses > totalIncome) {
+    msg4 += `⚠️ ההוצאות גבוהות מההכנסות!\n`;
+    msg4 += `מומלץ לבדוק את ההוצאות המשתנות.`;
+  } else if (profileContext.variableExpenses > profileContext.fixedExpenses) {
+    msg4 += `ההוצאות המשתנות גבוהות.\n`;
+    msg4 += `יש פוטנציאל לחיסכון משמעותי!`;
+  } else {
+    msg4 += `מצב טוב! רוב ההוצאות קבועות ויציבות.`;
+  }
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: msg4,
   });
   
   // שאל אם לאשר
@@ -2700,7 +2851,7 @@ async function createAutoBudget(ctx: RouterContext): Promise<RouterResult> {
     message: 'מאשר את התקציב?',
     buttons: [
       { buttonId: 'confirm_budget', buttonText: 'מאשר' },
-      { buttonId: 'manual_budget', buttonText: 'עריכה ידנית' },
+      { buttonId: 'manual_budget', buttonText: 'עריכה' },
     ],
   });
   
