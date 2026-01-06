@@ -593,6 +593,7 @@ async function showNextTransaction(
   }
   
   message += `\n\n(נשארו ${remaining})`;
+  message += `\n\n💡 *"רשימה"* לראות קטגוריות הכנסה`;
   
   // שמור הצעה לאישור מהיר
   if (suggestion) {
