@@ -1279,12 +1279,12 @@ export async function onDocumentProcessed(userId: string, phone: string): Promis
     .limit(1)
     .single();
   
-  // ספור תנועות ממתינות
+  // ספור תנועות ממתינות (pending או proposed)
   const { data: transactions } = await supabase
     .from('transactions')
     .select('id, type, amount')
     .eq('user_id', userId)
-    .eq('status', 'proposed');
+    .in('status', ['pending', 'proposed']);
   
   const incomeCount = transactions?.filter(t => t.type === 'income').length || 0;
   const expenseCount = transactions?.filter(t => t.type === 'expense').length || 0;
