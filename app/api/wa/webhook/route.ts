@@ -1456,19 +1456,14 @@ export async function POST(request: NextRequest) {
           const savedCount = insertedTx?.length || 0;
           console.log(`✅ Batch inserted ${savedCount} transactions`);
           
-          // חישוב תקופה לשמירת המסמך
+          // חישוב תקופה לשמירת המסמך - תמיד מהתנועות עצמן (יותר מדויק מ-AI)
           let periodStart: string | null = null;
           let periodEnd: string | null = null;
           
-          if (ocrData?.period?.start_date && ocrData?.period?.end_date) {
-            periodStart = parseDate(ocrData.period.start_date);
-            periodEnd = parseDate(ocrData.period.end_date);
-          } else if (ocrData?.report_info?.period_start && ocrData?.report_info?.period_end) {
-            periodStart = parseDate(ocrData.report_info.period_start);
-            periodEnd = parseDate(ocrData.report_info.period_end);
-          } else if (allTransactions.length > 0) {
-            const dates = allTransactions
-              .map((tx: any) => new Date(parseDate(tx.date)))
+          // חשב מהתנועות עצמן - הכי מדויק!
+          if (transactionsToInsert.length > 0) {
+            const dates = transactionsToInsert
+              .map((tx: any) => new Date(tx.tx_date))
               .filter((d: Date) => !isNaN(d.getTime()));
             
             if (dates.length > 0) {
@@ -1476,6 +1471,8 @@ export async function POST(request: NextRequest) {
               periodEnd = new Date(Math.max(...dates.map((d: Date) => d.getTime()))).toISOString().split('T')[0];
             }
           }
+          
+          console.log(`📅 Period calculated from transactions: ${periodStart} - ${periodEnd}`);
           
           // שמירת רשומת המסמך
           const { data: docRecord, error: docError } = await supabase
