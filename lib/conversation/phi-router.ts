@@ -1213,25 +1213,32 @@ async function answerCategoryQuestion(ctx: RouterContext, category: string): Pro
 function isCommand(msg: string, commands: string[]): boolean {
   const lower = msg.toLowerCase().trim();
   
+  // לוג לדיבאג
+  console.log(`[isCommand] Checking: "${lower}" (length=${lower.length}, codes=${[...lower].map(c => c.charCodeAt(0)).join(',')})`);
+  
   // בדיקה ישירה
   if (commands.some(cmd => lower === cmd || lower.includes(cmd))) {
+    console.log(`[isCommand] ✅ Direct match found`);
     return true;
   }
   
-  // 🆕 בדיקה ללא אימוג'ים - מסיר אימוג'ים נפוצים ובודק שוב
-  const emojiPattern = /[▶⏭✅❌📄💳📋🔍➕🛡🎯💚💸📊🎉️]/g;
-  const withoutEmojis = lower.replace(emojiPattern, '').trim();
+  // 🆕 בדיקה ללא אימוג'ים - מסיר הכל חוץ מעברית ואנגלית
+  const textOnly = lower.replace(/[^\u0590-\u05FFa-z0-9\s]/g, '').trim();
+  console.log(`[isCommand] Text only: "${textOnly}"`);
   
-  if (withoutEmojis && commands.some(cmd => {
+  if (textOnly && commands.some(cmd => {
     const cmdLower = cmd.toLowerCase();
-    const cmdWithoutEmojis = cmdLower.replace(emojiPattern, '').trim();
-    return withoutEmojis === cmdWithoutEmojis || 
-           withoutEmojis.includes(cmdWithoutEmojis) || 
-           cmdWithoutEmojis.includes(withoutEmojis);
+    const cmdTextOnly = cmdLower.replace(/[^\u0590-\u05FFa-z0-9\s]/g, '').trim();
+    const match = textOnly === cmdTextOnly || 
+           textOnly.includes(cmdTextOnly) || 
+           cmdTextOnly.includes(textOnly);
+    if (match) console.log(`[isCommand] ✅ Text-only match with "${cmd}"`);
+    return match;
   })) {
     return true;
   }
   
+  console.log(`[isCommand] ❌ No match found`);
   return false;
 }
 
