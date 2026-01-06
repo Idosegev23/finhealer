@@ -878,10 +878,10 @@ export async function POST(request: NextRequest) {
           
           console.log(`📝 Using prompt for document type: ${documentType} (${prompt.length} chars)`);
 
-          // 🆕 נסה GPT-5.1 קודם, אח"כ GPT-4o
+          // 🆕 GPT-5.2 with Responses API - direct PDF file analysis
           let content = '';
           try {
-            console.log('🔄 Trying GPT-5.1 with Responses API (direct PDF file)...');
+            console.log('🔄 Analyzing PDF with GPT-5.2 (effort: none for speed)...');
             const gpt52Response = await openai.responses.create({
               model: 'gpt-5.2-2025-12-11',
               input: [
@@ -893,12 +893,12 @@ export async function POST(request: NextRequest) {
                   ]
                 }
               ],
-              reasoning: { effort: 'low' },
+              reasoning: { effort: 'none' }, // ⚡ Fast mode - no reasoning overhead
               text: { verbosity: 'low' },
-              max_output_tokens: 32000
+              max_output_tokens: 16000 // Reduced for faster response
             });
             content = gpt52Response.output_text || '{}';
-            console.log('✅ GPT-5.2 succeeded');
+            console.log('✅ GPT-5.2 PDF analysis succeeded');
           } catch (gpt52Error: any) {
             console.log(`❌ GPT-5.2 failed: ${gpt52Error.message}`);
             throw gpt52Error; // No fallback - GPT-5.2 is the primary model
