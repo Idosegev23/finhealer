@@ -7,6 +7,26 @@ import { matchCreditTransactions } from '@/lib/reconciliation/credit-matcher';
 import { parseDate, parseDateWithFallback } from '@/lib/utils/date-parser';
 import * as XLSX from 'xlsx';
 
+/**
+ * 🔧 Clean AI JSON responses before parsing
+ * Fixes common issues like broken values, trailing commas, etc.
+ */
+function cleanJsonString(jsonStr: string): string {
+  return jsonStr
+    // Fix "29571. - null" patterns → null
+    .replace(/:\s*[\d.]+\s*-\s*null/g, ': null')
+    // Fix trailing commas before } or ]
+    .replace(/,(\s*[}\]])/g, '$1')
+    // Fix "null" as string → null
+    .replace(/"null"/g, 'null')
+    // Fix NaN values
+    .replace(/:\s*NaN/g, ': null')
+    // Fix undefined values
+    .replace(/:\s*undefined/g, ': null')
+    // Fix incomplete decimals like "123." → "123"
+    .replace(/:\s*(\d+)\.\s*([,}\]])/g, ': $1$2');
+}
+
 // ⚡️ Vercel Background Function Configuration
 export const runtime = 'nodejs'; // Force Node.js runtime
 export const maxDuration = 600; // 10 minutes for large documents with GPT-5-nano
@@ -519,7 +539,7 @@ async function analyzeLargePDF(buffer: Buffer, fileType: string, fileName: strin
 
       const content = response.output_text || '{}';
       try {
-        const chunkResult = JSON.parse(content);
+        const chunkResult = JSON.parse(cleanJsonString(content));
         if (chunkResult.transactions) {
           allResults.push(chunkResult);
         }
@@ -773,8 +793,8 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     
     // Parse JSON with improved error handling
     try {
-      // First, try direct parsing
-      const result = JSON.parse(content);
+      // First, try direct parsing with cleanup
+      const result = JSON.parse(cleanJsonString(content));
       return result;
     } catch (parseError: any) {
       console.error('❌ JSON Parse Error:', parseError.message);
@@ -793,11 +813,8 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
         if (match) jsonStr = match[0];
       }
       
-      // Clean up common JSON issues
-      jsonStr = jsonStr
-        .replace(/,\s*}/g, '}')     // Remove trailing commas in objects
-        .replace(/,\s*\]/g, ']')    // Remove trailing commas in arrays
-        .trim();
+      // Apply comprehensive cleanup
+      jsonStr = cleanJsonString(jsonStr);
       
       // Try parsing the cleaned version
       try {
@@ -849,9 +866,9 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
     
     const content = response.output_text || '{}';
     
-    // With response_format: json_object, GPT-4o returns valid JSON directly
+    // Parse JSON with cleanup
     try {
-      const result = JSON.parse(content);
+      const result = JSON.parse(cleanJsonString(content));
       return result;
     } catch (parseError: any) {
       console.error('❌ JSON Parse Error:', parseError.message);
@@ -864,9 +881,9 @@ async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType
         if (match) jsonStr = match[1];
       }
       
-      // Last resort
+      // Last resort with cleanup
       try {
-        const result = JSON.parse(jsonStr);
+        const result = JSON.parse(cleanJsonString(jsonStr));
         return result;
       } catch (secondError) {
         throw new Error(`Invalid JSON response from AI: ${parseError.message}`);
@@ -970,7 +987,8 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
     
     // Parse JSON response with improved error handling
     try {
-      const result = JSON.parse(content);
+      // Apply cleanup first
+      const result = JSON.parse(cleanJsonString(content));
       return result;
     } catch (parseError: any) {
       console.error('❌ JSON Parse Error:', parseError.message);
@@ -978,12 +996,12 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
       console.error('JSON String (last 200 chars):', content.substring(content.length - 200));
       
       // Try to fix incomplete JSON by adding missing closing brackets
-      let jsonStr = content.trim();
+      let jsonStr = cleanJsonString(content.trim());
       
       // Remove markdown code blocks if present
       if (jsonStr.includes('```')) {
         const match = jsonStr.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-        if (match) jsonStr = match[1];
+        if (match) jsonStr = cleanJsonString(match[1]);
       }
       
       // Count brackets to see what's missing
