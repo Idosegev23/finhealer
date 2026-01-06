@@ -1381,90 +1381,123 @@ export async function POST(request: NextRequest) {
           // יצירת batch ID ייחודי
           const pendingBatchId = `excel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           
-          // שליחת event ל-Inngest לעיבוד ברקע
-          const { inngest } = await import('@/lib/inngest/client');
-          
-          console.log(`📤 Sending to Inngest: excel/transactions.save with ${allTransactions.length} transactions, batchId: ${pendingBatchId}`);
-          
-          try {
-            const sendResult = await inngest.send({
-              name: 'excel/transactions.save',
-              data: {
-                userId: userData.id,
-                phone: phoneNumber,
-                transactions: allTransactions,
-                batchId: pendingBatchId,
-                documentInfo: {
-                  fileName,
-                  downloadUrl,
-                  documentType,
-                  ocrData,
-                },
-              },
-            });
-            
-            console.log(`✅ Inngest event sent successfully:`, JSON.stringify(sendResult));
-          } catch (inngestError: any) {
-            console.error(`❌ Inngest send error:`, inngestError.message);
-            // אם Inngest נכשל, ננסה לשמור ישירות
-            console.log(`⚠️ Falling back to direct save...`);
-            
-            // Helper to convert DD/MM/YYYY to YYYY-MM-DD
-            const parseDate = (dateStr: string | undefined): string => {
-              if (!dateStr) return new Date().toISOString().split('T')[0];
-              const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-              if (ddmmyyyy) {
-                const [, day, month, year] = ddmmyyyy;
-                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-              }
-              if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-              const parsed = new Date(dateStr);
-              if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
-              return new Date().toISOString().split('T')[0];
-            };
-            
-            // שמירה ישירה כ-fallback
-            const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
-            
-            // שמירת תנועות ישירות
-            let savedCount = 0;
-            for (const tx of allTransactions.slice(0, 50)) { // מקסימום 50 כ-fallback
-              const isIncome = tx.type === 'income' || tx.amount > 0;
-              const txDate = parseDate(tx.date);
-              
-              const { error } = await supabase
-                .from('transactions')
-                .insert({
-                  user_id: userData.id,
-                  type: isIncome ? 'income' : 'expense',
-                  amount: Math.abs(tx.amount || 0),
-                  vendor: tx.vendor || tx.payee || tx.description || 'לא ידוע',
-                  original_description: tx.description || '',
-                  tx_date: txDate,
-                  category: isIncome ? null : (tx.expense_category || null),
-                  income_category: isIncome ? (tx.income_category || null) : null,
-                  expense_type: tx.expense_type || 'variable',
-                  payment_method: documentType === 'credit' ? 'credit_card' : 'bank_transfer',
-                  source: 'excel',
-                  status: 'pending',
-                  batch_id: pendingBatchId,
-                });
-              
-              if (!error) savedCount++;
+          // Helper to convert DD/MM/YYYY to YYYY-MM-DD
+          const parseDate = (dateStr: string | undefined): string => {
+            if (!dateStr) return new Date().toISOString().split('T')[0];
+            const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (ddmmyyyy) {
+              const [, day, month, year] = ddmmyyyy;
+              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
             }
-            
-            console.log(`✅ Fallback saved ${savedCount} transactions directly`);
-            
-            // עדכון סטטוס משתמש
-            await supabase
-              .from('users')
-              .update({ onboarding_state: 'classification', current_phase: 'classification' })
-              .eq('id', userData.id);
-            
-            await onDocumentProcessed(userData.id, phoneNumber);
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+            const parsed = new Date(dateStr);
+            if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+            return new Date().toISOString().split('T')[0];
+          };
+          
+          // הכנת התנועות ל-Batch Insert
+          console.log(`📦 Preparing ${allTransactions.length} transactions for batch insert...`);
+          
+          const transactionsToInsert = allTransactions
+            .filter((tx: any) => Math.abs(tx.amount || 0) > 0)
+            .map((tx: any) => {
+              const isIncome = tx.type === 'income' || (tx.type !== 'expense' && tx.amount > 0);
+              return {
+                user_id: userData.id,
+                type: isIncome ? 'income' : 'expense',
+                amount: Math.abs(tx.amount || 0),
+                vendor: tx.vendor || tx.payee || tx.description || 'לא ידוע',
+                original_description: tx.description || tx.vendor || '',
+                notes: tx.notes || '',
+                tx_date: parseDate(tx.date),
+                category: isIncome ? null : (tx.expense_category || tx.category || null),
+                income_category: isIncome ? (tx.income_category || tx.category || null) : null,
+                expense_type: tx.expense_type || (isIncome ? null : 'variable'),
+                payment_method: tx.payment_method || (documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
+                source: 'excel',
+                status: 'pending',
+                batch_id: pendingBatchId,
+                auto_categorized: !!tx.expense_category,
+                confidence_score: tx.confidence || 0.5,
+              };
+            });
+          
+          // Batch Insert - הרבה יותר מהיר מאחד אחד!
+          const { data: insertedTx, error: insertError } = await supabase
+            .from('transactions')
+            .insert(transactionsToInsert)
+            .select('id');
+          
+          if (insertError) {
+            console.error('❌ Batch insert error:', insertError);
+            throw new Error(`Failed to save transactions: ${insertError.message}`);
           }
           
-          console.log(`✅ Excel processing complete: ${allTransactions.length} transactions`);
+          const savedCount = insertedTx?.length || 0;
+          console.log(`✅ Batch inserted ${savedCount} transactions`);
+          
+          // חישוב תקופה לשמירת המסמך
+          let periodStart: string | null = null;
+          let periodEnd: string | null = null;
+          
+          if (ocrData?.period?.start_date && ocrData?.period?.end_date) {
+            periodStart = parseDate(ocrData.period.start_date);
+            periodEnd = parseDate(ocrData.period.end_date);
+          } else if (ocrData?.report_info?.period_start && ocrData?.report_info?.period_end) {
+            periodStart = parseDate(ocrData.report_info.period_start);
+            periodEnd = parseDate(ocrData.report_info.period_end);
+          } else if (allTransactions.length > 0) {
+            const dates = allTransactions
+              .map((tx: any) => new Date(parseDate(tx.date)))
+              .filter((d: Date) => !isNaN(d.getTime()));
+            
+            if (dates.length > 0) {
+              periodStart = new Date(Math.min(...dates.map((d: Date) => d.getTime()))).toISOString().split('T')[0];
+              periodEnd = new Date(Math.max(...dates.map((d: Date) => d.getTime()))).toISOString().split('T')[0];
+            }
+          }
+          
+          // שמירת רשומת המסמך
+          const { data: docRecord, error: docError } = await supabase
+            .from('uploaded_statements')
+            .insert({
+              user_id: userData.id,
+              file_url: downloadUrl,
+              file_name: fileName,
+              file_type: documentType === 'credit' ? 'credit_statement' : 'bank_statement',
+              document_type: documentType,
+              status: 'completed',
+              processed: true,
+              period_start: periodStart,
+              period_end: periodEnd,
+              transactions_extracted: allTransactions.length,
+              transactions_created: savedCount,
+            })
+            .select('id')
+            .single();
+          
+          if (docError) {
+            console.error('⚠️ Document record error (non-fatal):', docError);
+          } else if (docRecord?.id) {
+            // עדכון התנועות עם document_id
+            await supabase
+              .from('transactions')
+              .update({ document_id: docRecord.id })
+              .eq('batch_id', pendingBatchId);
+            console.log(`✅ Document saved: ${docRecord.id}`);
+          }
+          
+          // עדכון סטטוס משתמש
+          await supabase
+            .from('users')
+            .update({ onboarding_state: 'classification', current_phase: 'classification' })
+            .eq('id', userData.id);
+          
+          // קריאה לתהליך הסיווג
+          const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+          await onDocumentProcessed(userData.id, phoneNumber);
+          
+          console.log(`✅ Excel processing complete: ${savedCount}/${allTransactions.length} transactions saved`);
           
         } catch (excelError: any) {
           progressUpdater.stop();
