@@ -21,6 +21,7 @@ import type { CategoryData } from '@/lib/ai/chart-prompts';
 // ============================================================================
 
 type UserState = 
+  | 'start'                   // Initial state after reset
   | 'waiting_for_name'
   | 'waiting_for_document'
   | 'classification'          // Generic classification (auto-detect income/expense)
@@ -108,6 +109,41 @@ export async function routeMessage(
   const ctx: RouterContext = { userId, phone, state, userName };
   
   console.log(`[φ Router] state=${state}, userName=${userName}`);
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: start (initial state after reset)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'start') {
+    // כל לחיצה/הודעה ב-state "start" מעבירה למצב המתנה למסמך
+    console.log(`[φ Router] State is 'start' - transitioning to waiting_for_document`);
+    
+    // עדכון ל-waiting_for_document
+    await supabase
+      .from('users')
+      .update({ onboarding_state: 'waiting_for_document' })
+      .eq('id', userId);
+    
+    // אם יש כבר תנועות ממתינות - עבור לסיווג
+    const { data: pendingTx } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .limit(1);
+    
+    if (pendingTx && pendingTx.length > 0) {
+      return await startClassification({ ...ctx, state: 'waiting_for_document' });
+    }
+    
+    // אחרת - בקש מסמך
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `היי ${userName || 'שם'}! 👋\n\n` +
+        `📄 שלח לי דוח בנק או אשראי (PDF/Excel) ואני אנתח את התנועות שלך.`,
+    });
+    
+    return { success: true, newState: 'waiting_for_document' };
+  }
   
   // ──────────────────────────────────────────────────────────────────────────
   // STATE: waiting_for_name
