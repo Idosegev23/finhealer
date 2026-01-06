@@ -168,29 +168,35 @@ export class GreenAPIClient {
 
   /**
    * שליחת כפתורים אינטראקטיביים (API חדש - Beta)
-   * משתמש ב-SendInteractiveButtons עם type: 'reply'
-   * @see https://greenapi.com/en/docs/api/sending/SendInteractiveButtons/
+   * משתמש ב-sendInteractiveButtonsReply
+   * @see https://green-api.com/en/docs/api/sending/SendInteractiveButtonsReply/
+   * 
+   * מגבלות:
+   * - עד 3 כפתורים
+   * - טקסט כפתור עד 25 תווים
+   * - לא עובד ב-Windows Desktop
    */
   async sendInteractiveButtons({ phoneNumber, message, header, footer, buttons }: SendInteractiveButtonsParams) {
-    const url = `${this.baseUrl}/SendInteractiveButtons/${this.token}`;
+    const url = `${this.baseUrl}/sendInteractiveButtonsReply/${this.token}`;
     const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
 
-    // Build buttons with type: 'reply' for clickable response buttons
+    // Validate and format buttons (max 3, max 25 chars each)
     const formattedButtons = buttons.slice(0, 3).map((btn, index) => ({
-      type: 'reply',
       buttonId: btn.buttonId || `btn_${index}`,
-      buttonText: btn.buttonText.substring(0, 25), // Max 25 chars per WhatsApp docs
+      buttonText: btn.buttonText.substring(0, 25), // Max 25 chars
     }));
 
-    const payload = {
+    const payload: Record<string, any> = {
       chatId: `${normalizedPhone}@c.us`,
-      header: header || '',
       body: message,
-      footer: footer || 'Phi φ',
       buttons: formattedButtons,
     };
+    
+    // Add optional fields only if provided
+    if (header) payload.header = header;
+    if (footer) payload.footer = footer;
 
-    console.log('📱 Sending interactive buttons:', JSON.stringify(payload, null, 2));
+    console.log('📱 Sending interactive buttons reply:', JSON.stringify(payload, null, 2));
 
     try {
       const response = await fetch(url, {
@@ -205,20 +211,26 @@ export class GreenAPIClient {
       
       // Check for errors in response body
       if (data.error) {
-        console.error('❌ SendInteractiveButtons error:', data.error);
-        throw new Error(data.error);
+        console.error('❌ sendInteractiveButtonsReply error:', data.error);
+        // Fallback to regular message if buttons fail
+        console.log('📝 Falling back to regular message...');
+        return this.sendMessage({ phoneNumber, message });
       }
 
       if (!response.ok) {
-        console.error('❌ SendInteractiveButtons HTTP error:', response.status, data);
-        throw new Error(`GreenAPI error: ${response.status} - ${JSON.stringify(data)}`);
+        console.error('❌ sendInteractiveButtonsReply HTTP error:', response.status, data);
+        // Fallback to regular message if buttons fail
+        console.log('📝 Falling back to regular message...');
+        return this.sendMessage({ phoneNumber, message });
       }
 
       console.log(`✅ Interactive buttons sent to ${normalizedPhone}@c.us:`, data.idMessage);
       return data;
     } catch (error: any) {
-      console.error('❌ SendInteractiveButtons error:', error?.message || error);
-      throw error;
+      console.error('❌ sendInteractiveButtonsReply error:', error?.message || error);
+      // Fallback to regular message
+      console.log('📝 Falling back to regular message...');
+      return this.sendMessage({ phoneNumber, message });
     }
   }
 

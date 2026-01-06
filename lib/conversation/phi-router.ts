@@ -112,8 +112,8 @@ export async function routeMessage(
   // STATE: waiting_for_document
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'waiting_for_document') {
-    // אם המשתמש רוצה להתחיל לסווג
-    if (isCommand(msg, ['נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג'])) {
+    // אם המשתמש רוצה להתחיל לסווג (כולל טקסט כפתור)
+    if (isCommand(msg, ['נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג', '▶️ נתחיל לסווג', 'נתחיל לסווג ▶️', '▶️ נמשיך לסווג', 'נמשיך לסווג ▶️'])) {
       return await startClassification(ctx);
     }
     
@@ -130,13 +130,13 @@ export async function routeMessage(
   // STATE: classification (generic - auto-detect income/expense)
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'classification') {
-    // אם המשתמש רוצה להתחיל לסווג
-    if (isCommand(msg, ['נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג', 'start_classify'])) {
+    // אם המשתמש רוצה להתחיל לסווג (כולל טקסט כפתור)
+    if (isCommand(msg, ['נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג', 'start_classify', '▶️ נתחיל לסווג', 'נתחיל לסווג ▶️', '▶️ נמשיך לסווג', 'נמשיך לסווג ▶️'])) {
       return await startClassification(ctx);
     }
     
-    // אם המשתמש רוצה להוסיף עוד מסמך
-    if (isCommand(msg, ['עוד דוח', 'דוח נוסף', 'add_bank', 'add_credit'])) {
+    // אם המשתמש רוצה להוסיף עוד מסמך (כולל טקסט כפתור)
+    if (isCommand(msg, ['עוד דוח', 'דוח נוסף', 'add_bank', 'add_credit', '📄 עוד דוח בנק', 'עוד דוח בנק 📄', '💳 דוח אשראי', 'דוח אשראי 💳', '📄 שלח עוד מסמך', 'שלח עוד מסמך 📄'])) {
       await greenAPI.sendMessage({
         phoneNumber: phone,
         message: `📄 מעולה! שלח לי את המסמך.`,
@@ -144,13 +144,25 @@ export async function routeMessage(
       return { success: true };
     }
     
-    // ברירת מחדל - הצג הודעת עזרה
+    // ברירת מחדל - הצג הודעת עזרה עם כפתורים
+    try {
+      await greenAPI.sendInteractiveButtons({
+        phoneNumber: phone,
+        message: `יש לי תנועות שמחכות לסיווג.\nמה תרצה לעשות?`,
+        header: 'מה עכשיו?',
+        buttons: [
+          { buttonId: 'start_classify', buttonText: '▶️ נמשיך לסווג' },
+          { buttonId: 'add_doc', buttonText: '📄 שלח עוד מסמך' },
+        ],
+      });
+    } catch {
     await greenAPI.sendMessage({
       phoneNumber: phone,
       message: `*מה עכשיו?*\n\n` +
         `• כתוב *"נמשיך"* להתחיל לסווג תנועות\n` +
         `• או שלח עוד מסמך PDF`,
     });
+    }
     return { success: true };
   }
   
@@ -310,8 +322,8 @@ async function handleClassificationResponse(
     return await moveToNextPhase(ctx, type);
   }
   
-  // פקודת דילוג
-  if (isCommand(msg, ['דלג', 'תדלג', 'הבא', 'skip'])) {
+  // פקודת דילוג (כולל טקסט כפתור)
+  if (isCommand(msg, ['דלג', 'תדלג', 'הבא', 'skip', '⏭️ דלג', 'דלג ⏭️'])) {
     // בדוק אם זה אשראי
     const isCredit = /visa|mastercard|ויזה|מסטרקארד|אשראי|\d{4}$/i.test(currentTx.vendor);
     
@@ -334,8 +346,8 @@ async function handleClassificationResponse(
     return await showNextTransaction(ctx, type);
   }
   
-  // אישור הצעה (כן / 1)
-  if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes'])) {
+  // אישור הצעה (כן / 1) - כולל טקסט כפתור
+  if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes', '✅ כן', 'כן ✅'])) {
     const suggestions = await getSuggestionsFromCache(ctx.userId);
     if (suggestions && suggestions[0]) {
       // If it's expense grouping, classify all in group
@@ -365,8 +377,8 @@ async function handleClassificationResponse(
     }
   }
   
-  // הצגת רשימת קטגוריות זמינות
-  if (isCommand(msg, ['רשימה', 'קטגוריות', 'איזה קטגוריות', 'אפשרויות', 'list', 'categories'])) {
+  // הצגת רשימת קטגוריות זמינות (כולל טקסט כפתור)
+  if (isCommand(msg, ['רשימה', 'קטגוריות', 'איזה קטגוריות', 'אפשרויות', 'list', 'categories', '📋 רשימה', 'רשימה 📋'])) {
     const categories = type === 'income' ? INCOME_CATEGORIES : CATEGORIES;
     const groups = type === 'income' 
       ? Array.from(new Set(INCOME_CATEGORIES.map(c => c.group)))
@@ -601,17 +613,41 @@ async function showNextTransaction(
   }
   
   message += `\n\n(נשארו ${remaining})`;
-  message += `\n\n💡 *"רשימה"* לראות קטגוריות הכנסה`;
   
   // שמור הצעה לאישור מהיר
   if (suggestion) {
     await saveSuggestionsToCache(ctx.userId, [suggestion]);
   }
   
-  await greenAPI.sendMessage({
+  // 🆕 שימוש בכפתורים לסיווג הכנסות
+  if (suggestion) {
+    try {
+      await greenAPI.sendInteractiveButtons({
     phoneNumber: ctx.phone,
     message,
-  });
+        buttons: [
+          { buttonId: 'confirm', buttonText: '✅ כן' },
+          { buttonId: 'skip', buttonText: '⏭️ דלג' },
+          { buttonId: 'list', buttonText: '📋 רשימה' },
+        ],
+      });
+    } catch {
+      await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: message + `\n\n💡 *"רשימה"* לראות קטגוריות` });
+    }
+  } else {
+    try {
+      await greenAPI.sendInteractiveButtons({
+        phoneNumber: ctx.phone,
+        message,
+        buttons: [
+          { buttonId: 'skip', buttonText: '⏭️ דלג' },
+          { buttonId: 'list', buttonText: '📋 רשימה' },
+        ],
+      });
+    } catch {
+      await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: message + `\n\n💡 *"רשימה"* לראות קטגוריות` });
+    }
+  }
   
   return { success: true };
 }
@@ -741,10 +777,36 @@ async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
     await saveSuggestionsToCache(ctx.userId, [suggestion]);
   }
   
-  await greenAPI.sendMessage({
+  // 🆕 שימוש בכפתורים לסיווג
+  if (suggestion) {
+    try {
+      await greenAPI.sendInteractiveButtons({
     phoneNumber: ctx.phone,
     message,
-  });
+        buttons: [
+          { buttonId: 'confirm', buttonText: '✅ כן' },
+          { buttonId: 'skip', buttonText: '⏭️ דלג' },
+          { buttonId: 'list', buttonText: '📋 רשימה' },
+        ],
+      });
+    } catch {
+      await greenAPI.sendMessage({ phoneNumber: ctx.phone, message });
+    }
+  } else {
+    // אין הצעה - שלח רק עם כפתור רשימה
+    try {
+      await greenAPI.sendInteractiveButtons({
+        phoneNumber: ctx.phone,
+        message,
+        buttons: [
+          { buttonId: 'skip', buttonText: '⏭️ דלג' },
+          { buttonId: 'list', buttonText: '📋 רשימה' },
+        ],
+      });
+    } catch {
+      await greenAPI.sendMessage({ phoneNumber: ctx.phone, message });
+    }
+  }
   
   return { success: true };
 }
@@ -851,14 +913,25 @@ async function showFinalSummary(ctx: RouterContext): Promise<RouterResult> {
     message += `⏳ ${pendingCredit} חיובי אשראי ממתינים לדוח פירוט\n\n`;
   }
   
-  message += `*מה עכשיו?*\n`;
-  message += `• כתוב *"ניתוח"* לזיהוי דפוסי הוצאה\n`;
-  message += `• או שלח עוד מסמכים לניתוח מדויק יותר`;
-  
-  await greenAPI.sendMessage({
-    phoneNumber: ctx.phone,
-    message,
-  });
+  // 🆕 שימוש בכפתורים
+  try {
+    await greenAPI.sendInteractiveButtons({
+      phoneNumber: ctx.phone,
+      message,
+      header: 'מה עכשיו?',
+      buttons: [
+        { buttonId: 'analyze', buttonText: '🔍 ניתוח התנהגות' },
+        { buttonId: 'add_more', buttonText: '📄 עוד מסמכים' },
+      ],
+    });
+  } catch {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: message + `\n\n*מה עכשיו?*\n` +
+        `• כתוב *"ניתוח"* לזיהוי דפוסי הוצאה\n` +
+        `• או שלח עוד מסמכים לניתוח מדויק יותר`,
+    });
+  }
   
   return { success: true, newState: 'behavior' };
 }
@@ -1295,8 +1368,8 @@ async function handleBehaviorPhase(ctx: RouterContext, msg: string): Promise<Rou
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  // פקודת ניתוח
-  if (isCommand(msg, ['נתח', 'ניתוח', 'analyze', 'התחל', 'start'])) {
+  // פקודת ניתוח (כולל טקסט כפתור)
+  if (isCommand(msg, ['נתח', 'ניתוח', 'analyze', 'התחל', 'start', '🔍 ניתוח התנהגות', 'ניתוח התנהגות 🔍'])) {
     return await startBehaviorAnalysis(ctx);
   }
   
@@ -1305,8 +1378,8 @@ async function handleBehaviorPhase(ctx: RouterContext, msg: string): Promise<Rou
     return await showBehaviorSummary(ctx);
   }
   
-  // מעבר לשלב הבא (goals)
-  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'יעדים', 'goals'])) {
+  // מעבר לשלב הבא (goals) - כולל טקסט כפתור
+  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'יעדים', 'goals', '▶️ המשך ליעדים', 'המשך ליעדים ▶️'])) {
     return await transitionToGoals(ctx);
   }
   
@@ -1469,14 +1542,26 @@ async function sendBehaviorSummary(
     });
   }
   
-  // הודעת סיום
-  await greenAPI.sendMessage({
-    phoneNumber: ctx.phone,
-    message: `*מה עכשיו?*\n\n` +
-      `• כתוב *"המשך"* לעבור לשלב היעדים\n` +
-      `• או שלח עוד דוחות לניתוח מדויק יותר\n\n` +
-      `φ *Phi - היחס הזהב של הכסף שלך*`,
-  });
+  // 🆕 הודעת סיום עם כפתורים
+  try {
+    await greenAPI.sendInteractiveButtons({
+      phoneNumber: ctx.phone,
+      message: `מוכן לשלב הבא?\n\nφ *Phi - היחס הזהב של הכסף שלך*`,
+      header: 'מה עכשיו?',
+      buttons: [
+        { buttonId: 'to_goals', buttonText: '▶️ המשך ליעדים' },
+        { buttonId: 'add_docs', buttonText: '📄 עוד דוחות' },
+      ],
+    });
+  } catch {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `*מה עכשיו?*\n\n` +
+        `• כתוב *"המשך"* לעבור לשלב היעדים\n` +
+        `• או שלח עוד דוחות לניתוח מדויק יותר\n\n` +
+        `φ *Phi - היחס הזהב של הכסף שלך*`,
+    });
+  }
   
   return { success: true };
 }
@@ -1624,15 +1709,29 @@ export async function onDocumentProcessed(userId: string, phone: string): Promis
     `📝 ${incomeCount + expenseCount} תנועות\n` +
     `💚 ${incomeCount} הכנסות (${totalIncome.toLocaleString('he-IL')} ₪)\n` +
     `💸 ${expenseCount} הוצאות (${totalExpenses.toLocaleString('he-IL')} ₪)\n\n` +
-    `${progressText}\n\n` +
-    `*מה עכשיו?*\n` +
-    `• יש לי עוד דוח בנק\n` +
-    `• יש לי דוח אשראי\n` +
-    `• נתחיל לסווג`;
+    `${progressText}`;
   
-  await greenAPI.sendMessage({
+  // 🆕 שימוש בכפתורים במקום טקסט
+  try {
+    await greenAPI.sendInteractiveButtons({
     phoneNumber: phone,
     message,
-  });
+      header: 'מה עכשיו?',
+      buttons: [
+        { buttonId: 'add_bank', buttonText: '📄 עוד דוח בנק' },
+        { buttonId: 'add_credit', buttonText: '💳 דוח אשראי' },
+        { buttonId: 'start_classify', buttonText: '▶️ נתחיל לסווג' },
+      ],
+    });
+  } catch {
+    // Fallback אם הכפתורים לא עובדים
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: message + `\n\n*מה עכשיו?*\n` +
+        `• כתוב *"עוד בנק"* - להוסיף דוח בנק\n` +
+        `• כתוב *"אשראי"* - להוסיף דוח אשראי\n` +
+        `• כתוב *"נמשיך"* - להתחיל לסווג`,
+    });
+  }
 }
 
