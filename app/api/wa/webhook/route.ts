@@ -1272,28 +1272,48 @@ export async function POST(request: NextRequest) {
           // קריאת ה-Excel
           const workbook = XLSX.read(buffer, { type: 'buffer' });
           
-          // המרה לטקסט
+          // המרה לטקסט - עם הגבלת שורות!
           let excelText = '';
           let totalRows = 0;
+          const MAX_ROWS_PER_SHEET = 100; // 🚀 הגבלה למניעת timeout
+          let wasLimited = false;
           
           for (const sheetName of workbook.SheetNames) {
             const sheet = workbook.Sheets[sheetName];
-            const csvData = XLSX.utils.sheet_to_csv(sheet);
-            const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[];
+            totalRows += jsonData.length;
+            
+            // 🚀 אם יש יותר מ-100 שורות, נגביל
+            const rowsToProcess = jsonData.slice(0, MAX_ROWS_PER_SHEET);
+            if (jsonData.length > MAX_ROWS_PER_SHEET) {
+              wasLimited = true;
+              console.log(`⚠️ Sheet "${sheetName}": limiting ${jsonData.length} rows → ${MAX_ROWS_PER_SHEET}`);
+            }
+            
+            // המר את השורות המוגבלות ל-CSV
+            const limitedSheet = XLSX.utils.aoa_to_sheet(rowsToProcess);
+            const csvData = XLSX.utils.sheet_to_csv(limitedSheet);
             
             excelText += `Sheet: ${sheetName}\n`;
             excelText += csvData + '\n\n';
-            totalRows += jsonData.length;
             
-            console.log(`📄 Sheet "${sheetName}": ${jsonData.length} rows`);
+            console.log(`📄 Sheet "${sheetName}": ${jsonData.length} rows (processed: ${rowsToProcess.length})`);
           }
           
-          console.log(`✅ Excel parsed: ${workbook.SheetNames.length} sheets, ${totalRows} rows, ${excelText.length} chars`);
+          console.log(`✅ Excel parsed: ${workbook.SheetNames.length} sheets, ${totalRows} total rows, ${excelText.length} chars`);
           
-          // הגבלת אורך לטוקנים
-          if (excelText.length > 50000) {
-            excelText = excelText.substring(0, 50000) + '\n...(truncated)';
-            console.log('⚠️ Excel text truncated to 50000 chars');
+          // 🆕 הודעה למשתמש אם הקובץ גדול מדי
+          if (wasLimited) {
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: `⚠️ הקובץ גדול (${totalRows} שורות).\nמעבד את 100 השורות הראשונות של כל גיליון.\n\n💡 לניתוח מלא, שלח מסמכים לפי חודש.`,
+            });
+          }
+          
+          // הגבלת אורך לטוקנים (גיבוי נוסף)
+          if (excelText.length > 30000) {
+            excelText = excelText.substring(0, 30000) + '\n...(truncated)';
+            console.log('⚠️ Excel text truncated to 30000 chars');
           }
           
           // שליחה ל-AI לניתוח
@@ -1317,12 +1337,36 @@ export async function POST(request: NextRequest) {
           console.log(`🤖 Sending Excel data to GPT-5.2 (${excelText.length} chars)...`);
           
           // 🆕 GPT-5.2 with Responses API - effort: 'none' for fast response!
-          const aiResponse = await openai.responses.create({
+          // ⏱️ With timeout to prevent Vercel 300s limit
+          const aiPromise = openai.responses.create({
             model: 'gpt-5.2-2025-12-11',
             input: prompt,
             reasoning: { effort: 'none' }, // ⚡ Fast mode - no deep thinking
             text: { verbosity: 'low' }, // ⚡ Concise output
           });
+          
+          // ⏱️ Timeout of 120 seconds for AI (leaves room for DB operations)
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('AI_TIMEOUT')), 120000)
+          );
+          
+          let aiResponse: any;
+          try {
+            aiResponse = await Promise.race([aiPromise, timeoutPromise]);
+          } catch (timeoutError: any) {
+            if (timeoutError.message === 'AI_TIMEOUT') {
+              console.error('⏱️ AI call timed out after 120 seconds');
+              progressUpdater.stop();
+              await greenAPI.sendMessage({
+                phoneNumber,
+                message: `⏱️ הקובץ גדול מדי ולוקח יותר מדי זמן לעבד.\n\n` +
+                  `💡 נסה לשלוח קבצים קטנים יותר (עד 100 שורות).\n` +
+                  `📅 עדיף: מסמך אחד לכל חודש.`,
+              });
+              return NextResponse.json({ status: 'success', message: 'timeout handled' });
+            }
+            throw timeoutError;
+          }
           
           const content = aiResponse.output_text || '{}';
           console.log('🎯 Excel OCR Result:', content.substring(0, 500));
