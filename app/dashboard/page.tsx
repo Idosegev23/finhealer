@@ -53,25 +53,42 @@ export default async function DashboardPage() {
     .eq('status', 'active')
     .order('priority', { ascending: true })
 
-  // 🆕 Get monthly transactions summary
-  const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
-  const { data: monthlyTransactions } = await supabase
+  // 🆕 Get ALL confirmed transactions for totals
+  const { data: allTransactions } = await supabase
     .from('transactions')
-    .select('type, amount, status')
+    .select('type, amount, status, tx_date')
     .eq('user_id', user.id)
-    .gte('date', `${currentMonth}-01`)
-    .lte('date', `${currentMonth}-31`)
 
-  const monthlyIncome = (monthlyTransactions || [])
-    .filter((t: any) => t.type === 'income')
+  // Calculate totals from ALL confirmed transactions
+  const totalIncome = (allTransactions || [])
+    .filter((t: any) => t.type === 'income' && t.status === 'confirmed')
     .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
   
-  const monthlyExpenses = (monthlyTransactions || [])
-    .filter((t: any) => t.type === 'expense')
+  const totalExpenses = (allTransactions || [])
+    .filter((t: any) => t.type === 'expense' && t.status === 'confirmed')
     .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
 
-  const pendingCount = (monthlyTransactions || [])
+  const pendingCount = (allTransactions || [])
     .filter((t: any) => t.status === 'pending' || t.status === 'proposed').length
+
+  // Find date range of transactions
+  const transactionDates = (allTransactions || [])
+    .filter((t: any) => t.tx_date)
+    .map((t: any) => new Date(t.tx_date))
+  const oldestDate = transactionDates.length > 0 
+    ? new Date(Math.min(...transactionDates.map(d => d.getTime())))
+    : null
+  const newestDate = transactionDates.length > 0
+    ? new Date(Math.max(...transactionDates.map(d => d.getTime())))
+    : null
+  
+  // Calculate number of months for averages
+  const monthsCount = oldestDate && newestDate
+    ? Math.max(1, Math.round((newestDate.getTime() - oldestDate.getTime()) / (30 * 24 * 60 * 60 * 1000)))
+    : 1
+  
+  const monthlyAvgIncome = Math.round(totalIncome / monthsCount)
+  const monthlyAvgExpenses = Math.round(totalExpenses / monthsCount)
 
   // 🆕 Get recent transactions
   const { data: recentTransactions } = await supabase
@@ -118,16 +135,19 @@ export default async function DashboardPage() {
           <PhaseJourney currentPhase={currentPhase} />
         </div>
 
-        {/* 🆕 Monthly Summary Cards */}
+        {/* 🆕 Financial Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-xl p-4 shadow-sm border border-phi-frost">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-green-600" />
               </div>
-              <span className="text-sm text-phi-slate">הכנסות החודש</span>
+              <div>
+                <span className="text-sm text-phi-slate">סה"כ הכנסות</span>
+                <p className="text-xs text-phi-slate/60">ממוצע: ₪{monthlyAvgIncome.toLocaleString('he-IL')}/חודש</p>
+              </div>
             </div>
-            <p className="text-2xl font-bold text-green-600">₪{monthlyIncome.toLocaleString('he-IL')}</p>
+            <p className="text-2xl font-bold text-green-600">₪{totalIncome.toLocaleString('he-IL')}</p>
           </div>
           
           <div className="bg-white rounded-xl p-4 shadow-sm border border-phi-frost">
@@ -135,9 +155,12 @@ export default async function DashboardPage() {
               <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
                 <TrendingDown className="w-5 h-5 text-red-600" />
               </div>
-              <span className="text-sm text-phi-slate">הוצאות החודש</span>
+              <div>
+                <span className="text-sm text-phi-slate">סה"כ הוצאות</span>
+                <p className="text-xs text-phi-slate/60">ממוצע: ₪{monthlyAvgExpenses.toLocaleString('he-IL')}/חודש</p>
+              </div>
             </div>
-            <p className="text-2xl font-bold text-red-600">₪{monthlyExpenses.toLocaleString('he-IL')}</p>
+            <p className="text-2xl font-bold text-red-600">₪{totalExpenses.toLocaleString('he-IL')}</p>
           </div>
           
           <div className="bg-white rounded-xl p-4 shadow-sm border border-phi-frost">
@@ -152,14 +175,23 @@ export default async function DashboardPage() {
           
           <div className="bg-white rounded-xl p-4 shadow-sm border border-phi-frost">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                <FileText className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 rounded-lg bg-phi-gold/20 flex items-center justify-center">
+                <span className="text-phi-gold font-serif font-bold">φ</span>
               </div>
-              <span className="text-sm text-phi-slate">מסמכים שהועלו</span>
+              <span className="text-sm text-phi-slate">יתרה</span>
             </div>
-            <p className="text-2xl font-bold text-purple-600">{documentsCount || 0}</p>
+            <p className={`text-2xl font-bold ${totalIncome - totalExpenses >= 0 ? 'text-phi-mint' : 'text-red-600'}`}>
+              {totalIncome - totalExpenses >= 0 ? '+' : ''}₪{(totalIncome - totalExpenses).toLocaleString('he-IL')}
+            </p>
           </div>
         </div>
+
+        {/* Date Range Info */}
+        {oldestDate && newestDate && (
+          <div className="text-center text-sm text-phi-slate mb-4">
+            📊 נתונים מ-{oldestDate.toLocaleDateString('he-IL')} עד {newestDate.toLocaleDateString('he-IL')} ({monthsCount} חודשים)
+          </div>
+        )}
 
         {/* 🆕 Current Status Banner */}
         <div className="bg-gradient-to-l from-phi-gold/20 to-phi-gold/5 rounded-xl p-4 mb-8 border border-phi-gold/30">
@@ -279,15 +311,15 @@ export default async function DashboardPage() {
               <span className="text-sm font-medium text-phi-dark text-center">גרפים</span>
             </Link>
 
-            {/* Transactions */}
+            {/* Budget */}
             <Link
-              href="/transactions"
+              href="/dashboard/budget"
               className="flex flex-col items-center p-4 rounded-xl bg-phi-coral/10 border-2 border-phi-coral/30 hover:border-phi-coral transition-all group"
             >
               <div className="w-12 h-12 rounded-xl bg-phi-coral flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <ArrowLeft className="w-6 h-6 text-white" />
+                <Target className="w-6 h-6 text-white" />
               </div>
-              <span className="text-sm font-medium text-phi-dark text-center">תנועות</span>
+              <span className="text-sm font-medium text-phi-dark text-center">תקציב</span>
             </Link>
           </div>
         </div>
@@ -312,3 +344,4 @@ export default async function DashboardPage() {
     </div>
   )
 }
+
