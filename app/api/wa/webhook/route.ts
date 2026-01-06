@@ -1381,18 +1381,38 @@ export async function POST(request: NextRequest) {
           // יצירת batch ID ייחודי
           const pendingBatchId = `excel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           
-          // Helper to convert DD/MM/YYYY to YYYY-MM-DD
+          // Helper to convert DD/MM/YYYY to YYYY-MM-DD with validation
           const parseDate = (dateStr: string | undefined): string => {
             if (!dateStr) return new Date().toISOString().split('T')[0];
+            
+            let year: number, month: number, day: number;
+            
+            // Try DD/MM/YYYY format
             const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
             if (ddmmyyyy) {
-              const [, day, month, year] = ddmmyyyy;
-              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              day = parseInt(ddmmyyyy[1], 10);
+              month = parseInt(ddmmyyyy[2], 10);
+              year = parseInt(ddmmyyyy[3], 10);
+            } 
+            // Try YYYY-MM-DD format
+            else if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+              const parts = dateStr.split('-');
+              year = parseInt(parts[0], 10);
+              month = parseInt(parts[1], 10);
+              day = parseInt(parts[2], 10);
             }
-            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-            const parsed = new Date(dateStr);
-            if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
-            return new Date().toISOString().split('T')[0];
+            // Try to parse with Date
+            else {
+              const parsed = new Date(dateStr);
+              if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+              return new Date().toISOString().split('T')[0];
+            }
+            
+            // Validate and fix invalid dates (like Feb 29 in non-leap year)
+            const maxDays = new Date(year, month, 0).getDate(); // Get last day of month
+            if (day > maxDays) day = maxDays;
+            
+            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           };
           
           // הכנת התנועות ל-Batch Insert
