@@ -26,6 +26,7 @@ type UserState =
   | 'classification'          // Generic classification (auto-detect income/expense)
   | 'classification_income'
   | 'classification_expense'
+  | 'behavior'                // Phase 2: Behavior analysis
   | 'monitoring';
 
 interface Transaction {
@@ -165,6 +166,13 @@ export async function routeMessage(
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'classification_expense') {
     return await handleClassificationResponse(ctx, msg, 'expense');
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: behavior (Phase 2)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'behavior') {
+    return await handleBehaviorPhase(ctx, msg);
   }
   
   // ──────────────────────────────────────────────────────────────────────────
@@ -780,10 +788,14 @@ async function showFinalSummary(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  // עדכן state
+  // עדכן state - עובר לשלב behavior (Phase 2)
   await supabase
     .from('users')
-    .update({ onboarding_state: 'monitoring' })
+    .update({ 
+      onboarding_state: 'behavior',
+      current_phase: 'behavior',
+      phase_updated_at: new Date().toISOString()
+    })
     .eq('id', ctx.userId);
   
   // חשב סיכומים
@@ -840,16 +852,15 @@ async function showFinalSummary(ctx: RouterContext): Promise<RouterResult> {
   }
   
   message += `*מה עכשיו?*\n`;
-  message += `• שלח עוד מסמך\n`;
-  message += `• שאל "כמה הוצאתי על X?"\n`;
-  message += `• כתוב "גרף" לראות התפלגות`;
+  message += `• כתוב *"ניתוח"* לזיהוי דפוסי הוצאה\n`;
+  message += `• או שלח עוד מסמכים לניתוח מדויק יותר`;
   
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message,
   });
   
-  return { success: true, newState: 'monitoring' };
+  return { success: true, newState: 'behavior' };
 }
 
 /**
@@ -1258,6 +1269,273 @@ function normalizeVendor(vendor: string): string {
     // הסר רווחים כפולים
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// ============================================================================
+// Document Processing Hook
+// ============================================================================
+
+// ============================================================================
+// Phase 2: Behavior Analysis
+// ============================================================================
+
+import { 
+  runFullAnalysis, 
+  type BehaviorAnalysisResult,
+  type RecurringPattern,
+  type VendorTrend,
+  type SpikeDetection,
+  type DayPattern
+} from '@/lib/analysis/behavior-engine';
+
+/**
+ * Handle behavior phase interactions
+ */
+async function handleBehaviorPhase(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // פקודת ניתוח
+  if (isCommand(msg, ['נתח', 'ניתוח', 'analyze', 'התחל', 'start'])) {
+    return await startBehaviorAnalysis(ctx);
+  }
+  
+  // הצגת סיכום
+  if (isCommand(msg, ['סיכום', 'תובנות', 'insights', 'summary'])) {
+    return await showBehaviorSummary(ctx);
+  }
+  
+  // מעבר לשלב הבא (goals)
+  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'יעדים', 'goals'])) {
+    return await transitionToGoals(ctx);
+  }
+  
+  // עזרה
+  if (isCommand(msg, ['עזרה', 'help', '?'])) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📊 *שלב 2: ניתוח התנהגות*\n\n` +
+        `*פקודות:*\n` +
+        `• *"ניתוח"* - הרץ ניתוח מלא\n` +
+        `• *"סיכום"* - הצג תובנות\n` +
+        `• *"המשך"* - עבור לשלב היעדים\n\n` +
+        `φ מזהה דפוסים בהוצאות שלך`,
+    });
+    return { success: true };
+  }
+  
+  // ברירת מחדל - הפעל ניתוח
+  return await startBehaviorAnalysis(ctx);
+}
+
+/**
+ * Start behavior analysis
+ */
+async function startBehaviorAnalysis(ctx: RouterContext): Promise<RouterResult> {
+  const greenAPI = getGreenAPIClient();
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `🔍 מנתח את ההתנהגות הפיננסית שלך...\n\n` +
+      `זה יכול לקחת כמה שניות.`,
+  });
+  
+  try {
+    const analysis = await runFullAnalysis(ctx.userId, 3);
+    return await sendBehaviorSummary(ctx, analysis);
+  } catch (error) {
+    console.error('[φ Router] Behavior analysis failed:', error);
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ משהו השתבש בניתוח.\n\nנסה שוב או כתוב "עזרה".`,
+    });
+    return { success: false };
+  }
+}
+
+/**
+ * Show behavior summary from existing analysis
+ */
+async function showBehaviorSummary(ctx: RouterContext): Promise<RouterResult> {
+  try {
+    const analysis = await runFullAnalysis(ctx.userId, 3);
+    return await sendBehaviorSummary(ctx, analysis);
+  } catch (error) {
+    const greenAPI = getGreenAPIClient();
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ לא הצלחתי לטעון את הניתוח.\n\nכתוב "ניתוח" להפעיל מחדש.`,
+    });
+    return { success: false };
+  }
+}
+
+/**
+ * Send behavior summary via WhatsApp
+ */
+async function sendBehaviorSummary(
+  ctx: RouterContext, 
+  analysis: BehaviorAnalysisResult
+): Promise<RouterResult> {
+  const greenAPI = getGreenAPIClient();
+  
+  if (analysis.transactionCount === 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📊 אין מספיק נתונים לניתוח.\n\n` +
+        `שלח דוחות בנק וסווג את התנועות קודם.`,
+    });
+    return { success: true };
+  }
+  
+  // הודעה ראשית
+  let message = `📊 *ניתוח התנהגות - ${analysis.periodMonths} חודשים*\n\n`;
+  
+  // סיכום כללי
+  message += `📈 *סיכום:*\n`;
+  message += `• סה"כ הוצאות: ${analysis.summary.totalSpent.toLocaleString('he-IL')} ₪\n`;
+  message += `• ממוצע חודשי: ${analysis.summary.monthlyAverage.toLocaleString('he-IL')} ₪\n`;
+  message += `• קבועות: ${analysis.summary.fixedExpenses.toLocaleString('he-IL')} ₪\n`;
+  message += `• משתנות: ${analysis.summary.variableExpenses.toLocaleString('he-IL')} ₪\n\n`;
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message,
+  });
+  
+  // מנויים
+  if (analysis.recurring.length > 0) {
+    let recurringMsg = `🔄 *מנויים וחיובים קבועים:*\n\n`;
+    
+    for (const rec of analysis.recurring.slice(0, 5)) {
+      const freq = rec.frequency === 'monthly' ? 'חודשי' : rec.frequency === 'weekly' ? 'שבועי' : 'רבעוני';
+      recurringMsg += `• ${rec.vendor}\n`;
+      recurringMsg += `   ${rec.avgAmount.toLocaleString('he-IL')} ₪/${freq}\n`;
+    }
+    
+    recurringMsg += `\nסה"כ מנויים: ${analysis.summary.subscriptionTotal.toLocaleString('he-IL')} ₪/חודש`;
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: recurringMsg,
+    });
+  }
+  
+  // מגמות
+  if (analysis.trends.length > 0) {
+    let trendMsg = `📈 *מגמות:*\n\n`;
+    
+    for (const trend of analysis.trends.slice(0, 3)) {
+      const arrow = trend.trend === 'increasing' ? '↑' : '↓';
+      const emoji = trend.trend === 'increasing' ? '🔴' : '🟢';
+      trendMsg += `${emoji} ${trend.vendor}: ${arrow} ${Math.abs(trend.changePercent).toFixed(0)}%\n`;
+    }
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: trendMsg,
+    });
+  }
+  
+  // קפיצות
+  if (analysis.spikes.length > 0) {
+    let spikeMsg = `⚡ *קפיצות בולטות:*\n\n`;
+    
+    for (const spike of analysis.spikes.slice(0, 3)) {
+      const percent = ((spike.spikeRatio - 1) * 100).toFixed(0);
+      spikeMsg += `• ${spike.vendor}\n`;
+      spikeMsg += `   ${spike.amount.toLocaleString('he-IL')} ₪ (${spike.date})\n`;
+      spikeMsg += `   +${percent}% מהממוצע\n\n`;
+    }
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: spikeMsg,
+    });
+  }
+  
+  // דפוסי יום
+  const topDay = analysis.dayPatterns.find(d => d.transactionCount > 0);
+  const bottomDay = [...analysis.dayPatterns].reverse().find(d => d.transactionCount > 0);
+  
+  if (topDay && bottomDay) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📅 *דפוסי יום:*\n\n` +
+        `💸 יום ${topDay.dayName} - הכי יקר\n` +
+        `   ${topDay.totalSpend.toLocaleString('he-IL')} ₪ (${topDay.topCategory || 'כללי'})\n\n` +
+        `✨ יום ${bottomDay.dayName} - הכי שקט\n` +
+        `   ${bottomDay.totalSpend.toLocaleString('he-IL')} ₪`,
+    });
+  }
+  
+  // הודעת סיום
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `*מה עכשיו?*\n\n` +
+      `• כתוב *"המשך"* לעבור לשלב היעדים\n` +
+      `• או שלח עוד דוחות לניתוח מדויק יותר\n\n` +
+      `φ *Phi - היחס הזהב של הכסף שלך*`,
+  });
+  
+  return { success: true };
+}
+
+/**
+ * Transition from behavior phase to goals phase
+ */
+async function transitionToGoals(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // עדכן phase
+  await supabase
+    .from('users')
+    .update({ 
+      onboarding_state: 'goals',
+      current_phase: 'goals',
+      phase_updated_at: new Date().toISOString()
+    })
+    .eq('id', ctx.userId);
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `🎯 *שלב 3: הגדרת יעדים*\n\n` +
+      `עכשיו נגדיר את היעדים הפיננסיים שלך.\n\n` +
+      `*מה חשוב לך?*\n` +
+      `1. חיסכון לקרן חירום\n` +
+      `2. סגירת חובות\n` +
+      `3. חיסכון למטרה ספציפית\n` +
+      `4. שיפור מצב פיננסי כללי\n\n` +
+      `כתוב מספר או תאר את היעד שלך.`,
+  });
+  
+  return { success: true, newState: 'monitoring' }; // TODO: change to 'goals' when implemented
+}
+
+/**
+ * Called after classification completes - move to behavior phase
+ */
+export async function onClassificationComplete(userId: string, phone: string): Promise<void> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // עדכן לשלב behavior
+  await supabase
+    .from('users')
+    .update({ 
+      onboarding_state: 'behavior',
+      current_phase: 'behavior',
+      phase_updated_at: new Date().toISOString()
+    })
+    .eq('id', userId);
+  
+  await greenAPI.sendMessage({
+    phoneNumber: phone,
+    message: `🎉 *סיימנו לסווג!*\n\n` +
+      `עכשיו φ ינתח את דפוסי ההוצאות שלך.\n\n` +
+      `כתוב *"ניתוח"* להתחיל`,
+  });
 }
 
 // ============================================================================
