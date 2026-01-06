@@ -135,9 +135,18 @@ export async function routeMessage(
   // STATE: waiting_for_document
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'waiting_for_document') {
-    // אם המשתמש רוצה להתחיל לסווג (כולל טקסט כפתור)
-    if (isCommand(msg, ['נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג', '▶️ נתחיל לסווג', 'נתחיל לסווג ▶️', '▶️ נמשיך לסווג', 'נמשיך לסווג ▶️'])) {
+    // אם המשתמש רוצה להתחיל לסווג (כולל טקסט כפתור ו-buttonId)
+    if (isCommand(msg, ['נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג', 'start_classify', '▶️ נתחיל לסווג', 'נתחיל לסווג ▶️', '▶️ נמשיך לסווג', 'נמשיך לסווג ▶️'])) {
       return await startClassification(ctx);
+    }
+    
+    // אם המשתמש רוצה להוסיף עוד מסמך (כולל buttonId)
+    if (isCommand(msg, ['עוד דוח', 'דוח נוסף', 'add_bank', 'add_credit', 'add_doc', '📄 עוד דוח בנק', '💳 דוח אשראי', '📄 שלח עוד מסמך'])) {
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `📄 מעולה! שלח לי את המסמך.`,
+      });
+      return { success: true };
     }
     
     // אחרת - מחכים למסמך
@@ -159,7 +168,7 @@ export async function routeMessage(
     }
     
     // אם המשתמש רוצה להוסיף עוד מסמך (כולל טקסט כפתור)
-    if (isCommand(msg, ['עוד דוח', 'דוח נוסף', 'add_bank', 'add_credit', '📄 עוד דוח בנק', 'עוד דוח בנק 📄', '💳 דוח אשראי', 'דוח אשראי 💳', '📄 שלח עוד מסמך', 'שלח עוד מסמך 📄'])) {
+    if (isCommand(msg, ['עוד דוח', 'דוח נוסף', 'add_bank', 'add_credit', 'add_doc', '📄 עוד דוח בנק', 'עוד דוח בנק 📄', '💳 דוח אשראי', 'דוח אשראי 💳', '📄 שלח עוד מסמך', 'שלח עוד מסמך 📄'])) {
       await greenAPI.sendMessage({
         phoneNumber: phone,
         message: `📄 מעולה! שלח לי את המסמך.`,
@@ -221,6 +230,36 @@ export async function routeMessage(
   // STATE: monitoring
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'monitoring') {
+    // טיפול בכפתורים - מסמכים
+    if (isCommand(msg, ['add_bank', 'add_credit', 'add_doc', 'add_more', 'add_docs', '📄 עוד דוח בנק', '💳 דוח אשראי', '📄 שלח עוד מסמך', '📄 עוד מסמכים', '📄 עוד דוחות'])) {
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `📄 מעולה! שלח לי את המסמך.`,
+      });
+      return { success: true };
+    }
+    
+    // טיפול בכפתורים - סיווג
+    if (isCommand(msg, ['start_classify', 'נתחיל', 'נמשיך', '▶️ נתחיל לסווג', '▶️ נמשיך לסווג'])) {
+      return await startClassification(ctx);
+    }
+    
+    // טיפול בכפתורים - ניתוח
+    if (isCommand(msg, ['analyze', 'ניתוח', '🔍 ניתוח התנהגות'])) {
+      // עבור ל-behavior ותפעיל ניתוח
+      const supabase = createServiceClient();
+      await supabase
+        .from('users')
+        .update({ onboarding_state: 'behavior' })
+        .eq('id', ctx.userId);
+      return await handleBehaviorPhase({ ...ctx, state: 'behavior' }, msg);
+    }
+    
+    // טיפול בכפתורים - יעדים
+    if (isCommand(msg, ['to_goals', 'יעדים', '▶️ המשך ליעדים'])) {
+      return await transitionToGoals(ctx);
+    }
+    
     // עזרה - הצג כל הפקודות
     if (isCommand(msg, ['עזרה', 'פקודות', 'help', 'תפריט', 'מה אפשר', '?'])) {
       await greenAPI.sendMessage({
