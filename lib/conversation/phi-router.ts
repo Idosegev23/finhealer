@@ -238,12 +238,12 @@ async function startClassification(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  // ספור הכנסות והוצאות
+  // ספור הכנסות והוצאות (pending או proposed)
   const { data: transactions } = await supabase
     .from('transactions')
     .select('id, type')
     .eq('user_id', ctx.userId)
-    .eq('status', 'proposed');
+    .in('status', ['pending', 'proposed']);
   
   const incomeCount = transactions?.filter(t => t.type === 'income').length || 0;
   const expenseCount = transactions?.filter(t => t.type === 'expense').length || 0;
@@ -291,7 +291,7 @@ async function handleClassificationResponse(
     .from('transactions')
     .select('id, amount, vendor, tx_date, type, expense_category')
     .eq('user_id', ctx.userId)
-    .eq('status', 'proposed')
+    .in('status', ['pending', 'proposed'])
     .eq('type', type)
     .order('tx_date', { ascending: false })
     .limit(1)
@@ -555,7 +555,7 @@ async function showNextTransaction(
     .from('transactions')
     .select('id, amount, vendor, tx_date, income_category')
     .eq('user_id', ctx.userId)
-    .eq('status', 'proposed')
+    .in('status', ['pending', 'proposed'])
     .eq('type', 'income')
     .order('tx_date', { ascending: false })
     .limit(1)
@@ -570,7 +570,7 @@ async function showNextTransaction(
     .from('transactions')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', ctx.userId)
-    .eq('status', 'proposed')
+    .in('status', ['pending', 'proposed'])
     .eq('type', 'income');
   
   const remaining = count || 0;
@@ -616,7 +616,7 @@ async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
     .from('transactions')
     .select('id, amount, vendor, tx_date, expense_category')
     .eq('user_id', ctx.userId)
-    .eq('status', 'proposed')
+    .in('status', ['pending', 'proposed'])
     .eq('type', 'expense')
     .order('tx_date', { ascending: false });
   
@@ -753,7 +753,7 @@ async function moveToNextPhase(
       .from('transactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', ctx.userId)
-      .eq('status', 'proposed')
+      .in('status', ['pending', 'proposed'])
       .eq('type', 'expense');
     
     if (count && count > 0) {
