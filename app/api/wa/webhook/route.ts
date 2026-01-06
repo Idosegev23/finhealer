@@ -951,9 +951,56 @@ export async function POST(request: NextRequest) {
           // - Bank: transactions = { income: [], expenses: [], loan_payments: [], savings_transfers: [] }
           let allTransactions: any[] = [];
           
+          // 🔧 Helper function to determine transaction type
+          const determineTransactionType = (tx: any): 'income' | 'expense' => {
+            // 1. If type is explicitly set, use it
+            if (tx.type === 'income') return 'income';
+            if (tx.type === 'expense') return 'expense';
+            
+            // 2. If income_category is set, it's income
+            if (tx.income_category) return 'income';
+            
+            // 3. If expense_category is set, it's expense
+            if (tx.expense_category || tx.expense_type) return 'expense';
+            
+            // 4. Check balance_before and balance_after
+            if (tx.balance_before !== undefined && tx.balance_after !== undefined) {
+              const balanceBefore = typeof tx.balance_before === 'string' 
+                ? parseFloat(tx.balance_before.replace(/[^\d.-]/g, '')) 
+                : tx.balance_before;
+              const balanceAfter = typeof tx.balance_after === 'string' 
+                ? parseFloat(tx.balance_after.replace(/[^\d.-]/g, '')) 
+                : tx.balance_after;
+              if (!isNaN(balanceBefore) && !isNaN(balanceAfter)) {
+                return balanceAfter > balanceBefore ? 'income' : 'expense';
+              }
+            }
+            
+            // 5. Check for negative amount indicators
+            const amountStr = String(tx.amount || tx.original_amount || '');
+            if (amountStr.includes('-') || amountStr.endsWith('-')) return 'expense';
+            
+            // 6. Check description for expense keywords
+            const desc = (tx.description || tx.vendor || '').toLowerCase();
+            const expenseKeywords = ['חיוב', 'תשלום', 'ויזה', 'ויזא', 'מסטרקארד', 'משיכה', 'הו"ק', 'ארנונה', 'חשמל', 'מים', 'גז'];
+            if (expenseKeywords.some(kw => desc.includes(kw))) return 'expense';
+            
+            // 7. Check description for income keywords
+            const incomeKeywords = ['משכורת', 'שכר', 'העברה ל', 'זיכוי', 'החזר', 'קצבה', 'גמלה'];
+            if (incomeKeywords.some(kw => desc.includes(kw))) return 'income';
+            
+            // 8. Default to expense (most bank transactions are expenses)
+            console.log(`⚠️ Could not determine type for: "${desc}" (${tx.amount}) - defaulting to expense`);
+            return 'expense';
+          };
+          
           if (Array.isArray(ocrData.transactions)) {
             // Credit statement format - transactions is array
-            allTransactions = ocrData.transactions;
+            // 🔧 FIX: Ensure each transaction has a type
+            allTransactions = ocrData.transactions.map((tx: any) => ({
+              ...tx,
+              type: determineTransactionType(tx)
+            }));
           } else if (ocrData.transactions && typeof ocrData.transactions === 'object') {
             // Bank statement format - transactions is object with categories
             const { income = [], expenses = [], loan_payments = [], savings_transfers = [] } = ocrData.transactions;
@@ -967,7 +1014,10 @@ export async function POST(request: NextRequest) {
             ];
           }
           
-          console.log(`📊 Parsed ${allTransactions.length} transactions (income: ${ocrData.transactions?.income?.length || 0}, expenses: ${ocrData.transactions?.expenses?.length || 0})`);
+          // Count actual types for logging
+          const incomeCountFromData = allTransactions.filter(tx => tx.type === 'income').length;
+          const expenseCountFromData = allTransactions.filter(tx => tx.type === 'expense').length;
+          console.log(`📊 Parsed ${allTransactions.length} transactions (income: ${incomeCountFromData}, expenses: ${expenseCountFromData})`);
           
           if (allTransactions.length === 0) {
             await greenAPI.sendMessage({
@@ -1400,10 +1450,45 @@ export async function POST(request: NextRequest) {
           }
           
           // טיפול בפורמטים שונים (כמו ב-PDF)
+          // 🔧 Helper function to determine transaction type (same as PDF)
+          const determineTransactionTypeExcel = (tx: any): 'income' | 'expense' => {
+            if (tx.type === 'income') return 'income';
+            if (tx.type === 'expense') return 'expense';
+            if (tx.income_category) return 'income';
+            if (tx.expense_category || tx.expense_type) return 'expense';
+            
+            if (tx.balance_before !== undefined && tx.balance_after !== undefined) {
+              const balanceBefore = typeof tx.balance_before === 'string' 
+                ? parseFloat(tx.balance_before.replace(/[^\d.-]/g, '')) 
+                : tx.balance_before;
+              const balanceAfter = typeof tx.balance_after === 'string' 
+                ? parseFloat(tx.balance_after.replace(/[^\d.-]/g, '')) 
+                : tx.balance_after;
+              if (!isNaN(balanceBefore) && !isNaN(balanceAfter)) {
+                return balanceAfter > balanceBefore ? 'income' : 'expense';
+              }
+            }
+            
+            const amountStr = String(tx.amount || tx.original_amount || '');
+            if (amountStr.includes('-') || amountStr.endsWith('-')) return 'expense';
+            
+            const desc = (tx.description || tx.vendor || '').toLowerCase();
+            const expenseKeywords = ['חיוב', 'תשלום', 'ויזה', 'ויזא', 'מסטרקארד', 'משיכה', 'הו"ק', 'ארנונה', 'חשמל', 'מים', 'גז'];
+            if (expenseKeywords.some(kw => desc.includes(kw))) return 'expense';
+            
+            const incomeKeywords = ['משכורת', 'שכר', 'העברה ל', 'זיכוי', 'החזר', 'קצבה', 'גמלה'];
+            if (incomeKeywords.some(kw => desc.includes(kw))) return 'income';
+            
+            return 'expense';
+          };
+          
           let allTransactions: any[] = [];
           
           if (Array.isArray(ocrData.transactions)) {
-            allTransactions = ocrData.transactions;
+            allTransactions = ocrData.transactions.map((tx: any) => ({
+              ...tx,
+              type: determineTransactionTypeExcel(tx)
+            }));
           } else if (ocrData.transactions && typeof ocrData.transactions === 'object') {
             const { income = [], expenses = [], loan_payments = [], savings_transfers = [] } = ocrData.transactions;
             allTransactions = [
@@ -1420,18 +1505,8 @@ export async function POST(request: NextRequest) {
           progressUpdater.stop();
           
           // ספירת הכנסות והוצאות - לוגיקה מתוקנת
-          const incomeCount = allTransactions.filter(tx => {
-            // הכנסה = type הוא income, או סכום חיובי ללא type מפורש
-            if (tx.type === 'income') return true;
-            if (tx.type === 'expense') return false;
-            return tx.amount > 0;
-          }).length;
-          const expenseCount = allTransactions.filter(tx => {
-            // הוצאה = type הוא expense, או סכום שלילי ללא type מפורש
-            if (tx.type === 'expense') return true;
-            if (tx.type === 'income') return false;
-            return tx.amount < 0;
-          }).length;
+          const incomeCount = allTransactions.filter(tx => tx.type === 'income').length;
+          const expenseCount = allTransactions.filter(tx => tx.type === 'expense').length;
           
           // שליחת הודעה למשתמש - הניתוח הסתיים!
           await greenAPI.sendMessage({
