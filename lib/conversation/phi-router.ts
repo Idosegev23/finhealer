@@ -28,6 +28,7 @@ type UserState =
   | 'classification_expense'
   | 'behavior'                // Phase 2: Behavior analysis
   | 'goals'                   // Phase 3: Goal setting
+  | 'budget'                  // Phase 4: Budget creation
   | 'monitoring';
 
 // Goal types for Phase 3
@@ -224,6 +225,13 @@ export async function routeMessage(
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'goals') {
     return await handleGoalsPhase(ctx, msg);
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: budget (Phase 4)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'budget') {
+    return await handleBudgetPhase(ctx, msg);
   }
   
   // ──────────────────────────────────────────────────────────────────────────
@@ -2479,6 +2487,325 @@ async function finishGoalsSetting(ctx: RouterContext): Promise<RouterResult> {
   return { success: true };
 }
 
+// ============================================================================
+// Budget Phase (Phase 4)
+// ============================================================================
+
+interface BudgetData {
+  totalIncome: number;
+  totalExpenses: number;
+  categories: { name: string; amount: number; percentage: number }[];
+}
+
+/**
+ * Calculate budget data from user transactions
+ */
+async function calculateBudgetData(userId: string): Promise<BudgetData> {
+  const supabase = createServiceClient();
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('date', `${currentMonth}-01`)
+    .lte('date', `${currentMonth}-31`);
+  
+  const income = transactions?.filter(t => t.type === 'income') || [];
+  const expenses = transactions?.filter(t => t.type === 'expense') || [];
+  
+  const totalIncome = income.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const totalExpenses = expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  // Group expenses by category
+  const categoryMap: Record<string, number> = {};
+  expenses.forEach(t => {
+    const cat = t.category || t.expense_category || 'אחר';
+    categoryMap[cat] = (categoryMap[cat] || 0) + Math.abs(t.amount);
+  });
+  
+  const categories = Object.entries(categoryMap)
+    .map(([name, amount]) => ({
+      name,
+      amount,
+      percentage: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0
+    }))
+    .sort((a, b) => b.amount - a.amount);
+  
+  return { totalIncome, totalExpenses, categories };
+}
+
+/**
+ * Handle budget phase messages
+ */
+async function handleBudgetPhase(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // תקציב אוטומטי - יצירת תקציב מבוסס על היסטוריה
+  if (isCommand(msg, ['auto_budget', 'תקציב אוטומטי', 'אוטומטי', 'auto'])) {
+    return await createAutoBudget(ctx);
+  }
+  
+  // הגדרה ידנית
+  if (isCommand(msg, ['manual_budget', 'הגדרה ידנית', 'ידני', 'manual'])) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `✏️ *הגדרה ידנית*\n\n` +
+        `כתוב את התקציב לכל קטגוריה בפורמט:\n` +
+        `*קטגוריה: סכום*\n\n` +
+        `לדוגמה:\n` +
+        `מזון: 2000\n` +
+        `תחבורה: 800\n\n` +
+        `או כתוב *"סיימתי"* לסיום`,
+    });
+    return { success: true };
+  }
+  
+  // דלג על תקציב
+  if (isCommand(msg, ['skip_budget', 'דלג', 'skip'])) {
+    return await skipBudget(ctx);
+  }
+  
+  // סיום תקציב / אישור תקציב אוטומטי
+  if (isCommand(msg, ['סיימתי', 'finish', 'done', 'confirm_budget', 'מאשר'])) {
+    return await finishBudget(ctx);
+  }
+  
+  // ניסיון לפרסר קטגוריה:סכום
+  const budgetMatch = msg.match(/^(.+?):\s*(\d+)$/);
+  if (budgetMatch) {
+    const category = budgetMatch[1].trim();
+    const amount = parseInt(budgetMatch[2]);
+    return await setBudgetCategory(ctx, category, amount);
+  }
+  
+  // ברירת מחדל - הצג עזרה
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `💰 *שלב התקציב*\n\n` +
+      `פקודות:\n` +
+      `• *"תקציב אוטומטי"* - φ יבנה לך תקציב\n` +
+      `• *"הגדרה ידנית"* - הגדר בעצמך\n` +
+      `• *"דלג"* - המשך בלי תקציב\n\n` +
+      `φ *Phi - היחס הזהב של הכסף שלך*`,
+  });
+  
+  return { success: true };
+}
+
+/**
+ * Create automatic budget based on history
+ */
+async function createAutoBudget(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  const { totalIncome, totalExpenses, categories } = await calculateBudgetData(ctx.userId);
+  
+  // יצירת תקציב לפי קטגוריות + 10% חיסכון
+  const savingsTarget = Math.round(totalIncome * 0.1);
+  const availableBudget = totalIncome - savingsTarget;
+  
+  // יצירת/עדכון תקציב ראשי
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  
+  // בדוק אם יש תקציב לחודש הנוכחי
+  const { data: existingBudget } = await supabase
+    .from('budgets')
+    .select('id')
+    .eq('user_id', ctx.userId)
+    .eq('month', currentMonth)
+    .single();
+  
+  let budgetId: string;
+  
+  if (existingBudget) {
+    budgetId = existingBudget.id;
+    // עדכן תקציב קיים
+    await supabase
+      .from('budgets')
+      .update({ 
+        total_budget: availableBudget,
+        savings_goal: savingsTarget,
+        is_auto_generated: true
+      })
+      .eq('id', budgetId);
+  } else {
+    // צור תקציב חדש
+    const { data: newBudget } = await supabase
+      .from('budgets')
+      .insert({
+        user_id: ctx.userId,
+        month: currentMonth,
+        total_budget: availableBudget,
+        total_spent: totalExpenses,
+        savings_goal: savingsTarget,
+        is_auto_generated: true,
+        status: 'active'
+      })
+      .select('id')
+      .single();
+    
+    budgetId = newBudget?.id;
+  }
+  
+  // שמור קטגוריות תקציב
+  if (budgetId) {
+    // מחק קטגוריות ישנות
+    await supabase
+      .from('budget_categories')
+      .delete()
+      .eq('budget_id', budgetId);
+    
+    // הוסף קטגוריות חדשות
+    const budgetCategories = categories.map(cat => ({
+      budget_id: budgetId,
+      category_name: cat.name,
+      detailed_category: cat.name,
+      allocated_amount: Math.round(cat.amount * 0.95),
+      spent_amount: cat.amount,
+      remaining_amount: Math.round(cat.amount * 0.95) - cat.amount,
+      percentage_used: cat.percentage
+    }));
+    
+    if (budgetCategories.length > 0) {
+      await supabase
+        .from('budget_categories')
+        .insert(budgetCategories);
+    }
+  }
+  
+  // בנה הודעה עם התקציב
+  let budgetMsg = `✨ *התקציב שלך מוכן!*\n\n`;
+  budgetMsg += `📊 *סיכום:*\n`;
+  budgetMsg += `• הכנסות: ₪${totalIncome.toLocaleString('he-IL')}\n`;
+  budgetMsg += `• יעד חיסכון (10%): ₪${savingsTarget.toLocaleString('he-IL')}\n`;
+  budgetMsg += `• תקציב זמין: ₪${availableBudget.toLocaleString('he-IL')}\n\n`;
+  
+  budgetMsg += `💰 *תקציב לפי קטגוריות:*\n`;
+  categories.slice(0, 5).forEach(cat => {
+    const budget = Math.round(cat.amount * 0.95);
+    budgetMsg += `• ${cat.name}: ₪${budget.toLocaleString('he-IL')}\n`;
+  });
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: budgetMsg,
+  });
+  
+  // שאל אם לאשר
+  await greenAPI.sendInteractiveButtons({
+    phoneNumber: ctx.phone,
+    message: 'מאשר את התקציב?',
+    buttons: [
+      { buttonId: 'confirm_budget', buttonText: 'מאשר' },
+      { buttonId: 'manual_budget', buttonText: 'עריכה ידנית' },
+    ],
+  });
+  
+  return { success: true };
+}
+
+/**
+ * Set budget for a specific category
+ */
+async function setBudgetCategory(ctx: RouterContext, category: string, amount: number): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  try {
+    await supabase
+      .from('budget_categories')
+      .upsert({
+        user_id: ctx.userId,
+        category_name: category,
+        monthly_budget: amount,
+        created_at: new Date().toISOString()
+      }, { onConflict: 'user_id,category_name' });
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `✅ נשמר: *${category}* - ₪${amount.toLocaleString('he-IL')}\n\n` +
+        `המשך להגדיר קטגוריות נוספות או כתוב *"סיימתי"*`,
+    });
+  } catch (err) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ שגיאה בשמירה. נסה שוב.`,
+    });
+  }
+  
+  return { success: true };
+}
+
+/**
+ * Skip budget phase
+ */
+async function skipBudget(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  await supabase
+    .from('users')
+    .update({ 
+      onboarding_state: 'monitoring',
+      current_phase: 'monitoring',
+      phase_updated_at: new Date().toISOString()
+    })
+    .eq('id', ctx.userId);
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `🎉 *סיימנו את ההגדרות!*\n\n` +
+      `אתה יכול תמיד לחזור ולהגדיר תקציב.\n\n` +
+      `*מה עכשיו?*\n` +
+      `• שלח מסמכים נוספים 📄\n` +
+      `• כתוב "סיכום" לראות את המצב שלך\n` +
+      `• שאל שאלות כמו "כמה הוצאתי על אוכל?"\n\n` +
+      `φ *Phi - היחס הזהב של הכסף שלך*`,
+  });
+  
+  return { success: true, newState: 'monitoring' };
+}
+
+/**
+ * Finish budget phase and move to monitoring
+ */
+async function finishBudget(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // ספור תקציבים שהוגדרו
+  const { count } = await supabase
+    .from('budget_categories')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId);
+  
+  await supabase
+    .from('users')
+    .update({ 
+      onboarding_state: 'monitoring',
+      current_phase: 'monitoring',
+      phase_updated_at: new Date().toISOString()
+    })
+    .eq('id', ctx.userId);
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `🎉 *התקציב שלך מוכן!*\n\n` +
+      `הגדרת ${count || 0} קטגוריות תקציב.\n\n` +
+      `φ יעקוב אחרי ההוצאות שלך ויתריע אם אתה חורג.\n\n` +
+      `*מה עכשיו?*\n` +
+      `• שלח הוצאות חדשות 💸\n` +
+      `• כתוב "סיכום" לראות את המצב\n` +
+      `• כתוב "תקציב" לראות יתרות\n\n` +
+      `φ *Phi - היחס הזהב של הכסף שלך*`,
+  });
+  
+  return { success: true, newState: 'monitoring' };
+}
+
 /**
  * Transition from goals phase to budget phase
  */
@@ -2490,29 +2817,38 @@ async function transitionToBudget(ctx: RouterContext): Promise<RouterResult> {
   await supabase
     .from('users')
     .update({ 
-      onboarding_state: 'monitoring', // TODO: change to 'budget' when budget phase is implemented
+      onboarding_state: 'budget',
       current_phase: 'budget',
       phase_updated_at: new Date().toISOString()
     })
     .eq('id', ctx.userId);
   
+  // חשב נתונים לתקציב
+  const { totalIncome, totalExpenses, categories } = await calculateBudgetData(ctx.userId);
+  
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `💰 *שלב 4: בניית תקציב*\n\n` +
-      `φ יבנה לך תקציב חכם מבוסס על:\n` +
-      `• ההיסטוריה שלך\n` +
-      `• היעדים שהגדרת\n` +
-      `• המלצות מותאמות\n\n` +
-      `🚧 *בקרוב...*\n` +
-      `התכונה הזו בפיתוח.\n\n` +
-      `בינתיים, אתה יכול:\n` +
-      `• לשלוח עוד מסמכים 📄\n` +
-      `• לראות גרפים 📊\n` +
-      `• לשאול שאלות 💬\n\n` +
-      `φ *Phi - היחס הזהב של הכסף שלך*`,
+      `φ מנתח את הנתונים שלך...\n\n` +
+      `📊 *סיכום חודשי:*\n` +
+      `• הכנסות: ₪${totalIncome.toLocaleString('he-IL')}\n` +
+      `• הוצאות: ₪${totalExpenses.toLocaleString('he-IL')}\n` +
+      `• יתרה: ₪${(totalIncome - totalExpenses).toLocaleString('he-IL')}\n\n` +
+      `*מה תרצה לעשות?*`,
   });
   
-  return { success: true, newState: 'monitoring' };
+  // שלח כפתורי פעולה
+  await greenAPI.sendInteractiveButtons({
+    phoneNumber: ctx.phone,
+    message: 'בחר אפשרות:',
+    buttons: [
+      { buttonId: 'auto_budget', buttonText: 'תקציב אוטומטי' },
+      { buttonId: 'manual_budget', buttonText: 'הגדרה ידנית' },
+      { buttonId: 'skip_budget', buttonText: 'דלג' },
+    ],
+  });
+  
+  return { success: true, newState: 'budget' };
 }
 
 /**
