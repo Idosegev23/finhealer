@@ -157,7 +157,7 @@ export async function detectRecurring(
     vendorGroups.get(key)!.push(tx);
   }
   
-  for (const [vendorKey, txs] of vendorGroups) {
+  for (const [vendorKey, txs] of Array.from(vendorGroups.entries())) {
     // Need at least 2 occurrences to detect pattern
     if (txs.length < 2) continue;
     
@@ -235,7 +235,7 @@ export async function detectSpikes(
     vendorGroups.get(key)!.push(tx);
   }
   
-  for (const [vendorKey, txs] of vendorGroups) {
+  for (const [vendorKey, txs] of Array.from(vendorGroups.entries())) {
     if (txs.length < 3) continue; // Need enough data to determine average
     
     const amounts = txs.map(t => t.amount);
@@ -282,7 +282,7 @@ export async function detectTrends(
     vendorGroups.get(key)!.push(tx);
   }
   
-  for (const [vendorKey, txs] of vendorGroups) {
+  for (const [vendorKey, txs] of Array.from(vendorGroups.entries())) {
     if (txs.length < 3) continue;
     
     // Group by month
@@ -357,7 +357,7 @@ export async function detectDayPatterns(
     dayGroups.get(dayOfWeek)!.push(tx);
   }
   
-  for (const [dayOfWeek, txs] of dayGroups) {
+  for (const [dayOfWeek, txs] of Array.from(dayGroups.entries())) {
     if (txs.length === 0) {
       patterns.push({
         dayOfWeek,
@@ -381,7 +381,7 @@ export async function detectDayPatterns(
     
     let topCategory: string | null = null;
     let maxAmount = 0;
-    for (const [cat, total] of categoryTotals) {
+    for (const [cat, total] of Array.from(categoryTotals.entries())) {
       if (total > maxAmount) {
         maxAmount = total;
         topCategory = cat;
@@ -424,7 +424,7 @@ export async function detectSeasonality(
   
   // Calculate stats for each month
   const monthlyStats: { month: string; total: number; count: number }[] = [];
-  for (const [month, txs] of monthlyData) {
+  for (const [month, txs] of Array.from(monthlyData.entries())) {
     const total = txs.reduce((sum, t) => sum + t.amount, 0);
     monthlyStats.push({ month, total, count: txs.length });
   }
@@ -484,7 +484,7 @@ export async function generateVendorSummaries(
     vendorGroups.get(key)!.push(tx);
   }
   
-  for (const [vendorKey, txs] of vendorGroups) {
+  for (const [vendorKey, txs] of Array.from(vendorGroups.entries())) {
     const amounts = txs.map(t => t.amount);
     const dates = txs.map(t => new Date(t.tx_date || t.date)).sort((a, b) => a.getTime() - b.getTime());
     
