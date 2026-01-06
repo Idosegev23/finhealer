@@ -376,8 +376,8 @@ async function handleClassificationResponse(
     return await showNextTransaction(ctx, type);
   }
   
-  // אישור הצעה (כן / 1) - כולל טקסט כפתור
-  if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes', '✅ כן', 'כן ✅'])) {
+  // אישור הצעה (כן / 1) - כולל טקסט כפתור ו-buttonId
+  if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes', '✅ כן', 'כן ✅', 'confirm'])) {
     const suggestions = await getSuggestionsFromCache(ctx.userId);
     if (suggestions && suggestions[0]) {
       // If it's expense grouping, classify all in group
@@ -1398,8 +1398,17 @@ async function handleBehaviorPhase(ctx: RouterContext, msg: string): Promise<Rou
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  // פקודת ניתוח (כולל טקסט כפתור)
-  if (isCommand(msg, ['נתח', 'ניתוח', 'analyze', 'התחל', 'start', '🔍 ניתוח התנהגות', 'ניתוח התנהגות 🔍'])) {
+  // פקודת ניתוח (כולל טקסט כפתור ו-buttonId)
+  if (isCommand(msg, ['נתח', 'ניתוח', 'analyze', 'התחל', 'start', '🔍 ניתוח התנהגות', 'ניתוח התנהגות 🔍', 'add_more', 'add_docs'])) {
+    // add_more ו-add_docs מפנים לשלוח עוד מסמכים
+    if (msg === 'add_more' || msg === 'add_docs') {
+      const greenAPI = getGreenAPIClient();
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `📄 מעולה! שלח לי עוד מסמך.`,
+      });
+      return { success: true };
+    }
     return await startBehaviorAnalysis(ctx);
   }
   
@@ -1408,8 +1417,8 @@ async function handleBehaviorPhase(ctx: RouterContext, msg: string): Promise<Rou
     return await showBehaviorSummary(ctx);
   }
   
-  // מעבר לשלב הבא (goals) - כולל טקסט כפתור
-  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'יעדים', 'goals', '▶️ המשך ליעדים', 'המשך ליעדים ▶️'])) {
+  // מעבר לשלב הבא (goals) - כולל טקסט כפתור ו-buttonId
+  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'יעדים', 'goals', '▶️ המשך ליעדים', 'המשך ליעדים ▶️', 'to_goals'])) {
     return await transitionToGoals(ctx);
   }
   
@@ -1648,8 +1657,8 @@ async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise<Router
   
   const goalContext: GoalCreationContext | null = user?.classification_context?.goalCreation || null;
   
-  // פקודת התחלת יעד חדש
-  if (isCommand(msg, ['יעד חדש', 'הוסף יעד', 'צור יעד', 'new goal', 'add goal', '➕ יעד חדש'])) {
+  // פקודת התחלת יעד חדש (כולל buttonId)
+  if (isCommand(msg, ['יעד חדש', 'הוסף יעד', 'צור יעד', 'new goal', 'add goal', '➕ יעד חדש', 'new_goal'])) {
     return await startNewGoal(ctx);
   }
   
@@ -1678,18 +1687,18 @@ async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise<Router
     return await handleGoalConfirmation(ctx, msg);
   }
   
-  // הצגת יעדים קיימים
-  if (isCommand(msg, ['יעדים', 'הצג יעדים', 'goals', 'רשימה', 'list'])) {
+  // הצגת יעדים קיימים (כולל buttonId)
+  if (isCommand(msg, ['יעדים', 'הצג יעדים', 'goals', 'רשימה', 'list', 'show_goals'])) {
     return await showUserGoals(ctx);
   }
   
-  // מעבר לשלב הבא (budget)
-  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'תקציב', 'budget', '▶️ המשך לתקציב'])) {
+  // מעבר לשלב הבא (budget) - כולל buttonId
+  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'תקציב', 'budget', '▶️ המשך לתקציב', 'to_budget'])) {
     return await transitionToBudget(ctx);
   }
   
-  // סיום הגדרת יעדים
-  if (isCommand(msg, ['סיימתי', 'done', 'מספיק', 'finish'])) {
+  // סיום הגדרת יעדים (כולל buttonId)
+  if (isCommand(msg, ['סיימתי', 'done', 'מספיק', 'finish', 'finish_goals'])) {
     return await finishGoalsSetting(ctx);
   }
   
