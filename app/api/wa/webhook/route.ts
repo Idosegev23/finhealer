@@ -929,8 +929,20 @@ export async function POST(request: NextRequest) {
           try {
             // Try to extract JSON from the response (may include markdown)
             const jsonMatch = content.match(/\{[\s\S]*\}/);
-            ocrData = JSON.parse(jsonMatch ? jsonMatch[0] : content);
-          } catch {
+            let jsonStr = jsonMatch ? jsonMatch[0] : content;
+            
+            // 🔧 FIX: Clean up common AI JSON errors before parsing
+            // Fix "29571. - null" patterns → null
+            jsonStr = jsonStr.replace(/:\s*[\d.]+\s*-\s*null/g, ': null');
+            // Fix trailing commas
+            jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+            // Fix "null" as string → null
+            jsonStr = jsonStr.replace(/"null"/g, 'null');
+            
+            ocrData = JSON.parse(jsonStr);
+          } catch (parseError) {
+            console.error('❌ JSON parse error:', parseError);
+            console.log('📝 Raw content (first 500 chars):', content.substring(0, 500));
             ocrData = { document_type: 'credit_statement', transactions: [] };
           }
 
