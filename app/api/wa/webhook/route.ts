@@ -347,11 +347,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 🆕 טיפול בלחיצה על כפתור - מעביר ל-Rigid Router
-    if (messageType === 'buttonsResponseMessage') {
-      const buttonId = payload.messageData?.buttonsResponseMessage?.buttonId || '';
-      const buttonText = payload.messageData?.buttonsResponseMessage?.buttonText || '';
+    if (messageType === 'interactiveButtonsResponse') {
+      const buttonId = payload.messageData?.interactiveButtonsResponse?.selectedButtonId || '';
+      const buttonText = payload.messageData?.interactiveButtonsResponse?.selectedButtonText || '';
       
-      console.log('🔘 Button pressed - buttonId:', buttonId, 'buttonText:', buttonText);
+      console.log('🔘 Button pressed - selectedButtonId:', buttonId, 'selectedButtonText:', buttonText);
 
       // עדיפות ל-buttonId, אחרת buttonText (שהוא בדיוק כמו הטריגר)
       const messageToRoute = buttonId || buttonText;
