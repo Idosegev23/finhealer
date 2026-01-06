@@ -349,9 +349,18 @@ export async function POST(request: NextRequest) {
       
       console.log('🔘 Button pressed:', buttonId, buttonText);
 
-      // 🎯 מעביר ל-φ Router כטקסט רגיל
+      // 🎯 מעביר ל-φ Router - נסה buttonId קודם, אם לא עובד נסה buttonText
       const { routeMessage } = await import('@/lib/conversation/phi-router');
-      const result = await routeMessage(userData.id, phoneNumber, buttonId);
+      
+      // נשלח את ה-buttonId, ואם הוא ריק נשלח את ה-buttonText
+      const messageToRoute = buttonId || buttonText;
+      let result = await routeMessage(userData.id, phoneNumber, messageToRoute);
+      
+      // אם לא הצליח עם buttonId, ננסה עם buttonText (עם האימוג'ים)
+      if (!result.success && buttonId && buttonText && buttonId !== buttonText) {
+        console.log('🔄 Retrying with buttonText:', buttonText);
+        result = await routeMessage(userData.id, phoneNumber, buttonText);
+      }
       
       console.log(`[φ Router] Button result: success=${result.success}`);
       

@@ -1212,7 +1212,23 @@ async function answerCategoryQuestion(ctx: RouterContext, category: string): Pro
 
 function isCommand(msg: string, commands: string[]): boolean {
   const lower = msg.toLowerCase().trim();
-  return commands.some(cmd => lower === cmd || lower.includes(cmd));
+  
+  // בדיקה ישירה
+  if (commands.some(cmd => lower === cmd || lower.includes(cmd))) {
+    return true;
+  }
+  
+  // 🆕 בדיקה ללא אימוג'ים - מסיר אימוג'ים ובודק שוב
+  const withoutEmojis = lower.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{1F000}-\u{1F02F}]|[\u{1F0A0}-\u{1F0FF}]|[▶️⏭️✅❌📄💳📋🔍➕🛡️🎯💚💸📊🎉]/gu, '').trim();
+  
+  if (withoutEmojis && commands.some(cmd => {
+    const cmdWithoutEmojis = cmd.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{1F000}-\u{1F02F}]|[\u{1F0A0}-\u{1F0FF}]|[▶️⏭️✅❌📄💳📋🔍➕🛡️🎯💚💸📊🎉]/gu, '').trim();
+    return withoutEmojis === cmdWithoutEmojis || withoutEmojis.includes(cmdWithoutEmojis) || cmdWithoutEmojis.includes(withoutEmojis);
+  })) {
+    return true;
+  }
+  
+  return false;
 }
 
 // DB-based cache (persists across serverless invocations)
