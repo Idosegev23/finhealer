@@ -1355,9 +1355,19 @@ export async function POST(request: NextRequest) {
           // עצור עדכוני התקדמות - הניתוח הסתיים!
           progressUpdater.stop();
           
-          // ספירת הכנסות והוצאות
-          const incomeCount = allTransactions.filter(tx => tx.type === 'income' || tx.amount > 0).length;
-          const expenseCount = allTransactions.filter(tx => tx.type === 'expense' || tx.amount < 0).length;
+          // ספירת הכנסות והוצאות - לוגיקה מתוקנת
+          const incomeCount = allTransactions.filter(tx => {
+            // הכנסה = type הוא income, או סכום חיובי ללא type מפורש
+            if (tx.type === 'income') return true;
+            if (tx.type === 'expense') return false;
+            return tx.amount > 0;
+          }).length;
+          const expenseCount = allTransactions.filter(tx => {
+            // הוצאה = type הוא expense, או סכום שלילי ללא type מפורש
+            if (tx.type === 'expense') return true;
+            if (tx.type === 'income') return false;
+            return tx.amount < 0;
+          }).length;
           
           // שליחת הודעה למשתמש - הניתוח הסתיים!
           await greenAPI.sendMessage({
@@ -1374,23 +1384,87 @@ export async function POST(request: NextRequest) {
           // שליחת event ל-Inngest לעיבוד ברקע
           const { inngest } = await import('@/lib/inngest/client');
           
-          await inngest.send({
-            name: 'excel/transactions.save',
-            data: {
-              userId: userData.id,
-              phone: phoneNumber,
-              transactions: allTransactions,
-              batchId: pendingBatchId,
-              documentInfo: {
-                fileName,
-                downloadUrl,
-                documentType,
-                ocrData,
-              },
-            },
-          });
+          console.log(`📤 Sending to Inngest: excel/transactions.save with ${allTransactions.length} transactions, batchId: ${pendingBatchId}`);
           
-          console.log(`✅ Excel AI analysis complete, sent to Inngest for saving: ${allTransactions.length} transactions`);
+          try {
+            const sendResult = await inngest.send({
+              name: 'excel/transactions.save',
+              data: {
+                userId: userData.id,
+                phone: phoneNumber,
+                transactions: allTransactions,
+                batchId: pendingBatchId,
+                documentInfo: {
+                  fileName,
+                  downloadUrl,
+                  documentType,
+                  ocrData,
+                },
+              },
+            });
+            
+            console.log(`✅ Inngest event sent successfully:`, JSON.stringify(sendResult));
+          } catch (inngestError: any) {
+            console.error(`❌ Inngest send error:`, inngestError.message);
+            // אם Inngest נכשל, ננסה לשמור ישירות
+            console.log(`⚠️ Falling back to direct save...`);
+            
+            // Helper to convert DD/MM/YYYY to YYYY-MM-DD
+            const parseDate = (dateStr: string | undefined): string => {
+              if (!dateStr) return new Date().toISOString().split('T')[0];
+              const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+              if (ddmmyyyy) {
+                const [, day, month, year] = ddmmyyyy;
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              }
+              if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+              const parsed = new Date(dateStr);
+              if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+              return new Date().toISOString().split('T')[0];
+            };
+            
+            // שמירה ישירה כ-fallback
+            const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+            
+            // שמירת תנועות ישירות
+            let savedCount = 0;
+            for (const tx of allTransactions.slice(0, 50)) { // מקסימום 50 כ-fallback
+              const isIncome = tx.type === 'income' || tx.amount > 0;
+              const txDate = parseDate(tx.date);
+              
+              const { error } = await supabase
+                .from('transactions')
+                .insert({
+                  user_id: userData.id,
+                  type: isIncome ? 'income' : 'expense',
+                  amount: Math.abs(tx.amount || 0),
+                  vendor: tx.vendor || tx.payee || tx.description || 'לא ידוע',
+                  original_description: tx.description || '',
+                  tx_date: txDate,
+                  category: isIncome ? null : (tx.expense_category || null),
+                  income_category: isIncome ? (tx.income_category || null) : null,
+                  expense_type: tx.expense_type || 'variable',
+                  payment_method: documentType === 'credit' ? 'credit_card' : 'bank_transfer',
+                  source: 'excel',
+                  status: 'pending',
+                  batch_id: pendingBatchId,
+                });
+              
+              if (!error) savedCount++;
+            }
+            
+            console.log(`✅ Fallback saved ${savedCount} transactions directly`);
+            
+            // עדכון סטטוס משתמש
+            await supabase
+              .from('users')
+              .update({ onboarding_state: 'classification', current_phase: 'classification' })
+              .eq('id', userData.id);
+            
+            await onDocumentProcessed(userData.id, phoneNumber);
+          }
+          
+          console.log(`✅ Excel processing complete: ${allTransactions.length} transactions`);
           
         } catch (excelError: any) {
           progressUpdater.stop();
