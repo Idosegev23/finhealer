@@ -1768,6 +1768,21 @@ async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise<Router
     return await finishGoalsSetting(ctx);
   }
   
+  // 🆕 זיהוי מספרים 1-4 כבחירת סוג יעד (גם אם אין goalContext)
+  if (['1', '2', '3', '4'].includes(msg.trim())) {
+    // שמור context ועבור ישירות לטיפול בבחירה
+    await supabase
+      .from('users')
+      .update({
+        classification_context: {
+          goalCreation: { step: 'type' }
+        }
+      })
+      .eq('id', ctx.userId);
+    
+    return await handleGoalTypeSelection(ctx, msg);
+  }
+  
   // עזרה
   if (isCommand(msg, ['עזרה', 'help', '?'])) {
     await greenAPI.sendMessage({
