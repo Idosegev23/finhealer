@@ -349,46 +349,13 @@ export async function POST(request: NextRequest) {
       
       console.log('🔘 Button pressed - buttonId:', buttonId, 'buttonText:', buttonText);
 
-      // 🎯 מיפוי buttonText → buttonId (לטיפול במקרים שנשלח רק buttonText)
-      const buttonTextToId: Record<string, string> = {
-        // סיווג
-        '✅ כן': 'confirm',
-        '⏭️ דלג': 'skip',
-        '📋 רשימה': 'list',
-        'כן ✅': 'confirm',
-        'דלג ⏭️': 'skip',
-        'רשימה 📋': 'list',
-        // מסמכים
-        '📄 עוד דוח בנק': 'add_bank',
-        '💳 דוח אשראי': 'add_credit',
-        '📄 שלח עוד מסמך': 'add_doc',
-        '📄 עוד מסמכים': 'add_more',
-        '📄 עוד דוחות': 'add_docs',
-        '▶️ נתחיל לסווג': 'start_classify',
-        '▶️ נמשיך לסווג': 'start_classify',
-        // behavior
-        '🔍 ניתוח התנהגות': 'analyze',
-        '▶️ המשך ליעדים': 'to_goals',
-        // goals
-        '➕ יעד חדש': 'new_goal',
-        '➕ עוד יעד': 'new_goal',
-        '📋 היעדים שלי': 'show_goals',
-        '✅ סיימתי': 'finish_goals',
-        '🛡️ קרן חירום': 'goal_emergency',
-        '💳 סגירת חובות': 'goal_debt',
-        '🎯 חיסכון למטרה': 'goal_savings',
-        '✅ אשר': 'confirm_goal',
-        '❌ בטל': 'cancel_goal',
-        '▶️ המשך לתקציב': 'to_budget',
-      };
+      // עדיפות ל-buttonId, אחרת buttonText (שהוא בדיוק כמו הטריגר)
+      const messageToRoute = buttonId || buttonText;
       
-      // נשתמש ב-buttonId, או נמפה מ-buttonText
-      const resolvedId = buttonId || buttonTextToId[buttonText] || buttonText;
-      
-      console.log('🎯 Resolved to:', resolvedId);
+      console.log('🎯 Routing:', messageToRoute);
 
       const { routeMessage } = await import('@/lib/conversation/phi-router');
-      const result = await routeMessage(userData.id, phoneNumber, resolvedId);
+      const result = await routeMessage(userData.id, phoneNumber, messageToRoute);
       
       console.log('[φ Router] Button result: success=' + result.success);
       

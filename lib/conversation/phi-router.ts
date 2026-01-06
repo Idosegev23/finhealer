@@ -183,8 +183,8 @@ export async function routeMessage(
         message: `יש לי תנועות שמחכות לסיווג.\nמה תרצה לעשות?`,
         header: 'מה עכשיו?',
         buttons: [
-          { buttonId: 'start_classify', buttonText: '▶️ נמשיך לסווג' },
-          { buttonId: 'add_doc', buttonText: '📄 שלח עוד מסמך' },
+          { buttonId: 'start_classify', buttonText: 'נמשיך' },
+          { buttonId: 'add_doc', buttonText: 'עוד דוח' },
         ],
       });
     } catch {
@@ -695,9 +695,9 @@ async function showNextTransaction(
     phoneNumber: ctx.phone,
     message,
         buttons: [
-          { buttonId: 'confirm', buttonText: '✅ כן' },
-          { buttonId: 'skip', buttonText: '⏭️ דלג' },
-          { buttonId: 'list', buttonText: '📋 רשימה' },
+          { buttonId: 'confirm', buttonText: 'כן' },
+          { buttonId: 'skip', buttonText: 'דלג' },
+          { buttonId: 'list', buttonText: 'רשימה' },
         ],
       });
     } catch {
@@ -709,8 +709,8 @@ async function showNextTransaction(
         phoneNumber: ctx.phone,
         message,
         buttons: [
-          { buttonId: 'skip', buttonText: '⏭️ דלג' },
-          { buttonId: 'list', buttonText: '📋 רשימה' },
+          { buttonId: 'skip', buttonText: 'דלג' },
+          { buttonId: 'list', buttonText: 'רשימה' },
         ],
       });
     } catch {
@@ -853,9 +853,9 @@ async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
     phoneNumber: ctx.phone,
     message,
         buttons: [
-          { buttonId: 'confirm', buttonText: '✅ כן' },
-          { buttonId: 'skip', buttonText: '⏭️ דלג' },
-          { buttonId: 'list', buttonText: '📋 רשימה' },
+          { buttonId: 'confirm', buttonText: 'כן' },
+          { buttonId: 'skip', buttonText: 'דלג' },
+          { buttonId: 'list', buttonText: 'רשימה' },
         ],
       });
     } catch {
@@ -868,8 +868,8 @@ async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
         phoneNumber: ctx.phone,
         message,
         buttons: [
-          { buttonId: 'skip', buttonText: '⏭️ דלג' },
-          { buttonId: 'list', buttonText: '📋 רשימה' },
+          { buttonId: 'skip', buttonText: 'דלג' },
+          { buttonId: 'list', buttonText: 'רשימה' },
         ],
       });
     } catch {
@@ -989,8 +989,8 @@ async function showFinalSummary(ctx: RouterContext): Promise<RouterResult> {
       message,
       header: 'מה עכשיו?',
       buttons: [
-        { buttonId: 'analyze', buttonText: '🔍 ניתוח התנהגות' },
-        { buttonId: 'add_more', buttonText: '📄 עוד מסמכים' },
+        { buttonId: 'analyze', buttonText: 'ניתוח' },
+        { buttonId: 'add_more', buttonText: 'עוד דוח' },
       ],
     });
   } catch {
@@ -1654,8 +1654,8 @@ async function sendBehaviorSummary(
       message: `מוכן לשלב הבא?\n\nφ *Phi - היחס הזהב של הכסף שלך*`,
       header: 'מה עכשיו?',
       buttons: [
-        { buttonId: 'to_goals', buttonText: '▶️ המשך ליעדים' },
-        { buttonId: 'add_docs', buttonText: '📄 עוד דוחות' },
+        { buttonId: 'to_goals', buttonText: 'המשך' },
+        { buttonId: 'add_docs', buttonText: 'עוד דוח' },
       ],
     });
   } catch {
@@ -1794,9 +1794,9 @@ async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise<Router
         `מה תרצה לעשות?`,
       header: 'שלב 3: יעדים',
       buttons: [
-        { buttonId: 'new_goal', buttonText: '➕ יעד חדש' },
-        { buttonId: 'show_goals', buttonText: '📋 היעדים שלי' },
-        { buttonId: 'finish_goals', buttonText: '✅ סיימתי' },
+        { buttonId: 'new_goal', buttonText: 'יעד חדש' },
+        { buttonId: 'show_goals', buttonText: 'יעדים' },
+        { buttonId: 'finish_goals', buttonText: 'סיימתי' },
       ],
     });
   } catch {
@@ -1840,9 +1840,9 @@ async function startNewGoal(ctx: RouterContext): Promise<RouterResult> {
         `4️⃣ *שיפור כללי* - איזון תקציבי`,
       header: 'בחר סוג יעד',
       buttons: [
-        { buttonId: 'goal_emergency', buttonText: '🛡️ קרן חירום' },
-        { buttonId: 'goal_debt', buttonText: '💳 סגירת חובות' },
-        { buttonId: 'goal_savings', buttonText: '🎯 חיסכון למטרה' },
+        { buttonId: 'goal_emergency', buttonText: 'קרן חירום' },
+        { buttonId: 'goal_debt', buttonText: 'סגירת חובות' },
+        { buttonId: 'goal_savings', buttonText: 'חיסכון' },
       ],
     });
   } catch {
@@ -2025,8 +2025,8 @@ async function handleGoalTypeSelection(ctx: RouterContext, msg: string): Promise
           `זה יעד כיווני - φ יעזור לך להשתפר בהדרגה.`,
         header: 'יעד נוסף?',
         buttons: [
-          { buttonId: 'new_goal', buttonText: '➕ עוד יעד' },
-          { buttonId: 'finish_goals', buttonText: '✅ סיימתי' },
+          { buttonId: 'new_goal', buttonText: 'יעד חדש' },
+          { buttonId: 'finish_goals', buttonText: 'סיימתי' },
         ],
       });
     } catch {
@@ -2252,8 +2252,8 @@ async function handleGoalDeadlineInput(ctx: RouterContext, msg: string): Promise
       message: confirmMessage,
       header: 'אישור יעד',
       buttons: [
-        { buttonId: 'confirm_goal', buttonText: '✅ אשר' },
-        { buttonId: 'cancel_goal', buttonText: '❌ בטל' },
+        { buttonId: 'confirm_goal', buttonText: 'אשר' },
+        { buttonId: 'cancel_goal', buttonText: 'בטל' },
       ],
     });
   } catch {
@@ -2316,9 +2316,9 @@ async function handleGoalConfirmation(ctx: RouterContext, msg: string): Promise<
           `יש לך *${count || 1} יעדים* פעילים.`,
         header: 'עוד יעד?',
         buttons: [
-          { buttonId: 'new_goal', buttonText: '➕ עוד יעד' },
-          { buttonId: 'show_goals', buttonText: '📋 היעדים שלי' },
-          { buttonId: 'finish_goals', buttonText: '✅ סיימתי' },
+          { buttonId: 'new_goal', buttonText: 'יעד חדש' },
+          { buttonId: 'show_goals', buttonText: 'יעדים' },
+          { buttonId: 'finish_goals', buttonText: 'סיימתי' },
         ],
       });
     } catch {
@@ -2446,8 +2446,8 @@ async function finishGoalsSetting(ctx: RouterContext): Promise<RouterResult> {
         `עכשיו נבנה תקציב שתומך ביעדים האלה.`,
       header: 'המשך לתקציב?',
       buttons: [
-        { buttonId: 'to_budget', buttonText: '▶️ המשך לתקציב' },
-        { buttonId: 'new_goal', buttonText: '➕ עוד יעד' },
+        { buttonId: 'to_budget', buttonText: 'המשך' },
+        { buttonId: 'new_goal', buttonText: 'יעד חדש' },
       ],
     });
   } catch {
@@ -2620,9 +2620,9 @@ export async function onDocumentProcessed(userId: string, phone: string): Promis
     message,
       header: 'מה עכשיו?',
       buttons: [
-        { buttonId: 'add_bank', buttonText: '📄 עוד דוח בנק' },
-        { buttonId: 'add_credit', buttonText: '💳 דוח אשראי' },
-        { buttonId: 'start_classify', buttonText: '▶️ נתחיל לסווג' },
+        { buttonId: 'add_bank', buttonText: 'עוד דוח' },
+        { buttonId: 'add_credit', buttonText: 'דוח אשראי' },
+        { buttonId: 'start_classify', buttonText: 'נתחיל' },
       ],
     });
   } catch {
