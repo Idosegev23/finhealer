@@ -1,167 +1,198 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+/**
+ * Goals API
+ * GET: Fetch user goals
+ * POST: Create a new goal
+ * PATCH: Update a goal
+ */
 
-// GET - שליפת יעדים
-export async function GET() {
+import { NextRequest, NextResponse } from 'next/server';
+import { createServiceClient } from '@/lib/supabase/server';
+
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = createServiceClient();
     
-    if (!user) {
+    // Get user from session
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const { data, error } = await supabase
+    
+    // Get optional status filter
+    const searchParams = request.nextUrl.searchParams;
+    const status = searchParams.get('status') || 'active';
+    
+    // Fetch goals
+    let query = supabase
       .from('goals')
       .select('*')
       .eq('user_id', user.id)
       .order('priority', { ascending: false })
       .order('created_at', { ascending: false });
-
+    
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+    
+    const { data: goals, error } = await query;
+    
     if (error) {
       console.error('Error fetching goals:', error);
       return NextResponse.json({ error: 'Failed to fetch goals' }, { status: 500 });
     }
-
-    return NextResponse.json({ goals: data || [] });
-
+    
+    // Calculate stats
+    const stats = {
+      total: goals?.length || 0,
+      totalTargetAmount: goals?.reduce((sum, g) => sum + (g.target_amount || 0), 0) || 0,
+      totalCurrentAmount: goals?.reduce((sum, g) => sum + (g.current_amount || 0), 0) || 0,
+      completedCount: goals?.filter(g => g.status === 'completed').length || 0,
+    };
+    
+    stats.totalTargetAmount - stats.totalCurrentAmount; // remaining
+    
+    return NextResponse.json({
+      goals: goals || [],
+      stats,
+    });
   } catch (error) {
-    console.error('Goals GET error:', error);
+    console.error('Goals API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// POST - יצירת/עדכון יעד
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = createServiceClient();
     
-    if (!user) {
+    // Get user from session
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
+    
     const body = await request.json();
-    const { 
-      id, 
-      name, 
-      target_amount, 
-      current_amount = 0,
-      deadline,
-      child_name,
-      priority = 0,
-      description,
-      status = 'active'
-    } = body;
-
-    // Validation
-    if (!name || !target_amount) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, target_amount' },
-        { status: 400 }
-      );
+    
+    // Validate required fields
+    if (!body.name || body.target_amount === undefined) {
+      return NextResponse.json({ error: 'Missing required fields: name, target_amount' }, { status: 400 });
     }
-
-    if (target_amount <= 0) {
-      return NextResponse.json(
-        { error: 'Target amount must be positive' },
-        { status: 400 }
-      );
+    
+    // Create goal
+    const { data: goal, error } = await supabase
+      .from('goals')
+      .insert({
+        user_id: user.id,
+        name: body.name,
+        target_amount: body.target_amount,
+        current_amount: body.current_amount || 0,
+        deadline: body.deadline || null,
+        description: body.description || null,
+        priority: body.priority || 1,
+        status: 'active',
+        child_name: body.child_name || null,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating goal:', error);
+      return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
     }
-
-    // Update או Insert
-    if (id) {
-      // Update
-      const { data, error } = await (supabase as any)
-        .from('goals')
-        .update({
-          name,
-          target_amount,
-          current_amount,
-          deadline,
-          child_name,
-          priority,
-          description,
-          status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error updating goal:', error);
-        return NextResponse.json({ error: 'Failed to update goal' }, { status: 500 });
-      }
-
-      return NextResponse.json({ goal: data });
-    } else {
-      // Insert
-      const { data, error } = await (supabase as any)
-        .from('goals')
-        .insert({
-          user_id: user.id,
-          name,
-          target_amount,
-          current_amount,
-          deadline,
-          child_name,
-          priority,
-          description,
-          status
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating goal:', error);
-        return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
-      }
-
-      // בדיקה אם זה היעד הראשון - אם כן, עדכן phase ל-monitoring
-      const { data: goalsCount } = await supabase
-        .from('goals')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      const { data: userData } = await supabase
-        .from('users')
-        .select('phase')
-        .eq('id', user.id)
-        .single();
-      
-      const userPhase = (userData as any)?.phase;
-
-      if (userPhase === 'goals' && goalsCount && (goalsCount as any).count === 1) {
-        // יעד ראשון - מעבר ל-monitoring
-        await (supabase as any)
-          .from('users')
-          .update({ phase: 'monitoring' })
-          .eq('id', user.id);
-
-        await (supabase as any)
-          .from('alerts')
-          .insert({
-            user_id: user.id,
-            type: 'welcome',
-            message: `מדהים! 🌟 הגדרת את היעד הראשון שלך. עברת לשלב האחרון: בקרה רציפה. מעכשיו אני מלווה אותך לאורך זמן עם התראות, דוחות ותובנות!`,
-            status: 'sent',
-            params: {
-              from_phase: 'goals',
-              to_phase: 'monitoring',
-              first_goal: data.name
-            }
-          });
-      }
-
-      return NextResponse.json({ goal: data }, { status: 201 });
-    }
-
+    
+    return NextResponse.json({ goal }, { status: 201 });
   } catch (error) {
-    console.error('Goals POST error:', error);
+    console.error('Goals API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = createServiceClient();
+    
+    // Get user from session
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const body = await request.json();
+    
+    if (!body.id) {
+      return NextResponse.json({ error: 'Missing goal id' }, { status: 400 });
+    }
+    
+    // Build update object
+    const updateData: Record<string, unknown> = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.target_amount !== undefined) updateData.target_amount = body.target_amount;
+    if (body.current_amount !== undefined) updateData.current_amount = body.current_amount;
+    if (body.deadline !== undefined) updateData.deadline = body.deadline;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.priority !== undefined) updateData.priority = body.priority;
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.child_name !== undefined) updateData.child_name = body.child_name;
+    
+    updateData.updated_at = new Date().toISOString();
+    
+    // Update goal
+    const { data: goal, error } = await supabase
+      .from('goals')
+      .update(updateData)
+      .eq('id', body.id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating goal:', error);
+      return NextResponse.json({ error: 'Failed to update goal' }, { status: 500 });
+    }
+    
+    return NextResponse.json({ goal });
+  } catch (error) {
+    console.error('Goals API error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = createServiceClient();
+    
+    // Get user from session
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Missing goal id' }, { status: 400 });
+    }
+    
+    // Soft delete (set status to cancelled)
+    const { error } = await supabase
+      .from('goals')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error deleting goal:', error);
+      return NextResponse.json({ error: 'Failed to delete goal' }, { status: 500 });
+    }
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Goals API error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

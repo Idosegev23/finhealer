@@ -10,7 +10,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
-import { getGreenAPIClient, sendWhatsAppImage } from '@/lib/greenapi/client';
+import { getGreenAPIClient, sendWhatsAppImage, sendWhatsAppInteractiveButtons } from '@/lib/greenapi/client';
 import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categories';
 import { INCOME_CATEGORIES, findBestIncomeMatch, findTopIncomeMatches } from '@/lib/finance/income-categories';
 import { generatePieChart } from '@/lib/ai/gemini-image-client';
@@ -27,7 +27,30 @@ type UserState =
   | 'classification_income'
   | 'classification_expense'
   | 'behavior'                // Phase 2: Behavior analysis
+  | 'goals'                   // Phase 3: Goal setting
   | 'monitoring';
+
+// Goal types for Phase 3
+interface Goal {
+  id: string;
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  deadline: string | null;
+  priority: number;
+  status: 'active' | 'completed' | 'cancelled';
+  child_name?: string;
+}
+
+type GoalType = 'emergency_fund' | 'debt_payoff' | 'savings_goal' | 'general_improvement';
+
+interface GoalCreationContext {
+  step: 'type' | 'name' | 'amount' | 'deadline' | 'confirm';
+  goalType?: GoalType;
+  goalName?: string;
+  targetAmount?: number;
+  deadline?: string;
+}
 
 interface Transaction {
   id: string;
@@ -185,6 +208,13 @@ export async function routeMessage(
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'behavior') {
     return await handleBehaviorPhase(ctx, msg);
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: goals (Phase 3)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'goals') {
+    return await handleGoalsPhase(ctx, msg);
   }
   
   // ──────────────────────────────────────────────────────────────────────────
@@ -1595,7 +1625,804 @@ async function transitionToGoals(ctx: RouterContext): Promise<RouterResult> {
       `כתוב מספר או תאר את היעד שלך.`,
   });
   
-  return { success: true, newState: 'monitoring' }; // TODO: change to 'goals' when implemented
+  return { success: true, newState: 'goals' };
+}
+
+// ============================================================================
+// Goals Phase Logic (Phase 3)
+// ============================================================================
+
+/**
+ * Handle goals phase interactions
+ */
+async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // קבל context של יצירת יעד
+  const { data: user } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', ctx.userId)
+    .single();
+  
+  const goalContext: GoalCreationContext | null = user?.classification_context?.goalCreation || null;
+  
+  // פקודת התחלת יעד חדש
+  if (isCommand(msg, ['יעד חדש', 'הוסף יעד', 'צור יעד', 'new goal', 'add goal', '➕ יעד חדש'])) {
+    return await startNewGoal(ctx);
+  }
+  
+  // בחירת סוג יעד (1-4)
+  if (goalContext?.step === 'type') {
+    return await handleGoalTypeSelection(ctx, msg);
+  }
+  
+  // קבלת שם היעד
+  if (goalContext?.step === 'name') {
+    return await handleGoalNameInput(ctx, msg);
+  }
+  
+  // קבלת סכום יעד
+  if (goalContext?.step === 'amount') {
+    return await handleGoalAmountInput(ctx, msg);
+  }
+  
+  // קבלת תאריך יעד
+  if (goalContext?.step === 'deadline') {
+    return await handleGoalDeadlineInput(ctx, msg);
+  }
+  
+  // אישור יעד
+  if (goalContext?.step === 'confirm') {
+    return await handleGoalConfirmation(ctx, msg);
+  }
+  
+  // הצגת יעדים קיימים
+  if (isCommand(msg, ['יעדים', 'הצג יעדים', 'goals', 'רשימה', 'list'])) {
+    return await showUserGoals(ctx);
+  }
+  
+  // מעבר לשלב הבא (budget)
+  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'תקציב', 'budget', '▶️ המשך לתקציב'])) {
+    return await transitionToBudget(ctx);
+  }
+  
+  // סיום הגדרת יעדים
+  if (isCommand(msg, ['סיימתי', 'done', 'מספיק', 'finish'])) {
+    return await finishGoalsSetting(ctx);
+  }
+  
+  // עזרה
+  if (isCommand(msg, ['עזרה', 'help', '?'])) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🎯 *שלב 3: הגדרת יעדים*\n\n` +
+        `*פקודות:*\n` +
+        `• *"יעד חדש"* - הוסף יעד חדש\n` +
+        `• *"יעדים"* - הצג יעדים קיימים\n` +
+        `• *"סיימתי"* - סיום והמשך לתקציב\n\n` +
+        `*סוגי יעדים:*\n` +
+        `1️⃣ קרן חירום - רשת ביטחון\n` +
+        `2️⃣ סגירת חובות - הפחתת חוב\n` +
+        `3️⃣ חיסכון למטרה - רכב, חופשה, דירה\n` +
+        `4️⃣ שיפור כללי - איזון תקציבי\n\n` +
+        `φ *Phi - היחס הזהב של הכסף שלך*`,
+    });
+    return { success: true };
+  }
+  
+  // ברירת מחדל - הצג אפשרויות
+  try {
+    await sendWhatsAppInteractiveButtons(ctx.phone, {
+      message: `🎯 *הגדרת יעדים*\n\n` +
+        `מה תרצה לעשות?`,
+      header: 'שלב 3: יעדים',
+      buttons: [
+        { buttonId: 'new_goal', buttonText: '➕ יעד חדש' },
+        { buttonId: 'show_goals', buttonText: '📋 היעדים שלי' },
+        { buttonId: 'finish_goals', buttonText: '✅ סיימתי' },
+      ],
+    });
+  } catch {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🎯 *הגדרת יעדים*\n\n` +
+        `*אפשרויות:*\n` +
+        `• כתוב *"יעד חדש"* להוספת יעד\n` +
+        `• כתוב *"יעדים"* לראות את היעדים שלך\n` +
+        `• כתוב *"סיימתי"* להמשיך לתקציב`,
+    });
+  }
+  
+  return { success: true };
+}
+
+/**
+ * Start creating a new goal
+ */
+async function startNewGoal(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // שמור context
+  await supabase
+    .from('users')
+    .update({
+      classification_context: {
+        goalCreation: { step: 'type' }
+      }
+    })
+    .eq('id', ctx.userId);
+  
+  try {
+    await sendWhatsAppInteractiveButtons(ctx.phone, {
+      message: `🎯 *יעד חדש*\n\n` +
+        `איזה סוג יעד?\n\n` +
+        `1️⃣ *קרן חירום* - 3-6 חודשי הוצאות\n` +
+        `2️⃣ *סגירת חובות* - הפחתת חוב\n` +
+        `3️⃣ *חיסכון למטרה* - רכב, חופשה, דירה\n` +
+        `4️⃣ *שיפור כללי* - איזון תקציבי`,
+      header: 'בחר סוג יעד',
+      buttons: [
+        { buttonId: 'goal_emergency', buttonText: '🛡️ קרן חירום' },
+        { buttonId: 'goal_debt', buttonText: '💳 סגירת חובות' },
+        { buttonId: 'goal_savings', buttonText: '🎯 חיסכון למטרה' },
+      ],
+    });
+  } catch {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🎯 *יעד חדש*\n\n` +
+        `איזה סוג יעד?\n\n` +
+        `1️⃣ *קרן חירום* - 3-6 חודשי הוצאות\n` +
+        `2️⃣ *סגירת חובות* - הפחתת חוב\n` +
+        `3️⃣ *חיסכון למטרה* - רכב, חופשה, דירה\n` +
+        `4️⃣ *שיפור כללי* - איזון תקציבי\n\n` +
+        `כתוב מספר (1-4) או תאר את היעד`,
+    });
+  }
+  
+  return { success: true };
+}
+
+/**
+ * Handle goal type selection
+ */
+async function handleGoalTypeSelection(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  let goalType: GoalType;
+  let goalName: string;
+  
+  const msgLower = msg.toLowerCase();
+  
+  // זיהוי סוג יעד
+  if (msg === '1' || isCommand(msg, ['קרן חירום', 'חירום', 'emergency', 'goal_emergency', '🛡️ קרן חירום'])) {
+    goalType = 'emergency_fund';
+    goalName = 'קרן חירום';
+  } else if (msg === '2' || isCommand(msg, ['סגירת חובות', 'חובות', 'debt', 'goal_debt', '💳 סגירת חובות'])) {
+    goalType = 'debt_payoff';
+    goalName = 'סגירת חובות';
+  } else if (msg === '3' || isCommand(msg, ['חיסכון', 'מטרה', 'savings', 'goal_savings', '🎯 חיסכון למטרה'])) {
+    goalType = 'savings_goal';
+    // נבקש שם ספציפי
+    await supabase
+      .from('users')
+      .update({
+        classification_context: {
+          goalCreation: { step: 'name', goalType: 'savings_goal' }
+        }
+      })
+      .eq('id', ctx.userId);
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🎯 *חיסכון למטרה*\n\n` +
+        `למה אתה חוסך?\n\n` +
+        `דוגמאות:\n` +
+        `• רכב חדש 🚗\n` +
+        `• חופשה משפחתית ✈️\n` +
+        `• מקדמה לדירה 🏠\n` +
+        `• לימודים 📚\n` +
+        `• חתונה / אירוע 💒\n\n` +
+        `כתוב את שם המטרה:`,
+    });
+    return { success: true };
+  } else if (msg === '4' || isCommand(msg, ['שיפור', 'כללי', 'general', 'איזון'])) {
+    goalType = 'general_improvement';
+    goalName = 'שיפור מצב פיננסי';
+  } else {
+    // לא זוהה - נקח את הטקסט כשם יעד
+    goalType = 'savings_goal';
+    goalName = msg;
+  }
+  
+  // עבור ליעד עם סכום קבוע או בקש סכום
+  if (goalType === 'emergency_fund') {
+    // חשב סכום מומלץ לקרן חירום
+    const { data: profile } = await supabase
+      .from('user_financial_profile')
+      .select('total_fixed_expenses')
+      .eq('user_id', ctx.userId)
+      .single();
+    
+    const monthlyExpenses = profile?.total_fixed_expenses || 10000;
+    const recommendedAmount = Math.round(monthlyExpenses * 3);
+    
+    await supabase
+      .from('users')
+      .update({
+        classification_context: {
+          goalCreation: { 
+            step: 'amount', 
+            goalType,
+            goalName,
+            recommendedAmount
+          }
+        }
+      })
+      .eq('id', ctx.userId);
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🛡️ *קרן חירום*\n\n` +
+        `מומלץ: 3-6 חודשי הוצאות\n` +
+        `הערכה לפי הנתונים שלך: *${recommendedAmount.toLocaleString('he-IL')} ₪*\n\n` +
+        `כמה תרצה לחסוך?\n` +
+        `(כתוב סכום או *"אשר"* לסכום המומלץ)`,
+    });
+  } else if (goalType === 'debt_payoff') {
+    // הצג חובות קיימים
+    const { data: loans } = await supabase
+      .from('loans')
+      .select('id, lender_name, current_balance, monthly_payment')
+      .eq('user_id', ctx.userId)
+      .eq('active', true);
+    
+    let debtMessage = `💳 *סגירת חובות*\n\n`;
+    
+    if (loans && loans.length > 0) {
+      debtMessage += `החובות שלך:\n`;
+      let totalDebt = 0;
+      for (const loan of loans) {
+        debtMessage += `• ${loan.lender_name}: ${loan.current_balance?.toLocaleString('he-IL')} ₪\n`;
+        totalDebt += loan.current_balance || 0;
+      }
+      debtMessage += `\n*סה"כ: ${totalDebt.toLocaleString('he-IL')} ₪*\n\n`;
+      debtMessage += `כמה תרצה לסגור?\n(כתוב סכום)`;
+      
+      await supabase
+        .from('users')
+        .update({
+          classification_context: {
+            goalCreation: { 
+              step: 'amount', 
+              goalType,
+              goalName,
+              totalDebt
+            }
+          }
+        })
+        .eq('id', ctx.userId);
+    } else {
+      debtMessage += `לא מצאתי הלוואות במערכת.\n\n`;
+      debtMessage += `כמה חוב תרצה לסגור?\n(כתוב סכום)`;
+      
+      await supabase
+        .from('users')
+        .update({
+          classification_context: {
+            goalCreation: { step: 'amount', goalType, goalName }
+          }
+        })
+        .eq('id', ctx.userId);
+    }
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: debtMessage,
+    });
+  } else if (goalType === 'general_improvement') {
+    // יעד כללי - אין צורך בסכום ספציפי
+    await supabase
+      .from('goals')
+      .insert({
+        user_id: ctx.userId,
+        name: goalName,
+        target_amount: 0,
+        current_amount: 0,
+        priority: 1,
+        status: 'active',
+      });
+    
+    // נקה context
+    await supabase
+      .from('users')
+      .update({ classification_context: {} })
+      .eq('id', ctx.userId);
+    
+    try {
+      await sendWhatsAppInteractiveButtons(ctx.phone, {
+        message: `✅ *נרשם!*\n\n` +
+          `יעד: *${goalName}*\n\n` +
+          `זה יעד כיווני - φ יעזור לך להשתפר בהדרגה.`,
+        header: 'יעד נוסף?',
+        buttons: [
+          { buttonId: 'new_goal', buttonText: '➕ עוד יעד' },
+          { buttonId: 'finish_goals', buttonText: '✅ סיימתי' },
+        ],
+      });
+    } catch {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `✅ *נרשם!*\n\n` +
+          `יעד: *${goalName}*\n\n` +
+          `זה יעד כיווני - φ יעזור לך להשתפר בהדרגה.\n\n` +
+          `• כתוב *"יעד חדש"* להוסיף עוד\n` +
+          `• כתוב *"סיימתי"* להמשיך`,
+      });
+    }
+  } else {
+    // חיסכון למטרה ספציפית - כבר טופל למעלה
+    await supabase
+      .from('users')
+      .update({
+        classification_context: {
+          goalCreation: { step: 'amount', goalType, goalName }
+        }
+      })
+      .eq('id', ctx.userId);
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🎯 *${goalName}*\n\n` +
+        `כמה כסף צריך ליעד הזה?\n` +
+        `(כתוב סכום בשקלים)`,
+    });
+  }
+  
+  return { success: true };
+}
+
+/**
+ * Handle goal name input (for savings_goal)
+ */
+async function handleGoalNameInput(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  const goalName = msg.trim();
+  
+  await supabase
+    .from('users')
+    .update({
+      classification_context: {
+        goalCreation: { 
+          step: 'amount', 
+          goalType: 'savings_goal',
+          goalName
+        }
+      }
+    })
+    .eq('id', ctx.userId);
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `🎯 *${goalName}*\n\n` +
+      `כמה כסף צריך?\n` +
+      `(כתוב סכום בשקלים)`,
+  });
+  
+  return { success: true };
+}
+
+/**
+ * Handle goal amount input
+ */
+async function handleGoalAmountInput(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  const { data: user } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', ctx.userId)
+    .single();
+  
+  const goalContext = user?.classification_context?.goalCreation;
+  
+  let targetAmount: number;
+  
+  // אישור סכום מומלץ
+  if (isCommand(msg, ['אשר', 'אישור', 'confirm', 'ok', 'כן'])) {
+    targetAmount = goalContext?.recommendedAmount || 30000;
+  } else {
+    // חילוץ מספר מהטקסט
+    const numberMatch = msg.replace(/[^\d]/g, '');
+    targetAmount = parseInt(numberMatch, 10);
+    
+    if (isNaN(targetAmount) || targetAmount <= 0) {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `❌ לא הבנתי את הסכום.\n\n` +
+          `כתוב מספר בשקלים, למשל: *50000*`,
+      });
+      return { success: true };
+    }
+  }
+  
+  await supabase
+    .from('users')
+    .update({
+      classification_context: {
+        goalCreation: { 
+          ...goalContext,
+          step: 'deadline',
+          targetAmount
+        }
+      }
+    })
+    .eq('id', ctx.userId);
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `💰 *${targetAmount.toLocaleString('he-IL')} ₪*\n\n` +
+      `עד מתי תרצה להגיע ליעד?\n\n` +
+      `דוגמאות:\n` +
+      `• *"שנה"* - 12 חודשים\n` +
+      `• *"שנתיים"* - 24 חודשים\n` +
+      `• *"6 חודשים"*\n` +
+      `• *"12/2026"* - תאריך ספציפי\n` +
+      `• *"ללא"* - יעד כללי ללא דדליין`,
+  });
+  
+  return { success: true };
+}
+
+/**
+ * Handle goal deadline input
+ */
+async function handleGoalDeadlineInput(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  const { data: user } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', ctx.userId)
+    .single();
+  
+  const goalContext = user?.classification_context?.goalCreation;
+  const msgLower = msg.toLowerCase();
+  
+  let deadline: string | null = null;
+  let deadlineText: string = '';
+  
+  // פרשנות תאריך
+  const now = new Date();
+  
+  if (isCommand(msg, ['ללא', 'אין', 'no deadline', 'none', 'כללי'])) {
+    deadline = null;
+    deadlineText = 'ללא דדליין';
+  } else if (msgLower.includes('שנה') && !msgLower.includes('שנתיים')) {
+    deadline = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0];
+    deadlineText = 'שנה';
+  } else if (msgLower.includes('שנתיים')) {
+    deadline = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate()).toISOString().split('T')[0];
+    deadlineText = 'שנתיים';
+  } else if (msgLower.includes('חודש')) {
+    const monthsMatch = msg.match(/(\d+)/);
+    const months = monthsMatch ? parseInt(monthsMatch[1], 10) : 6;
+    deadline = new Date(now.getFullYear(), now.getMonth() + months, now.getDate()).toISOString().split('T')[0];
+    deadlineText = `${months} חודשים`;
+  } else {
+    // נסה לפרש כתאריך
+    const dateMatch = msg.match(/(\d{1,2})[\/\-](\d{4})/);
+    if (dateMatch) {
+      const month = parseInt(dateMatch[1], 10);
+      const year = parseInt(dateMatch[2], 10);
+      deadline = `${year}-${month.toString().padStart(2, '0')}-01`;
+      deadlineText = `${month}/${year}`;
+    } else {
+      // ברירת מחדל - שנה
+      deadline = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0];
+      deadlineText = 'שנה';
+    }
+  }
+  
+  // חישוב סכום חודשי נדרש
+  const targetAmount = goalContext?.targetAmount || 0;
+  let monthlyRequired = 0;
+  let monthsToGoal = 12;
+  
+  if (deadline) {
+    const deadlineDate = new Date(deadline);
+    monthsToGoal = Math.max(1, Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+    monthlyRequired = Math.ceil(targetAmount / monthsToGoal);
+  }
+  
+  await supabase
+    .from('users')
+    .update({
+      classification_context: {
+        goalCreation: { 
+          ...goalContext,
+          step: 'confirm',
+          deadline,
+          deadlineText,
+          monthlyRequired,
+          monthsToGoal
+        }
+      }
+    })
+    .eq('id', ctx.userId);
+  
+  let confirmMessage = `📋 *סיכום היעד:*\n\n` +
+    `🎯 *${goalContext?.goalName}*\n` +
+    `💰 סכום: *${targetAmount.toLocaleString('he-IL')} ₪*\n`;
+  
+  if (deadline) {
+    confirmMessage += `📅 עד: *${deadlineText}*\n`;
+    confirmMessage += `💵 חודשי: *${monthlyRequired.toLocaleString('he-IL')} ₪*\n`;
+  } else {
+    confirmMessage += `📅 ללא דדליין\n`;
+  }
+  
+  confirmMessage += `\n*לאשר?*`;
+  
+  try {
+    await sendWhatsAppInteractiveButtons(ctx.phone, {
+      message: confirmMessage,
+      header: 'אישור יעד',
+      buttons: [
+        { buttonId: 'confirm_goal', buttonText: '✅ אשר' },
+        { buttonId: 'cancel_goal', buttonText: '❌ בטל' },
+      ],
+    });
+  } catch {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: confirmMessage + `\n\nכתוב *"אשר"* או *"בטל"*`,
+    });
+  }
+  
+  return { success: true };
+}
+
+/**
+ * Handle goal confirmation
+ */
+async function handleGoalConfirmation(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  const { data: user } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', ctx.userId)
+    .single();
+  
+  const goalContext = user?.classification_context?.goalCreation;
+  
+  if (isCommand(msg, ['אשר', 'כן', 'yes', 'confirm', 'ok', 'confirm_goal', '✅ אשר'])) {
+    // שמור יעד
+    await supabase
+      .from('goals')
+      .insert({
+        user_id: ctx.userId,
+        name: goalContext?.goalName || 'יעד',
+        target_amount: goalContext?.targetAmount || 0,
+        current_amount: 0,
+        deadline: goalContext?.deadline,
+        priority: 1,
+        status: 'active',
+      });
+    
+    // נקה context
+    await supabase
+      .from('users')
+      .update({ classification_context: {} })
+      .eq('id', ctx.userId);
+    
+    // ספור יעדים
+    const { count } = await supabase
+      .from('goals')
+      .select('id', { count: 'exact' })
+      .eq('user_id', ctx.userId)
+      .eq('status', 'active');
+    
+    try {
+      await sendWhatsAppInteractiveButtons(ctx.phone, {
+        message: `✅ *נשמר!*\n\n` +
+          `יעד: *${goalContext?.goalName}*\n` +
+          `סכום: *${(goalContext?.targetAmount || 0).toLocaleString('he-IL')} ₪*\n\n` +
+          `יש לך *${count || 1} יעדים* פעילים.`,
+        header: 'עוד יעד?',
+        buttons: [
+          { buttonId: 'new_goal', buttonText: '➕ עוד יעד' },
+          { buttonId: 'show_goals', buttonText: '📋 היעדים שלי' },
+          { buttonId: 'finish_goals', buttonText: '✅ סיימתי' },
+        ],
+      });
+    } catch {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `✅ *נשמר!*\n\n` +
+          `יעד: *${goalContext?.goalName}*\n` +
+          `סכום: *${(goalContext?.targetAmount || 0).toLocaleString('he-IL')} ₪*\n\n` +
+          `יש לך *${count || 1} יעדים* פעילים.\n\n` +
+          `• כתוב *"יעד חדש"* להוסיף עוד\n` +
+          `• כתוב *"יעדים"* לראות הכל\n` +
+          `• כתוב *"סיימתי"* להמשיך`,
+      });
+    }
+  } else if (isCommand(msg, ['בטל', 'לא', 'no', 'cancel', 'cancel_goal', '❌ בטל'])) {
+    // בטל ונקה context
+    await supabase
+      .from('users')
+      .update({ classification_context: {} })
+      .eq('id', ctx.userId);
+    
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ בוטל.\n\n` +
+        `כתוב *"יעד חדש"* לנסות שוב`,
+    });
+  } else {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `כתוב *"אשר"* או *"בטל"*`,
+    });
+  }
+  
+  return { success: true };
+}
+
+/**
+ * Show user's goals
+ */
+async function showUserGoals(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  const { data: goals } = await supabase
+    .from('goals')
+    .select('*')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'active')
+    .order('priority', { ascending: false });
+  
+  if (!goals || goals.length === 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📋 *היעדים שלך:*\n\n` +
+        `אין עדיין יעדים מוגדרים.\n\n` +
+        `כתוב *"יעד חדש"* להתחיל!`,
+    });
+    return { success: true };
+  }
+  
+  let message = `📋 *היעדים שלך:*\n\n`;
+  
+  for (let i = 0; i < goals.length; i++) {
+    const goal = goals[i];
+    const progress = goal.target_amount > 0 
+      ? Math.round((goal.current_amount / goal.target_amount) * 100)
+      : 0;
+    
+    const progressBar = createProgressBar(progress);
+    
+    message += `${i + 1}. *${goal.name}*\n`;
+    message += `   ${progressBar} ${progress}%\n`;
+    message += `   ${goal.current_amount.toLocaleString('he-IL')}/${goal.target_amount.toLocaleString('he-IL')} ₪\n`;
+    
+    if (goal.deadline) {
+      const deadline = new Date(goal.deadline);
+      const now = new Date();
+      const monthsLeft = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30));
+      message += `   📅 נשארו ${monthsLeft} חודשים\n`;
+    }
+    
+    message += `\n`;
+  }
+  
+  message += `*סה"כ: ${goals.length} יעדים*`;
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message,
+  });
+  
+  return { success: true };
+}
+
+/**
+ * Create a text-based progress bar
+ */
+function createProgressBar(percent: number): string {
+  const filled = Math.round(percent / 10);
+  const empty = 10 - filled;
+  return '▓'.repeat(filled) + '░'.repeat(empty);
+}
+
+/**
+ * Finish goals setting and move to budget phase
+ */
+async function finishGoalsSetting(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // ספור יעדים
+  const { data: goals } = await supabase
+    .from('goals')
+    .select('name, target_amount')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'active');
+  
+  const totalGoalAmount = goals?.reduce((sum, g) => sum + (g.target_amount || 0), 0) || 0;
+  
+  try {
+    await sendWhatsAppInteractiveButtons(ctx.phone, {
+      message: `🎯 *סיימנו להגדיר יעדים!*\n\n` +
+        `📊 *${goals?.length || 0} יעדים*\n` +
+        `💰 סה"כ: *${totalGoalAmount.toLocaleString('he-IL')} ₪*\n\n` +
+        `עכשיו נבנה תקציב שתומך ביעדים האלה.`,
+      header: 'המשך לתקציב?',
+      buttons: [
+        { buttonId: 'to_budget', buttonText: '▶️ המשך לתקציב' },
+        { buttonId: 'new_goal', buttonText: '➕ עוד יעד' },
+      ],
+    });
+  } catch {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🎯 *סיימנו להגדיר יעדים!*\n\n` +
+        `📊 *${goals?.length || 0} יעדים*\n` +
+        `💰 סה"כ: *${totalGoalAmount.toLocaleString('he-IL')} ₪*\n\n` +
+        `עכשיו נבנה תקציב שתומך ביעדים האלה.\n\n` +
+        `כתוב *"המשך"* לעבור לתקציב`,
+    });
+  }
+  
+  return { success: true };
+}
+
+/**
+ * Transition from goals phase to budget phase
+ */
+async function transitionToBudget(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // עדכן phase
+  await supabase
+    .from('users')
+    .update({ 
+      onboarding_state: 'monitoring', // TODO: change to 'budget' when budget phase is implemented
+      current_phase: 'budget',
+      phase_updated_at: new Date().toISOString()
+    })
+    .eq('id', ctx.userId);
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `💰 *שלב 4: בניית תקציב*\n\n` +
+      `φ יבנה לך תקציב חכם מבוסס על:\n` +
+      `• ההיסטוריה שלך\n` +
+      `• היעדים שהגדרת\n` +
+      `• המלצות מותאמות\n\n` +
+      `🚧 *בקרוב...*\n` +
+      `התכונה הזו בפיתוח.\n\n` +
+      `בינתיים, אתה יכול:\n` +
+      `• לשלוח עוד מסמכים 📄\n` +
+      `• לראות גרפים 📊\n` +
+      `• לשאול שאלות 💬\n\n` +
+      `φ *Phi - היחס הזהב של הכסף שלך*`,
+  });
+  
+  return { success: true, newState: 'monitoring' };
 }
 
 /**

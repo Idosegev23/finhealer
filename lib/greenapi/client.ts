@@ -422,4 +422,25 @@ export async function sendWhatsAppImage(
   return client.sendImage({ phoneNumber, imageBase64, caption, mimeType });
 }
 
+/**
+ * Convenience function to send WhatsApp interactive buttons
+ */
+export async function sendWhatsAppInteractiveButtons(
+  phoneNumber: string,
+  params: {
+    message: string;
+    header?: string;
+    footer?: string;
+    buttons: Array<{ buttonId: string; buttonText: string }>;
+  }
+) {
+  const client = getGreenAPIClient();
+  return client.sendInteractiveButtons({
+    phoneNumber,
+    message: params.message,
+    header: params.header,
+    footer: params.footer,
+    buttons: params.buttons,
+  });
+}
 
