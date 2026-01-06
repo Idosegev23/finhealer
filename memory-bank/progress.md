@@ -728,8 +728,8 @@ GREEN_INVOICE_SECRET=              # לתשלומים אמיתיים
 | Phase 1: Reflection | ✅ 100% | שיקוף עבר מושלם |
 | Phase 1.5: Document Scanning | ✅ 100% | סריקה וסיווג מושלמים |
 | Phase 2: Behavior | ✅ 100% | **מנוע ניתוח התנהגות הושלם!** |
-| Phase 3: Goals | 🚀 0% | **הבא בתור!** (שונה!) |
-| Phase 4: Budget | ⏳ 0% | תקציב מבוסס יעדים (שונה!) |
+| Phase 3: Goals | ✅ 100% | **מערכת יעדים הושלמה!** WhatsApp + Dashboard |
+| Phase 4: Budget | 🚀 0% | **הבא בתור!** תקציב מבוסס יעדים |
 | Phase 5: Monitoring | ⏳ 30% | Dashboard קיים |
 
 ---
@@ -797,4 +797,58 @@ GREEN_INVOICE_SECRET=              # לתשלומים אמיתיים
 
 ---
 
-**עדכון אחרון:** 6 בינואר 2026 - Phase 2 Behavior Engine הושלם! 🎯φ
+---
+
+## 🎯 **סבב 10: Phase 3 Goals System** (6 בינואר 2026)
+
+### ✅ Goals Management - מערכת יעדים מלאה
+
+#### 1. WhatsApp Goals Flow (phi-router.ts)
+- הוספת `goals` state ל-UserState
+- `handleGoalsPhase()` - routing לפקודות יעדים
+- `startNewGoal()` - התחלת יצירת יעד
+- `handleGoalTypeSelection()` - בחירת סוג יעד
+- `handleGoalNameInput()` - קבלת שם יעד
+- `handleGoalAmountInput()` - קבלת סכום
+- `handleGoalDeadlineInput()` - קבלת תאריך יעד
+- `handleGoalConfirmation()` - אישור ושמירה
+- `showUserGoals()` - הצגת יעדים קיימים
+- `finishGoalsSetting()` - סיום והמשך לתקציב
+- `transitionToBudget()` - מעבר לשלב 4
+
+#### 2. 4 סוגי יעדים נתמכים
+- 🛡️ **קרן חירום** - 3-6 חודשי הוצאות
+- 💳 **סגירת חובות** - הפחתת חוב
+- 🎯 **חיסכון למטרה** - רכב, חופשה, דירה
+- ⚖️ **שיפור כללי** - איזון תקציבי
+
+#### 3. API Endpoint: `/api/goals`
+- GET - קבלת יעדים עם סטטיסטיקות
+- POST - יצירת יעד חדש
+- PATCH - עדכון יעד קיים
+- DELETE - מחיקת יעד (soft delete)
+
+#### 4. Dashboard Goals Page
+- **Stats Cards** - יעדים פעילים, סה"כ יעד, נחסך, הושלמו
+- **Goal Cards** - progress bars אנימטיביים
+- **Add/Edit Form** - טופס יעד מלא
+- **Tips Section** - טיפים להצלחה
+- **Completed Goals** - סקשן יעדים שהושלמו 🎉
+
+#### 5. WhatsApp Interactive Buttons
+- כפתורי בחירת סוג יעד
+- כפתורי אישור/ביטול
+- כפתורי ניווט בין שלבים
+
+### 📊 סטטיסטיקות:
+- **3 קבצים חדשים:**
+  - `app/api/goals/route.ts`
+  - `app/dashboard/goals/page.tsx`
+- **+1500 שורות קוד**
+- **12 פונקציות חדשות** ב-phi-router.ts
+- **4 סוגי יעדים** נתמכים
+- **Full CRUD** ב-API
+
+---
+
+**עדכון אחרון:** 6 בינואר 2026 - Phase 3 Goals System הושלם! 🎯φ
