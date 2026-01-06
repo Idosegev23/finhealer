@@ -347,22 +347,50 @@ export async function POST(request: NextRequest) {
       const buttonId = payload.messageData?.buttonsResponseMessage?.buttonId || '';
       const buttonText = payload.messageData?.buttonsResponseMessage?.buttonText || '';
       
-      console.log('🔘 Button pressed:', buttonId, buttonText);
+      console.log('🔘 Button pressed - buttonId:', buttonId, 'buttonText:', buttonText);
 
-      // 🎯 מעביר ל-φ Router - נסה buttonId קודם, אם לא עובד נסה buttonText
+      // 🎯 מיפוי buttonText → buttonId (לטיפול במקרים שנשלח רק buttonText)
+      const buttonTextToId: Record<string, string> = {
+        // סיווג
+        '✅ כן': 'confirm',
+        '⏭️ דלג': 'skip',
+        '📋 רשימה': 'list',
+        'כן ✅': 'confirm',
+        'דלג ⏭️': 'skip',
+        'רשימה 📋': 'list',
+        // מסמכים
+        '📄 עוד דוח בנק': 'add_bank',
+        '💳 דוח אשראי': 'add_credit',
+        '📄 שלח עוד מסמך': 'add_doc',
+        '📄 עוד מסמכים': 'add_more',
+        '📄 עוד דוחות': 'add_docs',
+        '▶️ נתחיל לסווג': 'start_classify',
+        '▶️ נמשיך לסווג': 'start_classify',
+        // behavior
+        '🔍 ניתוח התנהגות': 'analyze',
+        '▶️ המשך ליעדים': 'to_goals',
+        // goals
+        '➕ יעד חדש': 'new_goal',
+        '➕ עוד יעד': 'new_goal',
+        '📋 היעדים שלי': 'show_goals',
+        '✅ סיימתי': 'finish_goals',
+        '🛡️ קרן חירום': 'goal_emergency',
+        '💳 סגירת חובות': 'goal_debt',
+        '🎯 חיסכון למטרה': 'goal_savings',
+        '✅ אשר': 'confirm_goal',
+        '❌ בטל': 'cancel_goal',
+        '▶️ המשך לתקציב': 'to_budget',
+      };
+      
+      // נשתמש ב-buttonId, או נמפה מ-buttonText
+      const resolvedId = buttonId || buttonTextToId[buttonText] || buttonText;
+      
+      console.log('🎯 Resolved to:', resolvedId);
+
       const { routeMessage } = await import('@/lib/conversation/phi-router');
+      const result = await routeMessage(userData.id, phoneNumber, resolvedId);
       
-      // נשלח את ה-buttonId, ואם הוא ריק נשלח את ה-buttonText
-      const messageToRoute = buttonId || buttonText;
-      let result = await routeMessage(userData.id, phoneNumber, messageToRoute);
-      
-      // אם לא הצליח עם buttonId, ננסה עם buttonText (עם האימוג'ים)
-      if (!result.success && buttonId && buttonText && buttonId !== buttonText) {
-        console.log('🔄 Retrying with buttonText:', buttonText);
-        result = await routeMessage(userData.id, phoneNumber, buttonText);
-      }
-      
-      console.log(`[φ Router] Button result: success=${result.success}`);
+      console.log('[φ Router] Button result: success=' + result.success);
       
       return NextResponse.json({
         status: 'button_response',
