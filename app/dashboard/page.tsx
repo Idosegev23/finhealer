@@ -143,7 +143,7 @@ export default async function DashboardPage() {
                 <TrendingUp className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <span className="text-sm text-phi-slate">סה"כ הכנסות</span>
+                <span className="text-sm text-phi-slate">סה״כ הכנסות</span>
                 <p className="text-xs text-phi-slate/60">ממוצע: ₪{monthlyAvgIncome.toLocaleString('he-IL')}/חודש</p>
               </div>
             </div>
@@ -156,7 +156,7 @@ export default async function DashboardPage() {
                 <TrendingDown className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <span className="text-sm text-phi-slate">סה"כ הוצאות</span>
+                <span className="text-sm text-phi-slate">סה״כ הוצאות</span>
                 <p className="text-xs text-phi-slate/60">ממוצע: ₪{monthlyAvgExpenses.toLocaleString('he-IL')}/חודש</p>
               </div>
             </div>
