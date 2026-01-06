@@ -5,66 +5,58 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Wallet, TrendingUp, Calendar, AlertCircle, 
   RefreshCw, Sparkles, DollarSign, Clock,
-  ChevronDown, ChevronUp, Target
+  ChevronDown, ChevronUp, Target, Users, Home,
+  CreditCard, ShoppingBag, Lock, Zap, Star,
+  PieChart, BarChart3, ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import BudgetCategoryCard from '@/components/budget/BudgetCategoryCard';
-import BudgetFrequencyCard from '@/components/budget/BudgetFrequencyCard';
+import { Progress } from '@/components/ui/progress';
 
-interface Budget {
-  id: string;
-  month: string;
-  total_budget: number;
-  total_spent: number;
-  daily_budget: number;
-  weekly_budget: number;
-  daily_spent: number;
-  weekly_spent: number;
-  days_passed: number;
-  days_remaining: number;
-  status: string;
-  savings_goal: number;
+interface BudgetData {
+  budget: any;
+  categories: any[];
+  frequencies: any[];
+  vendorBreakdown: any[];
+  expenseTypes: {
+    fixed: { total: number; avgMonthly: number; categories: string[] };
+    variable: { total: number; avgMonthly: number; categories: string[] };
+    special: { total: number; avgMonthly: number; categories: string[] };
+  };
+  summary: {
+    avgMonthlyIncome: number;
+    avgMonthlyExpenses: number;
+    avgMonthlySavings: number;
+    monthsAnalyzed: number;
+    transactionsCount: number;
+  };
+  profileContext: {
+    numPeople: number;
+    housingType: string;
+    incomeLevel: string;
+  };
 }
 
 export default function BudgetPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().substring(0, 7));
-  const [budget, setBudget] = useState<Budget | null>(null);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [frequencies, setFrequencies] = useState<any[]>([]);
+  const [data, setData] = useState<BudgetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [canCreate, setCanCreate] = useState(false);
-  const [showCategories, setShowCategories] = useState(true);
-  const [showFrequencies, setShowFrequencies] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'vendors'>('overview');
 
   useEffect(() => {
-    checkIfCanCreate();
     loadBudget();
   }, [currentMonth]);
-
-  const checkIfCanCreate = async () => {
-    try {
-      const response = await fetch('/api/budget/analyze-history');
-      if (response.ok) {
-        const data = await response.json();
-        setCanCreate(data.canCreateBudget);
-      }
-    } catch (error) {
-      console.error('Error checking budget eligibility:', error);
-    }
-  };
 
   const loadBudget = async () => {
     setLoading(true);
     try {
-      // TODO: יצירת API לשליפת תקציב קיים
-      // לעכשיו נדמה שאין תקציב
-      setBudget(null);
-      setCategories([]);
-      setFrequencies([]);
+      const response = await fetch(`/api/budget?month=${currentMonth}`);
+      if (response.ok) {
+        const result = await response.json();
+        setData(result);
+      }
     } catch (error) {
       console.error('Error loading budget:', error);
     } finally {
@@ -80,13 +72,11 @@ export default function BudgetPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           month: currentMonth,
-          savingsGoalPercentage: 10
+          savingsGoalPercentage: data?.profileContext?.incomeLevel === 'גבוהה' ? 15 : 10
         })
       });
 
       if (response.ok) {
-        const data = await response.json();
-        alert('✅ תקציב חכם נוצר בהצלחה!');
         loadBudget();
       } else {
         const error = await response.json();
@@ -94,7 +84,6 @@ export default function BudgetPage() {
       }
     } catch (error) {
       console.error('Error creating budget:', error);
-      alert('❌ שגיאה ביצירת תקציב');
     } finally {
       setCreating(false);
     }
@@ -102,140 +91,22 @@ export default function BudgetPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-phi-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500 dark:text-gray-400 text-lg">טוען תקציב...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-phi-gold mx-auto mb-4"></div>
+          <p className="text-phi-slate text-lg">טוען תקציב...</p>
         </div>
       </div>
     );
   }
 
-  // אם אין תקציב - מסך יצירה
-  if (!budget) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-950 py-12 px-4" dir="rtl">
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-6 shadow-2xl">
-              <Sparkles className="w-12 h-12 text-white" />
-            </div>
-            <h1 className="text-5xl font-black text-gray-900 dark:text-white mb-4">
-              תקציב חכם 🎯
-            </h1>
-            <p className="text-xl text-gray-600 dark:text-gray-400">
-              בואו ניצור תקציב מותאם אישית בהתבסס על ההיסטוריה שלך
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl p-8 border border-gray-200 dark:border-gray-800"
-          >
-            {canCreate ? (
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 dark:bg-green-900 rounded-full mb-6">
-                  <TrendingUp className="w-10 h-10 text-green-600 dark:text-green-400" />
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-                  מוכן ליצירה! 🎉
-                </h2>
-                <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-                  יש לנו מספיק נתונים כדי ליצור עבורך תקציב חכם ומותאם אישית.
-                  התקציב יתבסס על:
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6">
-                    <Calendar className="w-8 h-8 text-blue-600 dark:text-blue-400 mx-auto mb-3" />
-                    <h3 className="font-bold text-gray-900 dark:text-white mb-2">3 חודשים אחרונים</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      ניתוח מעמיק של ההוצאות שלך
-                    </p>
-                  </div>
-
-                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6">
-                    <Target className="w-8 h-8 text-purple-600 dark:text-purple-400 mx-auto mb-3" />
-                    <h3 className="font-bold text-gray-900 dark:text-white mb-2">מטרות אישיות</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      התאמה למטרות החיסכון שלך
-                    </p>
-                  </div>
-
-                  <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-6">
-                    <DollarSign className="w-8 h-8 text-green-600 dark:text-green-400 mx-auto mb-3" />
-                    <h3 className="font-bold text-gray-900 dark:text-white mb-2">מסוגלות פיננסית</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      בהתאם להכנסה ולמצב הכלכלי
-                    </p>
-                  </div>
-
-                  <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-6">
-                    <Sparkles className="w-8 h-8 text-orange-600 dark:text-orange-400 mx-auto mb-3" />
-                    <h3 className="font-bold text-gray-900 dark:text-white mb-2">המלצות AI</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      יעוץ חכם ומותאם אישית
-                    </p>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={createSmartBudget}
-                  disabled={creating}
-                  size="lg"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg px-10 h-14 shadow-xl"
-                >
-                  {creating ? (
-                    <>
-                      <RefreshCw className="w-5 h-5 ml-2 animate-spin" />
-                      יוצר תקציב חכם...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-5 h-5 ml-2" />
-                      צור תקציב חכם
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-yellow-100 dark:bg-yellow-900 rounded-full mb-6">
-                  <AlertCircle className="w-10 h-10 text-yellow-600 dark:text-yellow-400" />
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-                  עוד קצת נתונים...
-                </h2>
-                <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-                  כדי ליצור תקציב חכם ומדויק, נדרשות לפחות <strong>30 תנועות</strong> מ-3 החודשים האחרונים.
-                </p>
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 max-w-md mx-auto">
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    💡 <strong>טיפ:</strong> המשך לרשום הוצאות או העלה דוחות בנק כדי שנוכל ליצור עבורך תקציב מותאם אישית!
-                  </p>
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-
-  // אם יש תקציב - מסך ניהול
-  const percentageUsed = budget.total_budget > 0 ? (budget.total_spent / budget.total_budget) * 100 : 0;
-  const dailyPercentage = budget.daily_budget > 0 ? (budget.daily_spent / budget.daily_budget) * 100 : 0;
-  const weeklyPercentage = budget.weekly_budget > 0 ? (budget.weekly_spent / budget.weekly_budget) * 100 : 0;
+  const hasBudget = data?.budget;
+  const { summary, profileContext, expenseTypes, vendorBreakdown, categories } = data || {};
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 py-12 px-4" dir="rtl">
+    <div className="min-h-screen bg-phi-bg py-8 px-4" dir="rtl">
       <div className="max-w-7xl mx-auto">
+        
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -244,204 +115,460 @@ export default function BudgetPage() {
         >
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h1 className="text-5xl font-black text-gray-900 dark:text-white mb-3 flex items-center gap-3">
-                <Wallet className="w-12 h-12 text-blue-600" />
-                התקציב שלי
+              <h1 className="text-4xl font-bold text-phi-dark mb-2 flex items-center gap-3">
+                <span className="text-phi-gold font-serif text-5xl">φ</span>
+                תקציב חכם
               </h1>
-              <p className="text-xl text-gray-600 dark:text-gray-400">
-                מעקב בזמן אמת אחר ההוצאות והתקציב
+              <p className="text-phi-slate">
+                מבוסס על {summary?.monthsAnalyzed || 0} חודשים • {summary?.transactionsCount || 0} תנועות
               </p>
             </div>
             
-            <Select value={currentMonth} onValueChange={setCurrentMonth}>
-              <SelectTrigger className="w-48 h-12 text-lg font-semibold">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {/* TODO: Generate months dynamically */}
-                <SelectItem value={currentMonth}>
-                  {new Date(currentMonth + '-01').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-3">
+              <select
+                value={currentMonth}
+                onChange={(e) => setCurrentMonth(e.target.value)}
+                className="px-4 py-2 border border-phi-frost rounded-lg bg-white text-phi-dark"
+              >
+                {generateMonthOptions().map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+              
+              {!hasBudget && (
+                <Button
+                  onClick={createSmartBudget}
+                  disabled={creating}
+                  className="bg-phi-gold hover:bg-phi-coral text-white"
+                >
+                  {creating ? (
+                    <><RefreshCw className="w-4 h-4 ml-2 animate-spin" /> יוצר...</>
+                  ) : (
+                    <><Sparkles className="w-4 h-4 ml-2" /> צור תקציב חכם</>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
+        </motion.div>
+
+        {/* Profile Context Cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+        >
+          <Card className="bg-white border-phi-frost">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-phi-slate">נפשות</p>
+                  <p className="text-xl font-bold text-phi-dark">{profileContext?.numPeople || 1}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-phi-frost">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <Home className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-phi-slate">מגורים</p>
+                  <p className="text-xl font-bold text-phi-dark">{profileContext?.housingType || '-'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-phi-frost">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-phi-slate">רמת הכנסה</p>
+                  <p className="text-xl font-bold text-phi-dark">{profileContext?.incomeLevel || '-'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-phi-frost">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-phi-gold/20 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-phi-gold" />
+                </div>
+                <div>
+                  <p className="text-sm text-phi-slate">יעד חיסכון</p>
+                  <p className="text-xl font-bold text-phi-dark">
+                    {profileContext?.incomeLevel === 'גבוהה' ? '15%' : '10%'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Total Budget */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Card className={`shadow-xl border-2 ${
-              percentageUsed >= 100 ? 'border-red-500' : 
-              percentageUsed >= 90 ? 'border-yellow-500' : 
-              'border-green-500'
-            }`}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <Wallet className="w-10 h-10 text-blue-600" />
-                  <Badge variant="outline" className={
-                    percentageUsed >= 100 ? 'border-red-500 text-red-700' :
-                    percentageUsed >= 90 ? 'border-yellow-500 text-yellow-700' :
-                    'border-green-500 text-green-700'
-                  }>
-                    {Math.round(percentageUsed)}%
-                  </Badge>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">תקציב חודשי</p>
-                <p className="text-3xl font-black text-gray-900 dark:text-white mb-2">
-                  ₪{budget.total_budget.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-500">
-                  הוצאו: ₪{budget.total_spent.toLocaleString()}
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+        >
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <DollarSign className="w-10 h-10 opacity-80" />
+                <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
+              </div>
+              <p className="text-green-100 text-sm mb-1">הכנסות</p>
+              <p className="text-3xl font-bold">₪{(summary?.avgMonthlyIncome || 0).toLocaleString()}</p>
+            </CardContent>
+          </Card>
 
-          {/* Daily Budget */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card className="shadow-xl">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <Clock className="w-10 h-10 text-purple-600" />
-                  <Badge variant="outline">יומי</Badge>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">תקציב יומי</p>
-                <p className="text-3xl font-black text-gray-900 dark:text-white mb-2">
-                  ₪{budget.daily_budget?.toLocaleString() || 0}
-                </p>
-                <p className="text-sm text-gray-500">
-                  הוצאו היום: ₪{budget.daily_spent?.toLocaleString() || 0}
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <CreditCard className="w-10 h-10 opacity-80" />
+                <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
+              </div>
+              <p className="text-red-100 text-sm mb-1">הוצאות</p>
+              <p className="text-3xl font-bold">₪{(summary?.avgMonthlyExpenses || 0).toLocaleString()}</p>
+            </CardContent>
+          </Card>
 
-          {/* Weekly Budget */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card className="shadow-xl">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <Calendar className="w-10 h-10 text-orange-600" />
-                  <Badge variant="outline">שבועי</Badge>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">תקציב שבועי</p>
-                <p className="text-3xl font-black text-gray-900 dark:text-white mb-2">
-                  ₪{budget.weekly_budget?.toLocaleString() || 0}
-                </p>
-                <p className="text-sm text-gray-500">
-                  הוצאו השבוע: ₪{budget.weekly_spent?.toLocaleString() || 0}
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <Card className={`border-0 ${(summary?.avgMonthlySavings || 0) >= 0 
+            ? 'bg-gradient-to-br from-phi-mint to-teal-500 text-white' 
+            : 'bg-gradient-to-br from-orange-500 to-red-500 text-white'}`}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <Wallet className="w-10 h-10 opacity-80" />
+                <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
+              </div>
+              <p className="text-white/80 text-sm mb-1">יתרה</p>
+              <p className="text-3xl font-bold">₪{(summary?.avgMonthlySavings || 0).toLocaleString()}</p>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-          {/* Days Remaining */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card className="shadow-xl bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <TrendingUp className="w-10 h-10" />
-                  <Badge className="bg-white/20 text-white border-0">חיסכון</Badge>
-                </div>
-                <p className="text-sm text-green-100 mb-1">מטרת חיסכון</p>
-                <p className="text-3xl font-black mb-2">
-                  ₪{budget.savings_goal?.toLocaleString() || 0}
-                </p>
-                <p className="text-sm text-green-100">
-                  {budget.days_remaining || 0} ימים נשארו
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 border-b border-phi-frost">
+          {[
+            { id: 'overview', label: 'סקירה כללית', icon: PieChart },
+            { id: 'categories', label: 'קטגוריות', icon: BarChart3 },
+            { id: 'vendors', label: 'ממוצע שורת הוצאה', icon: ShoppingBag },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-phi-gold text-phi-gold'
+                  : 'border-transparent text-phi-slate hover:text-phi-dark'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Budget by Frequency */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="mb-8"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-              תקציב לפי סוג הוצאה
-            </h2>
-            <Button
-              variant="ghost"
-              onClick={() => setShowFrequencies(!showFrequencies)}
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'overview' && (
+            <motion.div
+              key="overview"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             >
-              {showFrequencies ? <ChevronUp /> : <ChevronDown />}
-            </Button>
-          </div>
-          
-          <AnimatePresence>
-            {showFrequencies && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-              >
-                {frequencies.map((freq, index) => (
-                  <BudgetFrequencyCard key={freq.id} {...freq} />
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+              {/* קבועות */}
+              <Card className="bg-white border-phi-frost">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                      <Lock className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg text-phi-dark">הוצאות קבועות</CardTitle>
+                      <p className="text-sm text-phi-slate">התחייבויות חודשיות</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-phi-dark mb-4">
+                    ₪{(expenseTypes?.fixed?.avgMonthly || 0).toLocaleString()}
+                    <span className="text-sm font-normal text-phi-slate">/חודש</span>
+                  </p>
+                  <div className="space-y-2">
+                    {expenseTypes?.fixed?.categories?.slice(0, 5).map((cat, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-phi-slate">
+                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        {cat}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* Budget by Category */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-              תקציב לפי קטגוריה
-            </h2>
-            <Button
-              variant="ghost"
-              onClick={() => setShowCategories(!showCategories)}
+              {/* משתנות */}
+              <Card className="bg-white border-phi-frost">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
+                      <Zap className="w-6 h-6 text-orange-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg text-phi-dark">הוצאות משתנות</CardTitle>
+                      <p className="text-sm text-phi-slate">ניתנות לשינוי</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-phi-dark mb-4">
+                    ₪{(expenseTypes?.variable?.avgMonthly || 0).toLocaleString()}
+                    <span className="text-sm font-normal text-phi-slate">/חודש</span>
+                  </p>
+                  <div className="space-y-2">
+                    {expenseTypes?.variable?.categories?.slice(0, 5).map((cat, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-phi-slate">
+                        <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                        {cat}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* מיוחדות */}
+              <Card className="bg-white border-phi-frost">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                      <Star className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg text-phi-dark">הוצאות מיוחדות</CardTitle>
+                      <p className="text-sm text-phi-slate">חד פעמיות</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-phi-dark mb-4">
+                    ₪{(expenseTypes?.special?.avgMonthly || 0).toLocaleString()}
+                    <span className="text-sm font-normal text-phi-slate">/חודש</span>
+                  </p>
+                  <div className="space-y-2">
+                    {expenseTypes?.special?.categories?.slice(0, 5).map((cat, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-phi-slate">
+                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                        {cat}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {activeTab === 'categories' && (
+            <motion.div
+              key="categories"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
             >
-              {showCategories ? <ChevronUp /> : <ChevronDown />}
-            </Button>
-          </div>
-          
-          <AnimatePresence>
-            {showCategories && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-              >
-                {categories.map((category, index) => (
-                  <BudgetCategoryCard key={category.id} {...category} />
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+              <Card className="bg-white border-phi-frost">
+                <CardHeader>
+                  <CardTitle className="text-phi-dark">תקציב לפי קטגוריות</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {categories && categories.length > 0 ? (
+                    <div className="space-y-4">
+                      {categories.map((cat, i) => {
+                        const percentage = cat.allocated_amount > 0 
+                          ? Math.min(100, (cat.spent_amount / cat.allocated_amount) * 100) 
+                          : 0;
+                        const isOver = percentage > 100;
+                        
+                        return (
+                          <div key={i} className="p-4 rounded-lg bg-phi-bg">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-medium text-phi-dark">{cat.category_name}</span>
+                              <div className="text-left">
+                                <span className={`font-bold ${isOver ? 'text-red-600' : 'text-phi-dark'}`}>
+                                  ₪{(cat.spent_amount || 0).toLocaleString()}
+                                </span>
+                                <span className="text-phi-slate"> / ₪{(cat.allocated_amount || 0).toLocaleString()}</span>
+                              </div>
+                            </div>
+                            <Progress 
+                              value={Math.min(percentage, 100)} 
+                              className={`h-2 ${isOver ? '[&>div]:bg-red-500' : '[&>div]:bg-phi-mint'}`}
+                            />
+                            <div className="flex justify-between mt-1 text-xs text-phi-slate">
+                              <span>{Math.round(percentage)}% נוצל</span>
+                              <span className={isOver ? 'text-red-600' : 'text-green-600'}>
+                                {isOver 
+                                  ? `חריגה של ₪${((cat.spent_amount || 0) - (cat.allocated_amount || 0)).toLocaleString()}`
+                                  : `נותרו ₪${((cat.allocated_amount || 0) - (cat.spent_amount || 0)).toLocaleString()}`
+                                }
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <BarChart3 className="w-16 h-16 text-phi-frost mx-auto mb-4" />
+                      <p className="text-phi-slate mb-4">אין קטגוריות תקציב עדיין</p>
+                      <Button onClick={createSmartBudget} disabled={creating} className="bg-phi-gold text-white">
+                        <Sparkles className="w-4 h-4 ml-2" />
+                        צור תקציב חכם
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {activeTab === 'vendors' && (
+            <motion.div
+              key="vendors"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <Card className="bg-white border-phi-frost">
+                <CardHeader>
+                  <CardTitle className="text-phi-dark flex items-center gap-2">
+                    <ShoppingBag className="w-5 h-5 text-phi-gold" />
+                    ממוצע שורת הוצאה (Top 20)
+                  </CardTitle>
+                  <p className="text-sm text-phi-slate">ממוצע חודשי לפי ספק/מקום</p>
+                </CardHeader>
+                <CardContent>
+                  {vendorBreakdown && vendorBreakdown.length > 0 ? (
+                    <div className="space-y-3">
+                      {vendorBreakdown.map((vendor, i) => {
+                        const maxAmount = vendorBreakdown[0]?.avgMonthly || 1;
+                        const percentage = (vendor.avgMonthly / maxAmount) * 100;
+                        
+                        return (
+                          <div key={i} className="flex items-center gap-4 p-3 rounded-lg hover:bg-phi-bg transition-colors">
+                            <div className="w-8 h-8 rounded-lg bg-phi-frost flex items-center justify-center text-phi-slate font-bold">
+                              {i + 1}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-medium text-phi-dark truncate max-w-[200px]">
+                                  {vendor.vendor}
+                                </span>
+                                <span className="font-bold text-phi-dark">
+                                  ₪{vendor.avgMonthly.toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 bg-phi-frost rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-phi-gold rounded-full transition-all"
+                                    style={{ width: `${percentage}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-phi-slate whitespace-nowrap">
+                                  {vendor.monthlyCount}x/חודש
+                                </span>
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {vendor.category}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <ShoppingBag className="w-16 h-16 text-phi-frost mx-auto mb-4" />
+                      <p className="text-phi-slate">אין מספיק נתונים</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Recommendations */}
+        {hasBudget && data?.budget?.confidence && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mt-8"
+          >
+            <Card className="bg-gradient-to-r from-phi-dark to-phi-slate text-white border-0">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-phi-gold/20 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-phi-gold" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold mb-2">המלצת φ</h3>
+                    <p className="text-white/80">
+                      {(summary?.avgMonthlySavings || 0) < 0 
+                        ? 'ההוצאות גבוהות מההכנסות. מומלץ לבדוק את ההוצאות המשתנות ולחפש דרכים לחסוך.'
+                        : (expenseTypes?.variable?.avgMonthly || 0) > (expenseTypes?.fixed?.avgMonthly || 0)
+                          ? 'ההוצאות המשתנות שלך גבוהות. יש פוטנציאל משמעותי לחיסכון!'
+                          : 'מצב טוב! רוב ההוצאות קבועות ויציבות. המשך לעקוב אחרי התקציב.'
+                      }
+                    </p>
+                    <div className="mt-4 flex items-center gap-2">
+                      <span className="text-sm text-white/60">רמת ביטחון:</span>
+                      <div className="flex-1 max-w-32 h-2 bg-white/20 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-phi-gold rounded-full"
+                          style={{ width: `${(data?.budget?.confidence || 0.7) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-bold">
+                        {Math.round((data?.budget?.confidence || 0.7) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
     </div>
   );
 }
 
+function generateMonthOptions() {
+  const months = [];
+  const now = new Date();
+  
+  for (let i = 0; i < 12; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = date.toISOString().substring(0, 7);
+    const label = date.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+    months.push({ value, label });
+  }
+  
+  return months;
+}
