@@ -1214,17 +1214,17 @@ function isCommand(msg: string, commands: string[]): boolean {
   const lower = msg.toLowerCase().trim();
   
   // לוג לדיבאג
-  console.log(`[isCommand] Checking: "${lower}" (length=${lower.length}, codes=${[...lower].map(c => c.charCodeAt(0)).join(',')})`);
+  console.log('[isCommand] Checking: "' + lower + '" (length=' + lower.length + ')');
   
   // בדיקה ישירה
   if (commands.some(cmd => lower === cmd || lower.includes(cmd))) {
-    console.log(`[isCommand] ✅ Direct match found`);
+    console.log('[isCommand] Direct match found');
     return true;
   }
   
   // 🆕 בדיקה ללא אימוג'ים - מסיר הכל חוץ מעברית ואנגלית
   const textOnly = lower.replace(/[^\u0590-\u05FFa-z0-9\s]/g, '').trim();
-  console.log(`[isCommand] Text only: "${textOnly}"`);
+  console.log('[isCommand] Text only: "' + textOnly + '"');
   
   if (textOnly && commands.some(cmd => {
     const cmdLower = cmd.toLowerCase();
@@ -1232,13 +1232,13 @@ function isCommand(msg: string, commands: string[]): boolean {
     const match = textOnly === cmdTextOnly || 
            textOnly.includes(cmdTextOnly) || 
            cmdTextOnly.includes(textOnly);
-    if (match) console.log(`[isCommand] ✅ Text-only match with "${cmd}"`);
+    if (match) console.log('[isCommand] Text-only match with "' + cmd + '"');
     return match;
   })) {
     return true;
   }
   
-  console.log(`[isCommand] ❌ No match found`);
+  console.log('[isCommand] No match found');
   return false;
 }
 
