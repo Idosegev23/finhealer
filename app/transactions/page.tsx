@@ -34,15 +34,16 @@ export default async function TransactionsPage() {
   // קבלת תנועות - 30 ימים אחרונים
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
 
+  // 🆕 שאילתה משופרת - בודקת גם date וגם tx_date
   const { data: transactions } = await supabase
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
-    .gte('tx_date', thirtyDaysAgo.toISOString().split('T')[0])
+    .or(`date.gte.${thirtyDaysAgoStr},tx_date.gte.${thirtyDaysAgoStr}`)
     .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
-    .order('tx_date', { ascending: false })
-    .order('created_at', { ascending: false});
+    .order('created_at', { ascending: false });
 
   // קבלת קטגוריות למסנן
   const { data: categories } = await supabase

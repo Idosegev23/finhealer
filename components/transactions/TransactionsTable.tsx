@@ -11,7 +11,11 @@ interface Transaction {
   description: string | null;
   source: string;
   tx_date: string;
-  status: 'proposed' | 'confirmed';
+  date: string;
+  status: 'proposed' | 'confirmed' | 'pending';
+  category: string | null;
+  expense_category: string | null;
+  income_category: string | null;
   budget_categories?: {
     id: string;
     name: string;
@@ -165,7 +169,7 @@ export default function TransactionsTable({
                 filteredTransactions.map((tx) => (
                   <tr key={tx.id} className="hover:bg-[#F5F6F8] transition-colors">
                     <td className="px-6 py-4 text-sm text-[#333333]">
-                      {new Date(tx.tx_date).toLocaleDateString('he-IL')}
+                      {new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL')}
                     </td>
                     <td className="px-6 py-4">
                       <div>
@@ -178,7 +182,11 @@ export default function TransactionsTable({
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {tx.budget_categories ? (
+                      {(tx.category || tx.expense_category || tx.income_category) ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-[#3A7BD5]">
+                          {tx.category || tx.expense_category || tx.income_category}
+                        </span>
+                      ) : tx.budget_categories?.name ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-[#3A7BD5]">
                           {tx.budget_categories.name}
                         </span>
