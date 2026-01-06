@@ -212,7 +212,45 @@ export async function POST(request: NextRequest) {
       itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
     }
 
-    // 6. Update statement status
+    // 6. Extract period from result and update statement status
+    // 🔧 FIX: Calculate period from transactions if not in report_info
+    let periodStart: string | null = null;
+    let periodEnd: string | null = null;
+    
+    // Try to get from report_info first
+    const reportInfo = result?.report_info || {};
+    if (reportInfo.period_start) {
+      periodStart = parseDate(reportInfo.period_start);
+    }
+    if (reportInfo.period_end) {
+      periodEnd = parseDate(reportInfo.period_end);
+    }
+    
+    // If not found, calculate from transactions
+    if (!periodStart || !periodEnd) {
+      const allTransactions = [
+        ...(result?.transactions?.income || []),
+        ...(result?.transactions?.expenses || []),
+        ...(Array.isArray(result?.transactions) ? result.transactions : []),
+      ];
+      
+      if (allTransactions.length > 0) {
+        const dates = allTransactions
+          .map((tx: any) => tx.date || tx.transaction_date)
+          .filter((d: string) => d)
+          .map((d: string) => parseDate(d))
+          .filter((d: string | null) => d)
+          .sort();
+        
+        if (dates.length > 0) {
+          if (!periodStart) periodStart = dates[0];
+          if (!periodEnd) periodEnd = dates[dates.length - 1];
+        }
+      }
+    }
+    
+    console.log(`📅 Document period: ${periodStart || 'unknown'} - ${periodEnd || 'unknown'}`);
+    
     await supabase
       .from('uploaded_statements')
       .update({
@@ -224,6 +262,9 @@ export async function POST(request: NextRequest) {
         error_message: null,
         retry_count: 0,
         extracted_data: result, // ✨ שמור את ה-result המלא (כולל billing_info) למטרות reconciliation
+        // 🔧 FIX: Add period dates from document/transactions
+        period_start: periodStart,
+        period_end: periodEnd,
       })
       .eq('id', statementId);
 
@@ -846,7 +887,12 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
     console.log(`📊 Analyzing Excel/Spreadsheet (${documentType})...`);
     
     // 1. Read Excel file using xlsx library
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    // 🔧 FIX: Enable cellDates to properly read dates from Excel
+    const workbook = XLSX.read(buffer, { 
+      type: 'buffer',
+      cellDates: true, // Parse dates as Date objects instead of serial numbers
+      cellNF: true,    // Keep number formats
+    });
     
     // 2. Convert all sheets to structured data
     const sheetsData: any = {};
@@ -856,10 +902,13 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
       const sheet = workbook.Sheets[sheetName];
       
       // Convert to JSON with header row
+      // 🔧 FIX: Use raw:false to get formatted values, dateNF for date formatting
       const jsonData = XLSX.utils.sheet_to_json(sheet, { 
         header: 1, // Use first row as headers
         defval: '', // Default value for empty cells
-        blankrows: false // Skip blank rows
+        blankrows: false, // Skip blank rows
+        raw: false, // Get formatted values instead of raw numbers
+        dateNF: 'DD/MM/YYYY', // Format dates as DD/MM/YYYY
       });
       
       if (jsonData.length > 0) {
