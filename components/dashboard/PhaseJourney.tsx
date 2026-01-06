@@ -6,26 +6,44 @@ import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
 // ϕ = U+03D5 (mathematical phi)
 const PHI = 'ϕ'
 
-type Phase = 'reflection' | 'data_collection' | 'behavior' | 'goals' | 'budget' | 'monitoring'
+type Phase = 'start' | 'reflection' | 'waiting_for_document' | 'data_collection' | 
+  'classification' | 'classification_income' | 'classification_expense' | 
+  'behavior' | 'goals' | 'budget' | 'monitoring'
 
 interface PhaseJourneyProps {
-  currentPhase: Phase
+  currentPhase: string
   className?: string
 }
 
-const phases: { id: Phase; label: string; description: string }[] = [
-  { id: 'reflection', label: 'שיקוף', description: 'שיקוף עבר' },
+const phases: { id: string; label: string; description: string }[] = [
   { id: 'data_collection', label: 'מסמכים', description: 'העלאת דוחות' },
+  { id: 'classification', label: 'סיווג', description: 'סיווג תנועות' },
   { id: 'behavior', label: 'דפוסים', description: 'ניתוח התנהגות' },
   { id: 'goals', label: 'יעדים', description: 'הגדרת מטרות' },
   { id: 'budget', label: 'תקציב', description: 'בניית תקציב' },
   { id: 'monitoring', label: 'מעקב', description: 'ליווי שוטף' },
 ]
 
-const phaseOrder: Phase[] = ['reflection', 'data_collection', 'behavior', 'goals', 'budget', 'monitoring']
+// Map all states to phase index
+function getPhaseIndex(state: string): number {
+  const stateMap: Record<string, number> = {
+    'start': 0,
+    'reflection': 0,
+    'waiting_for_document': 0,
+    'data_collection': 0,
+    'classification': 1,
+    'classification_income': 1,
+    'classification_expense': 1,
+    'behavior': 2,
+    'goals': 3,
+    'budget': 4,
+    'monitoring': 5,
+  }
+  return stateMap[state] ?? 0
+}
 
 export function PhaseJourney({ currentPhase, className = '' }: PhaseJourneyProps) {
-  const currentIndex = phaseOrder.indexOf(currentPhase)
+  const currentIndex = getPhaseIndex(currentPhase)
 
   return (
     <div className={`bg-white rounded-2xl p-6 shadow-sm border border-phi-frost ${className}`}>

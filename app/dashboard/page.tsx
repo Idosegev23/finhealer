@@ -108,8 +108,9 @@ export default async function DashboardPage() {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'בוקר טוב' : hour < 17 ? 'צהריים טובים' : 'ערב טוב'
 
-  const currentPhase = userDataInfo.phase || 'data_collection'
-  const onboardingState = userDataInfo.onboarding_state || 'start'
+  // Use current_phase or onboarding_state (they should be synced), fallback to phase
+  const currentPhase = userDataInfo.current_phase || userDataInfo.onboarding_state || userDataInfo.phase || 'data_collection'
+  const onboardingState = userDataInfo.onboarding_state || userDataInfo.current_phase || 'start'
   const score = Number(healthScore) || null
 
   return (
