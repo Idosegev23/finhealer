@@ -334,9 +334,14 @@ export async function routeMessage(
       return await answerCategoryQuestion(ctx, categoryMatch.name);
     }
     
-    // סיכום
-    if (isCommand(msg, ['סיכום', 'מצב', 'סטטוס'])) {
-      return await showFinalSummary(ctx);
+    // סיכום ב-monitoring - לא משנה state!
+    if (isCommand(msg, ['סיכום', 'מצב', 'סטטוס', 'summary'])) {
+      return await showMonitoringSummary(ctx);
+    }
+    
+    // תקציב - הצג יתרות
+    if (isCommand(msg, ['תקציב', 'budget', 'יתרות'])) {
+      return await showBudgetStatus(ctx);
     }
     
     // גרפים - בדיקה מפורשת
@@ -2963,11 +2968,24 @@ async function finishBudget(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  // ספור תקציבים שהוגדרו
-  const { count } = await supabase
-    .from('budget_categories')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', ctx.userId);
+  // Get current month's budget
+  const currentMonth = new Date().toISOString().substring(0, 7);
+  const { data: budget } = await supabase
+    .from('budgets')
+    .select('id')
+    .eq('user_id', ctx.userId)
+    .eq('month', currentMonth)
+    .single();
+  
+  // ספור קטגוריות תקציב דרך budget_id
+  let count = 0;
+  if (budget) {
+    const { count: catCount } = await supabase
+      .from('budget_categories')
+      .select('*', { count: 'exact', head: true })
+      .eq('budget_id', budget.id);
+    count = catCount || 0;
+  }
   
   await supabase
     .from('users')
@@ -3173,5 +3191,179 @@ export async function onDocumentProcessed(userId: string, phone: string): Promis
         `• כתוב *"נמשיך"* - להתחיל לסווג`,
     });
   }
+}
+
+// ============================================================================
+// Monitoring Phase Helpers
+// ============================================================================
+
+/**
+ * Show summary for monitoring phase - does NOT change state!
+ */
+async function showMonitoringSummary(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // Get all confirmed transactions
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('amount, type, category, tx_date')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'confirmed');
+  
+  const totalIncome = (transactions || [])
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  const totalExpenses = (transactions || [])
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  const balance = totalIncome - totalExpenses;
+  
+  // Category breakdown
+  const categoryTotals: Record<string, number> = {};
+  (transactions || [])
+    .filter(t => t.type === 'expense' && t.category)
+    .forEach(t => {
+      categoryTotals[t.category] = (categoryTotals[t.category] || 0) + Math.abs(t.amount);
+    });
+  
+  const topCategories = Object.entries(categoryTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([cat, amount]) => `• ${cat}: ₪${amount.toLocaleString('he-IL')}`)
+    .join('\n');
+  
+  // Goals progress
+  const { data: goals } = await supabase
+    .from('goals')
+    .select('name, target_amount, current_amount')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'active');
+  
+  const goalsText = (goals || [])
+    .map(g => {
+      const progress = Math.round((g.current_amount / g.target_amount) * 100);
+      return `• ${g.name}: ${progress}% (₪${g.current_amount.toLocaleString('he-IL')}/${g.target_amount.toLocaleString('he-IL')})`;
+    })
+    .join('\n');
+  
+  // Budget status
+  const currentMonth = new Date().toISOString().substring(0, 7);
+  const { data: budget } = await supabase
+    .from('budgets')
+    .select('total_budget, savings_goal, total_spent')
+    .eq('user_id', ctx.userId)
+    .eq('month', currentMonth)
+    .single();
+  
+  let message = `📊 *הסיכום שלך*\n\n`;
+  message += `💚 הכנסות: ₪${totalIncome.toLocaleString('he-IL')}\n`;
+  message += `💸 הוצאות: ₪${totalExpenses.toLocaleString('he-IL')}\n`;
+  message += `${balance >= 0 ? '✨' : '📉'} יתרה: ₪${balance.toLocaleString('he-IL')}\n\n`;
+  
+  if (topCategories) {
+    message += `*🏷️ ההוצאות הגדולות:*\n${topCategories}\n\n`;
+  }
+  
+  if (goalsText) {
+    message += `*🎯 יעדים:*\n${goalsText}\n\n`;
+  }
+  
+  if (budget) {
+    const budgetUsed = Math.round((Number(budget.total_spent) / Number(budget.total_budget)) * 100);
+    message += `*💰 תקציב החודש:*\n`;
+    message += `• תקציב: ₪${Number(budget.total_budget).toLocaleString('he-IL')}\n`;
+    message += `• הוצא: ₪${Number(budget.total_spent).toLocaleString('he-IL')} (${budgetUsed}%)\n`;
+    message += `• חיסכון: ₪${Number(budget.savings_goal).toLocaleString('he-IL')}\n`;
+  }
+  
+  message += `\nφ *Phi - היחס הזהב של הכסף שלך*`;
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message,
+  });
+  
+  return { success: true };
+}
+
+/**
+ * Show budget status with categories
+ */
+async function showBudgetStatus(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  const currentMonth = new Date().toISOString().substring(0, 7);
+  
+  // Get budget
+  const { data: budget } = await supabase
+    .from('budgets')
+    .select('id, total_budget, savings_goal, total_spent')
+    .eq('user_id', ctx.userId)
+    .eq('month', currentMonth)
+    .single();
+  
+  if (!budget) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ אין תקציב מוגדר לחודש זה.\n\n` +
+        `כתוב *"תקציב אוטומטי"* ליצירת תקציב.`,
+    });
+    return { success: true };
+  }
+  
+  // Get categories
+  const { data: categories } = await supabase
+    .from('budget_categories')
+    .select('category_name, allocated_amount, spent_amount')
+    .eq('budget_id', budget.id)
+    .order('allocated_amount', { ascending: false });
+  
+  const totalBudget = Number(budget.total_budget);
+  const totalSpent = Number(budget.total_spent);
+  const remaining = totalBudget - totalSpent;
+  const percentUsed = Math.round((totalSpent / totalBudget) * 100);
+  
+  let message = `💰 *תקציב ${currentMonth}*\n\n`;
+  message += `📊 *סיכום:*\n`;
+  message += `• תקציב כולל: ₪${totalBudget.toLocaleString('he-IL')}\n`;
+  message += `• הוצא: ₪${totalSpent.toLocaleString('he-IL')} (${percentUsed}%)\n`;
+  message += `• נותר: ₪${remaining.toLocaleString('he-IL')}\n`;
+  message += `• יעד חיסכון: ₪${Number(budget.savings_goal).toLocaleString('he-IL')}\n\n`;
+  
+  if (categories && categories.length > 0) {
+    message += `*🏷️ קטגוריות:*\n`;
+    categories.forEach(cat => {
+      const allocated = Number(cat.allocated_amount);
+      const spent = Number(cat.spent_amount);
+      const catRemaining = allocated - spent;
+      const emoji = catRemaining >= 0 ? '✅' : '🔴';
+      message += `${emoji} ${cat.category_name}: ₪${spent.toLocaleString('he-IL')}/${allocated.toLocaleString('he-IL')}\n`;
+    });
+  }
+  
+  // Status message
+  if (remaining < 0) {
+    message += `\n⚠️ *חריגה מהתקציב!*\n`;
+    message += `עברת את התקציב ב-₪${Math.abs(remaining).toLocaleString('he-IL')}`;
+  } else if (percentUsed > 80) {
+    message += `\n⚡ *קרוב לתקרה!*\n`;
+    message += `נשארו לך רק ₪${remaining.toLocaleString('he-IL')} לחודש`;
+  } else {
+    message += `\n✨ *מצוין!*\n`;
+    message += `נשארו לך ₪${remaining.toLocaleString('he-IL')} לחודש`;
+  }
+  
+  message += `\n\nφ *Phi - היחס הזהב של הכסף שלך*`;
+  
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message,
+  });
+  
+  return { success: true };
 }
 
