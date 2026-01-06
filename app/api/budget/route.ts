@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/budget
- * קבלת תקציב לחודש מסוים + קטגוריות + vendors
+ * קבלת תקציב לחודש מסוים + קטגוריות + vendors + missing data
  * Query params: month=YYYY-MM
  */
 export async function GET(request: Request) {
@@ -18,7 +18,50 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month') || new Date().toISOString().substring(0, 7);
 
-    // 1. קבלת תקציב ראשי
+    // 1. קבלת פרופיל
+    const { data: profile } = await supabase
+      .from('user_financial_profile')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    // 2. קבלת נתוני משתמש
+    const { data: userData } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    // 3. זיהוי נתונים חסרים
+    const missingData: { field: string; label: string; importance: 'critical' | 'important' | 'nice_to_have' }[] = [];
+    
+    // פרופיל בסיסי - קריטי
+    if (!profile) {
+      missingData.push({ field: 'profile', label: 'שאלון שיקוף לא מולא', importance: 'critical' });
+    } else {
+      // בדיקת שדות קריטיים בפרופיל
+      if (!profile.marital_status) {
+        missingData.push({ field: 'marital_status', label: 'מצב משפחתי', importance: 'critical' });
+      }
+      if (profile.total_monthly_income === null || profile.total_monthly_income === undefined) {
+        missingData.push({ field: 'total_monthly_income', label: 'הכנסה חודשית', importance: 'critical' });
+      }
+      if (profile.owns_home === null || profile.owns_home === undefined) {
+        missingData.push({ field: 'owns_home', label: 'סוג מגורים (בעלות/שכירות)', importance: 'important' });
+      }
+      if (profile.children_count === null || profile.children_count === undefined) {
+        missingData.push({ field: 'children_count', label: 'מספר ילדים', importance: 'important' });
+      }
+      // הוצאות קבועות - חשוב
+      if (!profile.rent_mortgage && !profile.owns_home) {
+        missingData.push({ field: 'rent_mortgage', label: 'שכירות/משכנתא', importance: 'important' });
+      }
+      if (!profile.total_fixed_expenses) {
+        missingData.push({ field: 'total_fixed_expenses', label: 'סה"כ הוצאות קבועות', importance: 'nice_to_have' });
+      }
+    }
+
+    // 4. קבלת תקציב ראשי
     const { data: budget } = await supabase
       .from('budgets')
       .select('*')
@@ -26,7 +69,7 @@ export async function GET(request: Request) {
       .eq('month', month)
       .single();
 
-    // 2. קבלת קטגוריות תקציב
+    // 5. קבלת קטגוריות תקציב
     let categories: any[] = [];
     if (budget) {
       const { data: cats } = await supabase
@@ -37,7 +80,7 @@ export async function GET(request: Request) {
       categories = cats || [];
     }
 
-    // 3. קבלת תדירויות
+    // 6. קבלת תדירויות
     let frequencies: any[] = [];
     if (budget) {
       const { data: freqs } = await supabase
@@ -47,7 +90,7 @@ export async function GET(request: Request) {
       frequencies = freqs || [];
     }
 
-    // 4. חישוב נתונים נוספים מתנועות (12 חודשים)
+    // 7. חישוב נתונים נוספים מתנועות (12 חודשים)
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
     const startDate = twelveMonthsAgo.toISOString().split('T')[0];
@@ -59,7 +102,16 @@ export async function GET(request: Request) {
       .eq('type', 'expense')
       .gte('date', startDate);
 
-    // 5. ממוצע שורת הוצאה (vendor breakdown)
+    // בדיקה אם אין מספיק תנועות
+    if (!transactions || transactions.length < 10) {
+      missingData.push({ 
+        field: 'transactions', 
+        label: `תנועות (${transactions?.length || 0}/10 מינימום)`, 
+        importance: 'critical' 
+      });
+    }
+
+    // 8. ממוצע שורת הוצאה (vendor breakdown)
     const vendorMap: Record<string, { total: number; count: number; category: string }> = {};
     const monthsWithData = new Set(transactions?.map(t => t.date?.substring(0, 7))).size || 1;
     
@@ -83,7 +135,7 @@ export async function GET(request: Request) {
       .sort((a, b) => b.avgMonthly - a.avgMonthly)
       .slice(0, 30);
 
-    // 6. פירוט לפי סוג הוצאה
+    // 9. פירוט לפי סוג הוצאה
     const expenseTypes = {
       fixed: { total: 0, count: 0, categories: [] as string[] },
       variable: { total: 0, count: 0, categories: [] as string[] },
@@ -121,20 +173,13 @@ export async function GET(request: Request) {
       (expenseTypes[k] as any).avgMonthly = Math.round(expenseTypes[k].total / monthsWithData);
     });
 
-    // 7. קבלת פרופיל
-    const { data: profile } = await supabase
-      .from('user_financial_profile')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    // 8. קבלת ילדים
+    // 10. קבלת ילדים (מטבלה נפרדת אם קיימת)
     const { count: childrenCount } = await supabase
       .from('children')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
-    // חישוב הכנסות מתנועות
+    // 11. חישוב הכנסות מתנועות
     const incomeTransactions = await supabase
       .from('transactions')
       .select('amount')
@@ -148,10 +193,51 @@ export async function GET(request: Request) {
     const totalExpenses = transactions?.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0) || 0;
     const avgMonthlyExpenses = Math.round(totalExpenses / monthsWithData);
 
-    // פרופיל קונטקסט
-    const numPeople = 1 + (profile?.marital_status === 'married' ? 1 : 0) + (childrenCount || 0);
-    const housingType = profile?.owns_home ? 'בעלות' : 'שכירות';
-    const incomeLevel = avgMonthlyIncome > 20000 ? 'גבוהה' : avgMonthlyIncome > 10000 ? 'בינונית' : 'נמוכה';
+    // 12. בניית פרופיל קונטקסט - עם ציון מה חסר
+    const numPeople = 1 + 
+      (profile?.marital_status === 'married' ? 1 : 0) + 
+      (profile?.children_count || childrenCount || 0);
+    
+    const housingType = profile?.owns_home === true 
+      ? 'בעלות' 
+      : profile?.owns_home === false 
+        ? 'שכירות' 
+        : null;
+    
+    // הכנסה - העדפה לפרופיל, fallback לתנועות
+    const profileIncome = profile?.total_monthly_income || 
+      (profile?.monthly_income || 0) + (profile?.spouse_income || 0) + (profile?.additional_income || 0);
+    const effectiveIncome = profileIncome > 0 ? profileIncome : avgMonthlyIncome;
+    
+    const incomeLevel = effectiveIncome > 20000 
+      ? 'גבוהה' 
+      : effectiveIncome > 10000 
+        ? 'בינונית' 
+        : effectiveIncome > 0 
+          ? 'נמוכה' 
+          : null;
+
+    // 13. קבלת יעדים
+    const { data: goals } = await supabase
+      .from('goals')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'active');
+
+    // 14. קבלת מסמכים
+    const { count: documentsCount } = await supabase
+      .from('uploaded_documents')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (!documentsCount || documentsCount === 0) {
+      missingData.push({ field: 'documents', label: 'לא הועלו מסמכים (דוחות בנק/אשראי)', importance: 'critical' });
+    }
+
+    // חישוב אחוז מילוי פרופיל
+    const totalFields = 8; // שדות קריטיים
+    const filledFields = totalFields - missingData.filter(m => m.importance === 'critical').length;
+    const profileCompleteness = Math.round((filledFields / totalFields) * 100);
 
     return NextResponse.json({
       budget,
@@ -160,17 +246,36 @@ export async function GET(request: Request) {
       vendorBreakdown,
       expenseTypes,
       summary: {
-        avgMonthlyIncome,
+        avgMonthlyIncome: effectiveIncome,
         avgMonthlyExpenses,
-        avgMonthlySavings: avgMonthlyIncome - avgMonthlyExpenses,
+        avgMonthlySavings: effectiveIncome - avgMonthlyExpenses,
         monthsAnalyzed: monthsWithData,
-        transactionsCount: transactions?.length || 0
+        transactionsCount: transactions?.length || 0,
+        documentsCount: documentsCount || 0,
+        goalsCount: goals?.length || 0
       },
       profileContext: {
         numPeople,
         housingType,
-        incomeLevel
-      }
+        incomeLevel,
+        hasProfile: !!profile,
+        profileCompleted: profile?.completed || false
+      },
+      profile: profile ? {
+        maritalStatus: profile.marital_status,
+        childrenCount: profile.children_count,
+        city: profile.city,
+        totalMonthlyIncome: profile.total_monthly_income,
+        totalFixedExpenses: profile.total_fixed_expenses,
+        ownsHome: profile.owns_home,
+        ownsCar: profile.owns_car,
+        totalDebt: profile.total_debt,
+        currentSavings: profile.current_savings
+      } : null,
+      goals: goals || [],
+      missingData,
+      profileCompleteness,
+      currentPhase: userData?.current_phase || userData?.onboarding_state || 'unknown'
     });
 
   } catch (error) {

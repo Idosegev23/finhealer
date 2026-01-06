@@ -257,7 +257,7 @@ function SourceBadge({ source }: { source: string }) {
   );
 }
 
-function StatusBadge({ status }: { status: 'proposed' | 'confirmed' }) {
+function StatusBadge({ status }: { status: 'proposed' | 'confirmed' | 'pending' }) {
   if (status === 'confirmed') {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E8F5E9] text-[#7ED957]">
@@ -267,10 +267,19 @@ function StatusBadge({ status }: { status: 'proposed' | 'confirmed' }) {
     );
   }
 
+  if (status === 'pending') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-[#2196F3]">
+        <Clock className="w-3 h-3" />
+        בהמתנה
+      </span>
+    );
+  }
+
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FFF3E0] text-[#F6A623]">
       <Clock className="w-3 h-3" />
-      ממתין
+      מוצע
     </span>
   );
 }

@@ -7,12 +7,20 @@ import {
   RefreshCw, Sparkles, DollarSign, Clock,
   ChevronDown, ChevronUp, Target, Users, Home,
   CreditCard, ShoppingBag, Lock, Zap, Star,
-  PieChart, BarChart3, ArrowRight
+  PieChart, BarChart3, ArrowRight, AlertTriangle,
+  CheckCircle, FileText, MessageCircle, XCircle
 } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+
+interface MissingDataItem {
+  field: string;
+  label: string;
+  importance: 'critical' | 'important' | 'nice_to_have';
+}
 
 interface BudgetData {
   budget: any;
@@ -30,12 +38,31 @@ interface BudgetData {
     avgMonthlySavings: number;
     monthsAnalyzed: number;
     transactionsCount: number;
+    documentsCount: number;
+    goalsCount: number;
   };
   profileContext: {
     numPeople: number;
-    housingType: string;
-    incomeLevel: string;
+    housingType: string | null;
+    incomeLevel: string | null;
+    hasProfile: boolean;
+    profileCompleted: boolean;
   };
+  profile: {
+    maritalStatus: string;
+    childrenCount: number;
+    city: string;
+    totalMonthlyIncome: number;
+    totalFixedExpenses: number;
+    ownsHome: boolean;
+    ownsCar: boolean;
+    totalDebt: number;
+    currentSavings: number;
+  } | null;
+  goals: any[];
+  missingData: MissingDataItem[];
+  profileCompleteness: number;
+  currentPhase: string;
 }
 
 export default function BudgetPage() {
@@ -101,11 +128,127 @@ export default function BudgetPage() {
   }
 
   const hasBudget = data?.budget;
-  const { summary, profileContext, expenseTypes, vendorBreakdown, categories } = data || {};
+  const { summary, profileContext, expenseTypes, vendorBreakdown, categories, missingData, profileCompleteness, currentPhase, goals } = data || {};
 
-  return (
+  // נתונים חסרים קריטיים
+  const criticalMissing = missingData?.filter(m => m.importance === 'critical') || [];
+  const importantMissing = missingData?.filter(m => m.importance === 'important') || [];
+  const hasCriticalMissing = criticalMissing.length > 0;
+
+    return (
     <div className="min-h-screen bg-phi-bg py-8 px-4" dir="rtl">
       <div className="max-w-7xl mx-auto">
+
+        {/* Missing Data Alert */}
+        {hasCriticalMissing && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Card className="bg-gradient-to-r from-red-50 to-orange-50 border-red-200">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-red-800 mb-2">נתונים חסרים לבניית תקציב</h3>
+                    <p className="text-red-700 text-sm mb-4">
+                      כדי לבנות תקציב מדויק, צריך להשלים את המידע הבא:
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+                      {criticalMissing.map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 text-sm text-red-700">
+                          <XCircle className="w-4 h-4 text-red-500" />
+                          {item.label}
+                        </div>
+                      ))}
+                      {importantMissing.slice(0, 4).map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 text-sm text-orange-700">
+                          <AlertCircle className="w-4 h-4 text-orange-500" />
+                          {item.label}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {!profileContext?.hasProfile && (
+                        <Link href="/reflection">
+                          <Button className="bg-red-600 hover:bg-red-700 text-white">
+                            <FileText className="w-4 h-4 ml-2" />
+                            מלא שאלון שיקוף
+                          </Button>
+                        </Link>
+                      )}
+                      {missingData?.some(m => m.field === 'documents') && (
+                        <Button variant="outline" className="border-red-300 text-red-700">
+                          <MessageCircle className="w-4 h-4 ml-2" />
+                          שלח מסמכים ב-WhatsApp
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Profile Completeness */}
+        {profileCompleteness !== undefined && profileCompleteness < 100 && !hasCriticalMissing && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Card className="bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <AlertCircle className="w-6 h-6 text-yellow-600" />
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-yellow-800">השלמת פרופיל</span>
+                      <span className="text-sm font-bold text-yellow-800">{profileCompleteness}%</span>
+                </div>
+                    <Progress value={profileCompleteness} className="h-2 [&>div]:bg-yellow-500" />
+                  </div>
+                  <Link href="/reflection">
+                    <Button size="sm" variant="outline" className="border-yellow-400 text-yellow-700">
+                      השלם
+                    </Button>
+                  </Link>
+                  </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Current Phase Banner */}
+        {currentPhase && currentPhase !== 'monitoring' && currentPhase !== 'budget' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mb-6"
+          >
+            <Card className="bg-phi-dark text-white border-0">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl font-serif text-phi-gold">φ</span>
+                    <div>
+                      <span className="text-sm text-gray-300">שלב נוכחי:</span>
+                      <span className="font-bold mr-2">{getPhaseLabel(currentPhase)}</span>
+                  </div>
+                  </div>
+                  <Button size="sm" className="bg-phi-gold hover:bg-phi-coral text-white">
+                    <MessageCircle className="w-4 h-4 ml-2" />
+                    המשך ב-WhatsApp
+                </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
         
         {/* Header */}
         <motion.div
@@ -153,49 +296,61 @@ export default function BudgetPage() {
         </motion.div>
 
         {/* Profile Context Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
         >
-          <Card className="bg-white border-phi-frost">
+          <Card className={`bg-white border-phi-frost ${!profileContext?.hasProfile ? 'opacity-60' : ''}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-blue-600" />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${profileContext?.hasProfile ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                  <Users className={`w-5 h-5 ${profileContext?.hasProfile ? 'text-blue-600' : 'text-gray-400'}`} />
                 </div>
                 <div>
                   <p className="text-sm text-phi-slate">נפשות</p>
-                  <p className="text-xl font-bold text-phi-dark">{profileContext?.numPeople || 1}</p>
+                  {profileContext?.hasProfile ? (
+                    <p className="text-xl font-bold text-phi-dark">{profileContext?.numPeople || 1}</p>
+                  ) : (
+                    <p className="text-sm text-red-500">חסר</p>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-phi-frost">
+          <Card className={`bg-white border-phi-frost ${!profileContext?.housingType ? 'opacity-60' : ''}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <Home className="w-5 h-5 text-purple-600" />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${profileContext?.housingType ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                  <Home className={`w-5 h-5 ${profileContext?.housingType ? 'text-purple-600' : 'text-gray-400'}`} />
                 </div>
                 <div>
                   <p className="text-sm text-phi-slate">מגורים</p>
-                  <p className="text-xl font-bold text-phi-dark">{profileContext?.housingType || '-'}</p>
+                  {profileContext?.housingType ? (
+                    <p className="text-xl font-bold text-phi-dark">{profileContext.housingType}</p>
+                  ) : (
+                    <p className="text-sm text-red-500">חסר</p>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-phi-frost">
+          <Card className={`bg-white border-phi-frost ${!profileContext?.incomeLevel ? 'opacity-60' : ''}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${profileContext?.incomeLevel ? 'bg-green-100' : 'bg-gray-100'}`}>
+                  <TrendingUp className={`w-5 h-5 ${profileContext?.incomeLevel ? 'text-green-600' : 'text-gray-400'}`} />
                 </div>
                 <div>
                   <p className="text-sm text-phi-slate">רמת הכנסה</p>
-                  <p className="text-xl font-bold text-phi-dark">{profileContext?.incomeLevel || '-'}</p>
+                  {profileContext?.incomeLevel ? (
+                    <p className="text-xl font-bold text-phi-dark">{profileContext.incomeLevel}</p>
+                  ) : (
+                    <p className="text-sm text-red-500">חסר</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -208,21 +363,39 @@ export default function BudgetPage() {
                   <Target className="w-5 h-5 text-phi-gold" />
                 </div>
                 <div>
-                  <p className="text-sm text-phi-slate">יעד חיסכון</p>
+                  <p className="text-sm text-phi-slate">יעדים</p>
                   <p className="text-xl font-bold text-phi-dark">
-                    {profileContext?.incomeLevel === 'גבוהה' ? '15%' : '10%'}
+                    {goals?.length || 0}
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+
+          <Card className={`bg-white border-phi-frost ${!summary?.documentsCount ? 'opacity-60' : ''}`}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${summary?.documentsCount ? 'bg-teal-100' : 'bg-gray-100'}`}>
+                  <FileText className={`w-5 h-5 ${summary?.documentsCount ? 'text-teal-600' : 'text-gray-400'}`} />
+                </div>
+                <div>
+                  <p className="text-sm text-phi-slate">מסמכים</p>
+                  {summary?.documentsCount ? (
+                    <p className="text-xl font-bold text-phi-dark">{summary.documentsCount}</p>
+                  ) : (
+                    <p className="text-sm text-red-500">חסר</p>
+                  )}
+                </div>
+              </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
         {/* Summary Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
         >
           <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
@@ -250,16 +423,16 @@ export default function BudgetPage() {
           <Card className={`border-0 ${(summary?.avgMonthlySavings || 0) >= 0 
             ? 'bg-gradient-to-br from-phi-mint to-teal-500 text-white' 
             : 'bg-gradient-to-br from-orange-500 to-red-500 text-white'}`}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
                 <Wallet className="w-10 h-10 opacity-80" />
                 <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
-              </div>
+                </div>
               <p className="text-white/80 text-sm mb-1">יתרה</p>
               <p className="text-3xl font-bold">₪{(summary?.avgMonthlySavings || 0).toLocaleString()}</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-phi-frost">
@@ -286,10 +459,10 @@ export default function BudgetPage() {
         {/* Tab Content */}
         <AnimatePresence mode="wait">
           {activeTab === 'overview' && (
-            <motion.div
+          <motion.div
               key="overview"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             >
@@ -333,7 +506,7 @@ export default function BudgetPage() {
                       <CardTitle className="text-lg text-phi-dark">הוצאות משתנות</CardTitle>
                       <p className="text-sm text-phi-slate">ניתנות לשינוי</p>
                     </div>
-                  </div>
+                </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-phi-dark mb-4">
@@ -440,9 +613,9 @@ export default function BudgetPage() {
                       </Button>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
           )}
 
           {activeTab === 'vendors' && (
@@ -552,8 +725,8 @@ export default function BudgetPage() {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
-        )}
+              </motion.div>
+            )}
       </div>
     </div>
   );
@@ -571,4 +744,19 @@ function generateMonthOptions() {
   }
   
   return months;
+}
+
+function getPhaseLabel(phase: string): string {
+  const phases: Record<string, string> = {
+    'reflection': '🪞 שיקוף',
+    'document_scanning': '📄 סריקת מסמכים',
+    'classification_income': '💰 סיווג הכנסות',
+    'classification_expense': '💸 סיווג הוצאות',
+    'behavior': '📊 ניתוח התנהגות',
+    'goals': '🎯 הגדרת יעדים',
+    'budget': '💼 תקציב',
+    'monitoring': '👁️ מעקב',
+    'unknown': '❓ לא ידוע'
+  };
+  return phases[phase] || phase;
 }
