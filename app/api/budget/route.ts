@@ -255,7 +255,7 @@ export async function GET(request: Request) {
         avgMonthlySavings: effectiveIncome - avgMonthlyExpenses,
         monthsAnalyzed: monthsWithData,
         transactionsCount: transactions?.length || 0,
-        documentsCount: documentsCount || 0,
+        documentsCount: statementsCount || 0,
         goalsCount: goals?.length || 0
       },
       profileContext: {
