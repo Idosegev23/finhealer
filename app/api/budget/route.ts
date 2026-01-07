@@ -224,13 +224,17 @@ export async function GET(request: Request) {
       .eq('user_id', user.id)
       .eq('status', 'active');
 
-    // 14. קבלת מסמכים
-    const { count: documentsCount } = await supabase
-      .from('uploaded_documents')
+    // 14. קבלת מסמכים - בודק בשתי הטבלאות
+    const { count: statementsCount } = await supabase
+      .from('uploaded_statements')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
-    if (!documentsCount || documentsCount === 0) {
+    // בודק גם תנועות - אם יש תנועות אז יש מסמכים
+    const hasDocuments = (statementsCount && statementsCount > 0) || 
+                         (transactions && transactions.length > 0);
+
+    if (!hasDocuments) {
       missingData.push({ field: 'documents', label: 'לא הועלו מסמכים (דוחות בנק/אשראי)', importance: 'critical' });
     }
 

@@ -22,7 +22,10 @@ export async function POST(request: Request) {
     // עדכון פרטים אישיים בטבלת users
     const userUpdates: any = {};
     if (employment_status) userUpdates.employment_status = employment_status;
-    if (full_name) userUpdates.full_name = full_name;
+    if (full_name) {
+      userUpdates.full_name = full_name;
+      userUpdates.name = full_name; // 🆕 עדכון גם name לסנכרון עם דשבורד ו-WhatsApp
+    }
     if (age) userUpdates.age = age;
     if (marital_status) userUpdates.marital_status = marital_status;
     if (city) userUpdates.city = city;
