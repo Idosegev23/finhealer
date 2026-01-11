@@ -169,8 +169,9 @@ export async function monitorUserGoals(userId: string): Promise<MonitoringResult
         impact: `שמור על איזון פיננסי`,
       });
       
-      // הפעל ריאיזון אוטומטי
-      if (goal.auto_adjust) {
+      // הפעל ריאיזון אוטומטי אם יש יעדים עם auto_adjust
+      const hasAutoAdjust = goals.some((g: any) => g.auto_adjust);
+      if (hasAutoAdjust) {
         await rebalanceAutomatically(userId, incomeChange.change);
         actions_taken.push('auto_rebalance_after_income_decrease');
       }
