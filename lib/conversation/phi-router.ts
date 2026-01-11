@@ -1802,9 +1802,40 @@ async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise<Router
     return await handleGoalConfirmation(ctx, msg);
   }
   
-  // הצגת יעדים קיימים (כולל buttonId)
+  // הצגת יעדים קיימים (כולל buttonId) - משודרג עם הקצאות
   if (isCommand(msg, ['יעדים', 'הצג יעדים', 'goals', 'רשימה', 'list', 'show_goals'])) {
-    return await showUserGoals(ctx);
+    const { showGoalsWithAllocations } = await import('./goals-wa-handler');
+    await showGoalsWithAllocations(ctx);
+    return { success: true };
+  }
+  
+  // 🆕 סימולציה - "מה יקרה אם..."
+  if (isCommand(msg, ['סימולציה', 'simulate', 'מה יקרה אם', 'תרחיש'])) {
+    const { runSimulation } = await import('./goals-wa-handler');
+    await runSimulation(ctx);
+    return { success: true };
+  }
+  
+  // 🆕 אופטימיזציה אוטומטית
+  if (isCommand(msg, ['אופטימיזציה', 'optimize', 'שפר', 'ייעל'])) {
+    const { runOptimization } = await import('./goals-wa-handler');
+    await runOptimization(ctx);
+    return { success: true };
+  }
+  
+  // 🆕 אישור אופטימיזציה
+  if (isCommand(msg, ['אשר', 'confirm', 'כן'])) {
+    const { data: user } = await supabase
+      .from('users')
+      .select('classification_context')
+      .eq('id', ctx.userId)
+      .single();
+    
+    if (user?.classification_context?.optimization?.pending) {
+      const { confirmOptimization } = await import('./goals-wa-handler');
+      await confirmOptimization(ctx);
+      return { success: true };
+    }
   }
   
   // מעבר לשלב הבא (budget) - כולל buttonId

@@ -1,57 +1,74 @@
+/**
+ * עמוד יעדים (φ Goals) - דשבורד מתקדם לניהול יעדים פיננסיים
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Target, Plus, CheckCircle2, Clock, TrendingUp, Trash2, Edit2, X, AlertCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-
-interface Goal {
-  id: string;
-  name: string;
-  target_amount: number;
-  current_amount: number;
-  deadline: string | null;
-  status: 'active' | 'completed' | 'cancelled';
-  priority: number;
-  created_at: string;
-  child_name?: string;
-}
-
-interface GoalStats {
-  total: number;
-  totalTargetAmount: number;
-  totalCurrentAmount: number;
-  completedCount: number;
-}
+import { Slider } from '@/components/ui/slider';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Target,
+  TrendingUp,
+  AlertCircle,
+  Sparkles,
+  PlayCircle,
+  RotateCcw,
+  CheckCircle2,
+  Clock,
+  DollarSign,
+} from 'lucide-react';
+import type { Goal, GoalAllocationResult } from '@/types/goals';
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [stats, setStats] = useState<GoalStats | null>(null);
+  const [allocationResult, setAllocationResult] = useState<GoalAllocationResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    target_amount: '',
-    deadline: '',
-    current_amount: '',
-  });
+  const [simulatedIncome, setSimulatedIncome] = useState<number | null>(null);
+  const [simulationResult, setSimulationResult] = useState<any>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
   
   useEffect(() => {
-    loadGoals();
+    loadGoalsAndAllocations();
   }, []);
   
-  async function loadGoals() {
+  async function loadGoalsAndAllocations() {
     try {
-      const res = await fetch('/api/goals?status=all');
-      const data = await res.json();
-      setGoals(data.goals || []);
-      setStats(data.stats || null);
+      setLoading(true);
+      
+      // שלוף מזהה משתמש
+      const response = await fetch('/api/auth/session');
+      const session = await response.json();
+      const userId = session?.user?.id;
+      
+      if (!userId) {
+        console.error('No user ID');
+        return;
+      }
+      
+      // שלוף יעדים והקצאות
+      const balanceResponse = await fetch(`/api/goals/balance?userId=${userId}`);
+      const balanceData = await balanceResponse.json();
+      
+      if (balanceData.success) {
+        setGoals(balanceData.goals || []);
+      }
+      
+      // חשב הקצאות
+      const allocResponse = await fetch('/api/goals/balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      
+      const allocData = await allocResponse.json();
+      if (allocData.success) {
+        setAllocationResult(allocData.result);
+      }
+      
     } catch (error) {
       console.error('Error loading goals:', error);
     } finally {
@@ -59,456 +76,387 @@ export default function GoalsPage() {
     }
   }
   
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function runSimulation(incomeChange: number) {
+    setIsSimulating(true);
     
     try {
-      const body = {
-        name: formData.name,
-        target_amount: parseFloat(formData.target_amount) || 0,
-        current_amount: parseFloat(formData.current_amount) || 0,
-        deadline: formData.deadline || null,
-      };
+      const response = await fetch('/api/auth/session');
+      const session = await response.json();
+      const userId = session?.user?.id;
       
-      if (editingGoal) {
-        // Update
-        await fetch('/api/goals', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...body, id: editingGoal.id }),
-        });
-      } else {
-        // Create
-        await fetch('/api/goals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-      }
-      
-      // Reset form and reload
-      setFormData({ name: '', target_amount: '', deadline: '', current_amount: '' });
-      setShowAddForm(false);
-      setEditingGoal(null);
-      loadGoals();
-    } catch (error) {
-      console.error('Error saving goal:', error);
-    }
-  }
-  
-  async function handleDelete(id: string) {
-    if (!confirm('האם למחוק את היעד?')) return;
-    
-    try {
-      await fetch(`/api/goals?id=${id}`, { method: 'DELETE' });
-      loadGoals();
-    } catch (error) {
-      console.error('Error deleting goal:', error);
-    }
-  }
-  
-  async function markComplete(goal: Goal) {
-    try {
-      await fetch('/api/goals', {
-        method: 'PATCH',
+      const simResponse = await fetch('/api/goals/simulate', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: goal.id,
-          status: 'completed',
-          current_amount: goal.target_amount,
+          userId,
+          scenario: {
+            type: 'income_change',
+            income_change: incomeChange,
+          },
         }),
       });
-      loadGoals();
+      
+      const simData = await simResponse.json();
+      if (simData.success) {
+        setSimulationResult(simData.result);
+      }
+      
     } catch (error) {
-      console.error('Error completing goal:', error);
+      console.error('Error running simulation:', error);
+    } finally {
+      setIsSimulating(false);
     }
   }
   
-  function startEdit(goal: Goal) {
-    setEditingGoal(goal);
-    setFormData({
-      name: goal.name,
-      target_amount: goal.target_amount.toString(),
-      current_amount: goal.current_amount.toString(),
-      deadline: goal.deadline?.split('T')[0] || '',
-    });
-    setShowAddForm(true);
+  function handleSimulationSlider(value: number[]) {
+    const income = allocationResult?.summary.total_income || 0;
+    const change = value[0];
+    setSimulatedIncome(income + change);
   }
   
-  function calculateProgress(goal: Goal): number {
-    if (goal.target_amount <= 0) return 0;
-    return Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100));
+  function applySimulation() {
+    if (simulatedIncome && allocationResult) {
+      const change = simulatedIncome - allocationResult.summary.total_income;
+      runSimulation(change);
+    }
   }
   
-  function getTimeRemaining(deadline: string | null): string {
-    if (!deadline) return 'ללא דדליין';
-    
-    const deadlineDate = new Date(deadline);
-    const now = new Date();
-    const diffMs = deadlineDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0) return 'פג תוקף';
-    if (diffDays === 0) return 'היום!';
-    if (diffDays === 1) return 'מחר';
-    if (diffDays < 30) return `${diffDays} ימים`;
-    if (diffDays < 365) return `${Math.round(diffDays / 30)} חודשים`;
-    return `${Math.round(diffDays / 365)} שנים`;
+  function resetSimulation() {
+    setSimulatedIncome(null);
+    setSimulationResult(null);
   }
-  
-  function getProgressColor(progress: number): string {
-    if (progress >= 100) return 'bg-emerald-500';
-    if (progress >= 75) return 'bg-lime-500';
-    if (progress >= 50) return 'bg-yellow-500';
-    if (progress >= 25) return 'bg-orange-500';
-    return 'bg-red-500';
-  }
-  
-  const activeGoals = goals.filter(g => g.status === 'active');
-  const completedGoals = goals.filter(g => g.status === 'completed');
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-phi-bg to-phi-frost p-6 flex items-center justify-center">
-        <div className="text-phi-slate">טוען יעדים...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-phi-gold mx-auto mb-4"></div>
+          <p className="text-phi-slate">טוען יעדים...</p>
+        </div>
       </div>
     );
   }
   
+  const currentIncome = allocationResult?.summary.total_income || 0;
+  const displayedResult = simulationResult?.after || allocationResult;
+  const isSimulationActive = simulationResult !== null;
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-phi-bg to-phi-frost p-6" dir="rtl">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-phi-dark mb-2 flex items-center gap-3">
-            <Target className="w-8 h-8 text-phi-gold" />
-            היעדים שלי
-          </h1>
-          <p className="text-phi-slate">הגדר יעדים פיננסיים ועקוב אחרי ההתקדמות</p>
-        </div>
-        
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <Card className="bg-white border-phi-frost">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-phi-slate">יעדים פעילים</p>
-                    <p className="text-2xl font-bold text-phi-dark">{activeGoals.length}</p>
-                  </div>
-                  <Target className="w-10 h-10 text-phi-gold opacity-50" />
+    <div className="container mx-auto px-4 py-8 max-w-7xl" dir="rtl">
+      {/* כותרת */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-phi-dark flex items-center gap-3 mb-2">
+          <Target className="w-10 h-10 text-phi-gold" />
+          φ היעדים שלך
+        </h1>
+        <p className="text-phi-slate text-lg">
+          {goals.length === 0
+            ? 'הגדר יעדים פיננסיים ונתחיל לעבוד לקראתם'
+            : `${goals.length} יעדים פעילים`}
+        </p>
+      </div>
+      
+      {/* סיכום כללי */}
+      {allocationResult && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-gradient-to-br from-phi-mint/20 to-phi-mint/5 border-phi-mint/30">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-phi-slate mb-1">הכנסה חודשית</p>
+                  <p className="text-2xl font-bold text-phi-dark">
+                    {currentIncome.toLocaleString('he-IL')} ₪
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-white border-phi-frost">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-phi-slate">סה&quot;כ יעד</p>
-                    <p className="text-2xl font-bold text-phi-dark">
-                      {stats.totalTargetAmount.toLocaleString('he-IL')} ₪
-                    </p>
-                  </div>
-                  <TrendingUp className="w-10 h-10 text-phi-mint opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-white border-phi-frost">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-phi-slate">נחסך עד כה</p>
-                    <p className="text-2xl font-bold text-emerald-600">
-                      {stats.totalCurrentAmount.toLocaleString('he-IL')} ₪
-                    </p>
-                  </div>
-                  <CheckCircle2 className="w-10 h-10 text-emerald-500 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-white border-phi-frost">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-phi-slate">הושלמו</p>
-                    <p className="text-2xl font-bold text-phi-dark">{completedGoals.length}</p>
-                  </div>
-                  <CheckCircle2 className="w-10 h-10 text-phi-gold opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-        
-        {/* Add Goal Button / Form */}
-        <AnimatePresence>
-          {showAddForm ? (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-            >
-              <Card className="mb-8 bg-white border-phi-gold border-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{editingGoal ? 'עריכת יעד' : 'יעד חדש'}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setShowAddForm(false);
-                        setEditingGoal(null);
-                        setFormData({ name: '', target_amount: '', deadline: '', current_amount: '' });
-                      }}
-                    >
-                      <X className="w-5 h-5" />
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="name">שם היעד</Label>
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          placeholder="למשל: קרן חירום, רכב חדש"
-                          required
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="target_amount">סכום יעד (₪)</Label>
-                        <Input
-                          id="target_amount"
-                          type="number"
-                          value={formData.target_amount}
-                          onChange={(e) => setFormData({ ...formData, target_amount: e.target.value })}
-                          placeholder="30000"
-                          required
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="current_amount">נחסך עד כה (₪)</Label>
-                        <Input
-                          id="current_amount"
-                          type="number"
-                          value={formData.current_amount}
-                          onChange={(e) => setFormData({ ...formData, current_amount: e.target.value })}
-                          placeholder="0"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="deadline">תאריך יעד (אופציונלי)</Label>
-                        <Input
-                          id="deadline"
-                          type="date"
-                          value={formData.deadline}
-                          onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-3 justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setShowAddForm(false);
-                          setEditingGoal(null);
-                        }}
-                      >
-                        ביטול
-                      </Button>
-                      <Button type="submit" className="bg-phi-gold hover:bg-phi-gold/90">
-                        {editingGoal ? 'עדכון' : 'שמור יעד'}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ) : (
-            <Button
-              onClick={() => setShowAddForm(true)}
-              className="mb-8 bg-phi-gold hover:bg-phi-gold/90 text-white"
-            >
-              <Plus className="w-5 h-5 ml-2" />
-              יעד חדש
-            </Button>
-          )}
-        </AnimatePresence>
-        
-        {/* Active Goals */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-phi-dark mb-4">יעדים פעילים</h2>
+                <DollarSign className="w-10 h-10 text-phi-mint" />
+              </div>
+            </CardContent>
+          </Card>
           
-          {activeGoals.length === 0 ? (
-            <Card className="bg-white/50 border-dashed border-2 border-phi-frost">
-              <CardContent className="p-8 text-center">
-                <Target className="w-12 h-12 mx-auto text-phi-slate/50 mb-4" />
-                <p className="text-phi-slate mb-4">אין עדיין יעדים פעילים</p>
-                <Button
-                  onClick={() => setShowAddForm(true)}
-                  variant="outline"
-                  className="border-phi-gold text-phi-gold hover:bg-phi-gold/10"
-                >
-                  <Plus className="w-4 h-4 ml-2" />
-                  הוסף יעד ראשון
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeGoals.map((goal) => {
-                const progress = calculateProgress(goal);
-                const remaining = goal.target_amount - goal.current_amount;
-                const timeRemaining = getTimeRemaining(goal.deadline);
+          <Card className="bg-gradient-to-br from-phi-gold/20 to-phi-gold/5 border-phi-gold/30">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-phi-slate mb-1">זמין ליעדים</p>
+                  <p className="text-2xl font-bold text-phi-dark">
+                    {allocationResult.summary.available_for_goals.toLocaleString('he-IL')} ₪
+                  </p>
+                </div>
+                <Target className="w-10 h-10 text-phi-gold" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-phi-coral/20 to-phi-coral/5 border-phi-coral/30">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-phi-slate mb-1">סה״כ מוקצה</p>
+                  <p className="text-2xl font-bold text-phi-dark">
+                    {allocationResult.summary.total_allocated.toLocaleString('he-IL')} ₪
+                  </p>
+                </div>
+                <TrendingUp className="w-10 h-10 text-phi-coral" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className={`bg-gradient-to-br ${
+            allocationResult.safetyCheck.passed
+              ? 'from-green-500/20 to-green-500/5 border-green-500/30'
+              : 'from-red-500/20 to-red-500/5 border-red-500/30'
+          }`}>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-phi-slate mb-1">מצב תקציבי</p>
+                  <p className="text-lg font-bold text-phi-dark">
+                    {allocationResult.safetyCheck.comfort_level === 'excellent' && 'מצוין'}
+                    {allocationResult.safetyCheck.comfort_level === 'comfortable' && 'נוח'}
+                    {allocationResult.safetyCheck.comfort_level === 'tight' && 'צמוד'}
+                    {allocationResult.safetyCheck.comfort_level === 'critical' && 'קריטי'}
+                  </p>
+                </div>
+                {allocationResult.safetyCheck.passed ? (
+                  <CheckCircle2 className="w-10 h-10 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-10 h-10 text-red-600" />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
+      {/* אזהרות */}
+      {allocationResult && allocationResult.warnings.length > 0 && (
+        <Alert className="mb-6 border-phi-coral bg-phi-coral/10">
+          <AlertCircle className="h-4 w-4 text-phi-coral" />
+          <AlertDescription className="text-phi-dark">
+            {allocationResult.warnings.map((w, i) => (
+              <div key={i}>{w}</div>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {/* סימולטור */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-phi-gold" />
+            סימולטור - מה יקרה אם...
+          </CardTitle>
+          <CardDescription>
+            משוך את הסליידר לראות איך שינוי בהכנסה ישפיע על היעדים שלך
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div>
+              <div className="flex justify-between mb-3">
+                <span className="text-sm text-phi-slate">הכנסה חודשית</span>
+                <span className="text-lg font-bold text-phi-dark">
+                  {(simulatedIncome || currentIncome).toLocaleString('he-IL')} ₪
+                </span>
+              </div>
+              <Slider
+                value={[simulatedIncome ? simulatedIncome - currentIncome : 0]}
+                onValueChange={handleSimulationSlider}
+                min={-currentIncome * 0.5}
+                max={currentIncome * 0.5}
+                step={100}
+                className="mb-4"
+              />
+              <div className="flex justify-between text-sm text-phi-slate">
+                <span>{(currentIncome * 0.5).toLocaleString('he-IL')}- ₪</span>
+                <span>ללא שינוי</span>
+                <span>+{(currentIncome * 0.5).toLocaleString('he-IL')} ₪</span>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <Button 
+                onClick={applySimulation}
+                disabled={!simulatedIncome || isSimulating}
+                className="flex-1 bg-phi-gold hover:bg-phi-gold/90"
+              >
+                <PlayCircle className="w-4 h-4 ml-2" />
+                {isSimulating ? 'מחשב...' : 'הרץ סימולציה'}
+              </Button>
+              <Button 
+                onClick={resetSimulation}
+                variant="outline"
+                disabled={!isSimulationActive}
+              >
+                <RotateCcw className="w-4 h-4 ml-2" />
+                איפוס
+              </Button>
+            </div>
+            
+            {/* תוצאות סימולציה */}
+            {simulationResult && (
+              <div className="bg-phi-mint/10 border border-phi-mint/30 rounded-lg p-4 mt-4">
+                <h4 className="font-bold text-phi-dark mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-phi-mint" />
+                  תוצאות הסימולציה
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-phi-slate">יעדים שישתפרו:</span>
+                    <span className="font-bold text-green-600">
+                      {simulationResult.impact_summary.goals_improved}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-phi-slate">יעדים שיוקטנו:</span>
+                    <span className="font-bold text-red-600">
+                      {simulationResult.impact_summary.goals_worsened}
+                    </span>
+                  </div>
+                  {simulationResult.impact_summary.total_time_saved_months > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-phi-slate">חודשים שנחסכו:</span>
+                      <span className="font-bold text-phi-mint">
+                        {simulationResult.impact_summary.total_time_saved_months}
+                      </span>
+                    </div>
+                  )}
+                  <div className="pt-3 mt-3 border-t border-phi-mint/20">
+                    <p className="text-phi-dark font-medium">
+                      {simulationResult.impact_summary.recommendation}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* רשימת יעדים */}
+      <Card>
+        <CardHeader>
+          <CardTitle>היעדים שלך</CardTitle>
+          <CardDescription>
+            {displayedResult?.allocations.length || 0} יעדים פעילים
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {displayedResult && displayedResult.allocations.length > 0 ? (
+            <div className="space-y-4">
+              {displayedResult.allocations.map((allocation: any, index: number) => {
+                const goal = goals.find(g => g.id === allocation.goal_id);
+                if (!goal) return null;
+                
+                const progress = (goal.current_amount / goal.target_amount) * 100;
+                const priorityColor = goal.priority <= 3 ? 'text-red-600' : goal.priority <= 6 ? 'text-yellow-600' : 'text-green-600';
                 
                 return (
-                  <motion.div
-                    key={goal.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    <Card className="bg-white hover:shadow-lg transition-shadow">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between">
-                          <CardTitle className="text-lg text-phi-dark">{goal.name}</CardTitle>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => startEdit(goal)}
-                            >
-                              <Edit2 className="w-4 h-4 text-phi-slate" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleDelete(goal.id)}
-                            >
-                              <Trash2 className="w-4 h-4 text-red-400" />
-                            </Button>
-                          </div>
-                        </div>
-                        {goal.deadline && (
-                          <CardDescription className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {timeRemaining}
-                          </CardDescription>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        {/* Progress Bar */}
-                        <div className="mb-4">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-phi-slate">התקדמות</span>
-                            <span className="font-semibold text-phi-dark">{progress}%</span>
-                          </div>
-                          <div className="h-3 bg-phi-frost rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${progress}%` }}
-                              transition={{ duration: 0.8, ease: 'easeOut' }}
-                              className={`h-full ${getProgressColor(progress)}`}
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* Amounts */}
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-phi-slate">נחסך:</span>
-                            <span className="font-medium text-emerald-600">
-                              {goal.current_amount.toLocaleString('he-IL')} ₪
+                  <Card key={goal.id} className={isSimulationActive && allocation.monthly_allocation !== allocationResult?.allocations[index]?.monthly_allocation ? 'border-phi-gold border-2' : ''}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-xl font-bold text-phi-dark">{goal.name}</h3>
+                            <span className={`text-sm font-medium ${priorityColor}`}>
+                              עדיפות {goal.priority}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-phi-slate">יעד:</span>
-                            <span className="font-medium text-phi-dark">
-                              {goal.target_amount.toLocaleString('he-IL')} ₪
-                            </span>
-                          </div>
-                          <div className="flex justify-between border-t pt-2">
-                            <span className="text-phi-slate">נותר:</span>
-                            <span className="font-semibold text-phi-gold">
-                              {remaining.toLocaleString('he-IL')} ₪
-                            </span>
+                          <div className="flex gap-6 text-sm text-phi-slate">
+                            <span>יעד: {goal.target_amount.toLocaleString('he-IL')} ₪</span>
+                            <span>נוכחי: {goal.current_amount.toLocaleString('he-IL')} ₪</span>
+                            <span>נותר: {allocation.remaining_amount.toLocaleString('he-IL')} ₪</span>
                           </div>
                         </div>
-                        
-                        {/* Mark Complete Button */}
-                        {progress >= 100 && (
-                          <Button
-                            onClick={() => markComplete(goal)}
-                            className="w-full mt-4 bg-emerald-500 hover:bg-emerald-600"
-                          >
-                            <CheckCircle2 className="w-4 h-4 ml-2" />
-                            סמן כהושלם
-                          </Button>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
+                      </div>
+                      
+                      <Progress value={progress} className="mb-4 h-3" />
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-phi-slate mb-1">הקצאה חודשית</p>
+                          <p className="font-bold text-phi-dark">
+                            {allocation.monthly_allocation.toLocaleString('he-IL')} ₪
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-phi-slate mb-1">חודשים לסיום</p>
+                          <p className="font-bold text-phi-dark flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {allocation.months_to_complete}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-phi-slate mb-1">סיום צפוי</p>
+                          <p className="font-bold text-phi-dark">
+                            {new Date(allocation.expected_completion_date).toLocaleDateString('he-IL', { month: 'short', year: 'numeric' })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-phi-slate mb-1">סטטוס</p>
+                          <p className={`font-bold ${allocation.is_achievable ? 'text-green-600' : 'text-red-600'}`}>
+                            {allocation.is_achievable ? '✅ ניתן להשגה' : '⚠️ קשה'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {allocation.warnings.length > 0 && (
+                        <div className="mt-4 text-sm text-phi-slate bg-phi-coral/10 p-3 rounded-lg">
+                          {allocation.warnings.join(', ')}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
-          )}
-        </div>
-        
-        {/* Completed Goals */}
-        {completedGoals.length > 0 && (
-          <div>
-            <h2 className="text-xl font-semibold text-phi-dark mb-4">יעדים שהושלמו 🎉</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {completedGoals.map((goal) => (
-                <Card key={goal.id} className="bg-emerald-50 border-emerald-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-                      <div>
-                        <p className="font-medium text-phi-dark">{goal.name}</p>
-                        <p className="text-sm text-emerald-600">
-                          {goal.target_amount.toLocaleString('he-IL')} ₪
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          ) : (
+            <div className="text-center py-12">
+              <Target className="w-16 h-16 text-phi-slate/30 mx-auto mb-4" />
+              <p className="text-phi-slate text-lg mb-4">אין עדיין יעדים פעילים</p>
+              <Button className="bg-phi-gold hover:bg-phi-gold/90">
+                הוסף יעד ראשון
+              </Button>
             </div>
-          </div>
-        )}
-        
-        {/* Tips Section */}
-        <Card className="mt-8 bg-gradient-to-br from-phi-gold/10 to-phi-mint/10 border-phi-gold/30">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <AlertCircle className="w-6 h-6 text-phi-gold flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="font-semibold text-phi-dark mb-2">טיפים להצלחה ביעדים</h3>
-                <ul className="text-sm text-phi-slate space-y-1">
-                  <li>• התחל עם יעד קטן וריאלי - ההצלחה תיתן לך מוטיבציה</li>
-                  <li>• קבע הוראת קבע חודשית לחשבון חיסכון נפרד</li>
-                  <li>• עדכן את ההתקדמות באופן קבוע</li>
-                  <li>• חגוג כל אבן דרך בדרך ליעד!</li>
-                </ul>
-              </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* המלצות */}
+      {allocationResult && allocationResult.suggestions.length > 0 && (
+        <Card className="mt-6 border-phi-mint bg-phi-mint/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-phi-mint">
+              <Sparkles className="w-6 h-6" />
+              המלצות φ
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {allocationResult.suggestions.map((suggestion, i) => (
+                <div key={i} className="flex items-start gap-3 p-4 bg-white rounded-lg">
+                  <div className={`rounded-full p-2 ${
+                    suggestion.priority === 'high' ? 'bg-red-100' :
+                    suggestion.priority === 'medium' ? 'bg-yellow-100' :
+                    'bg-green-100'
+                  }`}>
+                    <TrendingUp className={`w-5 h-5 ${
+                      suggestion.priority === 'high' ? 'text-red-600' :
+                      suggestion.priority === 'medium' ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-phi-dark mb-1">{suggestion.message}</p>
+                    <p className="text-sm text-phi-slate">{suggestion.impact}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   );
 }
