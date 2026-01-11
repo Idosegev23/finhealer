@@ -5,7 +5,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
-import { getGreenAPIClient } from '@/lib/whatsapp/greenapi-client';
+import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { calculateOptimalAllocations } from './goals-balancer';
 import { forecastIncome } from './income-forecaster';
 import type { Goal } from '@/types/goals';
