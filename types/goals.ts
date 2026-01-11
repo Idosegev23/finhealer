@@ -100,7 +100,7 @@ export interface GoalAllocationResult {
   allocations: GoalAllocation[];
   summary: AllocationSummary;
   warnings: string[];
-  suggestions: string[];
+  suggestions: Suggestion[];
   safetyCheck: SafetyCheck;
 }
 
@@ -132,8 +132,10 @@ export interface UrgencyCalculation {
   urgency_score: number;        // ציון מסכם
 }
 
+export type SuggestionType = 'increase_income' | 'reduce_expenses' | 'adjust_deadline' | 'change_priority' | 'remove_goal' | 'add_goal';
+
 export interface Suggestion {
-  type: 'increase_income' | 'reduce_expenses' | 'adjust_deadline' | 'change_priority' | 'remove_goal' | 'add_goal';
+  type: SuggestionType;
   goal_id?: string;
   message: string;
   impact: string;

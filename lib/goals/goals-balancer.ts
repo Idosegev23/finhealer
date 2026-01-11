@@ -52,7 +52,12 @@ export async function calculateOptimalAllocations(
       allocations: [],
       summary: createEmptySummary(),
       warnings: ['אין יעדים פעילים'],
-      suggestions: ['הוסף יעד חדש כדי להתחיל לחסוך'],
+      suggestions: [{
+        type: 'add_goal',
+        message: 'הוסף יעד חדש כדי להתחיל לחסוך',
+        impact: 'תתחיל לעבוד על עתיד פיננסי מאורגן',
+        priority: 'medium',
+      }],
       safetyCheck: { passed: true, remaining_for_life: 0, minimum_required: 0, comfort_level: 'excellent' },
     };
   }
@@ -67,9 +72,24 @@ export async function calculateOptimalAllocations(
       summary: financialData,
       warnings: ['⚠️ אין תקציב זמין ליעדים - כל ההכנסה מוקצית להוצאות קבועות ומינימום מחיה'],
       suggestions: [
-        'שקול להגדיל הכנסות',
-        'בדוק אילו הוצאות ניתן להפחית',
-        'דחה יעדים לתקופה עתידית',
+        {
+          type: 'increase_income',
+          message: 'שקול להגדיל הכנסות',
+          impact: 'תוכל להתחיל לעבוד על יעדים פיננסיים',
+          priority: 'high',
+        },
+        {
+          type: 'reduce_expenses',
+          message: 'בדוק אילו הוצאות ניתן להפחית',
+          impact: 'כל ₪ שתחסוך יעזור לך להתחיל לצבור',
+          priority: 'high',
+        },
+        {
+          type: 'adjust_deadline',
+          message: 'דחה יעדים לתקופה עתידית',
+          impact: 'תפחית לחץ ותתקדם בהדרגה',
+          priority: 'medium',
+        },
       ],
       safetyCheck: {
         passed: false,
