@@ -69,7 +69,7 @@ interface TransactionGroup {
   totalAmount: number;
 }
 
-interface RouterContext {
+export interface RouterContext {
   userId: string;
   phone: string;
   state: UserState;
