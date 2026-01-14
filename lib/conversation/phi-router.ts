@@ -1737,17 +1737,55 @@ async function transitionToGoals(ctx: RouterContext): Promise<RouterResult> {
     })
     .eq('id', ctx.userId);
   
+  // הודעת ברוכים הבאים למערכת φ Goals Balancer
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
-    message: `🎯 *שלב 3: הגדרת יעדים*\n\n` +
-      `עכשיו נגדיר את היעדים הפיננסיים שלך.\n\n` +
+    message: `🎯 *שלב 3: φ Goals Balancer*\n\n` +
+      `עכשיו נגדיר את היעדים הפיננסיים שלך!\n\n` +
+      `💡 *המערכת תעשה בשבילך:*\n` +
+      `• 📊 תחשב הקצאה אוטומטית לכל יעד\n` +
+      `• ⚖️ תשקלל לפי עדיפות ודחיפות\n` +
+      `• 🛡️ תוודא שנשאר לך לחיות (״אוכל בצלחת״)\n` +
+      `• 🔄 תתאים אוטומטית לשינויי הכנסה\n\n` +
       `*מה חשוב לך?*\n` +
-      `1. חיסכון לקרן חירום\n` +
-      `2. סגירת חובות\n` +
-      `3. חיסכון למטרה ספציפית\n` +
-      `4. שיפור מצב פיננסי כללי\n\n` +
+      `1️⃣ חיסכון לקרן חירום\n` +
+      `2️⃣ סגירת חובות\n` +
+      `3️⃣ חיסכון למטרה ספציפית\n` +
+      `4️⃣ שיפור מצב פיננסי כללי\n\n` +
       `כתוב מספר או תאר את היעד שלך.`,
   });
+  
+  // הצג כפתורים לכלים מתקדמים (אם כבר יש יעדים)
+  const { count: existingGoals } = await supabase
+    .from('goals')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId);
+  
+  if (existingGoals && existingGoals > 0) {
+    try {
+      await greenAPI.sendInteractiveButtons({
+        phoneNumber: ctx.phone,
+        message: `✨ *כלים מתקדמים זמינים:*\n\n` +
+          `• *יעדים* - הצג יעדים + הקצאות מחושבות\n` +
+          `• *סימולציה* - בדוק ״מה יקרה אם...״\n` +
+          `• *אופטימיזציה* - קבל המלצות φ חכמות`,
+        buttons: [
+          { buttonId: 'show_goals', buttonText: 'יעדים' },
+          { buttonId: 'simulate', buttonText: 'סימולציה' },
+          { buttonId: 'optimize', buttonText: 'אופטימיזציה' },
+        ],
+      });
+    } catch {
+      // אם כפתורים נכשלו, שלח רק טקסט
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `✨ *כלים מתקדמים:*\n` +
+          `• כתוב *"יעדים"* לראות הקצאות\n` +
+          `• כתוב *"סימולציה"* לבדוק תרחישים\n` +
+          `• כתוב *"אופטימיזציה"* להמלצות`,
+      });
+    }
+  }
   
   return { success: true, newState: 'goals' };
 }
@@ -1867,11 +1905,15 @@ async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise<Router
   if (isCommand(msg, ['עזרה', 'help', '?'])) {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `🎯 *שלב 3: הגדרת יעדים*\n\n` +
-        `*פקודות:*\n` +
+      message: `🎯 *שלב 3: φ Goals Balancer*\n\n` +
+        `*פקודות בסיסיות:*\n` +
         `• *"יעד חדש"* - הוסף יעד חדש\n` +
-        `• *"יעדים"* - הצג יעדים קיימים\n` +
+        `• *"יעדים"* - הצג יעדים + הקצאות מחושבות\n` +
         `• *"סיימתי"* - סיום והמשך לתקציב\n\n` +
+        `*כלים מתקדמים:*\n` +
+        `• *"סימולציה"* - בדוק תרחישי ״מה יקרה אם״\n` +
+        `• *"אופטימיזציה"* - קבל המלצות φ אוטומטיות\n` +
+        `• *"אשר"* - אשר שינויים מוצעים\n\n` +
         `*סוגי יעדים:*\n` +
         `1️⃣ קרן חירום - רשת ביטחון\n` +
         `2️⃣ סגירת חובות - הפחתת חוב\n` +
@@ -2527,21 +2569,62 @@ async function finishGoalsSetting(ctx: RouterContext): Promise<RouterResult> {
   // ספור יעדים
   const { data: goals } = await supabase
     .from('goals')
-    .select('name, target_amount')
+    .select('name, target_amount, monthly_allocation')
     .eq('user_id', ctx.userId)
     .eq('status', 'active');
   
   const totalGoalAmount = goals?.reduce((sum, g) => sum + (g.target_amount || 0), 0) || 0;
+  const totalMonthlyAllocation = goals?.reduce((sum, g) => sum + (g.monthly_allocation || 0), 0) || 0;
+  
+  // 🆕 הצע לחשב הקצאות אם עדיין לא חושבו
+  if (goals && goals.length > 0 && totalMonthlyAllocation === 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `⚙️ מחשב הקצאות אוטומטיות...`,
+    });
+    
+    try {
+      // קריאה לאלגוריתם φ Goals Balancer
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/goals/balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: ctx.userId, applyChanges: true }),
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        const allocationsCalculated = result.allocations?.length > 0;
+        
+        if (allocationsCalculated) {
+          await greenAPI.sendMessage({
+            phoneNumber: ctx.phone,
+            message: `✅ *הקצאות חושבו!*\n\n` +
+              `המערכת חישבה הקצאה אופטימלית לכל יעד בהתאם להכנסה ולעדיפויות שלך.\n\n` +
+              `כתוב *"יעדים"* לראות את ההקצאות המלאות.`,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error calculating allocations:', error);
+      // המשך גם אם החישוב נכשל
+    }
+  }
   
   try {
     await sendWhatsAppInteractiveButtons(ctx.phone, {
       message: `🎯 *סיימנו להגדיר יעדים!*\n\n` +
         `📊 *${goals?.length || 0} יעדים*\n` +
-        `💰 סה"כ: *${totalGoalAmount.toLocaleString('he-IL')} ₪*\n\n` +
-        `עכשיו נבנה תקציב שתומך ביעדים האלה.`,
+        `💰 סה״כ יעד: *${totalGoalAmount.toLocaleString('he-IL')} ₪*\n` +
+        (totalMonthlyAllocation > 0 ? `💵 הקצאה חודשית: *${totalMonthlyAllocation.toLocaleString('he-IL')} ₪*\n\n` : '\n') +
+        `✨ *כלים זמינים:*\n` +
+        `• *"יעדים"* - הצג הקצאות מחושבות\n` +
+        `• *"סימולציה"* - בדוק תרחישים\n` +
+        `• *"אופטימיזציה"* - המלצות φ\n\n` +
+        `מוכן לבנות תקציב?`,
       header: 'המשך לתקציב?',
       buttons: [
         { buttonId: 'to_budget', buttonText: 'המשך' },
+        { buttonId: 'show_goals', buttonText: 'יעדים' },
         { buttonId: 'new_goal', buttonText: 'יעד חדש' },
       ],
     });
@@ -2550,9 +2633,13 @@ async function finishGoalsSetting(ctx: RouterContext): Promise<RouterResult> {
       phoneNumber: ctx.phone,
       message: `🎯 *סיימנו להגדיר יעדים!*\n\n` +
         `📊 *${goals?.length || 0} יעדים*\n` +
-        `💰 סה"כ: *${totalGoalAmount.toLocaleString('he-IL')} ₪*\n\n` +
-        `עכשיו נבנה תקציב שתומך ביעדים האלה.\n\n` +
-        `כתוב *"המשך"* לעבור לתקציב`,
+        `💰 סה״כ: *${totalGoalAmount.toLocaleString('he-IL')} ₪*\n` +
+        (totalMonthlyAllocation > 0 ? `💵 הקצאה חודשית: *${totalMonthlyAllocation.toLocaleString('he-IL')} ₪*\n\n` : '\n') +
+        `✨ *כלים:*\n` +
+        `• *"יעדים"* - הקצאות\n` +
+        `• *"סימולציה"* - תרחישים\n` +
+        `• *"אופטימיזציה"* - המלצות\n\n` +
+        `כתוב *"המשך"* לתקציב`,
     });
   }
   
