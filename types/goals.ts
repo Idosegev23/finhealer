@@ -3,17 +3,29 @@
  */
 
 export type GoalType = 
-  | 'emergency_fund'      // קרן חירום
-  | 'debt_payoff'         // סגירת חובות
-  | 'savings_goal'        // חיסכון למטרה
-  | 'general_improvement' // שיפור כללי
-  | 'retirement'          // פנסיה
-  | 'education'           // לימודים
-  | 'home_purchase'       // רכישת דירה
-  | 'vehicle'             // רכב
-  | 'vacation'            // חופשה
-  | 'wedding'             // חתונה
-  | 'other';              // אחר
+  | 'emergency_fund'           // קרן חירום
+  | 'debt_payoff'              // סגירת חובות
+  | 'savings_goal'             // חיסכון למטרה
+  | 'general_improvement'      // שיפור כללי
+  | 'retirement'               // פנסיה
+  | 'education'                // לימודים
+  | 'home_purchase'            // רכישת דירה
+  | 'vehicle'                  // רכב
+  | 'vacation'                 // חופשה
+  | 'wedding'                  // חתונה
+  | 'renovation'               // שיפוץ דירה
+  | 'real_estate_investment'   // רכישת נכס להשקעה
+  | 'pension_increase'         // הגדלת פנסיה
+  | 'child_savings'            // חיסכון לילד
+  | 'family_savings'           // חיסכון משפחתי
+  | 'other';                   // אחר
+
+export type BudgetSource = 
+  | 'income'      // הכנסה שוטפת
+  | 'bonus'       // בונוס
+  | 'sale'        // מכירת נכס
+  | 'inheritance' // ירושה
+  | 'other';      // אחר
 
 export type GoalStatus = 'active' | 'completed' | 'cancelled' | 'paused';
 
@@ -50,6 +62,14 @@ export interface Goal {
   description?: string;
   child_name?: string;
   
+  // שדות חדשים - מימון ותלויות
+  budget_source?: BudgetSource;
+  funding_notes?: string;
+  child_id?: string; // קישור לטבלת children
+  depends_on_goal_id?: string; // תלות ביעד אחר
+  goal_group?: string; // קיבוץ לוגי (ילדים, נדל״ן, רכבים)
+  milestones?: GoalMilestoneData[]; // אבני דרך שהושגו
+  
   // שדות למנוע השקלול
   is_flexible: boolean;
   min_allocation: number;
@@ -68,6 +88,34 @@ export interface GoalMetadata {
   category?: string;
   urgency_override?: number;
   max_allocation?: number;
+}
+
+export interface GoalMilestoneData {
+  percent: number; // 25, 50, 75, 100
+  reached_at: string;
+  celebrated: boolean;
+}
+
+export interface GoalMilestone {
+  id: string;
+  goal_id: string;
+  percent_reached: number;
+  amount_reached: number;
+  reached_at: Date;
+  celebrated: boolean;
+  celebration_sent_at?: Date;
+  notes?: string;
+  created_at: Date;
+}
+
+export interface GoalWithDependencies extends Goal {
+  depends_on_goal_name?: string;
+  depends_on_goal_status?: GoalStatus;
+  depends_on_current_amount?: number;
+  depends_on_target_amount?: number;
+  can_start: boolean;
+  milestones_reached: number;
+  milestone_history?: GoalMilestoneData[];
 }
 
 export interface GoalAllocationInput {

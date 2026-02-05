@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
 
     const messageType = payload.messageData?.typeMessage;
     // messageId כבר הוגדר למעלה
-    
+
     // 🔍 DEBUG: הצג את כל סוג ההודעה והנתונים
     console.log('📨 MESSAGE TYPE:', messageType);
     console.log('📨 FULL MESSAGE DATA:', JSON.stringify(payload.messageData, null, 2));

@@ -17,11 +17,19 @@ import type {
   Suggestion,
   AllocationHistory,
 } from '@/types/goals';
+import {
+  sortGoalsByDependencies,
+  canGoalStart,
+  getDependencyReductionFactor,
+  detectCircularDependencies,
+  generateDependencySuggestions,
+} from './dependencies-handler';
 
 const ALGORITHM_VERSION = '1.0.0';
 const DEFAULT_SAFETY_MARGIN_PERCENT = 10; // 10% מרווח ביטחון
 const MINIMUM_COMFORT_PERCENT = 30; // 30% מההכנסה לאחר הוצאות קבועות
 const MAX_GOAL_ALLOCATION_PERCENT = 40; // יעד בודד לא יכול לקבל יותר מ-40%
+const DEPENDENCY_REDUCTION_FACTOR = 0.3; // יעדים תלויים מקבלים 30% מההקצאה המקורית
 
 /**
  * פונקציה ראשית - מחשבת הקצאות אופטימליות
@@ -65,7 +73,13 @@ export async function calculateOptimalAllocations(
   // שלב 2: חשב הכנסות והוצאות
   const financialData = await calculateFinancialData(userId, input);
   
-  // שלב 3: בדוק אם יש תקציב ליעדים
+  // שלב 3: בדוק תלויות בין יעדים
+  const dependencyWarnings = detectCircularDependencies(goals);
+  
+  // מיין יעדים לפי תלויות (יעדים שאחרים תלויים בהם קודם)
+  const sortedGoals = sortGoalsByDependencies(goals);
+  
+  // שלב 4: בדוק אם יש תקציב ליעדים
   if (financialData.available_for_goals <= 0) {
     return {
       allocations: [],
@@ -101,8 +115,17 @@ export async function calculateOptimalAllocations(
     };
   }
   
-  // שלב 4: חשב urgency לכל יעד
-  const urgencyScores = goals.map(goal => calculateUrgencyScore(goal));
+  // שלב 5: חשב urgency לכל יעד (עם התחשבות בתלויות)
+  const urgencyScores = sortedGoals.map(goal => {
+    const baseUrgency = calculateUrgencyScore(goal);
+    const reductionFactor = getDependencyReductionFactor(goal, sortedGoals);
+    
+    // יעדים תלויים מקבלים urgency מופחת
+    return {
+      ...baseUrgency,
+      urgency_score: baseUrgency.urgency_score * reductionFactor,
+    };
+  });
   
   // שלב 5: הרץ אלגוריתם הקצאה אופטימלי
   const allocations = allocateOptimally(
@@ -120,8 +143,10 @@ export async function calculateOptimalAllocations(
     financialData.minimum_living
   );
   
-  // שלב 7: צור המלצות
-  const suggestions = generateSuggestions(goals, allocations, financialData, safetyCheck);
+  // שלב 8: צור המלצות (כולל תלויות)
+  const baseSuggestions = generateSuggestions(sortedGoals, allocations, financialData, safetyCheck);
+  const dependencySuggestions = generateDependencySuggestions(sortedGoals, dependencyWarnings);
+  const suggestions = [...baseSuggestions, ...dependencySuggestions];
   
   // שלב 8: צור אזהרות
   const warnings = generateWarnings(allocations, safetyCheck);

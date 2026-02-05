@@ -301,7 +301,7 @@ export default function BudgetPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
-        >
+          >
           <Card className={`bg-white border-phi-frost ${!profileContext?.hasProfile ? 'opacity-60' : ''}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -397,7 +397,7 @@ export default function BudgetPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
-        >
+          >
           <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">

@@ -20,8 +20,16 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
+  Plus,
+  ArrowUpDown,
 } from 'lucide-react';
 import type { Goal, GoalAllocationResult } from '@/types/goals';
+import { GoalModal } from '@/components/goals/GoalModal';
+import { GoalsListCard } from '@/components/goals/GoalsListCard';
+import { GoalsDragList } from '@/components/goals/GoalsDragList';
+import { GoalsTimeline } from '@/components/goals/GoalsTimeline';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -30,6 +38,12 @@ export default function GoalsPage() {
   const [simulatedIncome, setSimulatedIncome] = useState<number | null>(null);
   const [simulationResult, setSimulationResult] = useState<any>(null);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [userId, setUserId] = useState<string>('');
+  const [isDragMode, setIsDragMode] = useState(false);
+  
+  const supabase = createClientComponentClient();
   
   useEffect(() => {
     loadGoalsAndAllocations();
@@ -40,28 +54,35 @@ export default function GoalsPage() {
       setLoading(true);
       
       // שלוף מזהה משתמש
-      const response = await fetch('/api/auth/session');
-      const session = await response.json();
-      const userId = session?.user?.id;
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!userId) {
-        console.error('No user ID');
+      if (!user) {
+        console.error('No user');
         return;
       }
       
-      // שלוף יעדים והקצאות
-      const balanceResponse = await fetch(`/api/goals/balance?userId=${userId}`);
-      const balanceData = await balanceResponse.json();
+      setUserId(user.id);
       
-      if (balanceData.success) {
-        setGoals(balanceData.goals || []);
+      // שלוף יעדים מהDB
+      const { data: goalsData, error: goalsError } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('priority', { ascending: true });
+      
+      if (goalsError) {
+        console.error('Error loading goals:', goalsError);
+        return;
       }
+      
+      setGoals(goalsData || []);
       
       // חשב הקצאות
       const allocResponse = await fetch('/api/goals/balance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId: user.id }),
       });
       
       const allocData = await allocResponse.json();
@@ -76,6 +97,80 @@ export default function GoalsPage() {
     }
   }
   
+  async function handleSaveGoal(goalData: Partial<Goal>) {
+    try {
+      if (goalData.id) {
+        // עדכון
+        const { error } = await supabase
+          .from('goals')
+          .update(goalData)
+          .eq('id', goalData.id);
+        
+        if (error) throw error;
+      } else {
+        // יצירה חדשה
+        const { error } = await supabase
+          .from('goals')
+          .insert([{ ...goalData, current_amount: 0 }]);
+        
+        if (error) throw error;
+      }
+      
+      // רענן רשימה
+      await loadGoalsAndAllocations();
+      setIsModalOpen(false);
+      setEditingGoal(null);
+    } catch (error) {
+      console.error('Error saving goal:', error);
+      throw error;
+    }
+  }
+  
+  async function handleDeleteGoal(goalId: string) {
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update({ status: 'cancelled' })
+        .eq('id', goalId);
+      
+      if (error) throw error;
+      
+      await loadGoalsAndAllocations();
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+      throw error;
+    }
+  }
+  
+  function handleEditGoal(goal: Goal) {
+    setEditingGoal(goal);
+    setIsModalOpen(true);
+  }
+  
+  function handleNewGoal() {
+    setEditingGoal(null);
+    setIsModalOpen(true);
+  }
+  
+  async function handleReorderGoals(reorderedGoals: Goal[]) {
+    try {
+      // עדכן עדיפויות בDB
+      for (const goal of reorderedGoals) {
+        await supabase
+          .from('goals')
+          .update({ priority: goal.priority })
+          .eq('id', goal.id);
+      }
+      
+      // רענן נתונים
+      await loadGoalsAndAllocations();
+      setIsDragMode(false);
+    } catch (error) {
+      console.error('Error reordering goals:', error);
+      throw error;
+    }
+  }
+  
   async function runSimulation(incomeChange: number) {
     setIsSimulating(true);
     
@@ -85,7 +180,7 @@ export default function GoalsPage() {
       const userId = session?.user?.id;
       
       const simResponse = await fetch('/api/goals/simulate', {
-        method: 'POST',
+          method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
@@ -143,72 +238,84 @@ export default function GoalsPage() {
   
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl" dir="rtl">
-      {/* כותרת */}
-      <div className="mb-8">
+      {/* כותרת וכפתור יעד חדש */}
+        <div className="mb-8 flex justify-between items-start">
+          <div>
         <h1 className="text-4xl font-bold text-phi-dark flex items-center gap-3 mb-2">
           <Target className="w-10 h-10 text-phi-gold" />
           φ היעדים שלך
-        </h1>
+          </h1>
         <p className="text-phi-slate text-lg">
           {goals.length === 0
             ? 'הגדר יעדים פיננסיים ונתחיל לעבוד לקראתם'
             : `${goals.length} יעדים פעילים`}
         </p>
-      </div>
-      
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={() => setIsDragMode(true)} size="lg" variant="outline" className="gap-2">
+              <ArrowUpDown className="w-5 h-5" />
+              שנה סדר
+            </Button>
+            <Button onClick={handleNewGoal} size="lg" className="gap-2">
+              <Plus className="w-5 h-5" />
+              יעד חדש
+            </Button>
+          </div>
+        </div>
+        
       {/* סיכום כללי */}
       {allocationResult && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Card className="bg-gradient-to-br from-phi-mint/20 to-phi-mint/5 border-phi-mint/30">
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center justify-between">
+                  <div>
                   <p className="text-sm text-phi-slate mb-1">הכנסה חודשית</p>
                   <p className="text-2xl font-bold text-phi-dark">
                     {currentIncome.toLocaleString('he-IL')} ₪
                   </p>
-                </div>
+                  </div>
                 <DollarSign className="w-10 h-10 text-phi-mint" />
-              </div>
-            </CardContent>
-          </Card>
-          
+                </div>
+              </CardContent>
+            </Card>
+            
           <Card className="bg-gradient-to-br from-phi-gold/20 to-phi-gold/5 border-phi-gold/30">
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center justify-between">
+                  <div>
                   <p className="text-sm text-phi-slate mb-1">זמין ליעדים</p>
-                  <p className="text-2xl font-bold text-phi-dark">
+                    <p className="text-2xl font-bold text-phi-dark">
                     {allocationResult.summary.available_for_goals.toLocaleString('he-IL')} ₪
-                  </p>
-                </div>
+                    </p>
+                  </div>
                 <Target className="w-10 h-10 text-phi-gold" />
-              </div>
-            </CardContent>
-          </Card>
-          
+                </div>
+              </CardContent>
+            </Card>
+            
           <Card className="bg-gradient-to-br from-phi-coral/20 to-phi-coral/5 border-phi-coral/30">
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center justify-between">
+                  <div>
                   <p className="text-sm text-phi-slate mb-1">סה״כ מוקצה</p>
                   <p className="text-2xl font-bold text-phi-dark">
                     {allocationResult.summary.total_allocated.toLocaleString('he-IL')} ₪
-                  </p>
-                </div>
+                    </p>
+                  </div>
                 <TrendingUp className="w-10 h-10 text-phi-coral" />
-              </div>
-            </CardContent>
-          </Card>
-          
+                </div>
+              </CardContent>
+            </Card>
+            
           <Card className={`bg-gradient-to-br ${
             allocationResult.safetyCheck.passed
               ? 'from-green-500/20 to-green-500/5 border-green-500/30'
               : 'from-red-500/20 to-red-500/5 border-red-500/30'
           }`}>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center justify-between">
+                  <div>
                   <p className="text-sm text-phi-slate mb-1">מצב תקציבי</p>
                   <p className="text-lg font-bold text-phi-dark">
                     {allocationResult.safetyCheck.comfort_level === 'excellent' && 'מצוין'}
@@ -216,18 +323,18 @@ export default function GoalsPage() {
                     {allocationResult.safetyCheck.comfort_level === 'tight' && 'צמוד'}
                     {allocationResult.safetyCheck.comfort_level === 'critical' && 'קריטי'}
                   </p>
-                </div>
+                  </div>
                 {allocationResult.safetyCheck.passed ? (
                   <CheckCircle2 className="w-10 h-10 text-green-600" />
                 ) : (
                   <AlertCircle className="w-10 h-10 text-red-600" />
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        
       {/* אזהרות */}
       {allocationResult && allocationResult.warnings.length > 0 && (
         <Alert className="mb-6 border-phi-coral bg-phi-coral/10">
@@ -242,24 +349,24 @@ export default function GoalsPage() {
       
       {/* סימולטור */}
       <Card className="mb-8">
-        <CardHeader>
+                <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-phi-gold" />
             סימולטור - מה יקרה אם...
-          </CardTitle>
+                  </CardTitle>
           <CardDescription>
             משוך את הסליידר לראות איך שינוי בהכנסה ישפיע על היעדים שלך
           </CardDescription>
-        </CardHeader>
-        <CardContent>
+                </CardHeader>
+                <CardContent>
           <div className="space-y-6">
-            <div>
+                      <div>
               <div className="flex justify-between mb-3">
                 <span className="text-sm text-phi-slate">הכנסה חודשית</span>
                 <span className="text-lg font-bold text-phi-dark">
                   {(simulatedIncome || currentIncome).toLocaleString('he-IL')} ₪
                 </span>
-              </div>
+                      </div>
               <Slider
                 value={[simulatedIncome ? simulatedIncome - currentIncome : 0]}
                 onValueChange={handleSimulationSlider}
@@ -267,14 +374,14 @@ export default function GoalsPage() {
                 max={currentIncome * 0.5}
                 step={100}
                 className="mb-4"
-              />
+                        />
               <div className="flex justify-between text-sm text-phi-slate">
                 <span>{(currentIncome * 0.5).toLocaleString('he-IL')}- ₪</span>
                 <span>ללא שינוי</span>
                 <span>+{(currentIncome * 0.5).toLocaleString('he-IL')} ₪</span>
-              </div>
-            </div>
-            
+                      </div>
+                    </div>
+                    
             <div className="flex gap-3">
               <Button 
                 onClick={applySimulation}
@@ -284,14 +391,14 @@ export default function GoalsPage() {
                 <PlayCircle className="w-4 h-4 ml-2" />
                 {isSimulating ? 'מחשב...' : 'הרץ סימולציה'}
               </Button>
-              <Button 
+                      <Button
                 onClick={resetSimulation}
-                variant="outline"
+                        variant="outline"
                 disabled={!isSimulationActive}
-              >
+                      >
                 <RotateCcw className="w-4 h-4 ml-2" />
                 איפוס
-              </Button>
+                      </Button>
             </div>
             
             {/* תוצאות סימולציה */}
@@ -331,19 +438,36 @@ export default function GoalsPage() {
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+                </CardContent>
+              </Card>
       
-      {/* רשימת יעדים */}
-      <Card>
-        <CardHeader>
-          <CardTitle>היעדים שלך</CardTitle>
-          <CardDescription>
-            {displayedResult?.allocations.length || 0} יעדים פעילים
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {displayedResult && displayedResult.allocations.length > 0 ? (
+      {/* ציר זמן ויזואלי (Timeline) */}
+      {goals.length > 0 && (
+        <div className="mt-8">
+          <GoalsTimeline goals={goals} />
+        </div>
+      )}
+      
+      {/* רשימת יעדים - עם קומפוננטה חדשה */}
+      <div className="mt-8">
+        <h2 className="text-2xl font-bold text-phi-dark mb-4">רשימת יעדים</h2>
+        <GoalsListCard
+          goals={goals}
+          onEdit={handleEditGoal}
+          onDelete={handleDeleteGoal}
+        />
+      </div>
+      
+      {/* פירוט הקצאות - לפי המערכת הישנה */}
+      {displayedResult && displayedResult.allocations.length > 0 && (
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>פירוט הקצאות</CardTitle>
+            <CardDescription>
+              חישוב אוטומטי של φ Goals Balancer
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-4">
               {displayedResult.allocations.map((allocation: any, index: number) => {
                 const goal = goals.find(g => g.id === allocation.goal_id);
@@ -379,14 +503,14 @@ export default function GoalsPage() {
                           <p className="font-bold text-phi-dark">
                             {allocation.monthly_allocation.toLocaleString('he-IL')} ₪
                           </p>
-                        </div>
+                          </div>
                         <div>
                           <p className="text-phi-slate mb-1">חודשים לסיום</p>
                           <p className="font-bold text-phi-dark flex items-center gap-1">
                             <Clock className="w-4 h-4" />
                             {allocation.months_to_complete}
                           </p>
-                        </div>
+                          </div>
                         <div>
                           <p className="text-phi-slate mb-1">סיום צפוי</p>
                           <p className="font-bold text-phi-dark">
@@ -398,16 +522,16 @@ export default function GoalsPage() {
                           <p className={`font-bold ${allocation.is_achievable ? 'text-green-600' : 'text-red-600'}`}>
                             {allocation.is_achievable ? '✅ ניתן להשגה' : '⚠️ קשה'}
                           </p>
+                          </div>
                         </div>
-                      </div>
-                      
+                        
                       {allocation.warnings.length > 0 && (
                         <div className="mt-4 text-sm text-phi-slate bg-phi-coral/10 p-3 rounded-lg">
                           {allocation.warnings.join(', ')}
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                        )}
+                      </CardContent>
+                    </Card>
                 );
               })}
             </div>
@@ -446,17 +570,45 @@ export default function GoalsPage() {
                       suggestion.priority === 'medium' ? 'text-yellow-600' :
                       'text-green-600'
                     }`} />
-                  </div>
+        </div>
                   <div className="flex-1">
                     <p className="font-medium text-phi-dark mb-1">{suggestion.message}</p>
                     <p className="text-sm text-phi-slate">{suggestion.impact}</p>
-                  </div>
-                </div>
+                      </div>
+                    </div>
               ))}
             </div>
           </CardContent>
         </Card>
       )}
+      
+      {/* Modals */}
+      <GoalModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingGoal(null);
+        }}
+        onSave={handleSaveGoal}
+        goal={editingGoal}
+        userId={userId}
+      />
+      
+      {/* Drag & Drop Dialog */}
+      <Dialog open={isDragMode} onOpenChange={setIsDragMode}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">
+              🎯 סדר עדיפויות יעדים
+            </DialogTitle>
+          </DialogHeader>
+          <GoalsDragList
+            goals={goals}
+            onSave={handleReorderGoals}
+            onClose={() => setIsDragMode(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

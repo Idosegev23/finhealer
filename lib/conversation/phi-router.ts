@@ -1809,10 +1809,116 @@ async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise<Router
     .single();
   
   const goalContext: GoalCreationContext | null = user?.classification_context?.goalCreation || null;
+  const advancedGoalContext = user?.classification_context?.advancedGoalCreation || null;
+  const editGoalContext = user?.classification_context?.editGoal || null;
+  const autoAdjustContext = user?.classification_context?.autoAdjust || null;
   
-  // פקודת התחלת יעד חדש (כולל buttonId)
+  // 🆕 Advanced Goal Creation Flow
+  if (advancedGoalContext) {
+    const {
+      startAdvancedGoal,
+      handleAdvancedGoalTypeSelection,
+      handleChildSelection,
+      askBudgetSource,
+      handleBudgetSourceSelection,
+      createAdvancedGoal
+    } = await import('./advanced-goals-handler');
+    
+    if (advancedGoalContext.step === 'type') {
+      await handleAdvancedGoalTypeSelection(ctx.userId, ctx.phone, msg);
+      return { success: true };
+    } else if (advancedGoalContext.step === 'child') {
+      await handleChildSelection(ctx.userId, ctx.phone, msg, advancedGoalContext);
+      return { success: true };
+    } else if (advancedGoalContext.step === 'amount') {
+      const amount = parseFloat(msg.replace(/[^\d.]/g, ''));
+      if (!isNaN(amount) && amount > 0) {
+        await askBudgetSource(ctx.userId, ctx.phone, { ...advancedGoalContext, targetAmount: amount });
+      } else {
+        await greenAPI.sendMessage({
+          phoneNumber: ctx.phone,
+          message: `❌ סכום לא תקין. כתוב מספר חיובי.`,
+        });
+      }
+      return { success: true };
+    } else if (advancedGoalContext.step === 'budget_source') {
+      await handleBudgetSourceSelection(ctx.userId, ctx.phone, msg, advancedGoalContext);
+      return { success: true };
+    } else if (advancedGoalContext.step === 'confirm') {
+      if (msg.toLowerCase().includes('אשר') || msg.toLowerCase() === 'כן') {
+        await createAdvancedGoal(ctx.userId, ctx.phone, advancedGoalContext);
+      } else {
+        await supabase.from('users').update({ classification_context: {} }).eq('id', ctx.userId);
+        await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: `✅ בוטל.` });
+      }
+      return { success: true };
+    }
+  }
+  
+  // 🆕 Edit/Delete Goal Flow
+  if (editGoalContext) {
+    const {
+      handleGoalSelection,
+      handleActionSelection,
+      handleFieldEdit,
+      confirmGoalDeletion
+    } = await import('./edit-goal-handler');
+    
+    if (editGoalContext.step === 'select_goal') {
+      await handleGoalSelection(ctx.userId, ctx.phone, msg, editGoalContext);
+      return { success: true };
+    } else if (editGoalContext.step === 'select_action') {
+      await handleActionSelection(ctx.userId, ctx.phone, msg, editGoalContext);
+      return { success: true };
+    } else if (editGoalContext.step === 'edit_field') {
+      await handleFieldEdit(ctx.userId, ctx.phone, msg, editGoalContext);
+      return { success: true };
+    } else if (editGoalContext.step === 'confirm_delete') {
+      await confirmGoalDeletion(ctx.userId, ctx.phone, msg, editGoalContext);
+      return { success: true };
+    }
+  }
+  
+  // 🆕 Auto-Adjust Flow - תגובה להצעת התאמה
+  if (autoAdjustContext?.pending) {
+    const {
+      confirmAndApplyAdjustments,
+      cancelAdjustments
+    } = await import('../goals/auto-adjust-handler');
+    
+    if (isCommand(msg, ['אשר', 'אישור', 'כן', 'yes', 'confirm'])) {
+      await confirmAndApplyAdjustments(ctx.userId, ctx.phone);
+      return { success: true };
+    } else if (isCommand(msg, ['לא', 'ביטול', 'no', 'cancel'])) {
+      await cancelAdjustments(ctx.userId, ctx.phone);
+      return { success: true };
+    } else if (isCommand(msg, ['פרטים', 'details', 'מידע'])) {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `📊 *פרטים נוספים על ההתאמות:*\n\n` +
+          `ההצעה מבוססת על ההכנסה החדשה שלך.\n` +
+          `φ מחשב מחדש את כל ההקצאות באופן אוטומטי.\n\n` +
+          `*האם לאשר?*\n` +
+          `• *"אשר"* - יישום השינויים\n` +
+          `• *"לא"* - ביטול\n\n` +
+          `φ *Phi*`,
+      });
+      return { success: true };
+    }
+  }
+  
+  // פקודת התחלת יעד חדש (כולל buttonId) - משודרג למערכת חדשה
   if (isCommand(msg, ['יעד חדש', 'הוסף יעד', 'צור יעד', 'new goal', 'add goal', '➕ יעד חדש', 'new_goal'])) {
-    return await startNewGoal(ctx);
+    const { startAdvancedGoal } = await import('./advanced-goals-handler');
+    await startAdvancedGoal(ctx.userId, ctx.phone);
+    return { success: true };
+  }
+  
+  // 🆕 עריכת יעד קיים
+  if (isCommand(msg, ['עריכה', 'ערוך יעד', 'edit goal', 'שנה יעד', 'edit'])) {
+    const { startEditGoal } = await import('./edit-goal-handler');
+    await startEditGoal(ctx.userId, ctx.phone);
+    return { success: true };
   }
   
   // בחירת סוג יעד (1-4)
