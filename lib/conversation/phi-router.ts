@@ -3471,18 +3471,18 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
   const totalIncome = transactions?.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
   const totalExpenses = transactions?.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
   
-  // 🔥 אם היינו מחכים למסמך (כמו דוח אשראי שביקשנו) - התחל סיווג אוטומטית!
+  // 🔥 אם היינו מחכים למסמך (כמו דוח אשראי שביקשנו) - התחל תהליך סיווג אינטראקטיבי!
   if (wasWaitingForDocument && (incomeCount > 0 || expenseCount > 0)) {
-    console.log(`🎯 Document was requested - starting classification automatically for ${incomeCount + expenseCount} transactions`);
+    console.log(`🎯 Document was requested - starting interactive classification for ${incomeCount + expenseCount} transactions`);
     
-    // שלח הודעת סיכום מהירה
+    // שלח הודעת סיכום והתחלה
     await greenAPI.sendMessage({
       phoneNumber: phone,
       message: `✅ *קיבלתי את הדוח!*\n\n` +
         `📝 ${incomeCount + expenseCount} תנועות\n` +
         `💚 ${incomeCount} הכנסות (${totalIncome.toLocaleString('he-IL')} ₪)\n` +
         `💸 ${expenseCount} הוצאות (${totalExpenses.toLocaleString('he-IL')} ₪)\n\n` +
-        `🎯 *בוא נסווג ביחד!*`,
+        `🎯 *בוא נעבור עליהן ביחד!*`,
     });
     
     // עדכן state ל-classification והתחל
@@ -3494,7 +3494,7 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
       })
       .eq('id', userId);
     
-    // התחל סיווג - קרא ישירות ל-startClassification
+    // התחל תהליך סיווג אינטראקטיבי - תנועה אחר תנועה
     await startClassification({ userId, phone, state: 'classification' });
     return;
   }
