@@ -12,7 +12,8 @@ import {
   Calendar,
   DollarSign,
   Star,
-  ArrowUpDown
+  ArrowUpDown,
+  Plus
 } from 'lucide-react';
 import type { Goal } from '@/types/goals';
 
@@ -21,6 +22,7 @@ interface GoalsListCardProps {
   onEdit: (goal: Goal) => void;
   onDelete: (goalId: string) => void;
   onReorder?: (goals: Goal[]) => void;
+  onDeposit?: (goal: Goal) => void;
 }
 
 const GOAL_TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
@@ -42,7 +44,7 @@ const GOAL_TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
   other: { label: 'אחר', emoji: '📦' },
 };
 
-export function GoalsListCard({ goals, onEdit, onDelete, onReorder }: GoalsListCardProps) {
+export function GoalsListCard({ goals, onEdit, onDelete, onReorder, onDeposit }: GoalsListCardProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (goalId: string, goalName: string) => {
@@ -127,6 +129,17 @@ export function GoalsListCard({ goals, onEdit, onDelete, onReorder }: GoalsListC
                       </div>
 
                       <div className="flex gap-2">
+                        {onDeposit && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => onDeposit(goal)}
+                            className="bg-phi-gold hover:bg-phi-dark"
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            הפקדה
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"

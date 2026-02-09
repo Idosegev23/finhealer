@@ -28,6 +28,7 @@ import { GoalModal } from '@/components/goals/GoalModal';
 import { GoalsListCard } from '@/components/goals/GoalsListCard';
 import { GoalsDragList } from '@/components/goals/GoalsDragList';
 import { GoalsTimeline } from '@/components/goals/GoalsTimeline';
+import GoalDepositModal from '@/components/goals/GoalDepositModal';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -42,6 +43,7 @@ export default function GoalsPage() {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [isDragMode, setIsDragMode] = useState(false);
+  const [depositingGoal, setDepositingGoal] = useState<Goal | null>(null);
   
   const supabase = createClientComponentClient();
   
@@ -239,17 +241,17 @@ export default function GoalsPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl" dir="rtl">
       {/* כותרת וכפתור יעד חדש */}
-        <div className="mb-8 flex justify-between items-start">
-          <div>
-        <h1 className="text-4xl font-bold text-phi-dark flex items-center gap-3 mb-2">
-          <Target className="w-10 h-10 text-phi-gold" />
-          φ היעדים שלך
+      <div className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-4xl font-bold text-phi-dark flex items-center gap-3 mb-2">
+            <Target className="w-10 h-10 text-phi-gold" />
+            φ היעדים שלך
           </h1>
-        <p className="text-phi-slate text-lg">
-          {goals.length === 0
-            ? 'הגדר יעדים פיננסיים ונתחיל לעבוד לקראתם'
-            : `${goals.length} יעדים פעילים`}
-        </p>
+          <p className="text-phi-slate text-lg">
+            {goals.length === 0
+              ? 'הגדר יעדים פיננסיים ונתחיל לעבוד לקראתם'
+              : `${goals.length} יעדים פעילים`}
+          </p>
           </div>
           <div className="flex gap-3">
             <Button onClick={() => setIsDragMode(true)} size="lg" variant="outline" className="gap-2">
@@ -455,7 +457,21 @@ export default function GoalsPage() {
           goals={goals}
           onEdit={handleEditGoal}
           onDelete={handleDeleteGoal}
+          onDeposit={(goal) => setDepositingGoal(goal)}
         />
+        
+        {/* Modal להפקדה */}
+        {depositingGoal && (
+          <GoalDepositModal
+            goal={depositingGoal}
+            isOpen={!!depositingGoal}
+            onClose={() => setDepositingGoal(null)}
+            onSuccess={() => {
+              loadGoalsAndAllocations();
+              alert('ההפקדה נוספה בהצלחה!');
+            }}
+          />
+        )}
       </div>
       
       {/* פירוט הקצאות - לפי המערכת הישנה */}
@@ -468,6 +484,7 @@ export default function GoalsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {displayedResult.allocations.length > 0 ? (
             <div className="space-y-4">
               {displayedResult.allocations.map((allocation: any, index: number) => {
                 const goal = goals.find(g => g.id === allocation.goal_id);
@@ -503,14 +520,14 @@ export default function GoalsPage() {
                           <p className="font-bold text-phi-dark">
                             {allocation.monthly_allocation.toLocaleString('he-IL')} ₪
                           </p>
-                          </div>
+                        </div>
                         <div>
                           <p className="text-phi-slate mb-1">חודשים לסיום</p>
                           <p className="font-bold text-phi-dark flex items-center gap-1">
                             <Clock className="w-4 h-4" />
                             {allocation.months_to_complete}
                           </p>
-                          </div>
+                        </div>
                         <div>
                           <p className="text-phi-slate mb-1">סיום צפוי</p>
                           <p className="font-bold text-phi-dark">
@@ -522,8 +539,8 @@ export default function GoalsPage() {
                           <p className={`font-bold ${allocation.is_achievable ? 'text-green-600' : 'text-red-600'}`}>
                             {allocation.is_achievable ? '✅ ניתן להשגה' : '⚠️ קשה'}
                           </p>
-                          </div>
                         </div>
+                      </div>
                         
                       {allocation.warnings.length > 0 && (
                         <div className="mt-4 text-sm text-phi-slate bg-phi-coral/10 p-3 rounded-lg">
@@ -546,6 +563,7 @@ export default function GoalsPage() {
           )}
         </CardContent>
       </Card>
+      )}
       
       {/* המלצות */}
       {allocationResult && allocationResult.suggestions.length > 0 && (
@@ -570,12 +588,12 @@ export default function GoalsPage() {
                       suggestion.priority === 'medium' ? 'text-yellow-600' :
                       'text-green-600'
                     }`} />
-        </div>
+                  </div>
                   <div className="flex-1">
                     <p className="font-medium text-phi-dark mb-1">{suggestion.message}</p>
                     <p className="text-sm text-phi-slate">{suggestion.impact}</p>
-                      </div>
-                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           </CardContent>

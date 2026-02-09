@@ -134,13 +134,13 @@ async function createAdjustmentPlan(
   // חשב הקצאות נוכחיות
   const currentAllocations = await calculateOptimalAllocations({
     userId: incomeChange.userId,
-    monthly_income: incomeChange.oldIncome,
+    monthlyIncome: incomeChange.oldIncome,
   });
 
   // חשב הקצאות מוצעות
   const proposedAllocations = await calculateOptimalAllocations({
     userId: incomeChange.userId,
-    monthly_income: incomeChange.newIncome,
+    monthlyIncome: incomeChange.newIncome,
   });
 
   // צור רשימת התאמות

@@ -7,3 +7,5 @@ export function createClient() {
   )
 }
 
+// Alias for compatibility
+export const createClientComponentClient = createClient;

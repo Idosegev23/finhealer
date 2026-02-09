@@ -149,11 +149,13 @@ export function getDependencyChain(goal: Goal, allGoals: Goal[]): Goal[] {
 /**
  * המלצות לפי תלויות
  */
+import type { Suggestion, SuggestionType } from '@/types/goals';
+
 export function generateDependencySuggestions(
   goals: Goal[],
   warnings: string[]
-): Array<{ type: string; message: string; impact: string; priority: 'high' | 'medium' | 'low' }> {
-  const suggestions: Array<{ type: string; message: string; impact: string; priority: 'high' | 'medium' | 'low' }> = [];
+): Suggestion[] {
+  const suggestions: Suggestion[] = [];
 
   // זיהוי יעדים חסומים על ידי תלויות
   const blockedGoals = goals.filter(g => 
@@ -169,11 +171,12 @@ export function generateDependencySuggestions(
         ? Math.round((dependency.current_amount / dependency.target_amount) * 100)
         : 0;
 
+      const priority: 'high' | 'medium' = progress < 25 ? 'high' : 'medium';
       suggestions.push({
-        type: 'change_priority',
+        type: 'change_priority' as const,
         message: `יעד "${blocked.name}" מחכה להשלמת "${dependency.name}" (${progress}% הושלם)`,
         impact: `תעדוף "${dependency.name}" יזרז את התקדמות "${blocked.name}"`,
-        priority: progress < 25 ? 'high' : 'medium',
+        priority,
       });
     }
   }
@@ -181,10 +184,10 @@ export function generateDependencySuggestions(
   // תלויות מעגליות
   if (warnings.some(w => w.includes('תלות מעגלית'))) {
     suggestions.push({
-      type: 'remove_goal',
+      type: 'remove_goal' as const,
       message: 'זוהו תלויות מעגליות - שקול לשנות את סדר התלויות',
       impact: 'מניעת חסימות בין יעדים',
-      priority: 'high',
+      priority: 'high' as const,
     });
   }
 

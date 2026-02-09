@@ -16,6 +16,11 @@ interface Transaction {
   category: string | null;
   expense_category: string | null;
   income_category: string | null;
+  goal_id?: string | null;
+  goal?: {
+    id: string;
+    name: string;
+  } | null;
   budget_categories?: {
     id: string;
     name: string;
@@ -25,12 +30,14 @@ interface Transaction {
 interface TransactionsTableProps {
   initialTransactions: Transaction[];
   categories: Array<{ id: string; name: string }>;
+  goals?: Array<{ id: string; name: string }>;
   userId: string;
 }
 
 export default function TransactionsTable({ 
   initialTransactions, 
   categories,
+  goals = [],
   userId 
 }: TransactionsTableProps) {
   const [transactions, setTransactions] = useState(initialTransactions);
@@ -38,6 +45,41 @@ export default function TransactionsTable({
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'proposed' | 'confirmed'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [updatingGoal, setUpdatingGoal] = useState<string | null>(null);
+
+  // עדכון יעד של תנועה
+  async function handleGoalChange(transactionId: string, goalId: string | null) {
+    setUpdatingGoal(transactionId);
+    
+    try {
+      const { createClientComponentClient } = await import('@/lib/supabase/client');
+      const supabase = createClientComponentClient();
+      
+      const { error } = await supabase
+        .from('transactions')
+        .update({ goal_id: goalId })
+        .eq('id', transactionId);
+      
+      if (error) {
+        console.error('Failed to update goal:', error);
+        alert('שגיאה בעדכון היעד');
+        return;
+      }
+      
+      // עדכן state מקומי
+      setTransactions(prev => prev.map(tx => 
+        tx.id === transactionId 
+          ? { ...tx, goal_id: goalId }
+          : tx
+      ));
+      
+    } catch (error) {
+      console.error('Error updating goal:', error);
+      alert('שגיאה בעדכון היעד');
+    } finally {
+      setUpdatingGoal(null);
+    }
+  }
 
   // סינון
   const filteredTransactions = transactions.filter(tx => {
@@ -149,6 +191,7 @@ export default function TransactionsTable({
                 <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">תאריך</th>
                 <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">תיאור</th>
                 <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">קטגוריה</th>
+                <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">יעד</th>
                 <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">סכום</th>
                 <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">מקור</th>
                 <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">סטטוס</th>
@@ -158,7 +201,7 @@ export default function TransactionsTable({
             <tbody className="divide-y divide-gray-100">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="text-[#555555]">
                       <p className="text-lg mb-2">אין תנועות להצגה</p>
                       <p className="text-sm">נסה לשנות את המסננים או הוסף תנועה חדשה</p>
@@ -192,6 +235,29 @@ export default function TransactionsTable({
                         </span>
                       ) : (
                         <span className="text-xs text-[#555555]">ללא קטגוריה</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {tx.type === 'income' && tx.status === 'confirmed' ? (
+                        <select
+                          value={tx.goal_id || ''}
+                          onChange={(e) => handleGoalChange(tx.id, e.target.value || null)}
+                          disabled={updatingGoal === tx.id}
+                          className="text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-phi-gold"
+                        >
+                          <option value="">ללא יעד</option>
+                          {goals.map(goal => (
+                            <option key={goal.id} value={goal.id}>
+                              {goal.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : tx.goal?.name ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-phi-gold text-white">
+                          {tx.goal.name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4">

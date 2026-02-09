@@ -508,20 +508,20 @@ function generateSuggestions(
     }, 0);
     
     suggestions.push({
-      type: 'increase_income',
+      type: 'increase_income' as const,
       message: `אם תגדיל הכנסה ב-${Math.ceil(totalNeeded).toLocaleString('he-IL')} ₪, תוכל להשלים את כל היעדים בזמן`,
       impact: `${unachievableGoals.length} יעדים ייושלמו בזמן`,
-      priority: 'high',
+      priority: 'high' as const,
     });
   }
   
   // המלצה לתעדוף מחדש
   if (goals.length > 3 && safetyCheck.comfort_level === 'tight') {
     suggestions.push({
-      type: 'change_priority',
+      type: 'change_priority' as const,
       message: 'שקול להתמקד ב-2-3 יעדים עיקריים ולדחות את השאר',
       impact: 'תקדם מהר יותר ביעדים החשובים',
-      priority: 'medium',
+      priority: 'medium' as const,
     });
   }
   
@@ -533,11 +533,11 @@ function generateSuggestions(
       if (goal?.deadline) {
         const newDeadline = new Date(allocation.expected_completion_date);
         suggestions.push({
-          type: 'adjust_deadline',
+          type: 'adjust_deadline' as const,
           goal_id: goal.id,
           message: `דחה את "${goal.name}" ל-${newDeadline.toLocaleDateString('he-IL')} כדי להפחית לחץ`,
           impact: 'יאפשר הקצאה נוחה יותר ליעדים אחרים',
-          priority: 'medium',
+          priority: 'medium' as const,
         });
       }
     }
@@ -582,11 +582,11 @@ export function suggestPriorityAdjustments(goals: Goal[]): Suggestion[] {
   const emergencyFund = goals.find(g => g.goal_type === 'emergency_fund');
   if (emergencyFund && emergencyFund.priority > 2) {
     suggestions.push({
-      type: 'change_priority',
+      type: 'change_priority' as const,
       goal_id: emergencyFund.id,
       message: 'המלצה: העלה את קרן החירום לעדיפות 1 - זה הבסיס הפיננסי',
       impact: 'תבנה ביטחון פיננסי לפני השקעה ביעדים אחרים',
-      priority: 'high',
+      priority: 'high' as const,
     });
   }
   
@@ -599,10 +599,10 @@ export function suggestPriorityAdjustments(goals: Goal[]): Suggestion[] {
   
   if (longTermGoals.length > 0) {
     suggestions.push({
-      type: 'change_priority',
+      type: 'change_priority' as const,
       message: `יש לך ${longTermGoals.length} יעדים ארוכי טווח בעדיפות גבוהה - שקול להוריד עדיפות`,
       impact: 'תאפשר התקדמות מהירה יותר ביעדים קצרי טווח',
-      priority: 'medium',
+      priority: 'medium' as const,
     });
   }
   

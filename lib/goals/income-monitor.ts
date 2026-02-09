@@ -84,7 +84,7 @@ export async function monitorRecentIncomeChanges(): Promise<void> {
     }
 
     // קבל משתמשים ייחודיים
-    const uniqueUserIds = [...new Set(recentTransactions.map(t => t.user_id))];
+    const uniqueUserIds = Array.from(new Set(recentTransactions.map(t => t.user_id)));
     console.log(`[Income Monitor] Found ${uniqueUserIds.length} users with recent income`);
 
     for (const userId of uniqueUserIds) {

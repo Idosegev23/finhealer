@@ -53,3 +53,5 @@ export function createServiceClient() {
   )
 }
 
+// Alias for compatibility
+export const createClientServerClient = createClient;

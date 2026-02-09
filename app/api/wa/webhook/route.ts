@@ -1413,6 +1413,7 @@ export async function POST(request: NextRequest) {
             input: prompt,
             reasoning: { effort: 'none' }, // ⚡ Fast mode - no deep thinking
             text: { verbosity: 'low' }, // ⚡ Concise output
+            max_output_tokens: 12000 // 🔧 Limit output to prevent huge JSON
           });
           
           // ⏱️ Timeout of 120 seconds for AI (leaves room for DB operations)
@@ -1444,8 +1445,22 @@ export async function POST(request: NextRequest) {
           let ocrData: any;
           try {
             const jsonMatch = content.match(/\{[\s\S]*\}/);
-            ocrData = JSON.parse(jsonMatch ? jsonMatch[0] : content);
-          } catch {
+            let jsonStr = jsonMatch ? jsonMatch[0] : content;
+            
+            // 🔧 FIX: Clean up common AI JSON errors
+            // Fix trailing commas before closing brackets
+            jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+            // Fix "null" as string → null
+            jsonStr = jsonStr.replace(/:\s*"null"/g, ': null');
+            // Fix invalid patterns like "123. - null"
+            jsonStr = jsonStr.replace(/:\s*[\d.]+\s*-\s*null/g, ': null');
+            
+            ocrData = JSON.parse(jsonStr);
+          } catch (parseError: any) {
+            console.error('❌ Excel JSON parse error:', parseError.message);
+            console.log('📝 Raw content length:', content.length);
+            console.log('📝 First 500 chars:', content.substring(0, 500));
+            console.log('📝 Last 500 chars:', content.substring(Math.max(0, content.length - 500)));
             ocrData = { document_type: 'bank_statement', transactions: [] };
           }
           

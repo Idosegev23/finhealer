@@ -274,6 +274,49 @@ export async function routeMessage(
   // STATE: monitoring
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'monitoring') {
+    // 🆕 טיפול בבקשת איחוד הלוואות
+    const { data: userData } = await supabase
+      .from('users')
+      .select('classification_context')
+      .eq('id', userId)
+      .single();
+    
+    const loanContext = userData?.classification_context?.loanConsolidation;
+    
+    if (loanContext?.pending) {
+      // המשתמש במצב של החלטה על איחוד הלוואות
+      const { handleConsolidationResponse } = await import('@/lib/loans/consolidation-handler');
+      
+      if (isCommand(msg, ['כן', 'yes', 'מעוניין', 'בטח', 'אשמח'])) {
+        const response = await handleConsolidationResponse(userId, phone, 'yes');
+        await greenAPI.sendMessage({ phoneNumber: phone, message: response });
+        return { success: true };
+      }
+      
+      if (isCommand(msg, ['לא', 'no', 'לא מעוניין', 'תודה לא'])) {
+        const response = await handleConsolidationResponse(userId, phone, 'no');
+        await greenAPI.sendMessage({ phoneNumber: phone, message: response });
+        return { success: true };
+      }
+    }
+    
+    // 🆕 בדיקה אם יש בקשת איחוד פעילה שממתינה למסמכים
+    const { data: activeRequest } = await supabase
+      .from('loan_consolidation_requests')
+      .select('id, documents_received, documents_needed')
+      .eq('user_id', userId)
+      .eq('status', 'pending_documents')
+      .single();
+    
+    if (activeRequest) {
+      // יש בקשה פעילה - הודעה על כך
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `💡 אני ממתין למסמכי ההלוואות שלך (${activeRequest.documents_received}/${activeRequest.documents_needed}).\n\nשלח לי את המסמכים כדי שאוכל להעביר לגדי את הבקשה! 📄`,
+      });
+      return { success: true };
+    }
+    
     // טיפול בכפתורים - מסמכים
     if (isCommand(msg, ['add_bank', 'add_credit', 'add_doc', 'add_more', 'add_docs', '📄 עוד דוח בנק', '💳 דוח אשראי', '📄 שלח עוד מסמך', '📄 עוד מסמכים', '📄 עוד דוחות'])) {
       await greenAPI.sendMessage({
@@ -304,6 +347,11 @@ export async function routeMessage(
       return await transitionToGoals(ctx);
     }
     
+    // 🆕 הפקדה ליעד
+    if (msg.includes('הפקדה ליעד') || msg.startsWith('הפקדה:')) {
+      return await handleGoalDeposit(ctx, msg);
+    }
+    
     // עזרה - הצג כל הפקודות
     if (isCommand(msg, ['עזרה', 'פקודות', 'help', 'תפריט', 'מה אפשר', '?'])) {
       await greenAPI.sendMessage({
@@ -320,6 +368,8 @@ export async function routeMessage(
           `💰 *שאלות:*\n` +
           `• "כמה הוצאתי על [קטגוריה]?"\n` +
           `• "כמה אוכל?" / "כמה רכב?"\n\n` +
+          `🎯 *יעדים:*\n` +
+          `• *"הפקדה ליעד [שם] [סכום]"* - הפקדה ליעד\n\n` +
           `🔄 *ניווט:*\n` +
           `• *"נמשיך"* - להמשיך תהליך\n` +
           `• *"דלג"* - לדלג על תנועה\n\n` +
@@ -3312,9 +3362,15 @@ export async function onClassificationComplete(userId: string, phone: string): P
 /**
  * Called after document processing completes
  */
-export async function onDocumentProcessed(userId: string, phone: string): Promise<void> {
+export async function onDocumentProcessed(userId: string, phone: string, documentId?: string): Promise<void> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
+  
+  // 🆕 זיהוי הלוואות במסמך
+  if (documentId) {
+    const { detectLoansAndAsk } = await import('@/lib/loans/consolidation-handler');
+    await detectLoansAndAsk(userId, phone, documentId);
+  }
   
   // קבל את הדוח האחרון שהועלה
   const { data: latestDoc } = await supabase
@@ -3591,3 +3647,110 @@ async function showBudgetStatus(ctx: RouterContext): Promise<RouterResult> {
   return { success: true };
 }
 
+// ============================================================================
+// Goal Deposit Handler
+// ============================================================================
+
+/**
+ * טיפול בהפקדה ליעד דרך WhatsApp
+ * פורמט: "הפקדה ליעד [שם יעד] [סכום]"
+ */
+async function handleGoalDeposit(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  
+  // פענוח ההודעה
+  // "הפקדה ליעד קרן חירום 500"
+  const match = msg.match(/הפקדה\s*(?:ליעד|:)\s*(.+?)\s+(\d+\.?\d*)/i);
+  
+  if (!match) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ לא הצלחתי להבין.\n\nהפורמט הנכון:\n*״הפקדה ליעד [שם] [סכום]״*\n\nדוגמה:\n*״הפקדה ליעד קרן חירום 500״*`,
+    });
+    return { success: true };
+  }
+  
+  const goalName = match[1].trim();
+  const amount = parseFloat(match[2]);
+  
+  if (isNaN(amount) || amount <= 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ סכום לא תקין: ${match[2]}\n\nנסה שוב עם סכום חיובי.`,
+    });
+    return { success: true };
+  }
+  
+  // חפש את היעד
+  const { data: goals, error: goalsError } = await supabase
+    .from('goals')
+    .select('id, name, current_amount, target_amount')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'active')
+    .ilike('name', `%${goalName}%`);
+  
+  if (goalsError || !goals || goals.length === 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ לא מצאתי יעד בשם ״${goalName}״.\n\nכתוב *״יעדים״* לראות את כל היעדים שלך.`,
+    });
+    return { success: true };
+  }
+  
+  // אם יש יותר מיעד אחד - בקש הבהרה
+  if (goals.length > 1) {
+    const goalsList = goals.map((g, i) => `${i + 1}. ${g.name}`).join('\n');
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🤔 מצאתי כמה יעדים:\n\n${goalsList}\n\nאיזה מהם התכוונת? כתוב *״הפקדה ליעד [שם מלא] [סכום]״*`,
+    });
+    return { success: true };
+  }
+  
+  const goal = goals[0];
+  
+  // צור תנועה
+  const { error: txError } = await supabase
+    .from('transactions')
+    .insert({
+      user_id: ctx.userId,
+      goal_id: goal.id,
+      type: 'income',
+      amount,
+      description: `הפקדה ליעד: ${goal.name}`,
+      tx_date: new Date().toISOString(),
+      status: 'confirmed',
+      category: null,
+      income_category: 'savings',
+    });
+  
+  if (txError) {
+    console.error('Failed to create goal deposit:', txError);
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ שגיאה ביצירת ההפקדה. נסה שוב מאוחר יותר.`,
+    });
+    return { success: true };
+  }
+  
+  // הטריגר במסד הנתונים יעדכן את current_amount אוטומטית
+  
+  // חשב התקדמות
+  const newAmount = goal.current_amount + amount;
+  const progress = Math.round((newAmount / goal.target_amount) * 100);
+  const remaining = goal.target_amount - newAmount;
+  
+  // שלח הודעת אישור
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `✅ *הפקדה של ${amount.toLocaleString('he-IL')} ₪ נרשמה!*\n\n` +
+      `🎯 *יעד:* ${goal.name}\n` +
+      `💰 *יתרה חדשה:* ${newAmount.toLocaleString('he-IL')} ₪\n` +
+      `📊 *התקדמות:* ${progress}%\n` +
+      `📈 *נותר:* ${remaining.toLocaleString('he-IL')} ₪\n\n` +
+      `${progress >= 100 ? '🎉 *הגעת ליעד!*' : progress >= 75 ? '🔥 *כמעט שם!*' : progress >= 50 ? '💪 *חצי דרך!*' : '🚀 *התחלה מעולה!*'}`,
+  });
+  
+  return { success: true };
+}

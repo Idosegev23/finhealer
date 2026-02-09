@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
       .eq('id', statementId);
 
     // 7. Send WhatsApp notification
-    await sendWhatsAppNotification(stmt.user_id, itemsProcessed, docType);
+    await sendWhatsAppNotification(stmt.user_id, itemsProcessed, docType, statementId);
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`✅ [BG] Completed in ${duration}s`);
@@ -2760,7 +2760,7 @@ async function savePayslips(supabase: any, result: any, userId: string, document
 // WhatsApp Notification
 // ============================================================================
 
-async function sendWhatsAppNotification(userId: string, itemsCount: number, docType: string) {
+async function sendWhatsAppNotification(userId: string, itemsCount: number, docType: string, documentId?: string) {
   try {
     const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
     const supabase = createSupabaseClient(
@@ -2784,7 +2784,7 @@ async function sendWhatsAppNotification(userId: string, itemsCount: number, docT
     // 🆕 Use φ Router for bank/credit documents
     if (docType.includes('credit') || docType.includes('bank')) {
       const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
-      await onDocumentProcessed(userId, user.phone);
+      await onDocumentProcessed(userId, user.phone, documentId);
       console.log(`✅ φ Router notification sent to ${user.phone}`);
       return;
     }
