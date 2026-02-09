@@ -183,8 +183,14 @@ export async function getClassifiableTransactions(
     .eq('status', 'pending')
     .eq('document_type', 'credit');
   
-  const missingCards = new Set(missingCreditDocs?.map(d => d.card_last_4) || []);
+  const missingCards = new Set(missingCreditDocs?.map(d => d.card_last_4).filter(Boolean) || []);
   console.log(`📋 Missing credit cards: ${Array.from(missingCards).join(', ') || 'none'}`);
+  
+  // 🚨 אם אין missing_documents בכלל - אל תסנן שום דבר!
+  if (missingCards.size === 0) {
+    console.log(`✅ No missing documents - all ${allTransactions.length} transactions are classifiable`);
+    return allTransactions;
+  }
   
   // Filter out transactions that are credit card charges waiting for detail
   const classifiableTransactions = allTransactions.filter(tx => {
