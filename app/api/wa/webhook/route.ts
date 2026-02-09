@@ -903,7 +903,7 @@ export async function POST(request: NextRequest) {
               ],
               reasoning: { effort: 'none' }, // ⚡ Fast mode - no reasoning overhead
               text: { verbosity: 'low' },
-              max_output_tokens: 16000 // Reduced for faster response
+              max_output_tokens: 24000 // Increased to handle large bank statements
             });
             content = gpt52Response.output_text || '{}';
             console.log('✅ GPT-5.2 PDF analysis succeeded');

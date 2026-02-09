@@ -354,6 +354,12 @@ ${special.map(c => `  • ${c.name} (${c.category_group})`).join('\n')}
 אם יש 150 תנועות - חלץ את כל 150. אם יש 200 - חלץ את כל 200.
 **זה לא דוגמה - זה הדוח המלא!**
 
+🎯 **כדי לחסוך מקום - אל תכלול:**
+- ❌ balance_before / balance_after (לא נדרשים!)
+- ❌ notes מפורטות (רק description קצר)
+- ❌ reference numbers (לא נדרשים)
+- ✅ כלול רק את השדות החיוניים: date, vendor, amount, description, category
+
 🚨 **כללי פורמט JSON - חובה!** 🚨
 1. החזר **רק JSON תקין** - לא markdown, לא הסברים, לא טקסט נוסף
 2. התחל ישירות עם { וסיים עם }
@@ -692,6 +698,12 @@ ${categoriesGuide}
 | פנסיה | דוח פנסיה | יתרה, תשואה, דמי ניהול |
 
 ## **פורמט JSON:**
+
+🚨 **חשוב - שדות להחזיר:**
+- **אל תכלול** balance_before, balance_after, או notes מפורטות
+- **כלול רק** את השדות הנדרשים: date, vendor, amount, description, קטגוריות, payment_method
+- כך נקבל JSON קצר ויעיל יותר
+
 {
   "report_info": {
     "report_date": "01/11/2025",
@@ -773,26 +785,18 @@ ${categoriesGuide}
         "description": "משכורת",
         "vendor": "מעסיק",
         "amount": 10000.00,
-        "balance_before": 5000.00,
-        "balance_after": 15000.00,
         "income_category": "משכורת",
         "employment_type": "employee",
-        "category": "הכנסה מעבודה",
-        "payment_method": "bank_transfer",
-        "notes": "הכנסה - יתרה עלתה מ-5000 ל-15000"
+        "payment_method": "bank_transfer"
       },
       {
         "date": "12/10/2025",
         "description": "קצבת זקנה",
         "vendor": "ביטוח לאומי",
         "amount": 3500.00,
-        "balance_before": 15000.00,
-        "balance_after": 18500.00,
         "income_category": "קצבה",
         "allowance_type": "pension",
-        "category": "גמלאות",
-        "payment_method": "bank_transfer",
-        "notes": "קצבה מביטוח לאומי"
+        "payment_method": "bank_transfer"
       }
     ],
     "expenses": [
@@ -801,12 +805,9 @@ ${categoriesGuide}
         "description": "קניות בסופר",
         "vendor": "סופר דוידי",
         "amount": 350.00,
-        "balance_before": 15000.00,
-        "balance_after": 14650.00,
-        "category": "סופרמרקט",
+        "expense_category": "קניות סופר",
         "expense_type": "variable",
-        "payment_method": "credit_card",
-        "notes": "הוצאה - יתרה ירדה מ-15000 ל-14650"
+        "payment_method": "credit_card"
       }
     ],
     "loan_payments": [
@@ -815,13 +816,11 @@ ${categoriesGuide}
         "description": "החזר הלוואה בנק לאומי",
         "vendor": "בנק לאומי",
         "amount": 2000.00,
-        "balance_before": 14650.00,
-        "balance_after": 12650.00,
         "principal": 1500.00,
         "interest": 500.00,
         "loan_provider": "בנק לאומי",
-        "payment_method": "direct_debit",
-        "notes": "תשלום הלוואה"
+        "expense_category": "הלוואה פרטית מהבנק (פיננסים)",
+        "payment_method": "direct_debit"
       }
     ],
     "savings_transfers": [
@@ -830,11 +829,9 @@ ${categoriesGuide}
         "description": "העברה לפיקדון",
         "vendor": "העברה פנימית",
         "amount": 1000.00,
-        "balance_before": 12650.00,
-        "balance_after": 11650.00,
         "to_account": "פיקדון",
-        "payment_method": "bank_transfer",
-        "notes": "העברה לחיסכון"
+        "expense_category": "חיסכון",
+        "payment_method": "bank_transfer"
       }
     ]
   }
