@@ -160,13 +160,18 @@ export async function getClassifiableTransactions(
   const supabase = createServiceClient();
   
   // Get all pending transactions of the requested type
-  const { data: allTransactions } = await supabase
+  const { data: allTransactions, error: fetchError } = await supabase
     .from('transactions')
-    .select('id, amount, vendor, tx_date, type, expense_category, description, document_id')
+    .select('id, amount, vendor, tx_date, type, expense_category, original_description, document_id')
     .eq('user_id', userId)
     .in('status', ['pending', 'proposed'])
     .eq('type', type)
     .order('tx_date', { ascending: false });
+  
+  if (fetchError) {
+    console.error(`❌ Error fetching transactions:`, fetchError);
+    return [];
+  }
   
   if (!allTransactions || allTransactions.length === 0) {
     console.log(`📊 getClassifiableTransactions(${type}): 0 pending/proposed transactions`);
@@ -197,7 +202,7 @@ export async function getClassifiableTransactions(
     // Check if this is a credit card charge (חיוב לכרטיס אשראי)
     // רק תנועות שבאמת הן חיוב כרטיס - לא כל דבר עם 4 ספרות!
     const vendor = (tx.vendor || '').toLowerCase();
-    const description = (tx.description || '').toLowerCase();
+    const description = (tx.original_description || '').toLowerCase();
     const category = (tx.expense_category || '').toLowerCase();
     
     // זיהוי חיוב אשראי לפי:
