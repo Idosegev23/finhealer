@@ -1048,14 +1048,47 @@ async function moveToNextPhase(
   }
   
   // 🆕 סיימנו לסווג - בדוק אם יש מסמכים חסרים
+  // קודם כל בדוק אם יש מסמכים חסרים שכבר זוהו
   const hasMoreDocs = await checkAndRequestMissingDocuments(ctx.userId, ctx.phone);
   
   if (hasMoreDocs) {
-    // יש מסמכים חסרים - ממתינים
+    // יש מסמכים חסרים בטבלה - ממתינים
     return { success: true };
   }
   
-  // סיימנו הכל!
+  // אין מסמכים חסרים ב-missing_documents, אבל בדוק אם יש תנועות אשראי ללא פירוט
+  const { count: pendingCreditCount } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId)
+    .eq('status', 'needs_credit_detail');
+  
+  if (pendingCreditCount && pendingCreditCount > 0) {
+    // יש תנועות אשראי ממתינות - צריך לבקש דוחות אשראי
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🎉 *סיימנו את הסיווג!*\n\n` +
+        `⚠️ *רגע!* זיהיתי ${pendingCreditCount} חיובי אשראי.\n\n` +
+        `📄 *שלח לי את דוחות האשראי* כדי שאראה לאן הכסף הלך.\n\n` +
+        `💡 יש לך מספר כרטיסים? שלח כל אחד בנפרד.`,
+    });
+    
+    // עדכן state לממתין למסמך
+    await supabase
+      .from('users')
+      .update({ 
+        onboarding_state: 'waiting_for_document',
+        classification_context: {
+          waitingForDocument: 'credit',
+          waitingReason: 'pending_credit_charges'
+        }
+      })
+      .eq('id', ctx.userId);
+    
+    return { success: true };
+  }
+  
+  // אין מסמכים חסרים ואין תנועות אשראי ממתינות - סיימנו הכל!
   return await showFinalSummary(ctx);
 }
 
@@ -1105,13 +1138,6 @@ async function showFinalSummary(ctx: RouterContext): Promise<RouterResult> {
     .map(([cat, amount]) => `• ${cat}: ${amount.toLocaleString('he-IL')} ₪`)
     .join('\n');
   
-  // ספור ממתינים לפירוט
-  const { count: pendingCredit } = await supabase
-    .from('transactions')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', ctx.userId)
-    .eq('status', 'needs_credit_detail');
-  
   let message = `🎉 *סיימנו לסווג!*\n\n`;
   message += `📊 *הסיכום שלך:*\n`;
   message += `💚 הכנסות: ${totalIncome.toLocaleString('he-IL')} ₪\n`;
@@ -1122,9 +1148,7 @@ async function showFinalSummary(ctx: RouterContext): Promise<RouterResult> {
     message += `*הקטגוריות הגדולות:*\n${topCategories}\n\n`;
   }
   
-  if (pendingCredit && pendingCredit > 0) {
-    message += `⏳ ${pendingCredit} חיובי אשראי ממתינים לדוח פירוט\n\n`;
-  }
+  // הסרנו את ההודעה על חיובי אשראי - כי אנחנו כבר מבקשים אותם לפני שמגיעים לכאן
   
   // 🆕 שימוש בכפתורים
   try {
