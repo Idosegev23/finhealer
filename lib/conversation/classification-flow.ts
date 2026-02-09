@@ -169,8 +169,11 @@ export async function getClassifiableTransactions(
     .order('tx_date', { ascending: false });
   
   if (!allTransactions || allTransactions.length === 0) {
+    console.log(`📊 getClassifiableTransactions(${type}): 0 pending/proposed transactions`);
     return [];
   }
+  
+  console.log(`📊 getClassifiableTransactions(${type}): Found ${allTransactions.length} pending/proposed transactions`);
   
   // Get missing credit card documents
   const { data: missingCreditDocs } = await supabase
@@ -181,20 +184,46 @@ export async function getClassifiableTransactions(
     .eq('document_type', 'credit');
   
   const missingCards = new Set(missingCreditDocs?.map(d => d.card_last_4) || []);
+  console.log(`📋 Missing credit cards: ${Array.from(missingCards).join(', ') || 'none'}`);
   
   // Filter out transactions that are credit card charges waiting for detail
   const classifiableTransactions = allTransactions.filter(tx => {
-    // Check if this is a credit card charge
-    const isCredit = /visa|mastercard|ויזה|מסטרקארד|כרטיס|אשראי|credit|\d{4}$/i.test(tx.vendor || '');
+    // Check if this is a credit card charge (חיוב לכרטיס אשראי)
+    // רק תנועות שבאמת הן חיוב כרטיס - לא כל דבר עם 4 ספרות!
+    const vendor = (tx.vendor || '').toLowerCase();
+    const description = (tx.description || '').toLowerCase();
+    const category = (tx.expense_category || '').toLowerCase();
     
-    if (!isCredit) {
+    // זיהוי חיוב אשראי לפי:
+    // 1. קטגוריה מכילה "חיוב כרטיס" או "חיוב אשראי"
+    // 2. Vendor מכיל "חיוב" + "ויזה/מסטרקארד/כאל/מקס"
+    // 3. Description מכיל "חיוב לכרטיס"
+    const isCreditCharge = 
+      category.includes('חיוב כרטיס') ||
+      category.includes('חיוב אשראי') ||
+      (vendor.includes('חיוב') && (
+        vendor.includes('ויזה') || 
+        vendor.includes('ויזא') ||
+        vendor.includes('visa') ||
+        vendor.includes('mastercard') ||
+        vendor.includes('מסטרקארד') ||
+        vendor.includes('כאל') ||
+        vendor.includes('מקס') ||
+        vendor.includes('ישראכרט') ||
+        vendor.includes('לאומי קארד')
+      )) ||
+      description.includes('חיוב לכרטיס');
+    
+    if (!isCreditCharge) {
       // Not a credit charge - can classify
       return true;
     }
     
-    // Extract card number from vendor name
-    const cardMatch = (tx.vendor || '').match(/\d{4}$/);
-    const cardLast4 = cardMatch ? cardMatch[0] : null;
+    // זה חיוב אשראי - חלץ מספר כרטיס
+    const text = `${vendor} ${description}`;
+    const cardMatch = text.match(/\d{4}(?!\d)/); // 4 ספרות שלא ממשיכות
+    const starMatch = text.match(/\*{4}(\d{4})/); // ****1234
+    const cardLast4 = starMatch ? starMatch[1] : (cardMatch ? cardMatch[0] : null);
     
     // If we're missing detail for this card - skip it
     if (cardLast4 && missingCards.has(cardLast4)) {
@@ -202,9 +231,11 @@ export async function getClassifiableTransactions(
       return false;
     }
     
-    // Otherwise can classify
+    // Otherwise can classify (אין missing_document לכרטיס הזה)
     return true;
   });
+  
+  console.log(`✅ After filtering: ${classifiableTransactions.length} classifiable ${type} transactions`);
   
   return classifiableTransactions;
 }

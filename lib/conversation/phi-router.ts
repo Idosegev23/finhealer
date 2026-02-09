@@ -449,6 +449,8 @@ async function startClassification(ctx: RouterContext): Promise<RouterResult> {
   const incomeCount = incomeTransactions.length;
   const expenseCount = expenseTransactions.length;
   
+  console.log(`📊 Classifiable transactions: ${incomeCount} income, ${expenseCount} expense`);
+  
   if (incomeCount === 0 && expenseCount === 0) {
     // 🆕 אין תנועות לסיווג - בדוק למה
     // האם בכלל יש תנועות במערכת? (כולל confirmed)
