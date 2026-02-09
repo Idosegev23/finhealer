@@ -1163,6 +1163,35 @@ export async function POST(request: NextRequest) {
                 .eq('id', userData.id);
               console.log(`✅ User state updated to classification`);
               
+              // 🆕 סימון missing_document כ-uploaded
+              if (documentType === 'credit' || documentType === 'bank') {
+                const { markDocumentAsUploaded } = await import('@/lib/conversation/classification-flow');
+                
+                // חלץ כרטיס אשראי אם זה דוח אשראי
+                let cardLast4: string | null = null;
+                if (documentType === 'credit') {
+                  for (const tx of allTransactions) {
+                    const text = `${tx.vendor || ''} ${tx.description || ''}`;
+                    const cardMatch = text.match(/\d{4}$/);
+                    const starMatch = text.match(/\*{4}(\d{4})/);
+                    if (cardMatch) {
+                      cardLast4 = cardMatch[0];
+                      break;
+                    } else if (starMatch) {
+                      cardLast4 = starMatch[1];
+                      break;
+                    }
+                  }
+                }
+                
+                await markDocumentAsUploaded(
+                  userData.id,
+                  documentType,
+                  cardLast4,
+                  docRecord.id
+                );
+              }
+              
               // 🆕 קישור דוח אשראי לתנועות שדולגו
               if (documentType === 'credit') {
                 // חלץ 4 ספרות אחרונות של הכרטיס מהתנועות החדשות
@@ -1656,6 +1685,35 @@ export async function POST(request: NextRequest) {
               .update({ document_id: docRecord.id })
               .eq('batch_id', pendingBatchId);
             console.log(`✅ Document saved: ${docRecord.id}`);
+            
+            // 🆕 סימון missing_document כ-uploaded
+            if (documentType === 'credit' || documentType === 'bank') {
+              const { markDocumentAsUploaded } = await import('@/lib/conversation/classification-flow');
+              
+              // חלץ כרטיס אשראי אם זה דוח אשראי
+              let cardLast4: string | null = null;
+              if (documentType === 'credit') {
+                for (const tx of transactionsToInsert) {
+                  const text = `${tx.vendor || ''} ${tx.description || ''}`;
+                  const cardMatch = text.match(/\d{4}$/);
+                  const starMatch = text.match(/\*{4}(\d{4})/);
+                  if (cardMatch) {
+                    cardLast4 = cardMatch[0];
+                    break;
+                  } else if (starMatch) {
+                    cardLast4 = starMatch[1];
+                    break;
+                  }
+                }
+              }
+              
+              await markDocumentAsUploaded(
+                userData.id,
+                documentType,
+                cardLast4,
+                docRecord.id
+              );
+            }
           }
           
           // עדכון סטטוס משתמש

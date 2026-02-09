@@ -426,21 +426,28 @@ async function startClassification(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  // ספור הכנסות והוצאות (pending או proposed)
-  const { data: transactions } = await supabase
-    .from('transactions')
-    .select('id, type')
-    .eq('user_id', ctx.userId)
-    .in('status', ['pending', 'proposed']);
+  // 🆕 השתמש בפונקציה החכמה שמסננת תנועות לפי missing_documents
+  const { getClassifiableTransactions } = await import('./classification-flow');
   
-  const incomeCount = transactions?.filter(t => t.type === 'income').length || 0;
-  const expenseCount = transactions?.filter(t => t.type === 'expense').length || 0;
+  const incomeTransactions = await getClassifiableTransactions(ctx.userId, 'income');
+  const expenseTransactions = await getClassifiableTransactions(ctx.userId, 'expense');
+  
+  const incomeCount = incomeTransactions.length;
+  const expenseCount = expenseTransactions.length;
   
   if (incomeCount === 0 && expenseCount === 0) {
-    await greenAPI.sendMessage({
-      phoneNumber: ctx.phone,
-      message: `אין תנועות לסיווג! 🤷\n\nשלח לי דוח בנק חדש.`,
-    });
+    // 🆕 אין תנועות לסיווג - בדוק אם יש מסמכים חסרים
+    const { checkAndRequestMissingDocuments } = await import('./classification-flow');
+    const hasMoreDocs = await checkAndRequestMissingDocuments(ctx.userId, ctx.phone);
+    
+    if (!hasMoreDocs) {
+      // סיימנו הכל - עוברים לשלב הבא!
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `✅ *סיימנו את הסיווג!*\n\nכל התנועות מסווגות 🎉`,
+      });
+      // TODO: Move to next phase (behavior/goals)
+    }
     return { success: true };
   }
   
@@ -986,16 +993,14 @@ async function moveToNextPhase(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
+  // 🆕 Import classification flow helpers
+  const { getClassifiableTransactions, checkAndRequestMissingDocuments } = await import('./classification-flow');
+  
   if (completedType === 'income') {
-    // בדוק אם יש הוצאות
-    const { count } = await supabase
-      .from('transactions')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', ctx.userId)
-      .in('status', ['pending', 'proposed'])
-      .eq('type', 'expense');
+    // בדוק אם יש הוצאות (שלא ממתינות למסמך חסר)
+    const expenseTransactions = await getClassifiableTransactions(ctx.userId, 'expense');
     
-    if (count && count > 0) {
+    if (expenseTransactions.length > 0) {
       await supabase
         .from('users')
         .update({ onboarding_state: 'classification_expense' })
@@ -1008,6 +1013,14 @@ async function moveToNextPhase(
       
       return await showNextExpenseGroup({ ...ctx, state: 'classification_expense' });
     }
+  }
+  
+  // 🆕 סיימנו לסווג - בדוק אם יש מסמכים חסרים
+  const hasMoreDocs = await checkAndRequestMissingDocuments(ctx.userId, ctx.phone);
+  
+  if (hasMoreDocs) {
+    // יש מסמכים חסרים - ממתינים
+    return { success: true };
   }
   
   // סיימנו הכל!
