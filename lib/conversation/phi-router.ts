@@ -426,6 +426,20 @@ async function startClassification(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
+  // בדוק אם יש בכלל דוחות שהועלו
+  const { count: uploadedDocs } = await supabase
+    .from('uploaded_statements')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId);
+  
+  if (!uploadedDocs || uploadedDocs === 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📄 *אין עדיין דוחות במערכת!*\n\nשלח לי דוח בנק או דוח אשראי קודם.\n\n💡 אפשר לשלוח PDF, Excel או תמונה.`,
+    });
+    return { success: true };
+  }
+  
   // 🆕 השתמש בפונקציה החכמה שמסננת תנועות לפי missing_documents
   const { getClassifiableTransactions } = await import('./classification-flow');
   
@@ -436,7 +450,23 @@ async function startClassification(ctx: RouterContext): Promise<RouterResult> {
   const expenseCount = expenseTransactions.length;
   
   if (incomeCount === 0 && expenseCount === 0) {
-    // 🆕 אין תנועות לסיווג - בדוק אם יש מסמכים חסרים
+    // 🆕 אין תנועות לסיווג - בדוק למה
+    // האם בכלל יש תנועות במערכת? (כולל confirmed)
+    const { count: totalTransactions } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', ctx.userId);
+    
+    if (!totalTransactions || totalTransactions === 0) {
+      // אין תנועות בכלל - המשתמש עוד לא העלה דוח!
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `אין תנועות לסיווג! 🤷\n\nשלח לי דוח בנק או דוח אשראי קודם.`,
+      });
+      return { success: true };
+    }
+    
+    // יש תנועות אבל כולן מסווגות - בדוק אם יש מסמכים חסרים
     const { checkAndRequestMissingDocuments } = await import('./classification-flow');
     const hasMoreDocs = await checkAndRequestMissingDocuments(ctx.userId, ctx.phone);
     
