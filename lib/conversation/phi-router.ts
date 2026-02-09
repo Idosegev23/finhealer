@@ -3441,6 +3441,15 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
     await detectLoansAndAsk(userId, phone, documentId);
   }
   
+  // 🔥 בדוק אם המשתמש היה בstate של המתנה למסמך
+  const { data: userData } = await supabase
+    .from('users')
+    .select('onboarding_state, classification_context')
+    .eq('id', userId)
+    .single();
+  
+  const wasWaitingForDocument = userData?.onboarding_state === 'waiting_for_document';
+  
   // קבל את הדוח האחרון שהועלה
   const { data: latestDoc } = await supabase
     .from('uploaded_statements')
@@ -3461,6 +3470,34 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
   const expenseCount = transactions?.filter(t => t.type === 'expense').length || 0;
   const totalIncome = transactions?.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
   const totalExpenses = transactions?.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
+  
+  // 🔥 אם היינו מחכים למסמך (כמו דוח אשראי שביקשנו) - התחל סיווג אוטומטית!
+  if (wasWaitingForDocument && (incomeCount > 0 || expenseCount > 0)) {
+    console.log(`🎯 Document was requested - starting classification automatically for ${incomeCount + expenseCount} transactions`);
+    
+    // שלח הודעת סיכום מהירה
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `✅ *קיבלתי את המסמך!*\n\n` +
+        `📝 ${incomeCount + expenseCount} תנועות חדשות\n` +
+        `💚 ${incomeCount} הכנסות\n` +
+        `💸 ${expenseCount} הוצאות\n\n` +
+        `בוא נסווג אותן! 🎯`,
+    });
+    
+    // עדכן state ל-classification והתחל
+    await supabase
+      .from('users')
+      .update({ 
+        onboarding_state: 'classification',
+        classification_context: null,
+      })
+      .eq('id', userId);
+    
+    // התחל סיווג - קרא ישירות ל-startClassification
+    await startClassification({ userId, phone, state: 'classification' });
+    return;
+  }
   
   // זיהוי תקופה
   let periodText = '';
