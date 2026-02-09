@@ -41,9 +41,25 @@ export async function createClient() {
  * להשתמש רק ב-API routes מאובטחים (webhooks, cron jobs)
  */
 export function createServiceClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!serviceRoleKey) {
+    console.error('❌ CRITICAL: SUPABASE_SERVICE_ROLE_KEY is not defined!');
+    console.error('   This will cause RLS to block all inserts from webhooks.');
+    console.error('   Set SUPABASE_SERVICE_ROLE_KEY in Vercel environment variables.');
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is missing');
+  }
+  
+  if (!serviceRoleKey.startsWith('eyJ')) {
+    console.error('❌ CRITICAL: SUPABASE_SERVICE_ROLE_KEY appears invalid (should start with eyJ)');
+    throw new Error('Invalid SUPABASE_SERVICE_ROLE_KEY format');
+  }
+  
+  console.log('✅ Service role client created (key present)');
+  
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    serviceRoleKey,
     {
       auth: {
         autoRefreshToken: false,

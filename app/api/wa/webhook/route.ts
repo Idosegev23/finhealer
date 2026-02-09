@@ -1094,7 +1094,21 @@ export async function POST(request: NextRequest) {
           
           console.log(`✅ Saved ${insertedIds.length}/${allTransactions.length} transactions`);
           if (insertErrors.length > 0) {
-            console.error(`❌ ${insertErrors.length} transaction insert errors:`, insertErrors.slice(0, 3));
+            console.error(`❌ ${insertErrors.length} transaction insert errors:`);
+            // Log first 5 errors with details
+            insertErrors.slice(0, 5).forEach((err, idx) => {
+              console.error(`   Error ${idx + 1}: ${err.vendor} - ${err.error}`);
+            });
+            
+            // If ALL transactions failed - this is critical!
+            if (insertedIds.length === 0 && insertErrors.length > 0) {
+              console.error('🚨 CRITICAL: ALL transactions failed to insert!');
+              console.error('   Possible causes:');
+              console.error('   1. RLS policy blocking (check SUPABASE_SERVICE_ROLE_KEY)');
+              console.error('   2. Constraint violation (check source/status/category values)');
+              console.error('   3. Foreign key issue (check user_id exists)');
+              console.error(`   Sample error: ${insertErrors[0].error}`);
+            }
           }
           
           // חישוב סיכומים
