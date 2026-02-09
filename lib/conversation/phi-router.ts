@@ -3478,11 +3478,11 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
     // שלח הודעת סיכום מהירה
     await greenAPI.sendMessage({
       phoneNumber: phone,
-      message: `✅ *קיבלתי את המסמך!*\n\n` +
-        `📝 ${incomeCount + expenseCount} תנועות חדשות\n` +
-        `💚 ${incomeCount} הכנסות\n` +
-        `💸 ${expenseCount} הוצאות\n\n` +
-        `בוא נסווג אותן! 🎯`,
+      message: `✅ *קיבלתי את הדוח!*\n\n` +
+        `📝 ${incomeCount + expenseCount} תנועות\n` +
+        `💚 ${incomeCount} הכנסות (${totalIncome.toLocaleString('he-IL')} ₪)\n` +
+        `💸 ${expenseCount} הוצאות (${totalExpenses.toLocaleString('he-IL')} ₪)\n\n` +
+        `🎯 *בוא נסווג ביחד!*`,
     });
     
     // עדכן state ל-classification והתחל
@@ -3497,6 +3497,30 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
     // התחל סיווג - קרא ישירות ל-startClassification
     await startClassification({ userId, phone, state: 'classification' });
     return;
+  }
+  
+  // 🆕 אם זה דוח בנק ראשון - בדוק אם יש חיובי אשראי ממתינים
+  if (latestDoc?.document_type === 'bank' && !wasWaitingForDocument) {
+    const { data: pendingCreditDocs } = await supabase
+      .from('missing_documents')
+      .select('id, card_last_4, expected_amount')
+      .eq('user_id', userId)
+      .eq('document_type', 'credit')
+      .eq('status', 'pending')
+      .order('priority', { ascending: false });
+    
+    if (pendingCreditDocs && pendingCreditDocs.length > 0) {
+      // יש חיובי אשראי שזוהו - הודע למשתמש
+      const creditCount = pendingCreditDocs.length;
+      const creditCards = [...new Set(pendingCreditDocs.map(d => d.card_last_4).filter(Boolean))];
+      
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `💳 *זיהיתי ${creditCount} חיובי אשראי!*\n\n` +
+          `כרטיסים: ${creditCards.map(c => `****${c}`).join(', ')}\n\n` +
+          `נסווג את הבנק קודם, ואחרי זה אבקש את דוחות האשראי. 👍`,
+      });
+    }
   }
   
   // זיהוי תקופה

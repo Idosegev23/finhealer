@@ -52,22 +52,43 @@ export async function requestNextMissingDocument(userId: string, phone: string) 
   
   switch (nextDoc.document_type) {
     case 'credit':
-      message += `💳 *דוח פירוט אשראי*\n\n`;
-      if (nextDoc.card_last_4) {
-        message += `כרטיס: ****${nextDoc.card_last_4}\n`;
+      message += `💳 *צריך דוח פירוט אשראי*\n\n`;
+      
+      // תאריך חיוב מדויק
+      if (nextDoc.charge_date) {
+        const chargeDate = new Date(nextDoc.charge_date);
+        const day = chargeDate.getDate();
+        const month = chargeDate.getMonth() + 1;
+        const year = chargeDate.getFullYear();
+        message += `📅 תאריך חיוב: *${day}/${month}/${year}*\n`;
       }
+      
+      // כרטיס
+      if (nextDoc.card_last_4) {
+        message += `💳 כרטיס: ****${nextDoc.card_last_4}\n`;
+      }
+      
+      // סכום
+      if (nextDoc.expected_amount) {
+        message += `💰 סכום: ${Math.abs(nextDoc.expected_amount).toLocaleString('he-IL')} ₪\n`;
+      }
+      
+      // תקופה (אם יש)
       if (nextDoc.period_start && nextDoc.period_end) {
         const startDate = new Date(nextDoc.period_start);
         const endDate = new Date(nextDoc.period_end);
         const hebrewMonths = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
-        const month = hebrewMonths[endDate.getMonth()];
+        const startMonth = hebrewMonths[startDate.getMonth()];
+        const endMonth = hebrewMonths[endDate.getMonth()];
         const year = endDate.getFullYear();
-        message += `תקופה: ${month} ${year}\n`;
+        if (startDate.getMonth() === endDate.getMonth()) {
+          message += `📊 תקופת חיוב: ${endMonth} ${year}\n`;
+        } else {
+          message += `📊 תקופת חיוב: ${startMonth}-${endMonth} ${year}\n`;
+        }
       }
-      if (nextDoc.expected_amount) {
-        message += `סכום חיוב: ${Math.abs(nextDoc.expected_amount).toLocaleString('he-IL')} ₪\n`;
-      }
-      message += `\n📄 שלח לי את דוח האשראי של התקופה הזאת כדי לראות לאן הכסף הלך.`;
+      
+      message += `\n📄 *שלח את דוח הפירוט של החיוב הזה* כדי שאראה לאן הכסף הלך.`;
       break;
       
     case 'payslip':

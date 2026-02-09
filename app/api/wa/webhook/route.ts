@@ -1297,6 +1297,7 @@ export async function POST(request: NextRequest) {
                   user_id: userData.id,
                   document_type: missingDoc.type,
                   card_last_4: missingDoc.card_last_4 || null,
+                  charge_date: missingDoc.charge_date || missingDoc.payment_date || missingDoc.salary_date || null,
                   period_start: missingDoc.period_start || null,
                   period_end: missingDoc.period_end || null,
                   expected_amount: missingDoc.charge_amount || missingDoc.salary_amount || missingDoc.payment_amount || null,
