@@ -250,21 +250,81 @@ export async function routeMessage(
   }
   
   // ──────────────────────────────────────────────────────────────────────────
-  // STATE: goals_setup - הגדרת מטרות אחרי סיווג
+  // STATE: goals_setup - הגדרת מטרות אחרי סיווג (משתמש ב-advanced-goals-handler)
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'goals_setup') {
-    // אם המשתמש רוצה לדלג
-    if (isCommand(msg, ['דלג', 'skip', 'המשך', 'אין', 'לא'])) {
-      // דילג על מטרות - עובר לזיהוי הלוואות
+    // אם המשתמש רוצה לדלג על הגדרת מטרות
+    if (isCommand(msg, ['דלג', 'skip', 'אין', 'לא עכשיו', 'בינתיים לא', 'סיימתי', 'המשך', 'next', 'done', 'נמשיך'])) {
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `בסדר! תוכל להגדיר מטרות בכל זמן מהדאשבורד 👍`,
+      });
+      
+      // עובר לזיהוי הלוואות
       return await detectLoansFromClassifiedTransactions(ctx);
     }
     
-    // אחרת - המשתמש כתב מטרה
-    // TODO: שמור מטרה במסד נתונים
-    await greenAPI.sendMessage({
-      phoneNumber: phone,
-      message: `✅ מעולה! שמרתי את המטרה.\n\nיש עוד מטרות? או כתוב "המשך" להמשיך.`,
-    });
+    // אחרי יצירת יעד - אם המשתמש ענה "לא" לשאלה "רוצה עוד יעד?"
+    if (isCommand(msg, ['לא', 'no', 'לא תודה', 'זהו'])) {
+      // עובר לזיהוי הלוואות
+      return await detectLoansFromClassifiedTransactions(ctx);
+    }
+    
+    // אם המשתמש ענה "כן" לשאלה "רוצה עוד יעד?" - התחל יעד חדש
+    if (isCommand(msg, ['כן', 'yes', 'בטח', 'רוצה'])) {
+      const { startAdvancedGoal } = await import('./advanced-goals-handler');
+      await startAdvancedGoal(userId, phone);
+      return { success: true };
+    }
+    
+    // טיפול בהגדרת יעד מתקדם
+    const { 
+      handleAdvancedGoalTypeSelection,
+      handleChildSelection,
+      handleBudgetSourceSelection,
+      confirmAndCreateGoal 
+    } = await import('./advanced-goals-handler');
+    
+    // בדוק באיזה שלב של יצירת יעד אנחנו
+    const { data: user } = await supabase
+      .from('users')
+      .select('classification_context')
+      .eq('id', userId)
+      .single();
+    
+    const goalContext = user?.classification_context?.advancedGoalCreation;
+    
+    if (!goalContext) {
+      // אין context - זה שלב הראשון של בחירת סוג יעד
+      await handleAdvancedGoalTypeSelection(userId, phone, msg);
+      return { success: true };
+    }
+    
+    // טפל לפי ה-step
+    if (goalContext.step === 'child') {
+      await handleChildSelection(userId, phone, msg);
+    } else if (goalContext.step === 'budget_source') {
+      await handleBudgetSourceSelection(userId, phone, msg);
+    } else if (goalContext.step === 'confirm') {
+      if (isCommand(msg, ['כן', 'yes', 'אישור', 'אשר', 'בטח', 'כןן'])) {
+        await confirmAndCreateGoal(userId, phone);
+        
+        // אחרי יצירת יעד - שאל אם יש עוד
+        await greenAPI.sendMessage({
+          phoneNumber: phone,
+          message: `✅ *היעד נשמר!*\n\n` +
+            `רוצה להגדיר עוד יעד? (כן/לא)`,
+        });
+      } else {
+        await greenAPI.sendMessage({
+          phoneNumber: phone,
+          message: `כתוב *"כן"* לאשר או *"לא"* לבטל`,
+        });
+      }
+    } else {
+      // כל השאר - type, name, amount, deadline, priority
+      await handleAdvancedGoalTypeSelection(userId, phone, msg);
+    }
     
     return { success: true };
   }
@@ -274,20 +334,68 @@ export async function routeMessage(
   // ──────────────────────────────────────────────────────────────────────────
   if (state === 'loan_consolidation_offer') {
     if (isCommand(msg, ['כן', 'yes', 'מעוניין', 'רוצה', 'בטח'])) {
-      // משתמש מעוניין באיחוד
+      // משתמש מעוניין באיחוד - צור בקשה במסד נתונים
+      const { data: contextData } = await supabase
+        .from('users')
+        .select('classification_context')
+        .eq('id', userId)
+        .single();
+      
+      const loanContext = contextData?.classification_context?.loanConsolidation;
+      
+      // צור בקשת איחוד
+      const { data: request, error: createError } = await supabase
+        .from('loan_consolidation_requests')
+        .insert({
+          user_id: userId,
+          status: 'pending_documents',
+          total_monthly_payment: loanContext?.total_monthly || 0,
+          num_loans: loanContext?.count || 0,
+        })
+        .select('id')
+        .single();
+      
+      if (createError || !request) {
+        console.error('❌ Failed to create consolidation request:', createError);
+        await greenAPI.sendMessage({
+          phoneNumber: phone,
+          message: `אופס! משהו השתבש. נסה שוב מאוחר יותר.`,
+        });
+        return await showFinalSummary(ctx);
+      }
+      
+      console.log(`✅ Created consolidation request: ${request.id}`);
+      
+      // שלח הודעה למשתמש
       await greenAPI.sendMessage({
         phoneNumber: phone,
         message: `מעולה! 🎉\n\n` +
-          `📄 שלח לי את פרטי ההלוואות:\n` +
+          `📄 *שלח לי את פרטי ההלוואות:*\n` +
           `• דוחות הלוואה מהבנק\n` +
           `• הסכמי הלוואה\n` +
           `• כל מסמך שמראה יתרת חוב וריבית\n\n` +
-          `גדי יקבל את זה ויחזור אליך עם הצעות! 💰`,
+          `גדי יקבל את זה ויחזור אליך עם הצעות! 💰\n\n` +
+          `*או כתוב "המשך" אם אין לך מסמכים כרגע.*`,
       });
       
-      // TODO: צור בקשת איחוד במסד נתונים
-      return await showFinalSummary(ctx);
-    } else if (isCommand(msg, ['לא', 'no', 'תודה', 'לא מעוניין'])) {
+      // עדכן state לממתין למסמכי הלוואות
+      await supabase
+        .from('users')
+        .update({
+          onboarding_state: 'waiting_for_loan_docs',
+          classification_context: {
+            loanConsolidation: {
+              ...loanContext,
+              requestId: request.id,
+              waitingForDocs: true,
+            }
+          }
+        })
+        .eq('id', userId);
+      
+      return { success: true, newState: 'waiting_for_loan_docs' };
+      
+    } else if (isCommand(msg, ['לא', 'no', 'תודה', 'לא מעוניין', 'בינתיים לא'])) {
       // משתמש לא מעוניין
       await greenAPI.sendMessage({
         phoneNumber: phone,
@@ -301,6 +409,29 @@ export async function routeMessage(
     await greenAPI.sendMessage({
       phoneNumber: phone,
       message: `מעוניין באיחוד הלוואות? (כן/לא)`,
+    });
+    
+    return { success: true };
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────────
+  // STATE: waiting_for_loan_docs - ממתין למסמכי הלוואות
+  // ──────────────────────────────────────────────────────────────────────────
+  if (state === 'waiting_for_loan_docs') {
+    // אם המשתמש רוצה להמשיך בלי מסמכים
+    if (isCommand(msg, ['המשך', 'דלג', 'skip', 'בינתיים לא', 'אין לי'])) {
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `בסדר! גדי ייצור קשר בהמשך לקבלת המסמכים. 👍`,
+      });
+      
+      return await showFinalSummary(ctx);
+    }
+    
+    // אחרת מחכים למסמכים (יטופל ב-webhook כשישלחו קובץ)
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `📄 מחכה למסמכי ההלוואות!\n\nשלח PDF או תמונה של המסמכים.`,
     });
     
     return { success: true };
@@ -1184,7 +1315,7 @@ async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult> {
     })
     .eq('id', ctx.userId);
   
-  // שלח הודעת מעבר
+  // שלח הודעת סיכום
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `🎉 *סיימנו את הסיווג!*\n\n` +
@@ -1192,37 +1323,44 @@ async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult> {
       `💚 הכנסות: ${totalIncome.toLocaleString('he-IL')} ₪\n` +
       `💸 הוצאות: ${totalExpenses.toLocaleString('he-IL')} ₪\n` +
       `${balanceEmoji} יתרה: ${balance.toLocaleString('he-IL')} ₪\n\n` +
-      `🎯 *עכשיו בוא נגדיר מטרות!*\n\n` +
-      `יש לך מטרה פיננסית? (למשל: חיסכון לרכב, נופש, קרן חירום)\n\n` +
-      `כתוב את המטרה או "דלג" כדי להמשיך.`,
+      `🎯 *עכשיו בוא נגדיר מטרות!*`,
   });
+  
+  // התחל תהליך הגדרת יעד מתקדם
+  const { startAdvancedGoal } = await import('./advanced-goals-handler');
+  await startAdvancedGoal(ctx.userId, ctx.phone);
   
   return { success: true, newState: 'goals_setup' };
 }
 
 /**
- * אחרי הגדרת מטרות - זיהוי הלוואות ממשכנתא והצעת איחוד
+ * אחרי הגדרת מטרות - זיהוי הלוואות והצעת איחוד
  */
 async function detectLoansFromClassifiedTransactions(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   
-  // מצא את כל התנועות שסווגו כהלוואות או משכנתא
+  console.log(`🔍 Looking for loans in classified transactions for user ${ctx.userId}`);
+  
+  // מצא את כל התנועות שסווגו כהלוואות או משכנתא (confirmed בלבד!)
   const { data: loanTransactions } = await supabase
     .from('transactions')
-    .select('id, amount, vendor, category, expense_category')
+    .select('id, amount, vendor, category, expense_category, date')
     .eq('user_id', ctx.userId)
     .eq('status', 'confirmed')
     .eq('type', 'expense')
     .or(
-      'expense_category.ilike.%הלוואה%,' +
-      'expense_category.ilike.%משכנתא%,' +
+      'expense_category.ilike.%הלוואה פרטית%,' +
+      'expense_category.ilike.%הלוואת משכנתא%,' +
       'category.ilike.%הלוואה%,' +
       'category.ilike.%משכנתא%'
     );
   
+  console.log(`💰 Found ${loanTransactions?.length || 0} loan payment transactions`);
+  
   if (!loanTransactions || loanTransactions.length === 0) {
-    // אין הלוואות - עובר לשלב הבא (behavior)
+    console.log(`✅ No loans detected - moving to final summary`);
+    // אין הלוואות - עובר לסיכום סופי
     return await showFinalSummary(ctx);
   }
   
@@ -1236,25 +1374,30 @@ async function detectLoansFromClassifiedTransactions(ctx: RouterContext): Promis
     loansByVendor.get(vendor)!.push(tx);
   });
   
-  // חשב סך תשלומים חודשיים
+  // חשב סך תשלומים חודשיים (ממוצע)
   const totalMonthly = Array.from(loansByVendor.values())
     .map(txs => {
-      // קח את הממוצע של התשלומים (כי יכול להיות וריאציות קטנות)
-      const sum = txs.reduce((s, t) => s + Math.abs(t.amount), 0);
+      const sum = txs.reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
       return sum / txs.length;
     })
     .reduce((sum, avg) => sum + avg, 0);
   
   const loanCount = loansByVendor.size;
   
-  console.log(`💰 Detected ${loanCount} loans with total monthly payment of ${totalMonthly} ₪`);
+  console.log(`💰 Detected ${loanCount} loans with total monthly payment of ${totalMonthly.toFixed(2)} ₪`);
+  
+  // רשימת ההלוואות שמצאנו
+  const loansList = Array.from(loansByVendor.entries()).map(([vendor, txs]) => {
+    const avgPayment = txs.reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / txs.length;
+    return `• ${vendor}: ${avgPayment.toLocaleString('he-IL')} ₪/חודש`;
+  }).join('\n');
   
   // שלח הצעת איחוד
   if (loanCount === 1) {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `💳 *שמתי לב שיש לך הלוואה*\n\n` +
-        `💰 תשלום חודשי: ${totalMonthly.toLocaleString('he-IL')} ₪\n\n` +
+        `${loansList}\n\n` +
         `🎯 *גדי, היועץ הפיננסי שלנו, יכול לבדוק אם יש אפשרות לריבית טובה יותר!*\n\n` +
         `זה יכול לחסוך לך כסף 💸\n\n` +
         `מעוניין? (כן/לא)`,
@@ -1263,14 +1406,15 @@ async function detectLoansFromClassifiedTransactions(ctx: RouterContext): Promis
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `💳 *שמתי לב שיש לך ${loanCount} הלוואות!*\n\n` +
-        `💰 תשלום חודשי כולל: ${totalMonthly.toLocaleString('he-IL')} ₪\n\n` +
+        `${loansList}\n\n` +
+        `💰 סה"כ תשלום חודשי: ${totalMonthly.toLocaleString('he-IL')} ₪\n\n` +
         `💡 *איחוד הלוואות יכול לחסוך לך כסף* - הפחתת ריבית וניהול קל יותר.\n\n` +
         `🎯 גדי, היועץ הפיננסי שלנו, יכול לבדוק את האפשרויות שלך בחינם!\n\n` +
         `מעוניין? (כן/לא)`,
     });
   }
   
-  // עדכן context להמתנה לתשובה על איחוד הלוואות
+  // עדכן state להמתנה לתשובה על איחוד הלוואות
   await supabase
     .from('users')
     .update({
@@ -1280,6 +1424,7 @@ async function detectLoansFromClassifiedTransactions(ctx: RouterContext): Promis
           pending: true,
           count: loanCount,
           total_monthly: totalMonthly,
+          loans: Array.from(loansByVendor.keys()),
         }
       }
     })
