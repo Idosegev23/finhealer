@@ -732,6 +732,58 @@ export async function POST(request: NextRequest) {
         const currentState = userState?.onboarding_state;
         const explicitDocType = userState?.classification_context?.waitingForDocument;
         
+        // 🆕 טיפול מיוחד במסמכי הלוואות לאיחוד
+        if (currentState === 'waiting_for_loan_docs') {
+          console.log('📄 Loan document received for consolidation');
+          
+          const { receiveLoanDocument } = await import('@/lib/loans/consolidation-handler');
+          const response = await receiveLoanDocument(userData.id, phoneNumber, downloadUrl, fileName);
+          
+          const greenAPI = getGreenAPIClient();
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: response,
+          });
+          
+          // בדוק אם קיבלנו את כל המסמכים
+          const { data: updatedRequest } = await supabase
+            .from('loan_consolidation_requests')
+            .select('status, documents_received, documents_needed')
+            .eq('user_id', userData.id)
+            .eq('status', 'documents_received')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (updatedRequest) {
+            // קיבלנו את כל המסמכים - שלח לגדי!
+            const { sendLeadToAdvisor } = await import('@/lib/loans/lead-generator');
+            await sendLeadToAdvisor(updatedRequest.id);
+            
+            // עדכן למשתמש שהבקשה נשלחה
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: `✅ *הבקשה נשלחה לגדי!*\n\n` +
+                `הוא יבדוק את המצב שלך ויחזור אליך בהקדם.\n\n` +
+                `בינתיים, בוא נמשיך לנתח את ההתנהגות הפיננסית שלך 📊`,
+            });
+            
+            // עובר לשלב הבא
+            const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+            // קורא לסיכום סופי
+            await supabase
+              .from('users')
+              .update({ 
+                onboarding_state: 'behavior',
+                current_phase: 'behavior',
+                classification_context: null
+              })
+              .eq('id', userData.id);
+          }
+          
+          return NextResponse.json({ status: 'loan_document_received' });
+        }
+        
         // 🎯 זיהוי סוג מסמך לפי:
         // 1. סוג מסמך שהוגדר במפורש ב-context (waitingForDocument)
         // 2. ה-state הנוכחי של המשתמש

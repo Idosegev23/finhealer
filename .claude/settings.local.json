@@ -15,7 +15,14 @@
       "Bash(git push:*)",
       "Bash(npm run build:*)",
       "Bash(npm install:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "WebFetch(domain:code.claude.com)",
+      "Read(//Users/idosegev/.claude/**)",
+      "Bash(claude mcp add:*)",
+      "Bash(wc:*)",
+      "Bash(xargs:*)",
+      "Bash(npm test:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []
