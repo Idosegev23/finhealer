@@ -18,8 +18,8 @@ export function LoansStatusCard() {
     try {
       const res = await fetch("/api/loans");
       if (res.ok) {
-        const data = await res.json();
-        setLoans(data || []);
+        const json = await res.json();
+        setLoans(Array.isArray(json) ? json : json.data || []);
       }
     } catch (error) {
       console.error("Error fetching loans:", error);
