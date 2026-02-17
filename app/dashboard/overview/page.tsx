@@ -31,53 +31,35 @@ export default async function OverviewPage() {
 
   const userDataInfo = userData as any
 
-  // קבלת כל הנתונים
-  const { data: profile } = await supabase
-    .from('user_financial_profile')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
+  // קבלת כל הנתונים במקביל
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const today = now.toISOString().split('T')[0];
 
-  const { data: loans } = await supabase
-    .from('loans')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('active', true)
-
-  const { data: savings } = await supabase
-    .from('savings_accounts')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('active', true)
-
-  const { data: insurance } = await supabase
-    .from('insurance')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('active', true)
-
-  const { data: pensions } = await supabase
-    .from('pension_insurance')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('active', true)
-
-  const { data: income } = await supabase
-    .from('income_sources')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('active', true)
-
-  // ✨ קבלת הכנסות והוצאות מתנועות החודש (דוחות סרוקים)
-  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-  const { data: monthlyTransactions } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', user.id)
-    .in('status', ['confirmed', 'pending', 'proposed']) // כל התנועות כולל ממתינות
-    .gte('date', `${currentMonth}-01`)
-    .lte('date', `${currentMonth}-31`)
-    .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // parent transactions + מזומן
+  const [
+    { data: profile },
+    { data: loans },
+    { data: savings },
+    { data: insurance },
+    { data: pensions },
+    { data: income },
+    { data: monthlyTransactions },
+  ] = await Promise.all([
+    supabase.from('user_financial_profile').select('*').eq('user_id', user.id).single(),
+    supabase.from('loans').select('*').eq('user_id', user.id).eq('active', true),
+    supabase.from('savings_accounts').select('*').eq('user_id', user.id).eq('active', true),
+    supabase.from('insurance').select('*').eq('user_id', user.id).eq('active', true),
+    supabase.from('pension_insurance').select('*').eq('user_id', user.id).eq('active', true),
+    supabase.from('income_sources').select('*').eq('user_id', user.id).eq('active', true),
+    supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .in('status', ['confirmed', 'proposed'])
+      .gte('tx_date', firstOfMonth)
+      .lte('tx_date', today)
+      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'),
+  ]);
 
   const transactionIncome = (monthlyTransactions || [])
     .filter((tx: any) => tx.type === 'income')

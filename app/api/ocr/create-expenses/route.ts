@@ -122,10 +122,10 @@ export async function POST(request: Request) {
             .eq('payment_method', 'credit_card')
             .gte('amount', txAmount * 0.95) // Within 5% tolerance
             .lte('amount', txAmount * 1.05)
-            .gte('date', new Date(new Date(txDate).getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]) // ±7 days
-            .lte('date', new Date(new Date(txDate).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+            .gte('tx_date', new Date(new Date(txDate).getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]) // ±7 days
+            .lte('tx_date', new Date(new Date(txDate).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
             .is('receipt_id', null) // Not already linked to a receipt
-            .order('date', { ascending: false })
+            .order('tx_date', { ascending: false })
             .limit(5);
 
           let matchedDetail: any = null;

@@ -32,8 +32,8 @@ export async function GET(request: Request) {
       .eq('type', 'expense')
       .eq('status', 'confirmed') // ⭐ רק תנועות מאושרות - לא ממתינות!
       .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
-      .gte('date', startDateStr)
-      .order('date', { ascending: false });
+      .gte('tx_date', startDateStr)
+      .order('tx_date', { ascending: false });
 
     if (error) {
       console.error('Error fetching transactions:', error);
@@ -73,7 +73,7 @@ function groupByMonth(transactions: any[]) {
   const grouped: Record<string, any> = {};
 
   transactions.forEach((tx) => {
-    const date = new Date(tx.date);
+    const date = new Date(tx.tx_date);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
 
     if (!grouped[monthKey]) {

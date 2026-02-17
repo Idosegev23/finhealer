@@ -18,6 +18,7 @@ interface PendingTransaction {
   amount: number;
   vendor: string;
   date: string;
+  tx_date?: string;
   category: string;
   expense_category?: string;
   expense_category_id?: string;
@@ -811,7 +812,7 @@ export default function PendingExpensesPage() {
                         )}
                       </div>
                       <CardDescription className="text-2xl font-bold text-gray-700">
-                        📅 {formatDate(expense.date)} • 💳 {expense.payment_method || 'לא צוין'}
+                        📅 {formatDate(expense.tx_date || expense.date)} • 💳 {expense.payment_method || 'לא צוין'}
                         {expense.receipt_number && (
                           <> • 📄 מספר מסמך: {expense.receipt_number}</>
                         )}
@@ -868,7 +869,7 @@ export default function PendingExpensesPage() {
                         </div>
                         <div>
                           <span className="font-semibold text-gray-600 dark:text-gray-400">📅 תאריך:</span>
-                          <p className="text-gray-900 dark:text-white font-medium">{formatDate(expense.date)}</p>
+                          <p className="text-gray-900 dark:text-white font-medium">{formatDate(expense.tx_date || expense.date)}</p>
                         </div>
                         {expense.receipt_number && (
                           <div>

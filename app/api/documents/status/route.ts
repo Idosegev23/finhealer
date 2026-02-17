@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         .select('*')
         .eq('user_id', user.id)
         .eq('source', 'ocr')
-        .order('date', { ascending: false })
+        .order('tx_date', { ascending: false })
         .limit(100);
 
       transactions = txData || [];

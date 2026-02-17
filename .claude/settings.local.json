@@ -22,7 +22,9 @@
       "Bash(wc:*)",
       "Bash(xargs:*)",
       "Bash(npm test:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(head -5 grep -rln \"\\\\.gte\\\\\\(''date''\\\\|\\\\.lte\\\\\\(''date''\\\\|\\\\.order\\\\\\(''date''\\\\|\\\\.select.*date\" /Users/idosegev/Downloads/TriRoars/gadi/finhealer/app/api/)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

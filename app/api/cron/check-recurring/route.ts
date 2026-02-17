@@ -70,8 +70,8 @@ export async function GET(request: NextRequest) {
           .select('*')
           .eq('user_id', pattern.user_id)
           .ilike('vendor', `%${pattern.vendor}%`)
-          .gte('date', toleranceStart.toISOString().split('T')[0])
-          .lte('date', toleranceEnd.toISOString().split('T')[0]);
+          .gte('tx_date', toleranceStart.toISOString().split('T')[0])
+          .lte('tx_date', toleranceEnd.toISOString().split('T')[0]);
         
         if (matchingTransactions && matchingTransactions.length > 0) {
           // Found matching transaction - update occurrence_count

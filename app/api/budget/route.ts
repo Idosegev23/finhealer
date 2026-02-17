@@ -100,7 +100,7 @@ export async function GET(request: Request) {
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'expense')
-      .gte('date', startDate);
+      .gte('tx_date', startDate);
 
     // בדיקה אם אין מספיק תנועות
     if (!transactions || transactions.length < 10) {
@@ -185,7 +185,7 @@ export async function GET(request: Request) {
       .select('amount')
       .eq('user_id', user.id)
       .eq('type', 'income')
-      .gte('date', startDate);
+      .gte('tx_date', startDate);
 
     const totalIncome = incomeTransactions.data?.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0) || 0;
     const avgMonthlyIncome = Math.round(totalIncome / monthsWithData);

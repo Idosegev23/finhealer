@@ -175,12 +175,12 @@ async function fetchUserContext(supabase: any, userId: string): Promise<UserCont
     .select('date, vendor, amount, category')
     .eq('user_id', userId)
     .eq('type', 'expense')
-    .order('date', { ascending: false })
+    .order('tx_date', { ascending: false })
     .limit(5);
 
   if (transactions && transactions.length > 0) {
     context.recentTransactions = transactions.map((tx: any) => ({
-      date: new Date(tx.date).toLocaleDateString('he-IL'),
+      date: new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL'),
       description: tx.vendor || tx.category,
       amount: tx.amount,
       category: tx.category,

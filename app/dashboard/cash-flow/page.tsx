@@ -5,7 +5,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
@@ -17,8 +16,6 @@ export default function CashFlowPage() {
   const [analysis, setAnalysis] = useState<CashFlowAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [months, setMonths] = useState(12);
-  
-  const supabase = createClientComponentClient();
   
   useEffect(() => {
     loadCashFlowProjection();

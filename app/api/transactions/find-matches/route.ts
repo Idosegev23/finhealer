@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'expense')
-      .gte('date', minDate.toISOString().split('T')[0])
-      .lte('date', maxDate.toISOString().split('T')[0])
+      .gte('tx_date', minDate.toISOString().split('T')[0])
+      .lte('tx_date', maxDate.toISOString().split('T')[0])
       .eq('is_summary', true)
       .eq('has_details', false) // רק תנועות שעדיין לא יש להן פירוט
       .neq('status', 'rejected');

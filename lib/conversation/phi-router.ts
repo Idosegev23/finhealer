@@ -20,7 +20,7 @@ import type { CategoryData } from '@/lib/ai/chart-prompts';
 // Types
 // ============================================================================
 
-type UserState = 
+type UserState =
   | 'start'                   // Initial state after reset
   | 'waiting_for_name'
   | 'waiting_for_document'
@@ -29,8 +29,11 @@ type UserState =
   | 'classification_expense'
   | 'behavior'                // Phase 2: Behavior analysis
   | 'goals'                   // Phase 3: Goal setting
+  | 'goals_setup'             // Goal setup flow
   | 'budget'                  // Phase 4: Budget creation
-  | 'monitoring';
+  | 'monitoring'
+  | 'loan_consolidation_offer' // Loan consolidation flow
+  | 'waiting_for_loan_docs';  // Waiting for loan documents
 
 // Goal types for Phase 3
 interface Goal {
@@ -302,12 +305,12 @@ export async function routeMessage(
     
     // טפל לפי ה-step
     if (goalContext.step === 'child') {
-      await handleChildSelection(userId, phone, msg);
+      await handleChildSelection(userId, phone, msg, goalContext);
     } else if (goalContext.step === 'budget_source') {
-      await handleBudgetSourceSelection(userId, phone, msg);
+      await handleBudgetSourceSelection(userId, phone, msg, goalContext);
     } else if (goalContext.step === 'confirm') {
       if (isCommand(msg, ['כן', 'yes', 'אישור', 'אשר', 'בטח', 'כןן'])) {
-        await confirmAndCreateGoal(userId, phone);
+        await confirmAndCreateGoal(userId, phone, goalContext);
         
         // אחרי יצירת יעד - שאל אם יש עוד
         await greenAPI.sendMessage({
@@ -3831,7 +3834,7 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
       .eq('id', userId);
     
     // התחל תהליך סיווג אינטראקטיבי - תנועה אחר תנועה
-    await startClassification({ userId, phone, state: 'classification' });
+    await startClassification({ userId, phone, state: 'classification', userName: null });
     return;
   }
   
@@ -3848,7 +3851,7 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
     if (pendingCreditDocs && pendingCreditDocs.length > 0) {
       // יש חיובי אשראי שזוהו - הודע למשתמש
       const creditCount = pendingCreditDocs.length;
-      const creditCards = [...new Set(pendingCreditDocs.map(d => d.card_last_4).filter(Boolean))];
+      const creditCards = Array.from(new Set(pendingCreditDocs.map(d => d.card_last_4).filter(Boolean)));
       
       await greenAPI.sendMessage({
         phoneNumber: phone,

@@ -110,8 +110,8 @@ export async function GET(request: NextRequest) {
         .eq('user_id', user.id)
         .eq('type', 'income')
         .eq('status', 'confirmed')
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('tx_date', startDate)
+        .lte('tx_date', endDate)
         .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true');
 
       if (sourcesError) {
@@ -182,8 +182,8 @@ export async function GET(request: NextRequest) {
         .eq('user_id', user.id)
         .eq('type', 'income')
         .eq('status', 'confirmed')
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('tx_date', startDate)
+        .lte('tx_date', endDate)
         .or('has_details.is.null,has_details.eq.false');
 
       if (sourcesError) {
@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
 
       // הוספת תנועות הכנסה בפועל
       (transactions || []).forEach((tx: any) => {
-        const date = new Date(tx.date).toLocaleDateString('he-IL');
+        const date = new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL');
         const name = tx.vendor || `הכנסה (${date})`;
         result.push({
           name,

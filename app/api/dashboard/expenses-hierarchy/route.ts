@@ -106,8 +106,8 @@ export async function GET(request: NextRequest) {
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('tx_date', startDate)
+        .lte('tx_date', endDate)
         .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
       if (queryError) {
@@ -153,8 +153,8 @@ export async function GET(request: NextRequest) {
         .eq('type', 'expense')
         .eq('status', 'confirmed')
         .eq('expense_type', expenseType)
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('tx_date', startDate)
+        .lte('tx_date', endDate)
         .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
 
       if (queryError) {
@@ -204,10 +204,10 @@ export async function GET(request: NextRequest) {
         .eq('status', 'confirmed')
         .eq('expense_type', expenseType)
         .eq('expense_category', expenseCategory)
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('tx_date', startDate)
+        .lte('tx_date', endDate)
         .or('has_details.is.null,has_details.eq.false')
-        .order('date', { ascending: false });
+        .order('tx_date', { ascending: false });
 
       if (queryError) {
         console.error('❌ Error fetching transactions:', queryError);
@@ -217,7 +217,7 @@ export async function GET(request: NextRequest) {
       console.log(`✅ Found ${transactions?.length || 0} transactions for level 3 (${expenseType}/${expenseCategory})`);
 
       const result = (transactions || []).map((tx: any, index: number) => {
-        const date = new Date(tx.date).toLocaleDateString('he-IL');
+        const date = new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL');
         const desc = tx.vendor || tx.notes || `תנועה ${index + 1}`;
         return {
           name: `${desc} (${date})`,

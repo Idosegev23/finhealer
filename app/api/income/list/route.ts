@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('type', 'income')
       .eq('status', 'confirmed') // רק תנועות מאושרות
-      .gte('date', `${currentMonth}-01`)
-      .lte('date', `${currentMonth}-31`)
+      .gte('tx_date', `${currentMonth}-01`)
+      .lte('tx_date', `${currentMonth}-31`)
       .or('has_details.is.null,has_details.eq.false'); // רק parent transactions
 
     const monthlyIncomeFromTransactions = (transactionIncome || [])

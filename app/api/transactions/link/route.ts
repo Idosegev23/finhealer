@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       amount: tx.amount,
       vendor: tx.vendor,
-      date: tx.date,
+      date: tx.tx_date || tx.date,
       notes: tx.notes,
       category: tx.category,
       expense_category: tx.expense_category,

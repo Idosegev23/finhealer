@@ -393,7 +393,7 @@ function CategoryGroup({ title, categories, transactions, type }: CategoryGroupP
                         <div>
                           <p className="font-medium text-gray-900">{tx.vendor || 'לא צוין'}</p>
                           <p className="text-sm text-gray-500">
-                            {new Date(tx.date).toLocaleDateString('he-IL')}
+                            {new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL')}
                             {tx.payment_method && ` • ${tx.payment_method}`}
                           </p>
                         </div>

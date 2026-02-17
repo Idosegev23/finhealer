@@ -36,7 +36,7 @@ export async function GET() {
     const monthlyData: { [key: string]: number } = {};
     
     (transactions || []).forEach((tx: any) => {
-      const date = new Date(tx.date);
+      const date = new Date(tx.tx_date || tx.date);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       const monthName = date.toLocaleDateString('he-IL', { month: 'short', year: 'numeric' });
       

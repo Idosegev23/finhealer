@@ -175,12 +175,8 @@ export default function GoalsPage() {
   
   async function runSimulation(incomeChange: number) {
     setIsSimulating(true);
-    
+
     try {
-      const response = await fetch('/api/auth/session');
-      const session = await response.json();
-      const userId = session?.user?.id;
-      
       const simResponse = await fetch('/api/goals/simulate', {
           method: 'POST',
         headers: { 'Content-Type': 'application/json' },

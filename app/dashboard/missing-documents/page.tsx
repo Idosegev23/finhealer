@@ -43,7 +43,6 @@ export default function MissingDocumentsPage() {
         .from('missing_documents')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'pending')
         .order('priority', { ascending: false });
 
       if (error) {
@@ -122,8 +121,8 @@ export default function MissingDocumentsPage() {
   }
 
   const filteredDocs = filterType === 'all' 
-    ? missingDocs 
-    : missingDocs.filter(doc => doc.document_type === filterType);
+    ? missingDocs.filter(d => d.status === 'pending') 
+    : missingDocs.filter(doc => doc.document_type === filterType && doc.status === 'pending');
 
   const documentTypes = Array.from(new Set(missingDocs.map(doc => doc.document_type)));
 
@@ -179,7 +178,7 @@ export default function MissingDocumentsPage() {
     );
   }
 
-  const uploadedCount = 0; // TODO: Calculate from total vs pending
+  const uploadedCount = missingDocs.filter(d => d.status === 'uploaded').length;
   const totalCount = missingDocs.length;
 
   return (
