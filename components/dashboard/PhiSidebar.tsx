@@ -28,9 +28,9 @@ const navItems = [
   { href: "/dashboard/overview", label: "גרפים", icon: BarChart3 },
   { href: "/dashboard/goals", label: "יעדים", icon: Target },
   { href: "/dashboard/budget", label: "תקציב", icon: Wallet },
-  { href: "/transactions", label: "תנועות", icon: Receipt },
+  { href: "/dashboard/transactions", label: "תנועות", icon: Receipt },
   { href: "/dashboard/missing-documents", label: "מסמכים", icon: FileText },
-  { href: "/settings", label: "הגדרות", icon: Settings },
+  { href: "/dashboard/settings", label: "הגדרות", icon: Settings },
 ];
 
 export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProps) {

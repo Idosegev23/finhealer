@@ -205,7 +205,7 @@ export function DashboardNav() {
             {userMenuOpen && (
               <div className="absolute top-full mt-2 left-0 w-48 rounded-lg shadow-2xl border bg-white border-gray-200 z-[200]">
                 <Link
-                  href="/settings"
+                  href="/dashboard/settings"
                   onClick={() => setUserMenuOpen(false)}
                   className="flex items-center gap-3 px-4 py-3 transition-colors rounded-t-lg text-gray-700 hover:bg-gray-50"
                 >

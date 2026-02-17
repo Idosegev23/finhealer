@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Filter, Download, Plus, Edit2, Trash2, CheckCircle, Clock } from 'lucide-react';
+import { Search, CheckCircle, Clock } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -195,13 +195,12 @@ export default function TransactionsTable({
                 <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">סכום</th>
                 <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">מקור</th>
                 <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">סטטוס</th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">פעולות</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="text-[#555555]">
                       <p className="text-lg mb-2">אין תנועות להצגה</p>
                       <p className="text-sm">נסה לשנות את המסננים או הוסף תנועה חדשה</p>
@@ -273,22 +272,6 @@ export default function TransactionsTable({
                     <td className="px-6 py-4">
                       <StatusBadge status={tx.status} />
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="p-1.5 hover:bg-[#E3F2FD] rounded transition-colors"
-                          title="ערוך"
-                        >
-                          <Edit2 className="w-4 h-4 text-[#3A7BD5]" />
-                        </button>
-                        <button
-                          className="p-1.5 hover:bg-[#FFEBEE] rounded transition-colors"
-                          title="מחק"
-                        >
-                          <Trash2 className="w-4 h-4 text-[#D64541]" />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))
               )}
@@ -312,6 +295,9 @@ function SourceBadge({ source }: { source: string }) {
     manual: { text: 'ידני', color: 'bg-gray-100 text-gray-700' },
     wa_text: { text: 'WhatsApp', color: 'bg-green-100 text-green-700' },
     wa_image: { text: 'קבלה', color: 'bg-blue-100 text-blue-700' },
+    ocr: { text: 'סריקה', color: 'bg-purple-100 text-purple-700' },
+    bank_statement: { text: 'דוח בנק', color: 'bg-indigo-100 text-indigo-700' },
+    credit_statement: { text: 'כ. אשראי', color: 'bg-cyan-100 text-cyan-700' },
   };
 
   const { text, color } = labels[source] || labels.manual;

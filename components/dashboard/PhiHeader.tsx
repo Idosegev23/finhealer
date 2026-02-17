@@ -151,7 +151,7 @@ export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
                   <p className="text-xs text-phi-mint">משתמש פעיל</p>
                 </div>
                 <Link
-                  href="/settings"
+                  href="/dashboard/settings"
                   onClick={() => setProfileMenuOpen(false)}
                   className="flex items-center gap-3 w-full px-4 py-3 text-sm font-semibold transition-colors duration-150 rounded-md hover:bg-phi-gold/20"
                 >
