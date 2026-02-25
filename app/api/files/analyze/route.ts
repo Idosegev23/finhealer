@@ -6,9 +6,9 @@ import * as XLSX from 'xlsx';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 export async function POST(request: Request) {
   try {
@@ -119,7 +119,7 @@ ${text.substring(0, 5000)}
 
   try {
     // 🆕 GPT-5.2 with Responses API
-    const response = await openai.responses.create({
+    const response = await getOpenAI().responses.create({
       model: 'gpt-5.2-2025-12-11',
       input: `${systemPrompt}\n\n${userPrompt}`,
       reasoning: { effort: 'medium' },
@@ -177,7 +177,7 @@ async function analyzeImageWithAI(dataUrl: string, importType: string, source: '
 
   try {
     // 🆕 GPT-5.2 Vision with Responses API
-    const response = await openai.responses.create({
+    const response = await getOpenAI().responses.create({
       model: 'gpt-5.2-2025-12-11',
       input: [
         {

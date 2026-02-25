@@ -11,7 +11,7 @@ interface FloatingWhatsAppButtonProps {
 export default function FloatingWhatsAppButton({
   prefilledMessage = 'היי',
 }: FloatingWhatsAppButtonProps) {
-  const whatsappNumber = '972544266506'; // Bot number
+  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
   let whatsappUrl = `https://wa.me/${whatsappNumber}`;
 
   if (prefilledMessage) {

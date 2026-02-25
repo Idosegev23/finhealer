@@ -7,28 +7,18 @@
 
 import { createServiceClient } from '@/lib/supabase/server';
 import { detectPatterns, savePatterns, Pattern } from '@/lib/learning/pattern-detector';
-import OpenAI from 'openai';
-
-// Simple OpenAI client for AI tips
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { chatWithGeminiFlash } from '@/lib/ai/gemini-client';
 
 /**
- * Simple AI chat for tips generation
+ * AI chat for tips generation using Gemini Flash
  */
 async function generateAIResponse(prompt: string): Promise<string | null> {
   try {
-    // 🆕 GPT-5-nano with Responses API (fast chat)
-    const response = await openai.responses.create({
-      model: 'gpt-5-nano-2025-08-07',
-      input: `[System] אתה מאמן פיננסי בשם φ (פי). ענה בעברית, בקצרה ובחום.\n\n[User] ${prompt}`,
-      reasoning: { effort: 'none' },
-      max_output_tokens: 200,
-    });
-    return response.output_text || null;
+    const systemPrompt = 'אתה מאמן פיננסי בשם φ (פי). ענה בעברית, בקצרה ובחום.';
+    const response = await chatWithGeminiFlash(prompt, systemPrompt, '');
+    return response || null;
   } catch (error) {
-    console.error('[BehaviorAnalyzer] OpenAI error:', error);
+    console.error('[BehaviorAnalyzer] Gemini Flash error:', error);
     return null;
   }
 }
@@ -84,11 +74,11 @@ export async function analyzeBehavior(userId: string): Promise<BehaviorAnalysisR
   // 1. קבל תנועות 30 יום אחרונים
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('*')
+    .select('id, tx_date, amount, type, category, expense_category, vendor, is_recurring')
     .eq('user_id', userId)
-    .eq('status', 'approved')
-    .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
-    .order('date', { ascending: false });
+    .eq('status', 'confirmed')
+    .gte('tx_date', thirtyDaysAgo.toISOString().split('T')[0])
+    .order('tx_date', { ascending: false });
   
   if (!transactions || transactions.length < 5) {
     console.log(`[BehaviorAnalyzer] Not enough transactions (${transactions?.length || 0})`);
@@ -106,7 +96,7 @@ export async function analyzeBehavior(userId: string): Promise<BehaviorAnalysisR
   const totalSpent = Math.abs(expenses.reduce((sum, t) => sum + t.amount, 0));
   const totalIncome = income.reduce((sum, t) => sum + t.amount, 0);
   
-  const daysWithData = new Set(transactions.map(t => t.date)).size;
+  const daysWithData = new Set(transactions.map(t => t.tx_date)).size;
   const avgDailySpend = totalSpent / Math.max(daysWithData, 1);
   
   // 4. קטגוריות מובילות
@@ -203,12 +193,12 @@ function calculateSpendingTrend(transactions: any[]): 'increasing' | 'decreasing
   const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
   
   const thisWeek = transactions.filter(t => {
-    const date = new Date(t.date);
+    const date = new Date(t.tx_date);
     return date >= oneWeekAgo && t.amount < 0;
   });
-  
+
   const lastWeek = transactions.filter(t => {
-    const date = new Date(t.date);
+    const date = new Date(t.tx_date);
     return date >= twoWeeksAgo && date < oneWeekAgo && t.amount < 0;
   });
   
@@ -508,10 +498,10 @@ export async function getQuickAITip(userId: string): Promise<string | null> {
   // קבל נתונים בסיסיים
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('amount, expense_category, date')
+    .select('amount, expense_category, tx_date')
     .eq('user_id', userId)
     .eq('type', 'expense')
-    .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+    .gte('tx_date', thirtyDaysAgo.toISOString().split('T')[0]);
   
   if (!transactions || transactions.length < 5) {
     return 'עדיין אין מספיק נתונים לטיפ אישי - המשך לעדכן הוצאות! 📊';
@@ -565,11 +555,11 @@ export async function checkReadyForBudget(userId: string): Promise<{
   // 1. בדוק כמה זמן המשתמש בשלב behavior
   const { data: user } = await supabase
     .from('users')
-    .select('current_phase, phase_updated_at')
+    .select('phase, phase_updated_at')
     .eq('id', userId)
     .single();
-  
-  if (!user || user.current_phase !== 'behavior') {
+
+  if (!user || user.phase !== 'behavior') {
     return {
       ready: false,
       reason: 'המשתמש לא בשלב behavior',
@@ -591,7 +581,7 @@ export async function checkReadyForBudget(userId: string): Promise<{
     .from('transactions')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('status', 'approved');
+    .eq('status', 'confirmed');
   
   // 3. קריטריונים למעבר
   const MIN_DAYS = 30;
@@ -641,7 +631,7 @@ export async function transitionToBudget(userId: string): Promise<boolean> {
   await supabase
     .from('users')
     .update({
-      current_phase: 'budget',
+      phase: 'budget',
       phase_updated_at: new Date().toISOString(),
     })
     .eq('id', userId);

@@ -75,7 +75,7 @@ export async function monitorRecentIncomeChanges(): Promise<void> {
       .from('transactions')
       .select('user_id')
       .eq('type', 'income')
-      .gte('date', yesterday.toISOString())
+      .gte('tx_date', yesterday.toISOString().split('T')[0])
       .limit(100);
 
     if (!recentTransactions || recentTransactions.length === 0) {

@@ -232,8 +232,7 @@ export async function exportMonthlyReportToExcel(
 function getStatusHebrew(status: string): string {
   switch (status) {
     case 'confirmed': return 'מאושר';
-    case 'pending': return 'ממתין';
-    case 'proposed': return 'מוצע';
+    case 'pending': return 'ממתין לאישור';
     default: return status;
   }
 }

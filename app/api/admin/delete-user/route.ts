@@ -8,6 +8,12 @@ import { createClient } from '@supabase/supabase-js';
  */
 export async function POST(req: NextRequest) {
   try {
+    // Admin auth: require CRON_SECRET as Bearer token
+    const authHeader = req.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { email } = await req.json();
 
     if (!email) {

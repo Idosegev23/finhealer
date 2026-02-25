@@ -207,7 +207,7 @@ export async function DELETE(request: NextRequest) {
       payment_method: detail.payment_method,
       notes: detail.notes,
       source: 'ocr',
-      status: 'proposed', // מחזיר אותן למצב המתנה לאישור
+      status: 'pending',
       confidence_score: detail.confidence_score,
     }));
 

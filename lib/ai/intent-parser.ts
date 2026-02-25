@@ -1,5 +1,5 @@
 import { Intent, IntentType, Entity, EntityType } from "@/types/conversation";
-import { chatWithGPT5Fast } from "./gpt5-client";
+import { chatWithGeminiFlashMinimal } from "./gemini-client";
 
 /**
  * Parse user message to extract intent and entities
@@ -177,14 +177,9 @@ async function aiBasedParsing(
 }`;
 
   try {
-    const response = await chatWithGPT5Fast(
+    const response = await chatWithGeminiFlashMinimal(
       `נתח את ההודעה: "${message}"`,
-      systemPrompt,
-      {
-        userId: "",
-        userName: "",
-        phoneNumber: "",
-      }
+      systemPrompt
     );
 
     const parsed = JSON.parse(response);

@@ -19,11 +19,11 @@ export async function GET() {
 
     const { data: transactions, error } = await supabase
       .from("transactions")
-      .select("amount, date, type")
+      .select("amount, tx_date, type")
       .eq("user_id", user.id)
       .eq("type", "expense")
-      .gte("date", sixMonthsAgo.toISOString())
-      .order("date", { ascending: true });
+      .gte("tx_date", sixMonthsAgo.toISOString())
+      .order("tx_date", { ascending: true });
 
     if (error) {
       console.error("Error fetching transactions:", error);
@@ -36,7 +36,7 @@ export async function GET() {
     const monthlyData: { [key: string]: number } = {};
     
     (transactions || []).forEach((tx: any) => {
-      const date = new Date(tx.tx_date || tx.date);
+      const date = new Date(tx.tx_date);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       const monthName = date.toLocaleDateString('he-IL', { month: 'short', year: 'numeric' });
       

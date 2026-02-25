@@ -46,6 +46,7 @@ export const CATEGORIES: CategoryDef[] = [
   // --- בילויים ---
   { id: 'cat_109', name: 'חופשות', group: 'בילויים', type: 'variable', keywords: [] },
   { id: 'cat_110', name: 'בילויים ובידור', group: 'בילויים', type: 'variable', keywords: [] },
+  { id: 'cat_147', name: 'מסעדות', group: 'בילויים', type: 'variable', keywords: ['מסעדה', 'אוכל בחוץ', 'restaurant'] },
 
   // --- בריאות ---
   { id: 'cat_18', name: 'תרופות', group: 'בריאות', type: 'fixed', keywords: [] },

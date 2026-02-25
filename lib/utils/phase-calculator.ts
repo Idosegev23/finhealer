@@ -43,17 +43,17 @@ export async function getDaysOfData(userId: string): Promise<number> {
   // Get all confirmed transactions for the user
   const { data: transactions, error } = await supabase
     .from('transactions')
-    .select('date')
+    .select('tx_date')
     .eq('user_id', userId)
     .eq('status', 'confirmed')
-    .order('date', { ascending: false });
+    .order('tx_date', { ascending: false });
 
   if (error || !transactions || transactions.length === 0) {
     return 0;
   }
 
   // Count unique dates
-  const uniqueDates = new Set(transactions.map(t => t.date));
+  const uniqueDates = new Set(transactions.map(t => t.tx_date));
   
   // Calculate days between oldest and newest transaction
   // This represents the TIME SPAN of the data, not how long they've been using the app

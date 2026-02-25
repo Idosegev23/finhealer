@@ -20,12 +20,13 @@ export type GoalType =
   | 'family_savings'           // חיסכון משפחתי
   | 'other';                   // אחר
 
-export type BudgetSource = 
-  | 'income'      // הכנסה שוטפת
-  | 'bonus'       // בונוס
-  | 'sale'        // מכירת נכס
-  | 'inheritance' // ירושה
-  | 'other';      // אחר
+export type BudgetSource =
+  | 'income'           // הכנסה שוטפת
+  | 'bonus'            // בונוס
+  | 'sale'             // מכירת נכס
+  | 'inheritance'      // ירושה
+  | 'planned_savings'  // חיסכון מתוכנן
+  | 'other';           // אחר
 
 export type GoalStatus = 'active' | 'completed' | 'cancelled' | 'paused';
 

@@ -24,7 +24,16 @@
       "Bash(npm test:*)",
       "Bash(grep:*)",
       "Bash(head -5 grep -rln \"\\\\.gte\\\\\\(''date''\\\\|\\\\.lte\\\\\\(''date''\\\\|\\\\.order\\\\\\(''date''\\\\|\\\\.select.*date\" /Users/idosegev/Downloads/TriRoars/gadi/finhealer/app/api/)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__list_tables",
+      "Bash(echo:*)",
+      "Bash(for f in /Users/idosegev/Downloads/TriRoars/gadi/finhealer/supabase/migrations/*.sql)",
+      "Bash(do)",
+      "Bash(if grep -q \"CREATE TABLE.*transactions\\\\|CREATE TABLE public.transactions\" \"$f\")",
+      "Bash(then)",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

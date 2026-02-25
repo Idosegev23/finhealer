@@ -18,7 +18,7 @@ export default function WhatsAppActionButton({
   size = 'md',
   className = '',
 }: WhatsAppActionButtonProps) {
-  const whatsappNumber = '972544266506'; // Bot number
+  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
   let whatsappUrl = `https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`;
 
   if (prefilledMessage) {

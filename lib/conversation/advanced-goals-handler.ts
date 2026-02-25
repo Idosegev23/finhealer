@@ -6,6 +6,30 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import type { GoalType, BudgetSource, Goal } from '@/types/goals';
 
+/**
+ * עדכון classification_context בצורה בטוחה (merge, לא overwrite)
+ */
+async function mergeClassificationContext(
+  userId: string,
+  update: Record<string, any>
+): Promise<void> {
+  const supabase = createServiceClient();
+  const { data: user } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+
+  const existing = user?.classification_context || {};
+
+  await supabase
+    .from('users')
+    .update({
+      classification_context: { ...existing, ...update }
+    })
+    .eq('id', userId);
+}
+
 export interface AdvancedGoalContext {
   step: 'type' | 'name' | 'amount' | 'deadline' | 'priority' | 'budget_source' | 'child' | 'confirm';
   goalType?: GoalType;
@@ -127,14 +151,9 @@ export async function startAdvancedGoal(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        advancedGoalCreation: { step: 'type' as const }
-      }
-    })
-    .eq('id', userId);
+  await mergeClassificationContext(userId, {
+    advancedGoalCreation: { step: 'type' as const }
+  });
 
   await greenAPI.sendMessage({
     phoneNumber: phone,
@@ -255,37 +274,27 @@ export async function handleAdvancedGoalTypeSelection(
           `מה שם הילד?`,
       });
 
-      await supabase
-        .from('users')
-        .update({
-          classification_context: {
-            advancedGoalCreation: {
-              step: 'child',
-              goalType,
-              goalName,
-              goalGroup
-            }
-          }
-        })
-        .eq('id', userId);
+      await mergeClassificationContext(userId, {
+        advancedGoalCreation: {
+          step: 'child',
+          goalType,
+          goalName,
+          goalGroup
+        }
+      });
 
       return true;
     } else if (children.length === 1) {
       // ילד אחד - נשתמש בו אוטומטית
-      await supabase
-        .from('users')
-        .update({
-          classification_context: {
-            advancedGoalCreation: {
-              step: 'amount',
-              goalType,
-              goalName: `חיסכון ל${children[0].name}`,
-              goalGroup,
-              childId: children[0].id
-            }
-          }
-        })
-        .eq('id', userId);
+      await mergeClassificationContext(userId, {
+        advancedGoalCreation: {
+          step: 'amount',
+          goalType,
+          goalName: `חיסכון ל${children[0].name}`,
+          goalGroup,
+          childId: children[0].id
+        }
+      });
 
       await greenAPI.sendMessage({
         phoneNumber: phone,
@@ -304,39 +313,29 @@ export async function handleAdvancedGoalTypeSelection(
           `לאיזה ילד?\n\n${childrenList}\n\nכתוב מספר או שם:`,
       });
 
-      await supabase
-        .from('users')
-        .update({
-          classification_context: {
-            advancedGoalCreation: {
-              step: 'child',
-              goalType,
-              goalName,
-              goalGroup,
-              children: children.map(c => ({ id: c.id, name: c.name }))
-            }
-          }
-        })
-        .eq('id', userId);
+      await mergeClassificationContext(userId, {
+        advancedGoalCreation: {
+          step: 'child',
+          goalType,
+          goalName,
+          goalGroup,
+          children: children.map(c => ({ id: c.id, name: c.name }))
+        }
+      });
 
       return true;
     }
   }
 
   // המשך לשלב הבא (סכום)
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        advancedGoalCreation: {
-          step: 'amount',
-          goalType,
-          goalName,
-          goalGroup
-        }
-      }
-    })
-    .eq('id', userId);
+  await mergeClassificationContext(userId, {
+    advancedGoalCreation: {
+      step: 'amount',
+      goalType,
+      goalName,
+      goalGroup
+    }
+  });
 
   await greenAPI.sendMessage({
     phoneNumber: phone,
@@ -385,19 +384,14 @@ export async function handleChildSelection(
   }
 
   // עדכן context עם הילד שנבחר
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        advancedGoalCreation: {
-          ...context,
-          step: 'amount',
-          childId: selectedChild.id,
-          goalName: `חיסכון ל${selectedChild.name}`
-        }
-      }
-    })
-    .eq('id', userId);
+  await mergeClassificationContext(userId, {
+    advancedGoalCreation: {
+      ...context,
+      step: 'amount',
+      childId: selectedChild.id,
+      goalName: `חיסכון ל${selectedChild.name}`
+    }
+  });
 
   await greenAPI.sendMessage({
     phoneNumber: phone,
@@ -419,17 +413,12 @@ export async function askBudgetSource(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        advancedGoalCreation: {
-          ...context,
-          step: 'budget_source'
-        }
-      }
-    })
-    .eq('id', userId);
+  await mergeClassificationContext(userId, {
+    advancedGoalCreation: {
+      ...context,
+      step: 'budget_source'
+    }
+  });
 
   await greenAPI.sendMessage({
     phoneNumber: phone,
@@ -439,7 +428,8 @@ export async function askBudgetSource(
       `2️⃣ בונוס/פרמיה\n` +
       `3️⃣ מכירת נכס\n` +
       `4️⃣ ירושה\n` +
-      `5️⃣ אחר\n\n` +
+      `5️⃣ חיסכון מתוכנן\n` +
+      `6️⃣ אחר\n\n` +
       `כתוב מספר:`,
   });
 }
@@ -471,31 +461,29 @@ export async function handleBudgetSourceSelection(
   } else if (msg === '4' || msg.toLowerCase().includes('ירושה')) {
     budgetSource = 'inheritance';
     sourceName = 'ירושה';
-  } else if (msg === '5' || msg.toLowerCase().includes('אחר')) {
+  } else if (msg === '5' || msg.toLowerCase().includes('חיסכון')) {
+    budgetSource = 'planned_savings';
+    sourceName = 'חיסכון מתוכנן';
+  } else if (msg === '6' || msg.toLowerCase().includes('אחר')) {
     budgetSource = 'other';
     sourceName = 'אחר';
   } else {
     await greenAPI.sendMessage({
       phoneNumber: phone,
-      message: `❌ לא הבנתי. כתוב מספר 1-5.`,
+      message: `❌ לא הבנתי. כתוב מספר 1-6.`,
     });
     return false;
   }
 
   // עדכן context ועבור לאישור סופי
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        advancedGoalCreation: {
-          ...context,
-          step: 'confirm',
-          budgetSource,
-          fundingNotes: sourceName
-        }
-      }
-    })
-    .eq('id', userId);
+  await mergeClassificationContext(userId, {
+    advancedGoalCreation: {
+      ...context,
+      step: 'confirm',
+      budgetSource,
+      fundingNotes: sourceName
+    }
+  });
 
   await confirmAndCreateGoal(userId, phone, { ...context, budgetSource, fundingNotes: sourceName });
 
@@ -584,10 +572,21 @@ export async function createAdvancedGoal(
     return;
   }
 
-  // נקה context
+  // נקה רק את advancedGoalCreation מה-context
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+
+  const existingCtx = existingUser?.classification_context || {};
+  const { advancedGoalCreation, ...restCtx } = existingCtx as any;
+
   await supabase
     .from('users')
-    .update({ classification_context: {} })
+    .update({
+      classification_context: Object.keys(restCtx).length > 0 ? restCtx : null
+    })
     .eq('id', userId);
 
   const emoji = GOAL_TYPES_EXTENDED[context.goalType!]?.emoji || '🎯';

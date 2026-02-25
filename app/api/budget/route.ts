@@ -279,7 +279,7 @@ export async function GET(request: Request) {
       goals: goals || [],
       missingData,
       profileCompleteness,
-      currentPhase: userData?.current_phase || userData?.onboarding_state || 'unknown'
+      currentPhase: userData?.phase || 'unknown'
     });
 
   } catch (error) {

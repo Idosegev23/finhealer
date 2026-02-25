@@ -490,7 +490,7 @@ export default function GoalsPage() {
                 const priorityColor = goal.priority <= 3 ? 'text-red-600' : goal.priority <= 6 ? 'text-yellow-600' : 'text-green-600';
                 
                 return (
-                  <Card key={goal.id} className={isSimulationActive && allocation.monthly_allocation !== allocationResult?.allocations[index]?.monthly_allocation ? 'border-phi-gold border-2' : ''}>
+                  <Card key={goal.id} className={isSimulationActive && allocation.monthly_allocation !== allocationResult?.allocations.find((a: any) => a.goal_id === allocation.goal_id)?.monthly_allocation ? 'border-phi-gold border-2' : ''}>
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">

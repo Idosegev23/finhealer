@@ -81,8 +81,8 @@ export async function POST(request: NextRequest) {
         phone: phone === '0000000000' ? null : cleanPhone, // null אם זמני
         wa_opt_in: waOptIn !== undefined ? waOptIn : true,
         subscription_status: 'active',
-        current_phase: 'onboarding',
-        onboarding_state: hasNameFromOAuth ? 'waiting_for_document' : 'waiting_for_name', // 🆕
+        phase: 'data_collection',
+        onboarding_state: hasNameFromOAuth ? 'waiting_for_document' : 'waiting_for_name',
         created_at: existingUser ? undefined : new Date().toISOString(),
       }, {
         onConflict: 'id',

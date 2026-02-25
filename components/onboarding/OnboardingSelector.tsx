@@ -265,7 +265,7 @@ export function OnboardingSelector() {
 
   // WhatsApp Redirect Screen
   if (showWhatsAppRedirect) {
-    const botPhoneNumber = '972544266506';
+    const botPhoneNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
     const waLink = `https://wa.me/${botPhoneNumber}?text=היי`;
     const displayPhone = formattedPhone.startsWith('972') 
       ? `0${formattedPhone.slice(3)}` 

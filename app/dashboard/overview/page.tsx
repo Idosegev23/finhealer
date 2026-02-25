@@ -55,7 +55,7 @@ export default async function OverviewPage() {
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
-      .in('status', ['confirmed', 'proposed'])
+      .in('status', ['confirmed', 'pending'])
       .gte('tx_date', firstOfMonth)
       .lte('tx_date', today)
       .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'),

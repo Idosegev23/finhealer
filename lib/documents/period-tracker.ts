@@ -409,10 +409,10 @@ export async function checkForDuplicateTransactions(
   // חיפוש תנועות קיימות באותה תקופה
   const { data: existingTransactions } = await supabase
     .from('transactions')
-    .select('id, date, amount, vendor, original_description')
+    .select('id, tx_date, amount, vendor, original_description')
     .eq('user_id', userId)
-    .gte('date', periodStart)
-    .lte('date', periodEnd)
+    .gte('tx_date', periodStart)
+    .lte('tx_date', periodEnd)
     .limit(500);
   
   if (!existingTransactions || existingTransactions.length === 0) {
@@ -427,7 +427,7 @@ export async function checkForDuplicateTransactions(
   // יצירת hashes לתנועות קיימות
   const existingHashes = existingTransactions.map(tx => 
     generateTransactionHash({
-      date: tx.date,
+      date: tx.tx_date,
       amount: tx.amount,
       vendor: tx.vendor,
       description: tx.original_description,

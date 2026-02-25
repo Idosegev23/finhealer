@@ -55,7 +55,7 @@ export function BehaviorDashboard() {
       // קבל פרטי משתמש
       const { data: userData } = await supabase
         .from('users')
-        .select('phase_updated_at, current_phase')
+        .select('phase_updated_at, phase')
         .eq('id', user.id)
         .single();
 
@@ -69,9 +69,9 @@ export function BehaviorDashboard() {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const { data: transactions } = await supabase
         .from('transactions')
-        .select('amount, expense_category, date, type')
+        .select('amount, expense_category, tx_date, type')
         .eq('user_id', user.id)
-        .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+        .gte('tx_date', thirtyDaysAgo.toISOString().split('T')[0]);
 
       const expenses = (transactions || []).filter(t => t.type === 'expense' || t.amount < 0);
       const totalSpent = Math.abs(expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0));
@@ -98,11 +98,11 @@ export function BehaviorDashboard() {
       const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
       
       const thisWeekExpenses = expenses
-        .filter(t => new Date(t.date) >= oneWeekAgo)
+        .filter(t => new Date(t.tx_date) >= oneWeekAgo)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      
+
       const lastWeekExpenses = expenses
-        .filter(t => new Date(t.date) >= twoWeeksAgo && new Date(t.date) < oneWeekAgo)
+        .filter(t => new Date(t.tx_date) >= twoWeeksAgo && new Date(t.tx_date) < oneWeekAgo)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
       
       let spendingTrend: 'increasing' | 'decreasing' | 'stable' = 'stable';

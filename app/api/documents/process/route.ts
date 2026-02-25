@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import OpenAI from 'openai';
 import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { matchCreditTransactions } from '@/lib/reconciliation/credit-matcher';
@@ -31,12 +30,6 @@ function cleanJsonString(jsonStr: string): string {
 export const runtime = 'nodejs'; // Force Node.js runtime
 export const maxDuration = 600; // 10 minutes for large documents with GPT-5-nano
 export const dynamic = 'force-dynamic';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  timeout: 480000, // 8 minutes timeout for GPT-5.1 (which can take 3-4 min for large PDFs)
-  maxRetries: 0, // No retries - let it complete on first try
-});
 
 /**
  * Vercel Background Function לעיבוד מסמכים
@@ -527,17 +520,14 @@ async function analyzeLargePDF(buffer: Buffer, fileType: string, fileName: strin
       const chunkPrompt = getPromptForDocumentType(fileType, chunks[i], expenseCategories);
 
       const startChunk = Date.now();
-      // 🆕 GPT-5.2 with Responses API
-      const response = await openai.responses.create({
-        model: 'gpt-5.2-2025-12-11',
-        input: chunkPrompt,
-        reasoning: { effort: 'medium' },
-      });
+      // 🆕 Gemini 3.1 Pro for chunk analysis
+      const { chatWithGeminiProDeep } = await import('@/lib/ai/gemini-client');
+      const chunkResponse = await chatWithGeminiProDeep(chunkPrompt, '');
 
       const chunkDuration = ((Date.now() - startChunk) / 1000).toFixed(1);
       console.log(`✅ Chunk ${i + 1} analyzed in ${chunkDuration}s`);
 
-      const content = response.output_text || '{}';
+      const content = chunkResponse || '{}';
       try {
         const chunkResult = JSON.parse(cleanJsonString(content));
         if (chunkResult.transactions) {
@@ -697,30 +687,6 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       return await analyzeLargePDF(buffer, fileType, fileName);
     }
 
-    // Upload PDF directly to OpenAI Files API for analysis
-    // Note: We write to temp file because Files API needs a file stream
-    const tempFilePath = `/tmp/${Date.now()}-${fileName}`;
-    await require('fs').promises.writeFile(tempFilePath, buffer);
-
-    console.log(`📤 Uploading PDF to OpenAI Files API (${fileSizeMB.toFixed(2)} MB)...`);
-    
-    let fileUpload: any;
-    try {
-      fileUpload = await openai.files.create({
-        file: require('fs').createReadStream(tempFilePath),
-        purpose: 'assistants'
-      });
-      console.log(`✅ PDF uploaded to OpenAI Files API: ${fileUpload.id}`);
-    } catch (uploadError: any) {
-      console.error(`❌ Files API upload failed: ${uploadError.message}`);
-      // Clean up temp file
-      await require('fs').promises.unlink(tempFilePath).catch(() => {});
-      throw new Error(`Failed to upload PDF to OpenAI Files API: ${uploadError.message}. Please try again.`);
-    }
-    
-    // Clean up temp file
-    await require('fs').promises.unlink(tempFilePath);
-
     // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
     if (fileType === 'bank_statement' || fileType === 'credit_statement') {
@@ -734,7 +700,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
         .select('name, expense_type, category_group')
         .eq('is_active', true)
         .order('expense_type, category_group, display_order, name');
-      
+
       expenseCategories = categories || [];
       console.log(`📋 Loaded ${expenseCategories.length} expense categories from database`);
     }
@@ -742,50 +708,24 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Get appropriate prompt for document type (direct PDF analysis - no text)
     const prompt = getPromptForDocumentType(fileType, null, expenseCategories);
 
-    // Analyze with AI using direct PDF upload (GPT-5.1 Responses API or GPT-4o Chat Completions)
-    console.log(`🤖 Analyzing PDF directly with AI (trying GPT-5.1 first, then GPT-4o)...`);
-    console.log(`📊 Prompt length: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
+    // 🆕 Gemini 3.1 Pro - Direct PDF analysis via inline base64
+    console.log(`🤖 Analyzing PDF with Gemini 3.1 Pro (${fileSizeMB.toFixed(2)} MB)...`);
+    console.log(`📊 Prompt length: ${prompt.length} chars`);
 
     const startAI = Date.now();
 
-    // Try GPT-5.1 first with Responses API, then fallback to GPT-4o with Chat Completions
-    let response: any;
     let usedModel = '';
     let content = '';
 
-    // 🆕 GPT-5.2 with Responses API - Direct PDF file analysis
     try {
-      console.log(`🔄 Trying GPT-5.2 with Responses API (direct PDF file)...`);
-      
-      const gpt52Response = await openai.responses.create({
-        model: 'gpt-5.2-2025-12-11',
-        input: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'input_file',
-                file_id: fileUpload.id
-              },
-              {
-                type: 'input_text',
-                text: prompt
-              }
-            ]
-          }
-        ],
-        reasoning: { effort: 'medium' },
-        max_output_tokens: 32000
-      });
-      usedModel = 'gpt-5.2';
-      content = gpt52Response.output_text || '{}';
-      console.log(`✅ GPT-5.2 succeeded`);
-    } catch (gpt52Error: any) {
-      console.log(`❌ GPT-5.2 failed: ${gpt52Error.message}`);
-      console.error('GPT-5.2 error details:', gpt52Error);
-      
-      // Re-throw - no fallback to older models
-      throw new Error(`GPT-5.2 failed: ${gpt52Error.message}`);
+      const base64Pdf = buffer.toString('base64');
+      const { chatWithGeminiProVision } = await import('@/lib/ai/gemini-client');
+      content = await chatWithGeminiProVision(base64Pdf, 'application/pdf', prompt);
+      usedModel = 'gemini-3.1-pro';
+      console.log(`✅ Gemini 3.1 Pro succeeded`);
+    } catch (geminiError: any) {
+      console.log(`❌ Gemini 3.1 Pro failed: ${geminiError.message}`);
+      throw new Error(`Gemini 3.1 Pro failed: ${geminiError.message}`);
     }
 
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
@@ -839,32 +779,18 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
 async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType: string) {
   try {
-    console.log(`🖼️  Analyzing image with GPT-5.2 Vision (${documentType})...`);
-    
+    console.log(`🖼️  Analyzing image with Gemini 3.1 Pro Vision (${documentType})...`);
+
     const base64Image = buffer.toString('base64');
-    const dataUrl = `data:${mimeType};base64,${base64Image}`;
-    
+
     // Get appropriate prompt (images are usually credit/bank/receipt)
     const prompt = getPromptForDocumentType(documentType, null);
-    
-    // 🆕 GPT-5.2 with Responses API
-    const response = await openai.responses.create({
-      model: 'gpt-5.2-2025-12-11',
-      input: [
-        {
-          role: 'user',
-          content: [
-            { type: 'input_text', text: prompt },
-            { type: 'input_image', image_url: dataUrl, detail: 'high' },
-          ]
-        }
-      ],
-      reasoning: { effort: 'medium' },
-    });
 
-    console.log(`✅ GPT-5.2 Vision analysis complete`);
-    
-    const content = response.output_text || '{}';
+    // 🆕 Gemini 3.1 Pro Vision
+    const { chatWithGeminiProVision } = await import('@/lib/ai/gemini-client');
+    const content = await chatWithGeminiProVision(base64Image, mimeType, prompt);
+
+    console.log(`✅ Gemini 3.1 Pro Vision analysis complete`);
     
     // Parse JSON with cleanup
     try {
@@ -967,23 +893,15 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
     // 4. Get appropriate prompt
     const prompt = getPromptForDocumentType(documentType, excelText);
     
-    // 5. Send to GPT-5-mini using Responses API (faster, smarter)
-    console.log(`🤖 Analyzing with GPT-5-mini (Responses API)...`);
-    
-    // Combine system message with user prompt for Responses API
-    const fullPrompt = `אתה מומחה בניתוח מסמכים פיננסיים. החזר תמיד JSON תקין בלבד, ללא טקסט נוסף.\n\n${prompt}`;
-    
-    // 🆕 GPT-5.2 with Responses API
-    const response = await openai.responses.create({
-      model: 'gpt-5.2-2025-12-11',
-      input: fullPrompt,
-      reasoning: { effort: 'medium' },
-      max_output_tokens: 16000,
-    });
+    // 5. 🆕 Gemini 3.1 Pro for Excel analysis
+    console.log(`🤖 Analyzing with Gemini 3.1 Pro...`);
 
-    console.log(`✅ GPT-5-mini analysis complete`);
-    
-    const content = response.output_text || '{}';
+    const fullPrompt = `אתה מומחה בניתוח מסמכים פיננסיים. החזר תמיד JSON תקין בלבד, ללא טקסט נוסף.\n\n${prompt}`;
+
+    const { chatWithGeminiProDeep } = await import('@/lib/ai/gemini-client');
+    const content = await chatWithGeminiProDeep(fullPrompt, '');
+
+    console.log(`✅ Gemini 3.1 Pro analysis complete`);
     
     // Parse JSON response with improved error handling
     try {
@@ -1184,7 +1102,7 @@ async function saveBankTransactions(supabase: any, result: any, userId: string, 
         date: parsedDate,
         tx_date: parsedDate,
         source: 'ocr',
-        status: 'proposed',
+        status: 'pending',
         notes: tx.notes || tx.description || null,
         payment_method: paymentMethod,
         expense_type: tx.expense_type || 'variable',
@@ -1278,8 +1196,8 @@ async function detectAndSaveMissingDocuments(
         const searchDate = doc.charge_date || doc.salary_date || doc.payment_date;
         const searchAmount = doc.charge_amount || doc.salary_amount || doc.payment_amount;
         
-        const relatedTx = insertedTransactions.find((tx: any) => 
-          tx.date === searchDate && Math.abs(tx.amount - searchAmount) < 1
+        const relatedTx = insertedTransactions.find((tx: any) =>
+          tx.tx_date === searchDate && Math.abs(tx.amount - searchAmount) < 1
         );
         
         if (relatedTx) {
@@ -1288,7 +1206,7 @@ async function detectAndSaveMissingDocuments(
             .from('transactions')
             .select('id')
             .eq('user_id', userId)
-            .eq('date', searchDate)
+            .eq('tx_date', searchDate)
             .eq('amount', searchAmount)
             .limit(1)
             .single();
@@ -1798,7 +1716,7 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
         expense_type: detail.expense_type,
         payment_method: 'credit_card',
         source: 'ocr',
-        status: 'proposed', // ✅ תמיד proposed כדי להופיע ברשימה לאישור
+        status: 'pending', // ✅ תמיד proposed כדי להופיע ברשימה לאישור
         document_id: documentId,
         // Hierarchy fields
         is_source_transaction: false, // Credit details are NOT source
@@ -1969,7 +1887,7 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         date: parsedDate,
         tx_date: parsedDate,
         source: 'ocr',
-        status: 'proposed', // 🔥 תמיד proposed - המשתמש חייב לאשר ידנית!
+        status: 'pending', // 🔥 תמיד proposed - המשתמש חייב לאשר ידנית!
         needs_review: true,
         notes: tx.installment 
           ? `${tx.notes || tx.description || ''} ${tx.installment}`.trim() 
@@ -2017,14 +1935,14 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
             // Category is valid - use expense_type from database
             tx.expense_type = categoryMap.get(tx.expense_category);
             // 🔥 גם אם יש קטגוריה - תמיד proposed לאישור משתמש!
-            tx.status = 'proposed';
+            tx.status = 'pending';
             tx.needs_review = true;
           } else {
             // Category not found - mark as pending
             console.warn(`⚠️  Category "${tx.expense_category}" not found - marking as pending`);
             tx.expense_category = null;
             tx.expense_type = null;
-            tx.status = 'proposed';
+            tx.status = 'pending';
             tx.needs_review = true;
           }
         }
@@ -2682,7 +2600,7 @@ async function savePayslips(supabase: any, result: any, userId: string, document
           date: payDate || monthYear,
           tx_date: payDate || monthYear,
           source: 'ocr',
-          status: 'proposed',
+          status: 'pending',
           notes: `תלוש שכר ${monthYear}`,
           payment_method: 'bank_transfer',
           confidence_score: 0.9,

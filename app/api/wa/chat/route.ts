@@ -1,12 +1,8 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import OpenAI from 'openai';
+import { chatWithGeminiFlash } from '@/lib/ai/gemini-client';
 import { SYSTEM_PROMPT, buildContextMessage, parseExpenseFromAI, type UserContext } from '@/lib/ai/system-prompt';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 /**
  * POST /api/wa/chat
@@ -49,21 +45,17 @@ export async function POST(request: NextRequest) {
     // היסטוריה בסדר הפוך (ישן → חדש)
     const history = (recentMessages || []).reverse();
 
-    // 3. בניית input ל-GPT-5-nano (Responses API)
-    const systemContext = `${SYSTEM_PROMPT}\n\nהנה המידע על המשתמש:\n\n${buildContextMessage(context)}`;
-    const historyText = history.map(msg => `${msg.role}: ${msg.content}`).join('\n');
-    const fullInput = `${systemContext}\n\n${historyText}\n\nuser: ${message}`;
+    // 3. Build conversation history for Gemini
+    const geminiHistory = history.map((msg: any) => ({
+      role: msg.role === 'user' ? 'user' as const : 'model' as const,
+      content: msg.content,
+    }));
 
-    // 4. 🆕 קריאה ל-GPT-5-nano with Responses API (fast chat)
-    const chatResponse = await openai.responses.create({
-      model: 'gpt-5-nano-2025-08-07',
-      input: fullInput,
-      reasoning: { effort: 'none' }, // Fast chat - no reasoning
-      max_output_tokens: 1000,
-    });
-
-    const aiResponse = chatResponse.output_text || 'סליחה, לא הבנתי. תנסה שוב?';
-    const tokensUsed = chatResponse.usage?.total_tokens || 0;
+    // 4. 🆕 Gemini 3 Flash for fast chat
+    const userContext = buildContextMessage(context);
+    const aiResponse = await chatWithGeminiFlash(message, SYSTEM_PROMPT, userContext, geminiHistory)
+      || 'סליחה, לא הבנתי. תנסה שוב?';
+    const tokensUsed = 0;
 
     // 5. זיהוי הוצאה (אם יש)
     const detectedExpense = parseExpenseFromAI(aiResponse);
@@ -82,7 +74,7 @@ export async function POST(request: NextRequest) {
       role: 'assistant',
       content: aiResponse,
       tokens_used: tokensUsed,
-      model: 'gpt-5-nano',
+      model: 'gemini-3-flash',
       detected_expense: detectedExpense,
       expense_created: false,
     });
@@ -172,7 +164,7 @@ async function fetchUserContext(supabase: any, userId: string): Promise<UserCont
   // 4. 5 תנועות אחרונות
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('date, vendor, amount, category')
+    .select('tx_date, vendor, amount, category')
     .eq('user_id', userId)
     .eq('type', 'expense')
     .order('tx_date', { ascending: false })
@@ -180,7 +172,7 @@ async function fetchUserContext(supabase: any, userId: string): Promise<UserCont
 
   if (transactions && transactions.length > 0) {
     context.recentTransactions = transactions.map((tx: any) => ({
-      date: new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL'),
+      date: new Date(tx.tx_date).toLocaleDateString('he-IL'),
       description: tx.vendor || tx.category,
       amount: tx.amount,
       category: tx.category,

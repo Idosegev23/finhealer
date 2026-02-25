@@ -28,7 +28,7 @@ interface Transaction {
   category_id?: string;
   tx_date: string;
   type: 'income' | 'expense';
-  status: 'pending' | 'confirmed' | 'proposed';
+  status: 'pending' | 'confirmed';
   source?: string;
   created_at: string;
 }
@@ -132,7 +132,7 @@ export function useRealtimePendingTransactions(userId: string | null) {
   const { data, isLoading, error, refetch, lastUpdate } = useRealtimeTransactions(userId);
   
   const pendingTransactions = data.filter(tx => 
-    tx.status === 'pending' || tx.status === 'proposed'
+    tx.status === 'pending'
   );
   
   const confirmedTransactions = data.filter(tx => 
@@ -299,7 +299,7 @@ export function useRealtimeDashboardStats(userId: string | null) {
 
   // Calculate stats from transactions
   for (const tx of transactions) {
-    if (tx.status === 'pending' || tx.status === 'proposed') {
+    if (tx.status === 'pending') {
       stats.pendingCount++;
     } else if (tx.status === 'confirmed') {
       stats.confirmedCount++;

@@ -97,7 +97,7 @@ export async function POST(
     if (status === 'offer_sent' && updated) {
       const { data: userData } = await supabase
         .from('users')
-        .select('phone, full_name')
+        .select('phone, name, full_name')
         .eq('id', updated.user_id)
         .single();
       

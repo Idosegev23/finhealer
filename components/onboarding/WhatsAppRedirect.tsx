@@ -12,7 +12,7 @@ interface WhatsAppRedirectProps {
 
 export function WhatsAppRedirect({ phone, userName }: WhatsAppRedirectProps) {
   // מספר הWhatsApp של הבוט (Phi)
-  const botPhoneNumber = '972544266506';
+  const botPhoneNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
   const waLink = `https://wa.me/${botPhoneNumber}?text=היי`;
   
   // פורמט מספר הטלפון להצגה

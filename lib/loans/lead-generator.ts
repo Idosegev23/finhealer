@@ -33,7 +33,7 @@ export async function buildLeadData(requestId: string): Promise<ConsolidationLea
   // שלוף את המשתמש
   const { data: user, error: userError } = await supabase
     .from('users')
-    .select('full_name, email, phone, monthly_income')
+    .select('name, full_name, email, phone, monthly_income')
     .eq('id', request.user_id)
     .single();
   
@@ -64,14 +64,14 @@ export async function buildLeadData(requestId: string): Promise<ConsolidationLea
     .eq('user_id', request.user_id)
     .eq('type', 'expense')
     .eq('status', 'confirmed')
-    .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+    .gte('tx_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   
   const monthlyExpenses = expenses?.reduce((sum, t) => sum + t.amount, 0) || 0;
   
   // בנה את הליד
   const leadData: ConsolidationLeadData = {
     user_id: request.user_id,
-    user_name: user.full_name || 'לא צוין',
+    user_name: user.name || user.full_name || 'לא צוין',
     user_email: user.email || '',
     user_phone: user.phone || '',
     

@@ -26,8 +26,8 @@ export async function checkNegativeCashFlow(): Promise<void> {
     // שלוף משתמשים פעילים
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, phone, full_name')
-      .in('onboarding_state', ['monitoring', 'behavior', 'goals', 'budget'])
+      .select('id, phone, name, full_name')
+      .in('phase', ['monitoring', 'behavior', 'goals', 'budget'])
       .not('phone', 'is', null);
     
     if (usersError || !users) {
@@ -191,13 +191,15 @@ function buildAlertMessage(
   // CTA
   if (severity === 'critical') {
     message += `🔴 *דחוף!* עדכן את התקציב או הגדל הכנסה.\n`;
+    message += `💼 רוצה שגדי יבדוק את המצב? כתוב *"ייעוץ"*\n`;
   } else if (severity === 'warning') {
     message += `⚠️ *פעל עכשיו* למניעת גירעון.\n`;
+    message += `💼 רוצה עזרה מקצועית? כתוב *"ייעוץ"*\n`;
   } else {
     message += `💪 *תכנן מראש* כדי למנוע בעיות.\n`;
   }
-  
-  message += `\nכתוב *״תזרים״* לתחזית מלאה 📊`;
+
+  message += `\nכתוב *"תזרים"* לתחזית מלאה 📊`;
   
   return message;
 }
@@ -211,7 +213,7 @@ export async function checkUserCashFlow(userId: string): Promise<boolean> {
   // שלוף פרטי משתמש
   const { data: user, error } = await supabase
     .from('users')
-    .select('phone, full_name')
+    .select('phone, name, full_name')
     .eq('id', userId)
     .single();
   

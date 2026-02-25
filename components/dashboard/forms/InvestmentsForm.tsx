@@ -25,15 +25,15 @@ interface InvestmentAmounts {
 
 export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
   const router = useRouter();
-  const [hasInvestments, setHasInvestments] = useState<boolean | null>(null);
-  const [amounts, setAmounts] = useState<InvestmentAmounts>({
-    stocks_israel: 0,
-    stocks_foreign: 0,
-    bonds: 0,
-    mutual_funds: 0,
-    crypto: 0,
-    real_estate: 0,
-    other: 0,
+  const existingTotal = initialData?.investments || 0;
+  const [hasInvestments, setHasInvestments] = useState<boolean | null>(
+    existingTotal > 0 ? true : null
+  );
+  const [amounts, setAmounts] = useState<InvestmentAmounts>(() => {
+    if (initialData?.investments_breakdown) {
+      return { stocks_israel: 0, stocks_foreign: 0, bonds: 0, mutual_funds: 0, crypto: 0, real_estate: 0, other: 0, ...initialData.investments_breakdown };
+    }
+    return { stocks_israel: 0, stocks_foreign: 0, bonds: 0, mutual_funds: 0, crypto: 0, real_estate: 0, other: 0 };
   });
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -89,6 +89,21 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
 
   return (
     <div className="space-y-6">
+      {/* Existing investments summary */}
+      {existingTotal > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow-lg p-6 border-2 border-green-200"
+        >
+          <h3 className="text-lg font-bold text-[#1E2A3B] mb-2">סה&quot;כ השקעות רשומות</h3>
+          <p className="text-3xl font-bold text-[#7ED957]">
+            {existingTotal.toLocaleString('he-IL')} ₪
+          </p>
+          <p className="text-sm text-gray-500 mt-2">עדכן למטה אם יש שינויים</p>
+        </motion.div>
+      )}
+
       {/* Main Question */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}

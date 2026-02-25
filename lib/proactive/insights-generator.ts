@@ -271,14 +271,14 @@ async function detectSpendingPatterns(userId: string): Promise<Insight[]> {
   // Check for Friday night spending pattern
   const { data: fridaySpending } = await supabase
     .from("transactions")
-    .select("amount, date")
+    .select("amount, tx_date")
     .eq("user_id", userId)
     .eq("type", "expense")
-    .gte("date", new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString());
+    .gte("tx_date", new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString());
 
   if (fridaySpending) {
     const fridays = fridaySpending.filter((tx) => {
-      const date = new Date(tx.date);
+      const date = new Date(tx.tx_date);
       return date.getDay() === 5; // Friday
     });
 
@@ -318,10 +318,10 @@ async function detectAnomalies(userId: string): Promise<Insight[]> {
 
   const { data: transactions } = await supabase
     .from("transactions")
-    .select("amount, vendor, date")
+    .select("amount, vendor, tx_date")
     .eq("user_id", userId)
     .eq("type", "expense")
-    .gte("date", ninetyDaysAgo.toISOString());
+    .gte("tx_date", ninetyDaysAgo.toISOString());
 
   if (!transactions || transactions.length === 0) return insights;
 
@@ -334,7 +334,7 @@ async function detectAnomalies(userId: string): Promise<Insight[]> {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   const recentTransactions = transactions.filter(
-    (tx) => new Date(tx.date) >= sevenDaysAgo
+    (tx) => new Date(tx.tx_date) >= sevenDaysAgo
   );
 
   const recentSpending = recentTransactions.reduce(

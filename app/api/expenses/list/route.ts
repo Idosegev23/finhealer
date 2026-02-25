@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     // בניית query (parent transactions + cash expenses)
     let query = supabase
       .from('transactions')
-      .select('*', { count: 'exact' })
+      .select('id, tx_date, amount, vendor, category, expense_category, expense_type, notes, is_recurring, status, payment_method, expense_frequency, has_details, is_cash_expense', { count: 'exact' })
       .eq('user_id', user.id)
       .eq('type', 'expense')
       .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן

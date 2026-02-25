@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // Get all active recurring patterns
     const { data: patterns } = await supabase
       .from('recurring_patterns')
-      .select('*')
+      .select('id, user_id, vendor, amount, frequency, next_expected, day_tolerance, status, occurrence_count, missed_count')
       .eq('status', 'active');
 
     if (!patterns || patterns.length === 0) {
@@ -35,13 +35,33 @@ export async function GET(request: NextRequest) {
     let updated = 0;
     const today = new Date();
 
-    for (const pattern of patterns) {
-      const nextExpected = new Date(pattern.next_expected);
-      
-      // If next_expected is in the past, calculate new next_expected
-      if (nextExpected <= today) {
+    // 🚀 Batch load: find the widest tolerance window across all patterns
+    // and load all potentially matching transactions in one query
+    const pastPatterns = patterns.filter(p => new Date(p.next_expected) <= today);
+
+    if (pastPatterns.length > 0) {
+      // Find the widest date range needed
+      const maxTolerance = Math.max(...pastPatterns.map(p => p.day_tolerance || 3));
+      const earliestExpected = new Date(Math.min(...pastPatterns.map(p => new Date(p.next_expected).getTime())));
+      earliestExpected.setDate(earliestExpected.getDate() - maxTolerance);
+      const latestEnd = new Date(today);
+      latestEnd.setDate(latestEnd.getDate() + maxTolerance);
+
+      const userIds = Array.from(new Set(pastPatterns.map(p => p.user_id)));
+
+      const { data: allMatchingTx } = await supabase
+        .from('transactions')
+        .select('id, tx_date, amount, vendor, user_id')
+        .gte('tx_date', earliestExpected.toISOString().split('T')[0])
+        .lte('tx_date', latestEnd.toISOString().split('T')[0])
+        .in('user_id', userIds);
+
+      const txList = allMatchingTx || [];
+
+      for (const pattern of pastPatterns) {
+        const nextExpected = new Date(pattern.next_expected);
         let newNextExpected = new Date(nextExpected);
-        
+
         // Calculate based on frequency
         switch (pattern.frequency) {
           case 'weekly':
@@ -57,24 +77,25 @@ export async function GET(request: NextRequest) {
             newNextExpected.setFullYear(newNextExpected.getFullYear() + 1);
             break;
         }
-        
-        // Check if payment was found in the tolerance window
+
+        // Check if payment was found in the tolerance window (in memory)
+        const tolerance = pattern.day_tolerance || 3;
         const toleranceStart = new Date(nextExpected);
-        toleranceStart.setDate(toleranceStart.getDate() - (pattern.day_tolerance || 3));
-        
+        toleranceStart.setDate(toleranceStart.getDate() - tolerance);
         const toleranceEnd = new Date(nextExpected);
-        toleranceEnd.setDate(toleranceEnd.getDate() + (pattern.day_tolerance || 3));
-        
-        const { data: matchingTransactions } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', pattern.user_id)
-          .ilike('vendor', `%${pattern.vendor}%`)
-          .gte('tx_date', toleranceStart.toISOString().split('T')[0])
-          .lte('tx_date', toleranceEnd.toISOString().split('T')[0]);
-        
-        if (matchingTransactions && matchingTransactions.length > 0) {
-          // Found matching transaction - update occurrence_count
+        toleranceEnd.setDate(toleranceEnd.getDate() + tolerance);
+        const tolStartStr = toleranceStart.toISOString().split('T')[0];
+        const tolEndStr = toleranceEnd.toISOString().split('T')[0];
+
+        const vendorLower = (pattern.vendor || '').toLowerCase();
+        const matchingTransactions = txList.filter(tx =>
+          tx.user_id === pattern.user_id &&
+          tx.tx_date >= tolStartStr &&
+          tx.tx_date <= tolEndStr &&
+          (tx.vendor || '').toLowerCase().includes(vendorLower)
+        );
+
+        if (matchingTransactions.length > 0) {
           await supabase
             .from('recurring_patterns')
             .update({
@@ -84,10 +105,9 @@ export async function GET(request: NextRequest) {
               updated_at: new Date().toISOString(),
             })
             .eq('id', pattern.id);
-          
+
           updated++;
         } else {
-          // No matching transaction - increment missed_count
           await supabase
             .from('recurring_patterns')
             .update({
@@ -96,7 +116,7 @@ export async function GET(request: NextRequest) {
               updated_at: new Date().toISOString(),
             })
             .eq('id', pattern.id);
-          
+
           updated++;
         }
       }

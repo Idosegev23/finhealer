@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       .from('goals')
       .select('*')
       .eq('user_id', user.id)
-      .order('priority', { ascending: false })
+      .order('priority', { ascending: true })
       .order('created_at', { ascending: false });
     
     if (status !== 'all') {
@@ -49,8 +49,6 @@ export async function GET(request: NextRequest) {
       totalCurrentAmount: goals?.reduce((sum, g) => sum + (g.current_amount || 0), 0) || 0,
       completedCount: goals?.filter(g => g.status === 'completed').length || 0,
     };
-    
-    stats.totalTargetAmount - stats.totalCurrentAmount; // remaining
     
     return NextResponse.json({
       goals: goals || [],
@@ -93,6 +91,16 @@ export async function POST(request: NextRequest) {
         priority: body.priority || 1,
         status: 'active',
         child_name: body.child_name || null,
+        goal_type: body.goal_type || null,
+        budget_source: body.budget_source || null,
+        funding_notes: body.funding_notes || null,
+        child_id: body.child_id || null,
+        goal_group: body.goal_group || null,
+        is_flexible: body.is_flexible ?? true,
+        min_allocation: body.min_allocation || 0,
+        monthly_allocation: body.monthly_allocation || 0,
+        auto_adjust: body.auto_adjust ?? true,
+        depends_on_goal_id: body.depends_on_goal_id || null,
       })
       .select()
       .single();
@@ -136,6 +144,16 @@ export async function PATCH(request: NextRequest) {
     if (body.priority !== undefined) updateData.priority = body.priority;
     if (body.status !== undefined) updateData.status = body.status;
     if (body.child_name !== undefined) updateData.child_name = body.child_name;
+    if (body.goal_type !== undefined) updateData.goal_type = body.goal_type;
+    if (body.budget_source !== undefined) updateData.budget_source = body.budget_source;
+    if (body.funding_notes !== undefined) updateData.funding_notes = body.funding_notes;
+    if (body.child_id !== undefined) updateData.child_id = body.child_id;
+    if (body.goal_group !== undefined) updateData.goal_group = body.goal_group;
+    if (body.is_flexible !== undefined) updateData.is_flexible = body.is_flexible;
+    if (body.min_allocation !== undefined) updateData.min_allocation = body.min_allocation;
+    if (body.monthly_allocation !== undefined) updateData.monthly_allocation = body.monthly_allocation;
+    if (body.auto_adjust !== undefined) updateData.auto_adjust = body.auto_adjust;
+    if (body.depends_on_goal_id !== undefined) updateData.depends_on_goal_id = body.depends_on_goal_id;
     
     updateData.updated_at = new Date().toISOString();
     

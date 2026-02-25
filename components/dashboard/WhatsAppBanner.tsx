@@ -12,7 +12,7 @@ export default function WhatsAppBanner({
   message = 'כל הפעולות מתבצעות דרך WhatsApp - הדשבורד הוא לצפייה בלבד 👀',
   showButton = true,
 }: WhatsAppBannerProps) {
-  const whatsappNumber = '972544266506'; // Bot number
+  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=היי`;
 
   return (

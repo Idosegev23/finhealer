@@ -30,8 +30,9 @@ export async function GET(request: NextRequest) {
     // Get all active users with phone
     const { data: users, error: usersError } = await supabaseAdmin
       .from("users")
-      .select("id, phone, full_name")
+      .select("id, phone, name, full_name")
       .not("phone", "is", null)
+      .eq("wa_opt_in", true)
       .in("phase", ["behavior", "budget", "goals", "monitoring"])
       .limit(200);
 
@@ -39,13 +40,58 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Cron] Found ${users?.length || 0} users for monthly summary`);
 
+    // 🔧 Batch load transactions for all users (avoid N+1)
+    const userIds = (users || []).map(u => u.id);
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const prevMonth = new Date(lastMonth.getFullYear(), lastMonth.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 0);
+
+    const [{ data: allCurrentTx }, { data: allPrevTx }] = await Promise.all([
+      supabaseAdmin
+        .from("transactions")
+        .select("user_id, amount, type, vendor, budget_categories (name)")
+        .in("user_id", userIds)
+        .eq("status", "confirmed")
+        .gte("tx_date", lastMonth.toISOString().split("T")[0])
+        .lte("tx_date", lastMonthEnd.toISOString().split("T")[0]),
+      supabaseAdmin
+        .from("transactions")
+        .select("user_id, amount, type")
+        .in("user_id", userIds)
+        .eq("status", "confirmed")
+        .gte("tx_date", prevMonth.toISOString().split("T")[0])
+        .lte("tx_date", prevMonthEnd.toISOString().split("T")[0]),
+    ]);
+
+    // Group by user_id
+    const currentTxByUser = new Map<string, any[]>();
+    const prevTxByUser = new Map<string, any[]>();
+    for (const tx of allCurrentTx || []) {
+      const arr = currentTxByUser.get(tx.user_id) || [];
+      arr.push(tx);
+      currentTxByUser.set(tx.user_id, arr);
+    }
+    for (const tx of allPrevTx || []) {
+      const arr = prevTxByUser.get(tx.user_id) || [];
+      arr.push(tx);
+      prevTxByUser.set(tx.user_id, arr);
+    }
+
+    console.log(`[Cron] Batch loaded ${(allCurrentTx || []).length} current + ${(allPrevTx || []).length} prev month transactions`);
+
     let sentCount = 0;
     let errors = 0;
 
     for (const user of users || []) {
       try {
-        const summary = await generateMonthlySummary(user.id, user.full_name);
-        
+        const userTransactions = currentTxByUser.get(user.id) || [];
+        const userPrevTransactions = prevTxByUser.get(user.id) || [];
+        const summary = generateMonthlySummaryFromData(
+          userTransactions, userPrevTransactions, user.name || user.full_name
+        );
+
         if (summary) {
           // שלח הודעת טקסט
           await sendWhatsAppMessage(user.phone, summary);
@@ -96,34 +142,14 @@ export async function GET(request: NextRequest) {
 }
 
 // ============================================================================
-// Generate Monthly Summary
+// Generate Monthly Summary (from pre-loaded data - no N+1 queries)
 // ============================================================================
 
-async function generateMonthlySummary(
-  userId: string, 
+function generateMonthlySummaryFromData(
+  transactions: any[],
+  prevTransactions: any[],
   userName?: string
-): Promise<string | null> {
-  const now = new Date();
-  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-  
-  const startDate = lastMonth.toISOString().split("T")[0];
-  const endDate = lastMonthEnd.toISOString().split("T")[0];
-
-  // Get transactions
-  const { data: transactions } = await supabaseAdmin
-    .from("transactions")
-    .select(`
-      amount, 
-      type, 
-      vendor,
-      budget_categories (name)
-    `)
-    .eq("user_id", userId)
-    .eq("status", "confirmed")
-    .gte("tx_date", startDate)
-    .lte("tx_date", endDate);
-
+): string | null {
   if (!transactions || transactions.length < 5) {
     return null; // לא מספיק נתונים
   }
@@ -132,11 +158,11 @@ async function generateMonthlySummary(
   const income = transactions
     .filter(t => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
-  
+
   const expenses = transactions
     .filter(t => t.type === "expense")
     .reduce((sum, t) => sum + t.amount, 0);
-  
+
   const balance = income - expenses;
   const savingsRate = income > 0 ? ((balance / income) * 100) : 0;
 
@@ -147,29 +173,17 @@ async function generateMonthlySummary(
     const catName = txWithCategory.budget_categories?.name || "אחר";
     byCategory[catName] = (byCategory[catName] || 0) + t.amount;
   }
-  
+
   const topCategories = Object.entries(byCategory)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 3);
 
-  // Get previous month for comparison
-  const prevMonth = new Date(lastMonth.getFullYear(), lastMonth.getMonth() - 1, 1);
-  const prevMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 0);
-  
-  const { data: prevTransactions } = await supabaseAdmin
-    .from("transactions")
-    .select("amount, type")
-    .eq("user_id", userId)
-    .eq("status", "confirmed")
-    .gte("tx_date", prevMonth.toISOString().split("T")[0])
-    .lte("tx_date", prevMonthEnd.toISOString().split("T")[0]);
-
   const prevExpenses = (prevTransactions || [])
     .filter(t => t.type === "expense")
     .reduce((sum, t) => sum + t.amount, 0);
-  
-  const expenseChange = prevExpenses > 0 
-    ? Math.round(((expenses - prevExpenses) / prevExpenses) * 100) 
+
+  const expenseChange = prevExpenses > 0
+    ? Math.round(((expenses - prevExpenses) / prevExpenses) * 100)
     : 0;
 
   // Calculate φ Score (simplified)
@@ -184,23 +198,25 @@ async function generateMonthlySummary(
   phiScore = Math.min(100, Math.max(0, Math.round(phiScore)));
 
   // Build message
+  const now = new Date();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const monthName = getHebrewMonthName(lastMonth.getMonth());
   const greeting = userName ? `היי ${userName}! ` : "";
-  
+
   let msg = `📊 ${greeting}*סיכום ${monthName}:*\n\n`;
-  
+
   msg += `💰 *הכנסות:* ${formatCurrency(income)}\n`;
   msg += `💸 *הוצאות:* ${formatCurrency(expenses)}`;
-  
+
   if (expenseChange !== 0) {
     const arrow = expenseChange > 0 ? "↑" : "↓";
     const emoji = expenseChange > 0 ? "" : " 👍";
     msg += ` (${arrow}${Math.abs(expenseChange)}%${emoji})`;
   }
   msg += `\n`;
-  
+
   msg += `💵 *חסכון:* ${formatCurrency(balance)} (${savingsRate.toFixed(0)}%)\n\n`;
-  
+
   // Top categories
   if (topCategories.length > 0) {
     msg += `*קטגוריות מובילות:*\n`;
@@ -209,10 +225,10 @@ async function generateMonthlySummary(
     });
     msg += `\n`;
   }
-  
+
   // φ Score
   msg += `*ציון φ:* ${phiScore}/100 ${getPhiEmoji(phiScore)}\n`;
-  
+
   // Tip based on score
   if (phiScore >= 80) {
     msg += `\n🌟 מצוין! המשך ככה.`;
@@ -221,9 +237,9 @@ async function generateMonthlySummary(
   } else {
     msg += `\n📈 יש מה לשפר. בוא נדבר על זה?`;
   }
-  
+
   msg += `\n\nחודש טוב! 🌸`;
-  
+
   return msg;
 }
 

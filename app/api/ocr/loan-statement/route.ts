@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 export async function POST(request: Request) {
   try {
@@ -67,7 +67,7 @@ Return format:
 
     const userPrompt = 'Extract all loan information from this Israeli loan payoff statement (דוח סילוקין):';
 
-    const response = await openai.responses.create({
+    const response = await getOpenAI().responses.create({
       model: 'gpt-5.2-2025-12-11',
       input: [
         {

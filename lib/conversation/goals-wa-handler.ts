@@ -13,6 +13,23 @@ import type { RouterContext } from './phi-router';
 import type { Goal } from '@/types/goals';
 
 /**
+ * Helper: merge into classification_context without overwriting other keys
+ */
+async function mergeContext(userId: string, update: Record<string, any>): Promise<void> {
+  const supabase = createServiceClient();
+  const { data: user } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+  const existing = user?.classification_context || {};
+  await supabase
+    .from('users')
+    .update({ classification_context: { ...existing, ...update } })
+    .eq('id', userId);
+}
+
+/**
  * הצגת יעדים מתקדמת עם הקצאות מחושבות
  */
 export async function showGoalsWithAllocations(ctx: RouterContext): Promise<void> {
@@ -109,15 +126,8 @@ export async function runSimulation(ctx: RouterContext): Promise<void> {
       `כתוב מספר (1-4)`,
   });
   
-  // שמור במצב שמחכה לבחירת סימולציה
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        simulation: { step: 'choose_scenario' }
-      }
-    })
-    .eq('id', ctx.userId);
+  // שמור במצב שמחכה לבחירת סימולציה (merge to preserve other keys)
+  await mergeContext(ctx.userId, { simulation: { step: 'choose_scenario' } });
 }
 
 /**
@@ -206,9 +216,9 @@ export async function runOptimization(ctx: RouterContext): Promise<void> {
   if (goals) {
     for (const allocation of result.allocations) {
       const goal = goals.find((g: any) => g.id === allocation.goal_id);
-      if (goal && Math.abs(goal.monthly_allocation - allocation.monthly_allocation) > 50) {
+      if (goal && Math.abs((goal.monthly_allocation || 0) - allocation.monthly_allocation) > 50) {
         hasChanges = true;
-        const diff = allocation.monthly_allocation - goal.monthly_allocation;
+        const diff = allocation.monthly_allocation - (goal.monthly_allocation || 0);
         const sign = diff > 0 ? '+' : '';
         changesMessage += `• *${goal.name}*: ${sign}${diff.toLocaleString('he-IL')} ₪\n`;
       }
@@ -223,18 +233,13 @@ export async function runOptimization(ctx: RouterContext): Promise<void> {
     message += `האם לאשר את השינויים?\n\n`;
     message += `כתוב *"אשר"* או *"בטל"*`;
     
-    // שמור במצב המתנה לאישור
-    await supabase
-      .from('users')
-      .update({
-        classification_context: {
-          optimization: {
-            pending: true,
-            allocations: result.allocations,
-          }
-        }
-      })
-      .eq('id', ctx.userId);
+    // שמור במצב המתנה לאישור (merge to preserve other keys)
+    await mergeContext(ctx.userId, {
+      optimization: {
+        pending: true,
+        allocations: result.allocations,
+      }
+    });
     
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
@@ -279,13 +284,11 @@ export async function confirmOptimization(ctx: RouterContext): Promise<void> {
   await applyAllocations(allocations);
   await saveAllocationHistory(ctx.userId, allocations, 'optimization_applied');
   
-  // נקה context
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {}
-    })
-    .eq('id', ctx.userId);
+  // נקה optimization context בלבד (preserve other keys)
+  const { data: ctxUser } = await supabase.from('users').select('classification_context').eq('id', ctx.userId).single();
+  const ctxData = ctxUser?.classification_context || {};
+  const { optimization: _removed, ...restCtx } = ctxData as any;
+  await supabase.from('users').update({ classification_context: Object.keys(restCtx).length > 0 ? restCtx : null }).eq('id', ctx.userId);
   
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,

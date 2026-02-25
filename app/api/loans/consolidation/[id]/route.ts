@@ -30,7 +30,7 @@ export async function GET(
       .from('loan_consolidation_requests')
       .select(`
         *,
-        user:users(full_name, email, phone)
+        user:users(name, full_name, email, phone)
       `)
       .eq('id', id)
       .single();

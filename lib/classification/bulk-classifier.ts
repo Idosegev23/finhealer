@@ -165,7 +165,7 @@ export async function classifyVendorTransactions(
       .from('transactions')
       .select('id, vendor')
       .eq('user_id', userId)
-      .in('status', ['pending', 'proposed'])
+      .eq('status', 'pending')
       .is('category_id', null);
     
     if (fetchError) throw fetchError;

@@ -208,9 +208,9 @@ async function calculateFinancialData(
   
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('amount, type')
+    .select('amount, type, tx_date, expense_category, category')
     .eq('user_id', userId)
-    .gte('date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    .gte('tx_date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   
   // חשב ממוצעים
   let total_income = profile?.total_monthly_income || 0;
@@ -220,10 +220,31 @@ async function calculateFinancialData(
   if (total_income === 0 && transactions) {
     const incomeTransactions = transactions.filter(t => t.type === 'income');
     const expenseTransactions = transactions.filter(t => t.type === 'expense');
-    
-    total_income = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0) / 3; // ממוצע 3 חודשים
-    const totalExpenses = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0) / 3;
-    fixed_expenses = totalExpenses * 0.6; // הערכה: 60% מההוצאות הן קבועות
+
+    // חשב כמה חודשים יש בפועל (במקום הנחה של 3)
+    const txDates = transactions.map(t => new Date(t.tx_date));
+    if (txDates.length === 0) {
+      return createEmptySummary();
+    }
+    const minDate = new Date(Math.min(...txDates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...txDates.map(d => d.getTime())));
+    const monthSpan = Math.max(1, Math.round((maxDate.getTime() - minDate.getTime()) / (30 * 24 * 60 * 60 * 1000)));
+
+    total_income = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0) / monthSpan;
+    const totalExpenses = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0) / monthSpan;
+
+    // חשב הוצאות קבועות מקטגוריות קבועות (אם יש), אחרת הערכה של 60%
+    const fixedCategories = ['דיור', 'ביטוח', 'חינוך', 'הלוואות', 'מנויים', 'ארנונה', 'חשמל', 'מים', 'גז', 'אינטרנט', 'סלולר'];
+    const fixedCatTransactions = expenseTransactions.filter(t => {
+      const cat = ((t as any).expense_category || (t as any).category || '').toLowerCase();
+      return fixedCategories.some(fc => cat.includes(fc));
+    });
+
+    if (fixedCatTransactions.length > 0) {
+      fixed_expenses = fixedCatTransactions.reduce((sum, t) => sum + Number(t.amount), 0) / monthSpan;
+    } else {
+      fixed_expenses = totalExpenses * 0.6; // fallback: 60% הערכה
+    }
   }
   
   const minimum_living = total_income * 0.3; // 30% מההכנסה
@@ -466,11 +487,11 @@ function performSafetyCheck(
   } else if (remaining_for_life < minimum_required) {
     comfort_level = 'tight';
     message = '⚡ תקציב צמוד - שקול להפחית יעדים';
-  } else if (ratio >= 0.3) {
-    comfort_level = 'comfortable';
-    passed = true;
   } else if (ratio >= 0.4) {
     comfort_level = 'excellent';
+    passed = true;
+  } else if (ratio >= 0.3) {
+    comfort_level = 'comfortable';
     passed = true;
   } else {
     comfort_level = 'tight';

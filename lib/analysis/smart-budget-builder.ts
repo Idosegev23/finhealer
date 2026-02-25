@@ -9,7 +9,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { chatWithGPT5 } from '@/lib/ai/gpt5-client';
+import { chatWithGeminiPro } from '@/lib/ai/gemini-client';
 
 // ============================================================================
 // Types
@@ -123,26 +123,35 @@ async function collectFinancialData(userId: string): Promise<UserFinancialData> 
     .eq('type', 'expense')
     .gte('tx_date', threeMonthsAgo.toISOString().split('T')[0]);
   
-  // Group by category and calculate monthly averages
-  const categoryTotals: Record<string, { total: number; months: Set<string> }> = {};
-  
+  // Group by category and month for trend calculation
+  const categoryMonthly: Record<string, Record<string, number>> = {};
+
   transactions?.forEach(t => {
     const cat = t.expense_category || 'אחר';
     const month = t.tx_date.substring(0, 7);
-    
-    if (!categoryTotals[cat]) {
-      categoryTotals[cat] = { total: 0, months: new Set() };
-    }
-    
-    categoryTotals[cat].total += t.amount;
-    categoryTotals[cat].months.add(month);
+    if (!categoryMonthly[cat]) categoryMonthly[cat] = {};
+    categoryMonthly[cat][month] = (categoryMonthly[cat][month] || 0) + t.amount;
   });
-  
-  const spendingHistory = Object.entries(categoryTotals).map(([category, data]) => ({
-    category,
-    monthlyAverage: Math.round(data.total / Math.max(data.months.size, 1)),
-    trend: 'stable' as const, // TODO: Calculate actual trend
-  }));
+
+  const spendingHistory = Object.entries(categoryMonthly).map(([category, monthData]) => {
+    const months = Object.keys(monthData).sort();
+    const amounts = months.map(m => monthData[m]);
+    const total = amounts.reduce((s, a) => s + a, 0);
+    const monthlyAverage = Math.round(total / Math.max(amounts.length, 1));
+
+    let trend: 'up' | 'down' | 'stable' = 'stable';
+    if (amounts.length >= 2) {
+      const lastMonth = amounts[amounts.length - 1];
+      const earlierAvg = amounts.slice(0, -1).reduce((s, a) => s + a, 0) / (amounts.length - 1);
+      if (earlierAvg > 0) {
+        const changePercent = ((lastMonth - earlierAvg) / earlierAvg) * 100;
+        if (changePercent > 15) trend = 'up';
+        else if (changePercent < -15) trend = 'down';
+      }
+    }
+
+    return { category, monthlyAverage, trend };
+  });
   
   // Get goals
   const { data: goalsData } = await supabase
@@ -198,15 +207,13 @@ async function generateAIRecommendation(
   const prompt = buildBudgetPrompt(data, availableBudget);
   
   try {
-    const response = await chatWithGPT5(
-      [{ role: 'user', content: prompt, timestamp: new Date() }],
+    const response = await chatWithGeminiPro(
+      prompt,
       BUDGET_BUILDER_SYSTEM_PROMPT,
-      { userId: data.userId, userName: '', phoneNumber: '' },
-      { reasoningEffort: 'medium', maxOutputTokens: 2000 }
     );
-    
+
     // Parse AI response
-    const recommendation = parseAIResponse(response.response, data, availableBudget);
+    const recommendation = parseAIResponse(response, data, availableBudget);
     return recommendation;
   } catch (error) {
     console.error('AI budget generation failed:', error);

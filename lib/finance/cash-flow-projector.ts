@@ -52,9 +52,9 @@ export async function projectCashFlow(
   console.log(`[Cash Flow Projector] Projecting ${months} months for user ${userId}`);
   
   try {
-    // שלוף תחזית מה-database
+    // שלוף תחזית מה-database (dynamic function - supports any number of months)
     const { data: projections, error } = await supabase
-      .rpc('get_cash_flow_projection', {
+      .rpc('get_dynamic_cash_flow_projection', {
         p_user_id: userId,
         p_months: months,
       });
@@ -223,8 +223,8 @@ export async function projectCashFlowForAllUsers(): Promise<void> {
   
   const { data: users, error } = await supabase
     .from('users')
-    .select('id, phone, full_name')
-    .in('onboarding_state', ['monitoring', 'behavior', 'goals', 'budget']);
+    .select('id, phone, name, full_name')
+    .in('phase', ['monitoring', 'behavior', 'goals', 'budget']);
   
   if (error || !users) {
     console.error('[Cash Flow Projector] Failed to fetch users:', error);

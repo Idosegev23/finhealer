@@ -6,6 +6,35 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import type { Goal } from '@/types/goals';
 
+async function mergeContext(userId: string, update: Record<string, any>): Promise<void> {
+  const supabase = createServiceClient();
+  const { data: user } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+  const existing = user?.classification_context || {};
+  await supabase
+    .from('users')
+    .update({ classification_context: { ...existing, ...update } })
+    .eq('id', userId);
+}
+
+async function removeEditGoalContext(userId: string): Promise<void> {
+  const supabase = createServiceClient();
+  const { data: ctxUser } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+  const ctxData = ctxUser?.classification_context || {};
+  const { editGoal: _removed, ...restCtx } = ctxData as any;
+  await supabase
+    .from('users')
+    .update({ classification_context: Object.keys(restCtx).length > 0 ? restCtx : null })
+    .eq('id', userId);
+}
+
 export interface EditGoalContext {
   step: 'select_goal' | 'select_action' | 'edit_field' | 'confirm_delete';
   goalId?: string;
@@ -41,17 +70,12 @@ export async function startEditGoal(
   }
 
   // שמור context
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        editGoal: {
-          step: 'select_goal',
-          goals: goals.map(g => ({ id: g.id, name: g.name }))
-        }
-      }
-    })
-    .eq('id', userId);
+  await mergeContext(userId, {
+    editGoal: {
+      step: 'select_goal',
+      goals: goals.map(g => ({ id: g.id, name: g.name }))
+    }
+  });
 
   // הצג רשימת יעדים
   let message = `✏️ *עריכת יעד*\n\n`;
@@ -129,19 +153,14 @@ export async function handleGoalSelection(
   }
 
   // עדכן context ושאל מה לעשות
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        editGoal: {
-          step: 'select_action',
-          goalId: goal.id,
-          goalName: goal.name,
-          goalData: goal
-        }
-      }
-    })
-    .eq('id', userId);
+  await mergeContext(userId, {
+    editGoal: {
+      step: 'select_action',
+      goalId: goal.id,
+      goalName: goal.name,
+      goalData: goal
+    }
+  });
 
   const progress = goal.target_amount > 0 
     ? Math.round((goal.current_amount / goal.target_amount) * 100)
@@ -185,18 +204,13 @@ export async function handleActionSelection(
   const greenAPI = getGreenAPIClient();
 
   if (msg === '1' || msg.toLowerCase().includes('שם')) {
-    await supabase
-      .from('users')
-      .update({
-        classification_context: {
-          editGoal: {
-            ...context,
-            step: 'edit_field',
-            editField: 'name'
-          }
-        }
-      })
-      .eq('id', userId);
+    await mergeContext(userId, {
+      editGoal: {
+        ...context,
+        step: 'edit_field',
+        editField: 'name'
+      }
+    });
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
@@ -204,18 +218,13 @@ export async function handleActionSelection(
     });
     return true;
   } else if (msg === '2' || msg.toLowerCase().includes('סכום')) {
-    await supabase
-      .from('users')
-      .update({
-        classification_context: {
-          editGoal: {
-            ...context,
-            step: 'edit_field',
-            editField: 'amount'
-          }
-        }
-      })
-      .eq('id', userId);
+    await mergeContext(userId, {
+      editGoal: {
+        ...context,
+        step: 'edit_field',
+        editField: 'amount'
+      }
+    });
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
@@ -223,18 +232,13 @@ export async function handleActionSelection(
     });
     return true;
   } else if (msg === '3' || msg.toLowerCase().includes('תאריך')) {
-    await supabase
-      .from('users')
-      .update({
-        classification_context: {
-          editGoal: {
-            ...context,
-            step: 'edit_field',
-            editField: 'deadline'
-          }
-        }
-      })
-      .eq('id', userId);
+    await mergeContext(userId, {
+      editGoal: {
+        ...context,
+        step: 'edit_field',
+        editField: 'deadline'
+      }
+    });
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
@@ -243,18 +247,13 @@ export async function handleActionSelection(
     });
     return true;
   } else if (msg === '4' || msg.toLowerCase().includes('עדיפות')) {
-    await supabase
-      .from('users')
-      .update({
-        classification_context: {
-          editGoal: {
-            ...context,
-            step: 'edit_field',
-            editField: 'priority'
-          }
-        }
-      })
-      .eq('id', userId);
+    await mergeContext(userId, {
+      editGoal: {
+        ...context,
+        step: 'edit_field',
+        editField: 'priority'
+      }
+    });
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
@@ -263,17 +262,12 @@ export async function handleActionSelection(
     });
     return true;
   } else if (msg === '5' || msg.toLowerCase().includes('מחק')) {
-    await supabase
-      .from('users')
-      .update({
-        classification_context: {
-          editGoal: {
-            ...context,
-            step: 'confirm_delete'
-          }
-        }
-      })
-      .eq('id', userId);
+    await mergeContext(userId, {
+      editGoal: {
+        ...context,
+        step: 'confirm_delete'
+      }
+    });
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
@@ -284,10 +278,7 @@ export async function handleActionSelection(
     });
     return true;
   } else if (msg === '6' || msg.toLowerCase().includes('ביטול')) {
-    await supabase
-      .from('users')
-      .update({ classification_context: {} })
-      .eq('id', userId);
+    await removeEditGoalContext(userId);
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
@@ -390,10 +381,7 @@ export async function handleFieldEdit(
   }
 
   // נקה context
-  await supabase
-    .from('users')
-    .update({ classification_context: {} })
-    .eq('id', userId);
+  await removeEditGoalContext(userId);
 
   let fieldName = '';
   if (field === 'name') fieldName = 'שם';
@@ -441,10 +429,7 @@ export async function confirmGoalDeletion(
     }
 
     // נקה context
-    await supabase
-      .from('users')
-      .update({ classification_context: {} })
-      .eq('id', userId);
+    await removeEditGoalContext(userId);
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
@@ -457,10 +442,7 @@ export async function confirmGoalDeletion(
     return true;
   } else if (msg.toLowerCase().includes('ביטול') || msg.toLowerCase() === 'לא') {
     // בטל
-    await supabase
-      .from('users')
-      .update({ classification_context: {} })
-      .eq('id', userId);
+    await removeEditGoalContext(userId);
 
     await greenAPI.sendMessage({
       phoneNumber: phone,

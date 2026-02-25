@@ -150,8 +150,8 @@ async function checkIfNeedsCreditCardStatement(
     .from("transactions")
     .select("amount")
     .eq("user_id", userId)
-    .gte("date", startDate.toISOString())
-    .lte("date", endDate.toISOString())
+    .gte("tx_date", startDate.toISOString())
+    .lte("tx_date", endDate.toISOString())
     .eq("source", "bank_import"); // Only look at imported transactions
 
   if (!existingTransactions) return true;
@@ -187,7 +187,7 @@ async function findLinkedBankPayment(
 
   // Find the latest date in credit card transactions
   const latestDate = creditTransactions.reduce((latest, tx) => {
-    const txDate = new Date(tx.date);
+    const txDate = new Date(tx.tx_date);
     return txDate > latest ? txDate : latest;
   }, new Date(0));
 
@@ -203,8 +203,8 @@ async function findLinkedBankPayment(
     .select("id, amount, document_id")
     .eq("user_id", userId)
     .eq("type", "expense")
-    .gte("date", searchStart.toISOString())
-    .lte("date", searchEnd.toISOString());
+    .gte("tx_date", searchStart.toISOString())
+    .lte("tx_date", searchEnd.toISOString());
 
   if (!bankPayments) return null;
 

@@ -20,6 +20,7 @@ interface Milestone {
   };
   user: {
     phone: string;
+    name: string;
     full_name: string;
   };
 }
@@ -93,7 +94,7 @@ async function celebrateMilestone(milestone: any): Promise<void> {
     // שלוף את פרטי המשתמש
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('phone, full_name')
+      .select('phone, name, full_name')
       .eq('id', goal.user_id)
       .single();
     
@@ -108,7 +109,7 @@ async function celebrateMilestone(milestone: any): Promise<void> {
       goal.name,
       goal.current_amount,
       goal.target_amount,
-      user.full_name
+      user.name || user.full_name
     );
     
     // שלח הודעת WhatsApp

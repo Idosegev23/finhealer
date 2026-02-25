@@ -2,8 +2,8 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import * as XLSX from 'xlsx';
+import { EXPENSE_CATEGORIES_SYSTEM_PROMPT } from '@/lib/ai/expense-categories-prompt';
 
 // 🆕 הודעות מכינות לפני יצירת גרף
 const CHART_PREPARING_MESSAGES = [
@@ -14,24 +14,44 @@ const CHART_PREPARING_MESSAGES = [
   '🎯 שניה, מארגן את המספרים בתמונה...',
 ];
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// 🆕 Helper functions לפורמט תאריכים לעברית
-const HEBREW_MONTHS = [
-  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
-  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
-];
-
-function formatHebrewMonth(date: Date): string {
-  return `${HEBREW_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+// PII masking helpers for production logs
+function maskPhone(phone: string): string {
+  if (!phone || phone.length < 6) return '***';
+  return phone.slice(0, 3) + '***' + phone.slice(-2);
+}
+function maskUserId(id: string): string {
+  if (!id || id.length < 8) return '***';
+  return id.slice(0, 4) + '...' + id.slice(-4);
 }
 
-function formatMonthFromYYYYMM(monthStr: string): string {
-  const [year, month] = monthStr.split('-');
-  const monthIndex = parseInt(month) - 1;
-  return `${HEBREW_MONTHS[monthIndex]} ${year}`;
+// ============================================================================
+// 🛡️ Rate limiting per user_id
+// ============================================================================
+const userRateLimit = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 10_000; // 10 seconds
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = userRateLimit.get(userId);
+
+  // Clean expired entries periodically (every ~60s via lazy check)
+  if (userRateLimit.size > 500) {
+    for (const [key, val] of userRateLimit) {
+      if (val.resetAt < now) userRateLimit.delete(key);
+    }
+  }
+
+  if (!entry || entry.resetAt < now) {
+    userRateLimit.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false; // not limited
+  }
+
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return true; // rate limited
+  }
+  return false;
 }
 
 // ============================================================================
@@ -184,7 +204,23 @@ const processedMessages = new Set<string>();
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServiceClient();
-    const payload: GreenAPIWebhookPayload = await request.json();
+
+    // Read raw body FIRST for signature verification, then parse
+    const rawBody = await request.text();
+    const payload: GreenAPIWebhookPayload = JSON.parse(rawBody);
+
+    // אימות webhook signature (feature flag: WEBHOOK_SIGNATURE_REQUIRED)
+    // Must happen BEFORE any processing, using the raw wire-format body
+    const webhookSecret = process.env.GREEN_API_WEBHOOK_SECRET;
+    if (webhookSecret && process.env.WEBHOOK_SIGNATURE_REQUIRED === 'true') {
+      const signature = request.headers.get('x-webhook-signature') || '';
+      const { createHmac } = await import('crypto');
+      const expected = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+      if (signature !== expected && signature !== `sha256=${expected}`) {
+        console.warn('⚠️ Webhook signature mismatch - rejecting request');
+        return NextResponse.json({ status: 'unauthorized' }, { status: 401 });
+      }
+    }
 
     console.log('📱 GreenAPI Webhook received:', payload.typeWebhook);
 
@@ -193,10 +229,10 @@ export async function POST(request: NextRequest) {
       console.log('🛡️ Ignoring non-incoming message:', payload.typeWebhook);
       return NextResponse.json({ status: 'ignored', reason: payload.typeWebhook });
     }
-    
+
     // 🛡️ בדיקת כפילויות לפי idMessage - בדאטאבייס!
     const messageId = payload.idMessage;
-    
+
     // בדיקה בדאטאבייס - זה שורד בין invocations
     if (messageId) {
       const { data: existingMsg } = await supabase
@@ -205,13 +241,13 @@ export async function POST(request: NextRequest) {
         .eq('provider_msg_id', messageId)
         .limit(1)
         .single();
-      
+
       if (existingMsg) {
         console.log('🛡️ Duplicate message ignored (DB check):', messageId);
         return NextResponse.json({ status: 'ignored', reason: 'duplicate' });
       }
     }
-    
+
     // גם בדיקה in-memory לאותו invocation
     if (messageId && processedMessages.has(messageId)) {
       console.log('🛡️ Duplicate message ignored (memory):', messageId);
@@ -223,13 +259,6 @@ export async function POST(request: NextRequest) {
         const first = processedMessages.values().next().value;
         if (first) processedMessages.delete(first);
       }
-    }
-
-    // אימות webhook (אופציונלי - תלוי ב-GreenAPI setup)
-    const webhookSecret = process.env.GREEN_API_WEBHOOK_SECRET;
-    if (webhookSecret) {
-      const signature = request.headers.get('x-webhook-signature');
-      // TODO: implement signature verification if needed
     }
 
     // 🛡️ בדיקה נוספת - אם זה הודעה מהבוט עצמו
@@ -261,7 +290,7 @@ export async function POST(request: NextRequest) {
     
     const phoneNumber = normalizePhone(rawPhoneNumber);
     
-    console.log('📞 Raw phone:', rawPhoneNumber, '→ Normalized:', phoneNumber);
+    console.log('📞 Phone normalized:', maskPhone(phoneNumber));
     
     // נסה למצוא משתמש בכמה פורמטים
     const phoneVariants = [
@@ -270,7 +299,7 @@ export async function POST(request: NextRequest) {
       phoneNumber.replace(/^0/, '972'),              // 972547667775 (מ-0547667775)
     ];
     
-    console.log('🔍 Trying phone variants:', phoneVariants);
+    // phone variants generated for lookup
     
     // מציאת משתמש לפי מספר טלפון (נסה כל הפורמטים)
     const { data: users } = await supabase
@@ -280,21 +309,70 @@ export async function POST(request: NextRequest) {
     
     const user = users?.[0];
 
-    if (!user) {
-      console.log('❌ User not found for any phone variant:', phoneVariants);
-      return NextResponse.json({ 
-        status: 'error', 
-        message: 'User not found' 
-      }, { status: 404 });
-    }
-    
-    console.log('✅ User found:', user);
+    let userData: any;
 
-    const userData = user as any;
+    if (!user) {
+      // 🆕 Auto-create new user from WhatsApp
+      console.log('🆕 New user from WhatsApp:', maskPhone(phoneNumber));
+
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          phone: phoneNumber,
+          wa_opt_in: true,
+          onboarding_state: 'waiting_for_name',
+          phase: 'data_collection',
+        })
+        .select('id, name, wa_opt_in, phone')
+        .single();
+
+      if (createError || !newUser) {
+        console.error('❌ Failed to create new user:', createError);
+        return NextResponse.json({
+          status: 'error',
+          message: 'Failed to create user'
+        }, { status: 500 });
+      }
+
+      console.log('✅ New user created:', maskUserId(newUser.id));
+      userData = newUser;
+
+      // 🆕 Send welcome message and return early - don't process the first message as name
+      const greenAPIWelcome = getGreenAPIClient();
+
+      // Try to extract name from WhatsApp profile (senderName)
+      const senderName = payload.senderData?.senderName || '';
+      const cleanName = senderName && senderName !== phoneNumber && !/^\d+$/.test(senderName)
+        ? senderName.trim()
+        : '';
+
+      if (cleanName) {
+        // Save the WhatsApp profile name
+        await supabase
+          .from('users')
+          .update({ name: cleanName, full_name: cleanName, onboarding_state: 'waiting_for_document' })
+          .eq('id', newUser.id);
+
+        await greenAPIWelcome.sendMessage({
+          phoneNumber,
+          message: `היי ${cleanName}! 👋\n\nאני *φ Phi* - העוזר הפיננסי שלך.\n\n📄 שלח לי דוח בנק או אשראי (PDF/Excel/תמונה) ואני אנתח את התנועות שלך.`,
+        });
+      } else {
+        await greenAPIWelcome.sendMessage({
+          phoneNumber,
+          message: `היי! 👋\n\nאני *φ Phi* - העוזר הפיננסי שלך.\n\nאיך קוראים לך? 😊`,
+        });
+      }
+
+      return NextResponse.json({ status: 'new_user_greeted', userId: newUser.id });
+    } else {
+      console.log('✅ User found:', maskUserId((user as any).id));
+      userData = user as any;
+    }
 
     // 🆕 אם המשתמש לא אישר עדיין WhatsApp - מאשר אוטומטית ומתחיל אונבורדינג
     if (!userData.wa_opt_in) {
-      console.log('🚀 Auto-enabling WhatsApp for user:', phoneNumber);
+      console.log('🚀 Auto-enabling WhatsApp for:', maskUserId(userData.id));
       
       // עדכון wa_opt_in ל-true
       const { error: updateError } = await supabase
@@ -315,12 +393,21 @@ export async function POST(request: NextRequest) {
       console.log('✅ WhatsApp auto-enabled for user');
     }
 
+    // 🛡️ Rate limiting check
+    if (checkRateLimit(userData.id)) {
+      console.warn(`⚠️ Rate limited user ${maskUserId(userData.id)} (>${RATE_LIMIT_MAX} msgs in ${RATE_LIMIT_WINDOW_MS / 1000}s)`);
+      const greenAPIRL = getGreenAPIClient();
+      await greenAPIRL.sendMessage({
+        phoneNumber: phoneNumber,
+        message: `⏳ שניה, אני עדיין מעבד... נסה שוב בעוד כמה שניות.`,
+      });
+      return NextResponse.json({ status: 'rate_limited' });
+    }
+
     const messageType = payload.messageData?.typeMessage;
     // messageId כבר הוגדר למעלה
 
-    // 🔍 DEBUG: הצג את כל סוג ההודעה והנתונים
-    console.log('📨 MESSAGE TYPE:', messageType);
-    console.log('📨 FULL MESSAGE DATA:', JSON.stringify(payload.messageData, null, 2));
+    console.log('📨 MESSAGE TYPE:', messageType, 'keys:', Object.keys(payload.messageData || {}));
 
     // שמירת ההודעה בטבלה
     const waMessageData = {
@@ -347,63 +434,153 @@ export async function POST(request: NextRequest) {
     }
 
     // 🆕 טיפול בלחיצה על כפתור - מעביר ל-Rigid Router
-    if (messageType === 'interactiveButtonsResponse') {
-      const buttonId = payload.messageData?.interactiveButtonsResponse?.selectedButtonId || '';
-      const buttonText = payload.messageData?.interactiveButtonsResponse?.selectedButtonText || '';
-      
+    if (messageType === 'interactiveButtonsResponse' || messageType === 'buttonsResponseMessage') {
+      // Support both interactive buttons and old-format buttons
+      const interactiveData = payload.messageData?.interactiveButtonsResponse;
+      const oldButtonData = payload.messageData?.buttonsResponseMessage;
+
+      const buttonId = interactiveData?.selectedButtonId || oldButtonData?.selectedButtonId || '';
+      const buttonText = interactiveData?.selectedButtonText || oldButtonData?.selectedButtonText || '';
+
       console.log('🔘 Button pressed - selectedButtonId:', buttonId, 'selectedButtonText:', buttonText);
 
       // עדיפות ל-buttonId, אחרת buttonText (שהוא בדיוק כמו הטריגר)
       const messageToRoute = buttonId || buttonText;
-      
+
       console.log('🎯 Routing:', messageToRoute);
+
+      // 🆕 Handle receipt confirm/edit buttons directly
+      if (messageToRoute.startsWith('confirm_') || messageToRoute.startsWith('edit_')) {
+        const greenAPI = getGreenAPIClient();
+        const txId = messageToRoute.replace(/^(confirm_|edit_)/, '');
+
+        if (messageToRoute.startsWith('confirm_')) {
+          // Confirm the transaction
+          await supabase
+            .from('transactions')
+            .update({ status: 'confirmed' })
+            .eq('id', txId)
+            .eq('user_id', userData.id);
+
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: `✅ ההוצאה אושרה ונשמרה! 👍`,
+          });
+        } else {
+          // Edit - ask user to type correct details
+          await greenAPI.sendMessage({
+            phoneNumber,
+            message: `✏️ מה לתקן?\n\nכתוב בפורמט:\n*סכום:* 50\n*קטגוריה:* מכולת\n*תיאור:* קניות בסופר\n\nאו כתוב *"מחק"* למחיקת ההוצאה.`,
+          });
+
+          // Save edit context
+          const { data: ctxUser } = await supabase
+            .from('users')
+            .select('classification_context')
+            .eq('id', userData.id)
+            .single();
+
+          const existingCtx = ctxUser?.classification_context || {};
+          await supabase
+            .from('users')
+            .update({ classification_context: { ...existingCtx, editing_tx_id: txId } })
+            .eq('id', userData.id);
+        }
+
+        return NextResponse.json({ status: 'receipt_button_handled', action: messageToRoute.startsWith('confirm_') ? 'confirmed' : 'editing' });
+      }
 
       const { routeMessage } = await import('@/lib/conversation/phi-router');
       const result = await routeMessage(userData.id, phoneNumber, messageToRoute);
-      
+
       console.log('[φ Router] Button result: success=' + result.success);
-      
+
       return NextResponse.json({
         status: 'button_response',
         success: result.success,
       });
     }
     // טיפול לפי סוג הודעה - עם Orchestrator! 🤖
-    else if (messageType === 'textMessage') {
-      const text = payload.messageData?.textMessageData?.textMessage || '';
-      console.log('📝 Text message:', text);
+    else if (messageType === 'textMessage' || messageType === 'extendedTextMessage' || messageType === 'quotedMessage') {
+      // Extract text from all text-like message types
+      const text = messageType === 'extendedTextMessage'
+        ? (payload.messageData?.extendedTextMessageData?.text || payload.messageData?.textMessageData?.textMessage || '')
+        : messageType === 'quotedMessage'
+        ? (payload.messageData?.extendedTextMessageData?.text || payload.messageData?.textMessageData?.textMessage || payload.messageData?.quotedMessage?.caption || '')
+        : (payload.messageData?.textMessageData?.textMessage || '');
+      console.log('📝 Text message received, type:', messageType, 'length:', text.length);
 
       const greenAPI = getGreenAPIClient();
-      
+
+      // 🆕 Handle receipt edit flow - check if user is editing a transaction
+      {
+        const { data: editCtxUser } = await supabase
+          .from('users')
+          .select('classification_context')
+          .eq('id', userData.id)
+          .single();
+
+        const editingTxId = editCtxUser?.classification_context?.editing_tx_id;
+        if (editingTxId && text.trim()) {
+          const editMsg = text.trim();
+
+          // Check for delete command
+          if (editMsg === 'מחק' || editMsg === 'delete') {
+            await supabase.from('transactions').delete().eq('id', editingTxId).eq('user_id', userData.id);
+            await greenAPI.sendMessage({ phoneNumber, message: '🗑️ ההוצאה נמחקה.' });
+          } else {
+            // Parse edit: look for amount, category, description
+            const updates: any = {};
+            const amountMatch = editMsg.match(/(?:סכום[:\s]*)?(\d+(?:\.\d+)?)/);
+            const categoryMatch = editMsg.match(/(?:קטגוריה[:\s]*)([^\n,]+)/);
+            const descMatch = editMsg.match(/(?:תיאור[:\s]*)([^\n,]+)/);
+
+            if (amountMatch) updates.amount = parseFloat(amountMatch[1]);
+            if (categoryMatch) updates.expense_category = categoryMatch[1].trim();
+            if (descMatch) updates.notes = descMatch[1].trim();
+
+            if (Object.keys(updates).length > 0) {
+              await supabase.from('transactions').update(updates).eq('id', editingTxId).eq('user_id', userData.id);
+              await greenAPI.sendMessage({ phoneNumber, message: '✅ ההוצאה עודכנה!' });
+            } else {
+              // Treat the whole text as the category
+              updates.expense_category = editMsg;
+              await supabase.from('transactions').update(updates).eq('id', editingTxId).eq('user_id', userData.id);
+              await greenAPI.sendMessage({ phoneNumber, message: `✅ הקטגוריה עודכנה ל-"${editMsg}"` });
+            }
+          }
+
+          // Clean up editing context
+          const existingCtx = editCtxUser?.classification_context || {};
+          const { editing_tx_id: _, ...restCtx } = existingCtx as any;
+          await supabase.from('users').update({
+            classification_context: Object.keys(restCtx).length > 0 ? restCtx : null
+          }).eq('id', userData.id);
+
+          return NextResponse.json({ status: 'edit_completed' });
+        }
+      }
+
       // 🆕 RIGID ROUTER - לוגיקה קשיחה בלי AI להחלטות
       {
         console.log('🎯 Using Rigid Router (deterministic logic)');
-        
+
         try {
-          // שמירת הודעה נכנסת
-          const { error: insertError } = await supabase.from('wa_messages').insert({
-            user_id: userData.id,
-            direction: 'incoming',
-            msg_type: 'text',
-            payload: { text, messageId, timestamp: new Date().toISOString() },
-            status: 'delivered',
-            provider_msg_id: messageId,
-          });
-          
-          if (insertError) {
-            console.error('❌ Failed to save incoming message:', insertError);
-          } else {
-            console.log('✅ Incoming message saved to wa_messages');
-          }
-          
+          // הודעה כבר נשמרה ב-wa_messages בשלב הגנרי (שורה 355)
           // 🎯 קריאה ל-φ Router - לוגיקה נקייה וקשיחה
           const { routeMessage } = await import('@/lib/conversation/phi-router');
           const result = await routeMessage(userData.id, phoneNumber, text);
           
           console.log(`[φ Router] Result: success=${result.success}, newState=${result.newState || 'unchanged'}`);
-          
-          // הודעות נשלחות ישירות מה-router, אין צורך לשלוח כאן
-          
+
+          // Fallback if router didn't match any state
+          if (!result.success) {
+            await greenAPI.sendMessage({
+              phoneNumber,
+              message: `לא הבנתי 🤔\n\nכתוב *"עזרה"* לראות מה אפשר לעשות.`,
+            });
+          }
+
           return NextResponse.json({
             status: 'rigid_router_response',
             success: result.success,
@@ -421,14 +598,37 @@ export async function POST(request: NextRequest) {
       }
     } else if (messageType === 'imageMessage') {
       // 🔍 Debug: הצג את כל ה-payload
-      console.log('🖼️ Image message received. Full messageData:', JSON.stringify(payload.messageData, null, 2));
-      
+      console.log('🖼️ Image message received, mime:', payload.messageData?.fileMessageData?.mimeType || 'unknown');
+
       // 🔧 GreenAPI שולח את הנתונים ב-fileMessageData!
       const downloadUrl = payload.messageData?.fileMessageData?.downloadUrl || payload.messageData?.downloadUrl;
       const caption = payload.messageData?.fileMessageData?.caption || payload.messageData?.caption || '';
-      
+
       console.log('📥 Download URL:', downloadUrl);
       console.log('📝 Caption:', caption);
+
+      // 🆕 If user is in waiting_for_name and sends an image, auto-set name and advance
+      {
+        const { data: imgNameCheck } = await supabase
+          .from('users')
+          .select('onboarding_state, name')
+          .eq('id', userData.id)
+          .single();
+
+        if (imgNameCheck?.onboarding_state === 'waiting_for_name' && !imgNameCheck?.name) {
+          const imgSenderName = payload.senderData?.senderName || '';
+          const imgCleanName = imgSenderName && imgSenderName !== phoneNumber && !/^\d+$/.test(imgSenderName)
+            ? imgSenderName.trim()
+            : 'משתמש';
+
+          await supabase
+            .from('users')
+            .update({ name: imgCleanName, full_name: imgCleanName, onboarding_state: 'waiting_for_document' })
+            .eq('id', userData.id);
+
+          console.log(`📝 Auto-set name to "${imgCleanName}" from image sender`);
+        }
+      }
 
       // 🆕 אם אין downloadUrl, נשלח הודעת שגיאה
       if (!downloadUrl) {
@@ -513,23 +713,13 @@ export async function POST(request: NextRequest) {
 
           const userPrompt = 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע. **שים לב מיוחד לתאריך!**\n\n**חשוב מאוד - זיהוי הסכום הנכון:**\n- זהה את הסכום ששולם בפועל - זה נמצא ליד "סה״כ כולל מע״מ" או "סה״כ" בתחתית הקבלה\n- אל תשתמש במספר הקבלה כעלות! (מספר קבלה = 36401)\n- אל תשתמש במספר הקופה כעלות! (מספר קופה = 000083)\n- דוגמה: אם רשום "מספר קופה: 000083" ו"סה״כ כולל מע״מ: 79" - הסכום הוא 79, לא 83!\n- מספר קופה/קבלה ≠ סכום כסף\n\n**חשוב מאוד - פורמט תאריכים ישראלי:**\n- תאריכים ישראליים הם בפורמט: יום.חודש.שנה (DD.MM.YY)\n- **לא** כמו בארה"ב! אם רשום "10.11.20" זה יום 10, חודש 11 (נובמבר), שנה 2020\n- החזר בפורמט ISO: "YYYY-MM-DD" (למשל: "2020-11-10")\n\nהחזר תשובה בפורמט JSON.';
 
-          // 🆕 GPT-5.2 with Responses API - effort: 'none' for fast response!
-          const visionResponse = await openai.responses.create({
-            model: 'gpt-5.2-2025-12-11',
-            input: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'input_text', text: systemPrompt + '\n\n' + userPrompt },
-                  { type: 'input_image', image_url: `data:${mimeType};base64,${base64Image}`, detail: 'high' },
-                ]
-              }
-            ],
-            reasoning: { effort: 'none' }, // ⚡ Fast mode - no deep thinking
-            text: { verbosity: 'low' }, // ⚡ Concise output
-          });
-
-          const aiText = visionResponse.output_text || '{}';
+          // 🆕 Gemini 3.1 Pro Vision for receipt OCR
+          const { chatWithGeminiProVision } = await import('@/lib/ai/gemini-client');
+          const aiText = await chatWithGeminiProVision(
+            base64Image,
+            mimeType,
+            systemPrompt + '\n\n' + userPrompt
+          );
           console.log('🎯 OCR Result:', aiText);
 
           let ocrData: any;
@@ -621,7 +811,7 @@ export async function POST(request: NextRequest) {
               
               if (insertError) {
                 console.error('❌ Error inserting transaction:', insertError);
-                console.error('Transaction data:', { user_id: userData.id, amount: tx.amount, status: 'pending', source: 'ocr' });
+                console.error('Transaction data:', { user_id: maskUserId(userData.id), amount: tx.amount, status: 'pending', source: 'ocr' });
               } else if (insertedTx?.id) {
                 console.log('✅ Transaction inserted successfully:', insertedTx.id, { amount: tx.amount, status: 'pending', source: 'ocr' });
                 insertedIds.push(insertedTx.id);
@@ -684,6 +874,15 @@ export async function POST(request: NextRequest) {
               phoneNumber,
               message: `🎉 זיהיתי ${transactions.length} תנועות!\n\n👉 אשר את ההוצאות כאן:\n${siteUrl}/dashboard/expenses/pending`,
             });
+
+            // Trigger state machine - update user state for classification
+            try {
+              const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+              await onDocumentProcessed(userData.id, phoneNumber);
+              console.log('✅ φ Router notified of image-based transactions');
+            } catch (routerErr) {
+              console.error('⚠️ φ Router notification failed:', routerErr);
+            }
           }
 
         } catch (ocrError: any) {
@@ -695,16 +894,39 @@ export async function POST(request: NextRequest) {
         }
     } else if (messageType === 'documentMessage') {
       // 🆕 טיפול במסמכים (PDF, Excel, וכו')
-      console.log('📄 Document message received. Full messageData:', JSON.stringify(payload.messageData, null, 2));
-      
+      console.log('📄 Document message received, mime:', payload.messageData?.fileMessageData?.mimeType || 'unknown');
+
       // 🔧 GreenAPI שולח את הנתונים ב-fileMessageData!
       const downloadUrl = payload.messageData?.fileMessageData?.downloadUrl || payload.messageData?.downloadUrl;
       const fileName = payload.messageData?.fileMessageData?.fileName || payload.messageData?.fileName || 'document';
       const caption = payload.messageData?.fileMessageData?.caption || payload.messageData?.caption || '';
-      
+
       console.log('📥 Document URL:', downloadUrl);
       console.log('📝 File name:', fileName);
-      
+
+      // 🆕 If user is in waiting_for_name and sends a document, auto-set name and advance
+      {
+        const { data: nameCheckUser } = await supabase
+          .from('users')
+          .select('onboarding_state, name')
+          .eq('id', userData.id)
+          .single();
+
+        if (nameCheckUser?.onboarding_state === 'waiting_for_name' && !nameCheckUser?.name) {
+          const docSenderName = payload.senderData?.senderName || '';
+          const docCleanName = docSenderName && docSenderName !== phoneNumber && !/^\d+$/.test(docSenderName)
+            ? docSenderName.trim()
+            : 'משתמש';
+
+          await supabase
+            .from('users')
+            .update({ name: docCleanName, full_name: docCleanName, onboarding_state: 'waiting_for_document' })
+            .eq('id', userData.id);
+
+          console.log(`📝 Auto-set name to "${docCleanName}" from document sender`);
+        }
+      }
+
       if (!downloadUrl) {
         const greenAPI = getGreenAPIClient();
         await greenAPI.sendMessage({
@@ -713,14 +935,14 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json({ status: 'no_download_url' });
       }
-      
+
       const greenAPI = getGreenAPIClient();
-      
+
       // בדיקה אם זה PDF או Excel
       const lowerName = fileName.toLowerCase();
       const isPDF = lowerName.endsWith('.pdf');
       const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls') || lowerName.endsWith('.csv');
-      
+
       if (isPDF) {
         // 🆕 זיהוי חכם של סוג המסמך לפי ה-state
         const { data: userState } = await supabase
@@ -748,18 +970,18 @@ export async function POST(request: NextRequest) {
           // בדוק אם קיבלנו את כל המסמכים
           const { data: updatedRequest } = await supabase
             .from('loan_consolidation_requests')
-            .select('status, documents_received, documents_needed')
+            .select('id, status, documents_received, documents_needed')
             .eq('user_id', userData.id)
             .eq('status', 'documents_received')
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
-          
+
           if (updatedRequest) {
             // קיבלנו את כל המסמכים - שלח לגדי!
             const { sendLeadToAdvisor } = await import('@/lib/loans/lead-generator');
             await sendLeadToAdvisor(updatedRequest.id);
-            
+
             // עדכן למשתמש שהבקשה נשלחה
             await greenAPI.sendMessage({
               phoneNumber,
@@ -767,16 +989,23 @@ export async function POST(request: NextRequest) {
                 `הוא יבדוק את המצב שלך ויחזור אליך בהקדם.\n\n` +
                 `בינתיים, בוא נמשיך לנתח את ההתנהגות הפיננסית שלך 📊`,
             });
-            
-            // עובר לשלב הבא
-            const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
-            // קורא לסיכום סופי
+
+            // עובר לשלב הבא - נקה רק את loanConsolidation מה-context
+            const { data: ctxUser } = await supabase
+              .from('users')
+              .select('classification_context')
+              .eq('id', userData.id)
+              .single();
+
+            const existingCtx = ctxUser?.classification_context || {};
+            const { loanConsolidation: _, ...restCtx } = existingCtx as any;
+
             await supabase
               .from('users')
-              .update({ 
+              .update({
                 onboarding_state: 'behavior',
-                current_phase: 'behavior',
-                classification_context: null
+                phase: 'behavior',
+                classification_context: Object.keys(restCtx).length > 0 ? restCtx : null
               })
               .eq('id', userData.id);
           }
@@ -897,28 +1126,12 @@ export async function POST(request: NextRequest) {
           const pdfBuffer = await pdfResponse.arrayBuffer();
           const buffer = Buffer.from(pdfBuffer);
           
-          console.log(`🤖 Starting PDF analysis (type: ${documentType}) with OpenAI Files API...`);
-          
-          // העלאה ל-Files API
-          const fs = require('fs').promises;
-          const tempFilePath = `/tmp/${Date.now()}-${fileName}`;
-          await fs.writeFile(tempFilePath, buffer);
-          
-          let fileUpload: any;
-          try {
-            fileUpload = await openai.files.create({
-              file: require('fs').createReadStream(tempFilePath),
-              purpose: 'assistants'
-            });
-            console.log(`✅ PDF uploaded to OpenAI Files API: ${fileUpload.id}`);
-          } finally {
-            await fs.unlink(tempFilePath).catch(() => {});
-          }
-          
+          console.log(`🤖 Starting PDF analysis (type: ${documentType}) with Gemini 3.1 Pro...`);
+
           // 🆕 טען קטגוריות ובחר את הפרומפט המתאים לסוג המסמך
           const { getPromptForDocumentType } = await import('@/lib/ai/document-prompts');
           let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
-          
+
           if (documentType === 'credit' || documentType === 'bank') {
             const { data: categories } = await supabase
               .from('expense_categories')
@@ -927,46 +1140,32 @@ export async function POST(request: NextRequest) {
             expenseCategories = categories || [];
             console.log(`📋 Loaded ${expenseCategories.length} expense categories`);
           }
-          
+
           const prompt = getPromptForDocumentType(
-            documentType === 'credit' ? 'credit_statement' : 
-            documentType === 'bank' ? 'bank_statement' : 
+            documentType === 'credit' ? 'credit_statement' :
+            documentType === 'bank' ? 'bank_statement' :
             documentType,
-            null, // text - null כי אנחנו שולחים את הקובץ ישירות
+            null,
             expenseCategories
           );
-          
+
           console.log(`📝 Using prompt for document type: ${documentType} (${prompt.length} chars)`);
 
-          // 🆕 GPT-5.2 with Responses API - direct PDF file analysis
+          // 🆕 Gemini 3.1 Pro - direct PDF analysis via inline data
           let content = '';
           try {
-            console.log('🔄 Analyzing PDF with GPT-5.2 (effort: none for speed)...');
-            const gpt52Response = await openai.responses.create({
-              model: 'gpt-5.2-2025-12-11',
-              input: [
-              {
-                role: 'user',
-                content: [
-                    { type: 'input_file', file_id: fileUpload.id },
-                    { type: 'input_text', text: prompt }
-                  ]
-                }
-              ],
-              reasoning: { effort: 'none' }, // ⚡ Fast mode - no reasoning overhead
-              text: { verbosity: 'low' },
-              max_output_tokens: 24000 // Increased to handle large bank statements
-            });
-            content = gpt52Response.output_text || '{}';
-            console.log('✅ GPT-5.2 PDF analysis succeeded');
-          } catch (gpt52Error: any) {
-            console.log(`❌ GPT-5.2 failed: ${gpt52Error.message}`);
-            throw gpt52Error; // No fallback - GPT-5.2 is the primary model
+            console.log('🔄 Analyzing PDF with Gemini 3.1 Pro...');
+            const base64Pdf = buffer.toString('base64');
+            const { chatWithGeminiProVision } = await import('@/lib/ai/gemini-client');
+            content = await chatWithGeminiProVision(base64Pdf, 'application/pdf', prompt);
+            console.log('✅ Gemini Pro PDF analysis succeeded');
+          } catch (geminiError: any) {
+            console.log(`❌ Gemini Pro failed: ${geminiError.message}`);
+            throw geminiError;
           }
-          
-          // Clean up uploaded file from OpenAI + context
+
+          // Clean up context
           try {
-            await openai.files.del(fileUpload.id);
             await updateContext(userData.id, {
               waitingForDocument: undefined,
               taskProgress: undefined,
@@ -1106,13 +1305,64 @@ export async function POST(request: NextRequest) {
           
           console.log(`💾 Saving ${allTransactions.length} transactions with batch_id: ${pendingBatchId}`);
           
+          const duplicateSuspects: Array<{ vendor: string; amount: number; date: string }> = [];
+
           for (const tx of allTransactions) {
             const txDate = tx.date || new Date().toISOString().split('T')[0];
             const txType = tx.type || 'expense';
             // 🔧 FIX: category חובה - נשתמש בקטגוריה מה-AI או ברירת מחדל
-            const category = tx.expense_category || tx.income_category || tx.category || 
+            const category = tx.expense_category || tx.income_category || tx.category ||
               (txType === 'income' ? 'הכנסה אחרת' : 'הוצאה אחרת');
-            
+
+            // 🔍 Duplicate detection: check if similar transaction already exists
+            if (tx.vendor && tx.amount) {
+              const tolerance = Math.abs(tx.amount) * 0.02; // ±2%
+              const dateObj = new Date(txDate);
+              const dayBefore = new Date(dateObj.getTime() - 86400000).toISOString().split('T')[0];
+              const dayAfter = new Date(dateObj.getTime() + 86400000).toISOString().split('T')[0];
+
+              const { data: existingTx } = await (supabase as any)
+                .from('transactions')
+                .select('id, vendor, amount, tx_date')
+                .eq('user_id', userData.id)
+                .gte('tx_date', dayBefore)
+                .lte('tx_date', dayAfter)
+                .gte('amount', tx.amount - tolerance)
+                .lte('amount', tx.amount + tolerance)
+                .neq('status', 'duplicate_suspect')
+                .limit(1);
+
+              if (existingTx && existingTx.length > 0) {
+                duplicateSuspects.push({ vendor: tx.vendor, amount: tx.amount, date: txDate });
+                // Still insert but mark as duplicate suspect
+                const { data: inserted, error: insertError } = await (supabase as any)
+                  .from('transactions')
+                  .insert({
+                    user_id: userData.id,
+                    type: txType,
+                    amount: tx.amount,
+                    vendor: tx.vendor,
+                    date: txDate,
+                    tx_date: txDate,
+                    category: category,
+                    expense_category: tx.expense_category || tx.income_category || null,
+                    expense_type: tx.expense_type || (txType === 'income' ? null : 'variable'),
+                    payment_method: tx.payment_method || (documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
+                    source: 'ocr',
+                    status: 'duplicate_suspect',
+                    notes: `חשד לכפל: קיימת תנועה דומה (${existingTx[0].id})`,
+                    original_description: tx.description || '',
+                    auto_categorized: !!tx.expense_category,
+                    confidence_score: tx.confidence || 0.5,
+                    batch_id: pendingBatchId,
+                  })
+                  .select('id')
+                  .single();
+                if (!insertError && inserted?.id) insertedIds.push(inserted.id);
+                continue;
+              }
+            }
+
             const { data: inserted, error: insertError } = await (supabase as any)
               .from('transactions')
               .insert({
@@ -1127,7 +1377,7 @@ export async function POST(request: NextRequest) {
                 expense_type: tx.expense_type || (txType === 'income' ? null : 'variable'),
                 payment_method: tx.payment_method || (documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
                 source: 'ocr',
-                status: 'proposed', // 🔧 FIX: שונה מ-pending ל-proposed (תואם לסיווג)
+                status: 'pending',
                 notes: tx.notes || tx.description || '',
                 original_description: tx.description || '',
                 auto_categorized: !!tx.expense_category,
@@ -1145,6 +1395,18 @@ export async function POST(request: NextRequest) {
           }
           
           console.log(`✅ Saved ${insertedIds.length}/${allTransactions.length} transactions`);
+
+          // 🔍 Notify user about duplicate suspects
+          if (duplicateSuspects.length > 0) {
+            const dupList = duplicateSuspects.slice(0, 3).map(d =>
+              `• ${d.vendor} - ₪${Math.abs(d.amount).toLocaleString('he-IL')} (${d.date})`
+            ).join('\n');
+            await greenAPI.sendMessage({
+              phoneNumber: phoneNumber,
+              message: `⚠️ *חשד לכפל תשלום (${duplicateSuspects.length}):*\n\n${dupList}\n\nכתוב *"כפל תשלום"* לראות ולטפל`,
+            });
+          }
+
           if (insertErrors.length > 0) {
             console.error(`❌ ${insertErrors.length} transaction insert errors:`);
             // Log first 5 errors with details
@@ -1224,7 +1486,7 @@ export async function POST(request: NextRequest) {
                 .from('users')
                 .update({ 
                   onboarding_state: 'classification',
-                  current_phase: 'classification'
+                  phase: 'data_collection'
                 })
                 .eq('id', userData.id);
               console.log(`✅ User state updated to classification`);
@@ -1309,10 +1571,20 @@ export async function POST(request: NextRequest) {
                 }
               }
             }
+            // 🔗 Reconciliation: match credit detail to bank summaries
+            if (savedDocumentId && documentType === 'credit') {
+              try {
+                const { matchCreditTransactions } = await import('@/lib/reconciliation/credit-matcher');
+                await matchCreditTransactions(supabase, userData.id, savedDocumentId, 'credit_statement');
+                console.log('✅ Credit reconciliation completed');
+              } catch (reconErr) {
+                console.error('⚠️ Credit reconciliation error:', reconErr);
+              }
+            }
           } else {
             console.warn('⚠️ No period detected - document will not be saved');
           }
-          
+
           // בדיקת כיסוי תקופות - האם יש 3 חודשים?
           // 🆕 נחכה רגע לוודא שה-DB עודכן
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -1500,23 +1772,19 @@ export async function POST(request: NextRequest) {
             expenseCategories
           );
           
-          console.log(`🤖 Sending Excel data to GPT-5.2 (${excelText.length} chars)...`);
-          
-          // 🆕 GPT-5.2 with Responses API - effort: 'none' for fast response!
+          console.log(`🤖 Sending Excel data to Gemini 3.1 Pro (${excelText.length} chars)...`);
+
+          // 🆕 Gemini 3.1 Pro for text-based document analysis
+          const { chatWithGeminiProDeep } = await import('@/lib/ai/gemini-client');
+
           // ⏱️ With timeout to prevent Vercel 300s limit
-          const aiPromise = openai.responses.create({
-            model: 'gpt-5.2-2025-12-11',
-            input: prompt,
-            reasoning: { effort: 'none' }, // ⚡ Fast mode - no deep thinking
-            text: { verbosity: 'low' }, // ⚡ Concise output
-            max_output_tokens: 12000 // 🔧 Limit output to prevent huge JSON
-          });
-          
+          const aiPromise = chatWithGeminiProDeep(prompt, '').then(text => ({ output_text: text }));
+
           // ⏱️ Timeout of 120 seconds for AI (leaves room for DB operations)
-          const timeoutPromise = new Promise((_, reject) => 
+          const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('AI_TIMEOUT')), 120000)
           );
-          
+
           let aiResponse: any;
           try {
             aiResponse = await Promise.race([aiPromise, timeoutPromise]);
@@ -1786,7 +2054,7 @@ export async function POST(request: NextRequest) {
           // עדכון סטטוס משתמש
           await supabase
             .from('users')
-            .update({ onboarding_state: 'classification', current_phase: 'classification' })
+            .update({ onboarding_state: 'classification', phase: 'data_collection' })
             .eq('id', userData.id);
           
           // קריאה לתהליך הסיווג
@@ -1809,9 +2077,39 @@ export async function POST(request: NextRequest) {
           message: '📎 קיבלתי את הקובץ!\n\nאני תומך ב-PDF, Excel (XLSX/XLS/CSV) ותמונות.\n\nאפשר לשלוח בפורמט אחר?',
         });
       }
+    } else if (messageType === 'audioMessage' || messageType === 'voiceMessage') {
+      // Voice/audio messages - not supported yet
+      const greenAPI = getGreenAPIClient();
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `🎤 קיבלתי הודעה קולית!\n\nלצערי אני עדיין לא תומך בהודעות קוליות.\n\n💡 כתוב לי טקסט או שלח תמונה/PDF.`,
+      });
+    } else if (messageType === 'videoMessage') {
+      const greenAPI = getGreenAPIClient();
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `🎬 קיבלתי וידאו!\n\nאני לא יכול לעבד וידאו.\n\n💡 שלח תמונה של הקבלה/דוח במקום.`,
+      });
+    } else if (messageType === 'stickerMessage' || messageType === 'contactMessage' ||
+               messageType === 'locationMessage' || messageType === 'pollMessage' ||
+               messageType === 'listResponseMessage') {
+      // Catch-all for unsupported but known message types
+      const greenAPI = getGreenAPIClient();
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `👋 קיבלתי!\n\nאני עובד עם טקסט, תמונות ומסמכים (PDF/Excel).\n\n💡 כתוב *"עזרה"* לראות מה אפשר לעשות.`,
+      });
+    } else if (messageType && messageType !== 'extendedTextMessage' && messageType !== 'quotedMessage') {
+      // Unknown message type - still respond so user isn't left hanging
+      console.log(`⚠️ Unknown message type: ${messageType}`);
+      const greenAPI = getGreenAPIClient();
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `👋 קיבלתי!\n\nכתוב לי טקסט, שלח תמונה או מסמך ואני אטפל בזה.\n\nכתוב *"עזרה"* לעוד אפשרויות.`,
+      });
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       status: 'success',
       messageId: savedMessage.id
     });
@@ -1825,528 +2123,17 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Handle AI Chat
- * שליחת הודעה ל-AI וקבלת תשובה חכמה
- * הפונקציה מחזירה גם זיהוי הוצאה (אם רלוונטי)
- */
-async function handleAIChat(
-  supabase: any,
-  userId: string,
-  message: string,
-  phoneNumber: string
-): Promise<{ response: string; detected_expense?: any; tokens_used: number }> {
-  try {
-    // 1. שליפת context של המשתמש
-    const context = await fetchUserContext(supabase, userId);
-
-    // 2. שליפת 5 הודעות אחרונות (היסטוריה)
-    const { data: recentMessages } = await supabase
-      .from('chat_messages')
-      .select('role, content')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    // היסטוריה בסדר הפוך (ישן → חדש)
-    const history = (recentMessages || []).reverse();
-
-    // 3. בניית messages ל-OpenAI
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      // System prompt
-      { role: 'system', content: SYSTEM_PROMPT },
-      // Context
-      { role: 'system', content: `הנה המידע על המשתמש:\n\n${buildContextMessage(context)}` },
-      // היסטוריה
-      ...history.map((msg: any) => ({
-        role: msg.role as 'user' | 'assistant' | 'system',
-        content: msg.content,
-      })),
-      // ההודעה החדשה
-      { role: 'user', content: message },
-    ];
-
-    // 4. קריאה ל-OpenAI (GPT-5-nano for fast chat)
-    // Build combined input for Responses API
-    const systemContext = `${SYSTEM_PROMPT}\n\nהנה המידע על המשתמש:\n\n${buildContextMessage(context)}`;
-    const historyText = history.map((msg: any) => `${msg.role}: ${msg.content}`).join('\n');
-    const fullInput = `${systemContext}\n\n${historyText}\n\nuser: ${message}`;
-    
-    const chatResponse = await openai.responses.create({
-      model: 'gpt-5-nano-2025-08-07',
-      input: fullInput,
-      reasoning: { effort: 'none' }, // Fast chat - no reasoning
-    });
-
-    const aiResponse = chatResponse.output_text || 'סליחה, לא הבנתי. תנסה שוב? 🤔';
-    const tokensUsed = chatResponse.usage?.total_tokens || 0;
-
-    // 5. זיהוי הוצאה (אם יש)
-    const detectedExpense = parseExpenseFromAI(aiResponse);
-
-    // 6. שמירת הודעת המשתמש
-    await supabase.from('chat_messages').insert({
-      user_id: userId,
-      role: 'user',
-      content: message,
-      context_used: context,
-    });
-
-    // 7. שמירת תשובת ה-AI
-    await supabase.from('chat_messages').insert({
-      user_id: userId,
-      role: 'assistant',
-      content: aiResponse,
-      tokens_used: tokensUsed,
-      model: 'gpt-5-nano',
-      detected_expense: detectedExpense,
-      expense_created: false,
-    });
-
-    return {
-      response: aiResponse,
-      detected_expense: detectedExpense,
-      tokens_used: tokensUsed,
-    };
-  } catch (error) {
-    console.error('❌ AI Chat error:', error);
-    
-    // Fallback response
-    return {
-      response: 'סליחה, משהו השתבש. תנסה שוב? 🤔',
-      tokens_used: 0,
-    };
-  }
-}
-
-/**
- * שליפת context של המשתמש
- * (זהה לפונקציה ב-/api/wa/chat)
- */
-async function fetchUserContext(supabase: any, userId: string): Promise<UserContext> {
-  const context: UserContext = {};
-
-  // 1. פרופיל פיננסי + Phase
-  const { data: user } = await supabase
-    .from('users')
-    .select('name, phase')
-    .eq('id', userId)
-    .single();
-
-  const { data: profile } = await supabase
-    .from('user_financial_profile')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
-
-  if (profile) {
-    context.profile = {
-      name: user?.name,
-      age: profile.age,
-      monthlyIncome: profile.total_monthly_income,
-      totalFixedExpenses: profile.total_fixed_expenses,
-      availableBudget: (profile.total_monthly_income || 0) - (profile.total_fixed_expenses || 0),
-      totalDebt: profile.total_debt,
-      currentSavings: profile.current_savings,
-    };
-  }
-
-  // 2. Phase נוכחי
-  if (user?.phase) {
-    context.phase = {
-      current: user.phase,
-      progress: 50, // TODO: חשב באמת מהדאטה
-    };
-  }
-
-  // 3. תקציב חודשי (אם קיים)
-  const currentMonth = new Date().toISOString().substring(0, 7);
-  const { data: budget } = await supabase
-    .from('budgets')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('month', currentMonth)
-    .single();
-
-  if (budget) {
-    const remaining = budget.total_budget - budget.total_spent;
-    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-    const currentDay = new Date().getDate();
-    const daysRemaining = daysInMonth - currentDay;
-
-    context.budget = {
-      totalBudget: budget.total_budget,
-      totalSpent: budget.total_spent,
-      remaining,
-      daysRemaining,
-      status: budget.status,
-    };
-  }
-
-  // 4. יעדים פעילים
-  const { data: goals } = await supabase
-    .from('goals')
-    .select('name, target_amount, current_amount')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .limit(5);
-
-  if (goals && goals.length > 0) {
-    context.goals = goals.map((goal: any) => ({
-      name: goal.name,
-      targetAmount: goal.target_amount,
-      currentAmount: goal.current_amount || 0,
-      progress: Math.round(((goal.current_amount || 0) / goal.target_amount) * 100),
-    }));
-  }
-
-  // 5. תנועות אחרונות
-  const { data: transactions } = await supabase
-    .from('transactions')
-    .select('tx_date, vendor, amount, category')
-    .eq('user_id', userId)
-    .eq('type', 'expense')
-    .order('tx_date', { ascending: false })
-    .limit(5);
-
-  if (transactions && transactions.length > 0) {
-    context.recentTransactions = transactions.map((tx: any) => ({
-      date: new Date(tx.tx_date).toLocaleDateString('he-IL'),
-      description: tx.vendor || tx.category,
-      amount: tx.amount,
-      category: tx.category,
-    }));
-  }
-
-  // 6. התראות אחרונות (3 ימים)
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-
-  const { data: alerts } = await supabase
-    .from('alerts')
-    .select('type, message, created_at')
-    .eq('user_id', userId)
-    .gte('created_at', threeDaysAgo.toISOString())
-    .order('created_at', { ascending: false })
-    .limit(3);
-
-  if (alerts && alerts.length > 0) {
-    context.alerts = alerts.map((alert: any) => ({
-      type: alert.type,
-      message: alert.message,
-      createdAt: new Date(alert.created_at).toLocaleDateString('he-IL'),
-    }));
-  }
-
-  // 7. הלוואות פעילות
-  const { data: loans } = await supabase
-    .from('loans')
-    .select('loan_type, lender_name, current_balance, monthly_payment, interest_rate, remaining_payments')
-    .eq('user_id', userId)
-    .eq('active', true)
-    .order('current_balance', { ascending: false })
-    .limit(10);
-
-  if (loans && loans.length > 0) {
-    context.loans = loans.map((loan: any) => ({
-      type: loan.loan_type === 'mortgage' ? 'משכנתא' : 
-            loan.loan_type === 'personal' ? 'הלוואה אישית' : 
-            loan.loan_type === 'car' ? 'הלוואת רכב' : 'הלוואה',
-      lender: loan.lender_name,
-      amount: loan.current_balance || 0,
-      monthlyPayment: loan.monthly_payment || 0,
-      interestRate: loan.interest_rate,
-      remainingPayments: loan.remaining_payments,
-    }));
-  }
-
-  // 8. ביטוחים פעילים
-  const { data: insurance } = await supabase
-    .from('insurance')
-    .select('insurance_type, provider, monthly_premium, active')
-    .eq('user_id', userId)
-    .eq('active', true)
-    .limit(10);
-
-  if (insurance && insurance.length > 0) {
-    context.insurance = insurance.map((ins: any) => ({
-      type: ins.insurance_type,
-      provider: ins.provider,
-      monthlyPremium: ins.monthly_premium,
-      active: ins.active,
-    }));
-  }
-
-  // 9. מנוי
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('plan, status, billing_cycle')
-    .eq('user_id', userId)
-    .single();
-
-  if (subscription) {
-    context.subscriptions = {
-      plan: subscription.plan,
-      status: subscription.status,
-      billingCycle: subscription.billing_cycle,
-    };
-  }
-
-  return context;
-}
-
-/**
- * Handle Confirm Transaction
- * אישור transaction - שינוי סטטוס מ-proposed ל-confirmed
- */
-async function handleConfirmTransaction(
-  supabase: any,
-  userId: string,
-  transactionId: string,
-  phoneNumber: string
-) {
-  const greenAPI = getGreenAPIClient();
-
-  try {
-    // עדכן transaction
-    const { data: transaction, error } = await supabase
-      .from('transactions')
-      .update({ status: 'confirmed' })
-      .eq('id', transactionId)
-      .eq('user_id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('❌ Error confirming transaction:', error);
-      await greenAPI.sendMessage({
-        phoneNumber,
-        message: 'אופס! משהו השתבש באישור ההוצאה 😕',
-      });
-      return;
-    }
-
-    console.log('✅ Transaction confirmed:', transactionId);
-
-    // שלח הודעת אישור + שאל על קטגוריה (אם אין)
-    if (!transaction.category_id) {
-      // קבל קטגוריות
-      const { data: categories } = await supabase
-        .from('budget_categories')
-        .select('id, name')
-        .eq('user_id', userId)
-        .eq('active', true)
-        .order('priority', { ascending: false })
-        .limit(3);
-
-      if (categories && categories.length > 0) {
-        const buttons = categories.map((cat: any) => ({
-          buttonId: `category_${transactionId}_${cat.id}`,
-          buttonText: cat.name,
-        }));
-
-        await greenAPI.sendButtons({
-          phoneNumber,
-          message: `נרשם! 💚\n\nבאיזו קטגוריה?`,
-          buttons,
-        });
-      } else {
-        await greenAPI.sendMessage({
-          phoneNumber,
-          message: `נרשם! 💚\n\n${transaction.amount} ₪${transaction.vendor ? ` ב${transaction.vendor}` : ''}`,
-        });
-      }
-    } else {
-      await greenAPI.sendMessage({
-        phoneNumber,
-        message: `נרשם! 💚\n\n${transaction.amount} ₪${transaction.vendor ? ` ב${transaction.vendor}` : ''}`,
-      });
-    }
-  } catch (error) {
-    console.error('❌ Confirm error:', error);
-  }
-}
-
-/**
- * Handle Edit Transaction
- * בקשת עריכה - שליחת הוראות למשתמש
- */
-async function handleEditTransaction(
-  supabase: any,
-  userId: string,
-  transactionId: string,
-  phoneNumber: string
-) {
-  const greenAPI = getGreenAPIClient();
-
-  try {
-    const { data: transaction } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('id', transactionId)
-      .eq('user_id', userId)
-      .single();
-
-    if (!transaction) {
-      await greenAPI.sendMessage({
-        phoneNumber,
-        message: 'לא מצאתי את ההוצאה 🤔',
-      });
-      return;
-    }
-
-    await greenAPI.sendMessage({
-      phoneNumber,
-      message: `בסדר! כתוב את הסכום והמקום הנכונים 👇\n\nלדוגמה: "45 ₪ קפה"`,
-    });
-
-    // מחק את ה-proposed transaction
-    await supabase
-      .from('transactions')
-      .delete()
-      .eq('id', transactionId)
-      .eq('user_id', userId);
-  } catch (error) {
-    console.error('❌ Edit error:', error);
-  }
-}
-
-/**
- * Handle Category Selection
- * בחירת קטגוריה ל-transaction
- */
-async function handleCategorySelection(
-  supabase: any,
-  userId: string,
-  transactionId: string,
-  categoryId: string,
-  phoneNumber: string
-) {
-  const greenAPI = getGreenAPIClient();
-
-  try {
-    const { data: transaction, error } = await supabase
-      .from('transactions')
-      .update({ category_id: categoryId })
-      .eq('id', transactionId)
-      .eq('user_id', userId)
-      .select('*, budget_categories(name)')
-      .single();
-
-    if (error) {
-      console.error('❌ Error setting category:', error);
-      return;
-    }
-
-    const categoryName = transaction.budget_categories?.name || 'לא ידוע';
-
-    await greenAPI.sendMessage({
-      phoneNumber,
-      message: `מעולה! נרשם תחת "${categoryName}" 📊`,
-    });
-  } catch (error) {
-    console.error('❌ Category selection error:', error);
-  }
-}
-
-/**
- * Handle Split Transaction
- * פיצול transaction למספר קטגוריות
- */
-async function handleSplitTransaction(
-  supabase: any,
-  userId: string,
-  transactionId: string,
-  phoneNumber: string
-) {
-  const greenAPI = getGreenAPIClient();
-
-  await greenAPI.sendMessage({
-    phoneNumber,
-    message: 'פיצול הוצאה 🔀\n\nכתוב כך:\n50 ₪ קפה, 30 ₪ חנייה',
-  });
-
-  // TODO: implement split logic in text message handler
-}
-
-/**
- * Handle Payment Method Selection
- * עדכון אמצעי תשלום להוצאות מהקבלה
- */
-async function handlePaymentMethod(
-  supabase: any,
-  userId: string,
-  receiptId: string,
-  paymentType: string,
-  phoneNumber: string
-) {
-  const greenAPI = getGreenAPIClient();
-
-  try {
-    // מצא את כל ההוצאות שקשורות לקבלה הזו (proposed status)
-    const { data: transactions, error: fetchError } = await supabase
-      .from('transactions')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('source', 'ocr')
-      .eq('status', 'proposed')
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (fetchError || !transactions || transactions.length === 0) {
-      await greenAPI.sendMessage({
-        phoneNumber,
-        message: 'לא מצאתי הוצאות לעדכן 🤔',
-      });
-      return;
-    }
-
-    // עדכן את כל ההוצאות האחרונות עם אמצעי התשלום
-    const paymentMethodMap: Record<string, string> = {
-      credit: 'credit',
-      cash: 'cash',
-      debit: 'debit',
-    };
-
-    const paymentMethod = paymentMethodMap[paymentType] || 'cash';
-
-    for (const tx of transactions) {
-      await supabase
-        .from('transactions')
-        .update({
-          payment_method: paymentMethod,
-          status: 'confirmed', // אישור אוטומטי
-        })
-        .eq('id', tx.id);
-    }
-
-    // הודעת אישור
-    const paymentText = paymentType === 'credit' ? 'אשראי 💳' : 
-                       paymentType === 'cash' ? 'מזומן 💵' : 
-                       'חיוב 🏦';
-
-    await greenAPI.sendMessage({
-      phoneNumber,
-      message: `מעולה! ✅\n\nההוצאות נשמרו כ-${paymentText}\n\nתוכל לראות אותן ב-Dashboard 📊`,
-    });
-
-    console.log('✅ Payment method updated:', { userId, receiptId, paymentMethod, count: transactions.length });
-
-  } catch (error) {
-    console.error('❌ Payment method error:', error);
-    await greenAPI.sendMessage({
-      phoneNumber,
-      message: 'אופס! משהו השתבש 😕',
-    });
-  }
-}
-
 // Allow GET for testing
 export async function GET() {
-  return NextResponse.json({ 
+  return NextResponse.json({
     status: 'ok',
     message: 'GreenAPI Webhook endpoint is active',
     timestamp: new Date().toISOString()
   });
 }
 
+// Dead code removed: handleAIChat, fetchUserContext, handleConfirmTransaction,
+// handleEditTransaction, handleCategorySelection, handleSplitTransaction,
+// handlePaymentMethod (~530 lines). Migrated to φ Router.
+//
+// END OF FILE

@@ -38,7 +38,7 @@ export async function detectPatterns(userId: string): Promise<Pattern[]> {
     .from("transactions")
     .select("*")
     .eq("user_id", userId)
-    .order("date", { ascending: false })
+    .order("tx_date", { ascending: false })
     .limit(500); // Last 500 transactions
 
   if (!transactions || transactions.length === 0) {

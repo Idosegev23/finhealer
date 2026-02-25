@@ -31,8 +31,9 @@ export async function GET(request: NextRequest) {
     // Get all active users with phone numbers
     const { data: users, error: usersError } = await supabaseAdmin
       .from("users")
-      .select("id, phone, full_name")
+      .select("id, phone, name, full_name")
       .in("phase", ["behavior", "budget", "goals", "monitoring"])
+      .eq("wa_opt_in", true)
       .not("phone", "is", null)
       .limit(100);
 
@@ -45,11 +46,39 @@ export async function GET(request: NextRequest) {
     let sentCount = 0;
     let errors = 0;
 
+    // 🚀 Batch load: all transactions for the last 2 weeks for all users upfront
+    const userIds = (users || []).map(u => u.id);
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const twoWeeksAgo = new Date(weekAgo);
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 7);
+    const todayStr = new Date().toISOString().split("T")[0];
+    const twoWeeksAgoStr = twoWeeksAgo.toISOString().split("T")[0];
+
+    const { data: allTwoWeeksTx } = await supabaseAdmin
+      .from("transactions")
+      .select("user_id, amount, type, expense_category, tx_date")
+      .eq("status", "confirmed")
+      .gte("tx_date", twoWeeksAgoStr)
+      .lte("tx_date", todayStr)
+      .in("user_id", userIds);
+
+    // Group by user_id in memory
+    const txByUser = new Map<string, typeof allTwoWeeksTx>();
+    for (const tx of allTwoWeeksTx || []) {
+      if (!txByUser.has(tx.user_id)) txByUser.set(tx.user_id, []);
+      txByUser.get(tx.user_id)!.push(tx);
+    }
+
     for (const user of users || []) {
       try {
-        // Generate weekly summary
-        const summary = await generateWeeklySummary(user.id);
-        
+        // Generate weekly summary using pre-loaded data
+        const summary = generateWeeklySummaryFromData(
+          user.id,
+          user.name || user.full_name,
+          txByUser.get(user.id) || []
+        );
+
         if (summary && user.phone) {
           // Send via WhatsApp
           await greenAPI.sendMessage({
@@ -88,42 +117,32 @@ export async function GET(request: NextRequest) {
 }
 
 // ============================================================================
-// Generate Weekly Summary
+// Generate Weekly Summary (using pre-loaded data - no DB calls!)
 // ============================================================================
 
-async function generateWeeklySummary(userId: string): Promise<string | null> {
-  // Get last 7 days data
+function generateWeeklySummaryFromData(
+  userId: string,
+  userName: string | null,
+  allTransactions: Array<{ user_id: string; amount: number; type: string; expense_category: string; tx_date: string }>
+): string | null {
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
   const weekAgoStr = weekAgo.toISOString().split("T")[0];
-  const todayStr = new Date().toISOString().split("T")[0];
 
-  // Get user info including phi score
-  const { data: user } = await supabaseAdmin
-    .from("users")
-    .select("full_name, phi_score, current_phase")
-    .eq("id", userId)
-    .single();
+  // Split into this week and last week
+  const thisWeekTx = allTransactions.filter(t => t.tx_date >= weekAgoStr);
+  const prevWeekTx = allTransactions.filter(t => t.tx_date < weekAgoStr);
 
-  // Get transactions (using amount < 0 for expenses)
-  const { data: transactions } = await supabaseAdmin
-    .from("transactions")
-    .select("amount, expense_category, date")
-    .eq("user_id", userId)
-    .eq("status", "approved")
-    .gte("date", weekAgoStr)
-    .lte("date", todayStr);
-
-  if (!transactions || transactions.length === 0) {
+  if (thisWeekTx.length === 0) {
     return null;
   }
 
-  // Calculate totals
-  const expenses = transactions.filter(t => t.amount < 0);
-  const income = transactions.filter(t => t.amount > 0);
-  
-  const totalExpenses = Math.abs(expenses.reduce((sum, t) => sum + t.amount, 0));
-  const totalIncome = income.reduce((sum, t) => sum + t.amount, 0);
+  // Calculate totals - use type field for reliable categorization
+  const expenses = thisWeekTx.filter(t => t.type === "expense" || t.amount < 0);
+  const income = thisWeekTx.filter(t => t.type === "income" || (t.amount > 0 && t.type !== "expense"));
+
+  const totalExpenses = expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const totalIncome = income.reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   // Group by category
   const byCategory: Record<string, number> = {};
@@ -137,40 +156,25 @@ async function generateWeeklySummary(userId: string): Promise<string | null> {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
-  // Get previous week for comparison
-  const twoWeeksAgo = new Date(weekAgo);
-  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 7);
-  
-  const { data: prevTransactions } = await supabaseAdmin
-    .from("transactions")
-    .select("amount")
-    .eq("user_id", userId)
-    .eq("status", "approved")
-    .lt("amount", 0)
-    .gte("date", twoWeeksAgo.toISOString().split("T")[0])
-    .lt("date", weekAgoStr);
-  
-  const prevWeekExpenses = Math.abs(prevTransactions?.reduce((sum, t) => sum + t.amount, 0) || 0);
-  const changePercent = prevWeekExpenses > 0 
+  // Previous week comparison
+  const prevWeekExpenses = prevWeekTx
+    .filter(t => t.type === "expense" || t.amount < 0)
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  const changePercent = prevWeekExpenses > 0
     ? Math.round(((totalExpenses - prevWeekExpenses) / prevWeekExpenses) * 100)
     : 0;
 
   // Build message
-  const userName = user?.full_name?.split(' ')[0] || 'היי';
-  let msg = `📊 *סיכום שבועי, ${userName}!*\n\n`;
-  
-  // Phi Score if available
-  if (user?.phi_score) {
-    const scoreEmoji = user.phi_score >= 80 ? '🌟' : user.phi_score >= 60 ? '👍' : '📈';
-    msg += `${scoreEmoji} *ציון φ:* ${user.phi_score}/100\n\n`;
-  }
-  
+  const displayName = userName?.split(' ')[0] || 'היי';
+  let msg = `📊 *סיכום שבועי, ${displayName}!*\n\n`;
+
   if (totalIncome > 0) {
     msg += `💰 הכנסות: ${formatCurrency(totalIncome)}\n`;
   }
-  
+
   msg += `💸 הוצאות: ${formatCurrency(totalExpenses)}\n`;
-  
+
   // Week over week comparison
   if (prevWeekExpenses > 0) {
     if (changePercent > 0) {
@@ -181,7 +185,7 @@ async function generateWeeklySummary(userId: string): Promise<string | null> {
       msg += `➡️ כמו השבוע שעבר\n`;
     }
   }
-  
+
   // Balance
   const balance = totalIncome - totalExpenses;
   if (balance > 0) {
@@ -189,14 +193,14 @@ async function generateWeeklySummary(userId: string): Promise<string | null> {
   } else if (balance < 0 && totalIncome > 0) {
     msg += `⚠️ גירעון: ${formatCurrency(Math.abs(balance))}\n`;
   }
-  
+
   msg += `\n🔝 *הוצאות לפי קטגוריה:*\n`;
-  
+
   for (const [category, amount] of sortedCategories) {
     const percent = Math.round((amount / totalExpenses) * 100);
     msg += `• ${category}: ${formatCurrency(amount)} (${percent}%)\n`;
   }
-  
+
   // Insight based on data
   const biggestCategory = sortedCategories[0];
   if (biggestCategory && biggestCategory[1] > totalExpenses * 0.35) {
@@ -207,9 +211,19 @@ async function generateWeeklySummary(userId: string): Promise<string | null> {
   } else if (changePercent > 20) {
     msg += `\n💡 *שים לב:* עלייה משמעותית בהוצאות השבוע. רוצה לבדוק יחד?`;
   }
-  
+
+  // Weekly challenge - based on data patterns
+  if (changePercent > 10) {
+    msg += `\n\n💪 *אתגר השבוע:* נסה לחתוך 10% מההוצאות - זה ${formatCurrency(Math.round(totalExpenses * 0.1))} חיסכון!`;
+  } else if (sortedCategories.length > 0) {
+    const topCat = sortedCategories[0][0];
+    msg += `\n\n🎯 *אתגר השבוע:* נסה לצמצם ${topCat} ב-15% - מה דעתך?`;
+  } else {
+    msg += `\n\n📊 כתוב *"תזרים"* לתחזית 3 חודשים קדימה 📈`;
+  }
+
   msg += `\n\nשבוע טוב! 😊`;
-  
+
   return msg;
 }
 

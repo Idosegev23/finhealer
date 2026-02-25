@@ -29,8 +29,9 @@ export async function GET(request: NextRequest) {
     // Get all active users
     const { data: users, error: usersError } = await supabaseAdmin
       .from("users")
-      .select("id, phone, full_name")
+      .select("id, phone, name, full_name")
       .in("phase", ["budget", "goals", "monitoring"])
+      .eq("wa_opt_in", true)
       .not("phone", "is", null)
       .limit(100);
 
@@ -43,11 +44,61 @@ export async function GET(request: NextRequest) {
     let sentCount = 0;
     let errors = 0;
 
+    // 🚀 Batch load: all last month transactions, budgets, and goals upfront
+    const userIds = (users || []).map(u => u.id);
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const startDate = `${lastMonth.toISOString().slice(0, 7)}-01`;
+    const endDate = lastMonthEnd.toISOString().split("T")[0];
+    const lastMonthStr = lastMonth.toISOString().slice(0, 7);
+
+    const [txResult, budgetResult, goalsResult] = await Promise.all([
+      supabaseAdmin
+        .from("transactions")
+        .select("user_id, amount, type, expense_category")
+        .gte("tx_date", startDate)
+        .lte("tx_date", endDate)
+        .in("user_id", userIds),
+      supabaseAdmin
+        .from("budgets")
+        .select("user_id, total_budget, budget_categories(*)")
+        .eq("month", lastMonthStr)
+        .in("user_id", userIds),
+      supabaseAdmin
+        .from("goals")
+        .select("user_id, name, target_amount, current_amount")
+        .eq("status", "active")
+        .in("user_id", userIds),
+    ]);
+
+    // Group by user_id in memory
+    const txByUser = new Map<string, typeof txResult.data>();
+    for (const tx of txResult.data || []) {
+      if (!txByUser.has(tx.user_id)) txByUser.set(tx.user_id, []);
+      txByUser.get(tx.user_id)!.push(tx);
+    }
+    const budgetByUser = new Map<string, any>();
+    for (const b of budgetResult.data || []) {
+      budgetByUser.set(b.user_id, b);
+    }
+    const goalsByUser = new Map<string, any[]>();
+    for (const g of goalsResult.data || []) {
+      if (!goalsByUser.has(g.user_id)) goalsByUser.set(g.user_id, []);
+      goalsByUser.get(g.user_id)!.push(g);
+    }
+
     for (const user of users || []) {
       try {
-        // Generate monthly review
-        const review = await generateMonthlyReview(user.id, user.full_name);
-        
+        // Generate monthly review using pre-loaded data
+        const review = generateMonthlyReviewFromData(
+          user.name || user.full_name,
+          txByUser.get(user.id) || [],
+          budgetByUser.get(user.id) || null,
+          goalsByUser.get(user.id) || [],
+          lastMonth
+        );
+
         if (review) {
           // Send via WhatsApp
           await sendWhatsAppMessage(user.phone, review);
@@ -83,27 +134,16 @@ export async function GET(request: NextRequest) {
 }
 
 // ============================================================================
-// Generate Monthly Review
+// Generate Monthly Review (using pre-loaded data - no DB calls!)
 // ============================================================================
 
-async function generateMonthlyReview(userId: string, userName?: string): Promise<string | null> {
-  // Get last month data
-  const now = new Date();
-  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-  
-  const lastMonthStr = lastMonth.toISOString().slice(0, 7);
-  const startDate = `${lastMonthStr}-01`;
-  const endDate = lastMonthEnd.toISOString().split("T")[0];
-
-  // Get transactions
-  const { data: transactions } = await supabaseAdmin
-    .from("transactions")
-    .select("amount, type, expense_category")
-    .eq("user_id", userId)
-    .gte("tx_date", startDate)
-    .lte("tx_date", endDate);
-
+function generateMonthlyReviewFromData(
+  userName: string | null,
+  transactions: Array<{ amount: number; type: string; expense_category: string }>,
+  budget: any | null,
+  goals: Array<{ name: string; target_amount: number; current_amount: number }>,
+  lastMonth: Date
+): string | null {
   if (!transactions || transactions.length === 0) {
     return null;
   }
@@ -111,18 +151,10 @@ async function generateMonthlyReview(userId: string, userName?: string): Promise
   // Calculate totals
   const expenses = transactions.filter(t => t.type === "expense");
   const income = transactions.filter(t => t.type === "income");
-  
+
   const totalExpenses = expenses.reduce((sum, t) => sum + t.amount, 0);
   const totalIncome = income.reduce((sum, t) => sum + t.amount, 0);
   const balance = totalIncome - totalExpenses;
-
-  // Get budget
-  const { data: budget } = await supabaseAdmin
-    .from("budgets")
-    .select("*, budget_categories(*)")
-    .eq("user_id", userId)
-    .eq("month", lastMonthStr)
-    .single();
 
   // Calculate φ Score
   const phiScore = calculatePhiScore(totalExpenses, totalIncome, budget);
@@ -142,7 +174,7 @@ async function generateMonthlyReview(userId: string, userName?: string): Promise
     for (const budgetCat of budget.budget_categories) {
       const spent = byCategory[budgetCat.category_name] || 0;
       const allocated = budgetCat.allocated_amount || 0;
-      
+
       if (spent <= allocated) {
         successes.push(`${budgetCat.category_name}: ${formatCurrency(spent)} / ${formatCurrency(allocated)}`);
       } else {
@@ -152,31 +184,24 @@ async function generateMonthlyReview(userId: string, userName?: string): Promise
     }
   }
 
-  // Get goals progress
-  const { data: goals } = await supabaseAdmin
-    .from("goals")
-    .select("name, target_amount, current_amount")
-    .eq("user_id", userId)
-    .eq("status", "active");
-
   // Build message
   const monthName = getHebrewMonthName(lastMonth.getMonth());
   const greeting = userName ? `היי ${userName}! ` : "";
-  
+
   let msg = `🎉 ${greeting}${monthName} הסתיים!\n\n`;
-  
+
   msg += `📊 **ציון φ: ${phiScore}/100** ${getPhiEmoji(phiScore)}\n\n`;
-  
+
   msg += `💰 **סיכום:**\n`;
   msg += `הכנסות: ${formatCurrency(totalIncome)}\n`;
   msg += `הוצאות: ${formatCurrency(totalExpenses)}\n`;
   msg += `יתרה: ${balance >= 0 ? "+" : ""}${formatCurrency(balance)}\n\n`;
-  
+
   if (budget) {
     const budgetUsage = Math.round((totalExpenses / budget.total_budget) * 100);
     msg += `📈 **תקציב:** ${budgetUsage}%\n\n`;
   }
-  
+
   if (successes.length > 0) {
     msg += `⭐ **הצלחות:**\n`;
     for (const s of successes.slice(0, 3)) {
@@ -184,7 +209,7 @@ async function generateMonthlyReview(userId: string, userName?: string): Promise
     }
     msg += `\n`;
   }
-  
+
   if (overages.length > 0) {
     msg += `⚠️ **חריגות:**\n`;
     for (const o of overages.slice(0, 3)) {
@@ -192,7 +217,7 @@ async function generateMonthlyReview(userId: string, userName?: string): Promise
     }
     msg += `\n`;
   }
-  
+
   if (goals && goals.length > 0) {
     msg += `🎯 **יעדים:**\n`;
     for (const goal of goals.slice(0, 3)) {
@@ -201,7 +226,7 @@ async function generateMonthlyReview(userId: string, userName?: string): Promise
     }
     msg += `\n`;
   }
-  
+
   // Recommendation
   msg += `💡 **המלצה לחודש הבא:**\n`;
   if (overages.length > 0) {
@@ -211,9 +236,9 @@ async function generateMonthlyReview(userId: string, userName?: string): Promise
   } else {
     msg += `נסה לאזן את ההוצאות עם ההכנסות.`;
   }
-  
+
   msg += `\n\nחודש טוב! 💪`;
-  
+
   return msg;
 }
 

@@ -248,15 +248,15 @@ async function detectIncomeChange(userId: string): Promise<{ change: number; per
     .select('amount')
     .eq('user_id', userId)
     .eq('type', 'income')
-    .gte('date', threeMonthsAgo.toISOString().split('T')[0]);
-  
+    .gte('tx_date', threeMonthsAgo.toISOString().split('T')[0]);
+
   const { data: oldTx } = await supabase
     .from('transactions')
     .select('amount')
     .eq('user_id', userId)
     .eq('type', 'income')
-    .gte('date', sixMonthsAgo.toISOString().split('T')[0])
-    .lt('date', threeMonthsAgo.toISOString().split('T')[0]);
+    .gte('tx_date', sixMonthsAgo.toISOString().split('T')[0])
+    .lt('tx_date', threeMonthsAgo.toISOString().split('T')[0]);
   
   if (!recentTx || !oldTx || recentTx.length === 0 || oldTx.length === 0) {
     return null;

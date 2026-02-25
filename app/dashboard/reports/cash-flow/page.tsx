@@ -51,7 +51,7 @@ export default function CashFlowReportPage() {
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'approved')
+        .eq('status', 'confirmed')
         .gte('tx_date', sixMonthsAgo.toISOString().split('T')[0])
         .order('tx_date', { ascending: true });
 

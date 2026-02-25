@@ -145,12 +145,21 @@ export async function requestNextMissingDocument(userId: string, phone: string) 
   
   message += `\n\n🔢 נשארו ${missingDocs.length} מסמכים לעיבוד.`;
   
-  // Update classification_context to wait for this document
+  // Update classification_context to wait for this document (מזג context קיים!)
   const supabase = createServiceClient();
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+
+  const existingCtx = existingUser?.classification_context || {};
+
   await supabase
     .from('users')
     .update({
       classification_context: {
+        ...existingCtx,
         waitingForDocument: nextDoc.document_type,
         waitingForDocumentId: nextDoc.id,
         waitingForCard: nextDoc.card_last_4,
@@ -185,7 +194,7 @@ export async function getClassifiableTransactions(
     .from('transactions')
     .select('id, amount, vendor, tx_date, type, expense_category, original_description, document_id')
     .eq('user_id', userId)
-    .in('status', ['pending', 'proposed'])
+    .eq('status', 'pending')
     .eq('type', type)
     .order('tx_date', { ascending: false });
   

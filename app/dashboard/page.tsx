@@ -22,7 +22,7 @@ export default async function DashboardPage() {
 
   const { data: userData } = await supabase
     .from('users')
-    .select('id, name, subscription_status, current_phase, onboarding_state, phase')
+    .select('id, name, subscription_status, phase, onboarding_state')
     .eq('id', user.id)
     .single()
 
@@ -83,7 +83,7 @@ export default async function DashboardPage() {
       .from('transactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .in('status', ['pending', 'proposed']),
+      .eq('status', 'pending'),
   ])
 
   // Monthly calculations
@@ -98,7 +98,7 @@ export default async function DashboardPage() {
 
   const hour = now.getHours()
   const greeting = hour < 12 ? 'בוקר טוב' : hour < 17 ? 'צהריים טובים' : 'ערב טוב'
-  const currentPhase = u.current_phase || u.onboarding_state || u.phase || 'data_collection'
+  const currentPhase = u.phase || 'data_collection'
   const score = Number(healthScore) || null
 
   const phaseLabel: Record<string, string> = {
@@ -289,7 +289,7 @@ export default async function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-left flex items-center gap-2">
-                    {(tx.status === 'pending' || tx.status === 'proposed') && (
+                    {tx.status === 'pending' && (
                       <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">ממתין</span>
                     )}
                     <p className={`font-semibold text-sm ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>

@@ -12,7 +12,7 @@ interface Transaction {
   source: string;
   tx_date: string;
   date: string;
-  status: 'proposed' | 'confirmed' | 'pending';
+  status: 'pending' | 'confirmed' | 'pending';
   category: string | null;
   expense_category: string | null;
   income_category: string | null;
@@ -43,7 +43,7 @@ export default function TransactionsTable({
   const [transactions, setTransactions] = useState(initialTransactions);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'proposed' | 'confirmed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'confirmed'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [updatingGoal, setUpdatingGoal] = useState<string | null>(null);
 
@@ -102,7 +102,7 @@ export default function TransactionsTable({
     totalExpenses: transactions
       .filter(tx => tx.type === 'expense' && tx.status === 'confirmed')
       .reduce((sum, tx) => sum + tx.amount, 0),
-    proposedCount: transactions.filter(tx => tx.status === 'proposed').length,
+    proposedCount: transactions.filter(tx => tx.status === 'pending').length,
   };
 
   return (
@@ -165,7 +165,7 @@ export default function TransactionsTable({
           >
             <option value="all">כל הסטטוסים</option>
             <option value="confirmed">מאושרות</option>
-            <option value="proposed">ממתינות</option>
+            <option value="pending">ממתינות</option>
           </select>
 
           {/* Category Filter */}
@@ -309,7 +309,7 @@ function SourceBadge({ source }: { source: string }) {
   );
 }
 
-function StatusBadge({ status }: { status: 'proposed' | 'confirmed' | 'pending' }) {
+function StatusBadge({ status }: { status: 'pending' | 'confirmed' | 'pending' }) {
   if (status === 'confirmed') {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E8F5E9] text-[#7ED957]">

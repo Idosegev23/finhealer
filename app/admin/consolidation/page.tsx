@@ -28,7 +28,7 @@ export default function AdminConsolidationPage() {
       .from('loan_consolidation_requests')
       .select(`
         *,
-        user:users(full_name, email, phone)
+        user:users(name, full_name, email, phone)
       `)
       .order('created_at', { ascending: false });
     
@@ -192,7 +192,7 @@ export default function AdminConsolidationPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {request.user?.full_name || 'לא צוין'}
+                          {request.user?.name || request.user?.full_name || 'לא צוין'}
                         </div>
                         <div className="text-sm text-gray-500">
                           {request.user?.phone || ''}

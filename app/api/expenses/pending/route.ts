@@ -16,13 +16,12 @@ export async function GET() {
     }
 
     // שליפת כל התנועות הממתינות (הכנסות + הוצאות)
-    // כולל גם 'pending' (מ-WhatsApp) וגם 'proposed' (מ-OCR אחר)
-    // כולל גם כל ה-sources (ocr, whatsapp, manual)
+    // כל התנועות הממתינות לאישור
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
-      .in('status', ['pending', 'proposed'])
+      .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
     // ⭐ שליפת receipt_number מ-receipts table עבור תנועות עם receipt_id

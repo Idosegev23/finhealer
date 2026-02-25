@@ -11,6 +11,7 @@ import {
   FileText,
   Settings,
   BarChart3,
+  ClipboardList,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/dashboard/goals", label: "יעדים", icon: Target },
   { href: "/dashboard/budget", label: "תקציב", icon: Wallet },
   { href: "/dashboard/transactions", label: "תנועות", icon: Receipt },
+  { href: "/dashboard/reports", label: "דוחות", icon: ClipboardList },
   { href: "/dashboard/missing-documents", label: "מסמכים", icon: FileText },
   { href: "/dashboard/settings", label: "הגדרות", icon: Settings },
 ];

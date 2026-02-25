@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('transactions')
-      .select('*', { count: 'exact' })
+      .select('id, tx_date, amount, type, status, vendor, category, expense_category, income_category, notes, is_recurring, payment_method, expense_frequency, has_details, is_cash_expense', { count: 'exact' })
       .eq('user_id', user.id)
       .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
       .order('tx_date', { ascending: false });

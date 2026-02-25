@@ -93,8 +93,8 @@ async function matchAndDeleteSummaries(
       .eq('user_id', userId)
       .gte('amount', minAmount)
       .lte('amount', maxAmount)
-      .gte('date', minDate.toISOString().split('T')[0])
-      .lte('date', maxDate.toISOString().split('T')[0]);
+      .gte('tx_date', minDate.toISOString().split('T')[0])
+      .lte('tx_date', maxDate.toISOString().split('T')[0]);
     
     if (searchError) {
       console.error('Error searching for matches:', searchError);

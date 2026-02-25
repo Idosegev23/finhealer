@@ -34,11 +34,11 @@ export async function forecastIncome(
   // שלוף תנועות הכנסה היסטוריות (12 חודשים אחרונים)
   const { data: transactions, error } = await supabase
     .from('transactions')
-    .select('amount, date, income_category')
+    .select('amount, tx_date, income_category')
     .eq('user_id', userId)
     .eq('type', 'income')
-    .gte('date', getDateMonthsAgo(12))
-    .order('date', { ascending: true });
+    .gte('tx_date', getDateMonthsAgo(12))
+    .order('tx_date', { ascending: true });
   
   if (error || !transactions || transactions.length === 0) {
     // אין נתונים - נסה לשלוף מהצהרה
@@ -162,7 +162,7 @@ function groupByMonth(transactions: any[]): Array<{ month: Date; total: number; 
   const grouped = new Map<string, { month: Date; total: number; count: number }>();
   
   for (const tx of transactions) {
-    const date = new Date(tx.date);
+    const date = new Date(tx.tx_date);
     const key = `${date.getFullYear()}-${date.getMonth()}`;
     
     if (!grouped.has(key)) {

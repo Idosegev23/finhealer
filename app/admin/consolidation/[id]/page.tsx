@@ -147,7 +147,7 @@ export default function ConsolidationRequestDetailPage() {
             <div className="space-y-3">
               <div>
                 <span className="text-gray-600">שם:</span>
-                <p className="font-medium">{request.user?.full_name || 'לא צוין'}</p>
+                <p className="font-medium">{request.user?.name || request.user?.full_name || 'לא צוין'}</p>
               </div>
               <div>
                 <span className="text-gray-600">טלפון:</span>

@@ -99,7 +99,7 @@ export async function scheduleSalaryReminder(
     .eq("user_id", userId)
     .eq("type", "income")
     .eq("category", "משכורת")
-    .gte("date", expectedSalaryDate.toISOString())
+    .gte("tx_date", expectedSalaryDate.toISOString())
     .single();
 
   if (!salaryTransaction) {
@@ -128,15 +128,15 @@ export async function scheduleExpenseLoggingReminder(
   // Check last expense logged
   const { data: lastExpense } = await supabase
     .from("transactions")
-    .select("date")
+    .select("tx_date")
     .eq("user_id", userId)
     .eq("type", "expense")
-    .order("date", { ascending: false })
+    .order("tx_date", { ascending: false })
     .limit(1)
     .single();
 
   if (lastExpense) {
-    const lastDate = new Date(lastExpense.date);
+    const lastDate = new Date(lastExpense.tx_date);
     const daysSince = Math.floor(
       (Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
     );

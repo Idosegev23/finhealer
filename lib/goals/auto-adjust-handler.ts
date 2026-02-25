@@ -60,8 +60,8 @@ export async function detectIncomeChangeAndPropose(
       .select('amount')
       .eq('user_id', userId)
       .eq('type', 'income')
-      .gte('date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
-      .order('date', { ascending: false });
+      .gte('tx_date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+      .order('tx_date', { ascending: false });
 
     if (!recentTransactions || recentTransactions.length === 0) return;
 
@@ -82,11 +82,20 @@ export async function detectIncomeChangeAndPropose(
       // צור תוכנית התאמה
       const plan = await createAdjustmentPlan(incomeChange);
 
-      // שמור בהקשר
+      // שמור בהקשר (merge עם context קיים)
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('classification_context')
+        .eq('id', userId)
+        .single();
+
+      const existingContext = existingUser?.classification_context || {};
+
       await supabase
         .from('users')
         .update({
           classification_context: {
+            ...existingContext,
             autoAdjust: {
               plan,
               incomeChange,
@@ -290,13 +299,20 @@ export async function confirmAndApplyAdjustments(
       .update({ monthly_income: incomeChange.newIncome })
       .eq('id', userId);
 
-    // נקה context
+    // נקה רק autoAdjust מה-context
+    const { data: ctxUser } = await supabase
+      .from('users')
+      .select('classification_context')
+      .eq('id', userId)
+      .single();
+
+    const ctxData = ctxUser?.classification_context || {};
+    const { autoAdjust: _removed, ...restContext } = ctxData as any;
+
     await supabase
       .from('users')
       .update({
-        classification_context: {
-          autoAdjust: null,
-        },
+        classification_context: Object.keys(restContext).length > 0 ? restContext : null,
       })
       .eq('id', userId);
 
@@ -327,12 +343,20 @@ export async function cancelAdjustments(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
+  // נקה רק autoAdjust מה-context
+  const { data: ctxUser } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+
+  const ctxData = ctxUser?.classification_context || {};
+  const { autoAdjust: _removed, ...restCtx } = ctxData as any;
+
   await supabase
     .from('users')
     .update({
-      classification_context: {
-        autoAdjust: null,
-      },
+      classification_context: Object.keys(restCtx).length > 0 ? restCtx : null,
     })
     .eq('id', userId);
 
