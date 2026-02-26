@@ -1157,9 +1157,25 @@ export async function POST(request: NextRequest) {
             console.log('🔄 Analyzing PDF with Gemini 3.1 Pro...');
             const base64Pdf = buffer.toString('base64');
             const { chatWithGeminiProVision } = await import('@/lib/ai/gemini-client');
-            content = await chatWithGeminiProVision(base64Pdf, 'application/pdf', prompt);
+
+            // ⏱️ Timeout wrapper to prevent Vercel function timeout (240s leaves room for DB ops)
+            const aiPromise = chatWithGeminiProVision(base64Pdf, 'application/pdf', prompt);
+            const timeoutPromise = new Promise<string>((_, reject) =>
+              setTimeout(() => reject(new Error('PDF_AI_TIMEOUT')), 240000)
+            );
+            content = await Promise.race([aiPromise, timeoutPromise]);
+
             console.log('✅ Gemini Pro PDF analysis succeeded');
           } catch (geminiError: any) {
+            if (geminiError.message === 'PDF_AI_TIMEOUT') {
+              console.error('⏱️ PDF AI call timed out after 240 seconds');
+              progressUpdater.stop();
+              await greenAPI.sendMessage({
+                phoneNumber,
+                message: `⏱️ המסמך גדול מדי ולוקח יותר מדי זמן לנתח.\n\nנסה לשלוח מסמך קצר יותר (עד 3 חודשים), או צלם את העמודים הרלוונטיים.`,
+              });
+              return NextResponse.json({ status: 'success', message: 'pdf timeout handled' });
+            }
             console.log(`❌ Gemini Pro failed: ${geminiError.message}`);
             throw geminiError;
           }
@@ -1181,7 +1197,7 @@ export async function POST(request: NextRequest) {
             // Try to extract JSON from the response (may include markdown)
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             let jsonStr = jsonMatch ? jsonMatch[0] : content;
-            
+
             // 🔧 FIX: Clean up common AI JSON errors before parsing
             // Fix "29571. - null" patterns → null
             jsonStr = jsonStr.replace(/:\s*[\d.]+\s*-\s*null/g, ': null');
@@ -1189,12 +1205,33 @@ export async function POST(request: NextRequest) {
             jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
             // Fix "null" as string → null
             jsonStr = jsonStr.replace(/"null"/g, 'null');
-            
+
             ocrData = JSON.parse(jsonStr);
           } catch (parseError) {
             console.error('❌ JSON parse error:', parseError);
             console.log('📝 Raw content (first 500 chars):', content.substring(0, 500));
-            ocrData = { document_type: 'credit_statement', transactions: [] };
+            console.log('📝 Raw content (last 300 chars):', content.substring(Math.max(0, content.length - 300)));
+
+            // 🔧 Try to recover truncated JSON by closing open brackets
+            try {
+              let jsonStr = content.match(/\{[\s\S]*/)?.[0] || content;
+              // Remove trailing incomplete object/value
+              jsonStr = jsonStr.replace(/,\s*\{[^}]*$/s, '');
+              // Count open/close brackets and close them
+              const openBraces = (jsonStr.match(/\{/g) || []).length;
+              const closeBraces = (jsonStr.match(/\}/g) || []).length;
+              const openBrackets = (jsonStr.match(/\[/g) || []).length;
+              const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+              jsonStr += ']'.repeat(Math.max(0, openBrackets - closeBrackets));
+              jsonStr += '}'.repeat(Math.max(0, openBraces - closeBraces));
+              // Clean up
+              jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+              ocrData = JSON.parse(jsonStr);
+              console.log(`✅ JSON recovery succeeded: ${ocrData.transactions?.length || 0} transactions salvaged`);
+            } catch (recoveryError) {
+              console.error('❌ JSON recovery also failed:', recoveryError);
+              ocrData = { document_type: 'credit_statement', transactions: [] };
+            }
           }
 
           // 🆕 Handle different response formats:

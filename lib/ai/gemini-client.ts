@@ -41,7 +41,9 @@ async function retryWithBackoff<T>(
       return await fn();
     } catch (error: any) {
       const status = error?.status || error?.httpStatusCode || 0;
-      const isRetryable = status === 429 || status >= 500;
+      const errorMsg = error?.message || '';
+      const isNetworkError = errorMsg.includes('fetch failed') || errorMsg.includes('ECONNRESET') || errorMsg.includes('ETIMEDOUT');
+      const isRetryable = status === 429 || status >= 500 || isNetworkError;
 
       if (!isRetryable || attempt === maxRetries) {
         throw error;
@@ -269,7 +271,7 @@ export async function chatWithGeminiProVision(
         ],
         config: {
           thinkingConfig: { thinkingLevel: 'high' as any },
-          maxOutputTokens: 8000,
+          maxOutputTokens: 32000,
           responseMimeType: 'application/json',
         },
       });

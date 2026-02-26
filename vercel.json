@@ -26,6 +26,9 @@
     },
     "app/api/cron/milestone-notifications/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/wa/webhook/route.ts": {
+      "maxDuration": 600
     }
   },
   "crons": [
