@@ -42,18 +42,38 @@ export interface RouterResult {
 export function isCommand(msg: string, commands: string[]): boolean {
   const lower = msg.toLowerCase().trim();
 
-  // Direct match
-  if (commands.some(cmd => lower === cmd || lower.includes(cmd))) {
-    return true;
+  for (const cmd of commands) {
+    const cmdLower = cmd.toLowerCase().trim();
+
+    // Exact match
+    if (lower === cmdLower) return true;
+
+    // Single-word command: require whole-word match (prevents "כנ" matching inside "הכנס")
+    if (!cmdLower.includes(' ')) {
+      const msgWords = lower.split(/\s+/);
+      if (msgWords.includes(cmdLower)) return true;
+    } else {
+      // Multi-word command: substring match is OK
+      if (lower.includes(cmdLower)) return true;
+    }
   }
 
-  // Match without emojis
+  // Match without emojis/special chars
   const textOnly = lower.replace(/[^\u0590-\u05FFa-z0-9\s]/g, '').trim();
-  if (textOnly && commands.some(cmd => {
-    const cmdTextOnly = cmd.toLowerCase().replace(/[^\u0590-\u05FFa-z0-9\s]/g, '').trim();
-    return textOnly === cmdTextOnly || textOnly.includes(cmdTextOnly) || cmdTextOnly.includes(textOnly);
-  })) {
-    return true;
+  if (textOnly) {
+    const textWords = textOnly.split(/\s+/);
+    for (const cmd of commands) {
+      const cmdTextOnly = cmd.toLowerCase().replace(/[^\u0590-\u05FFa-z0-9\s]/g, '').trim();
+      if (!cmdTextOnly) continue;
+
+      if (textOnly === cmdTextOnly) return true;
+
+      if (!cmdTextOnly.includes(' ')) {
+        if (textWords.includes(cmdTextOnly)) return true;
+      } else {
+        if (textOnly.includes(cmdTextOnly)) return true;
+      }
+    }
   }
 
   return false;

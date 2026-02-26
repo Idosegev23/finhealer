@@ -439,8 +439,8 @@ export async function POST(request: NextRequest) {
       const interactiveData = payload.messageData?.interactiveButtonsResponse;
       const oldButtonData = payload.messageData?.buttonsResponseMessage;
 
-      const buttonId = interactiveData?.selectedButtonId || oldButtonData?.selectedButtonId || '';
-      const buttonText = interactiveData?.selectedButtonText || oldButtonData?.selectedButtonText || '';
+      const buttonId = interactiveData?.selectedButtonId || oldButtonData?.selectedButtonId || oldButtonData?.buttonId || '';
+      const buttonText = interactiveData?.selectedButtonText || oldButtonData?.selectedButtonText || oldButtonData?.buttonText || '';
 
       console.log('🔘 Button pressed - selectedButtonId:', buttonId, 'selectedButtonText:', buttonText);
 

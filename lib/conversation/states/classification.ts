@@ -13,6 +13,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient, sendWhatsAppInteractiveButtons } from '@/lib/greenapi/client';
 import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categories';
 import { INCOME_CATEGORIES, findBestIncomeMatch, findTopIncomeMatches } from '@/lib/finance/income-categories';
+import { chatWithGeminiFlashMinimal } from '@/lib/ai/gemini-client';
 
 // ============================================================================
 // handleClassificationState
@@ -245,6 +246,23 @@ export async function handleClassificationResponse(
       return await showNextExpenseGroup(ctx);
     }
 
+    // Fix last classification - reopen the most recent confirmed transaction
+    if (isCommand(msg, ['תקן', 'תיקון', 'fix', 'חזור', 'טעות', 'לא נכון'])) {
+      const reopened = await reopenLastClassified(ctx.userId, 'expense', supabase);
+      if (reopened) {
+        await greenAPI.sendMessage({
+          phoneNumber: ctx.phone,
+          message: `↩️ פתחתי מחדש: *${reopened.vendor}* (${Math.abs(reopened.amount).toLocaleString('he-IL')} ₪)\nהיה: *${reopened.category}*\n\nכתוב קטגוריה חדשה:`,
+        });
+        return await showNextExpenseGroup(ctx);
+      }
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `אין תנועה אחרונה לתקן.`,
+      });
+      return { success: true };
+    }
+
     // Show categories list
     if (isCommand(msg, ['רשימה', 'list', '📋 רשימה', 'רשימה 📋', 'קטגוריות', 'אפשרויות', 'categories'])) {
       const groups = Array.from(new Set(CATEGORIES.map(c => c.group)));
@@ -270,6 +288,14 @@ export async function handleClassificationResponse(
       return { success: true };
     }
 
+    // ---- FAST INTENT: category match before confirm (prevents "הכנס" matching "כנ") ----
+    if (msg.length > 3) {
+      const earlyMatch = findBestMatch(msg);
+      if (earlyMatch) {
+        return await classifyGroup(ctx, txIds, earlyMatch.name, type);
+      }
+    }
+
     // Confirm suggestion ("כן")
     if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes', '✅ כן', 'כן ✅', 'confirm'])) {
       const suggestions = await getSuggestionsFromCache(ctx.userId);
@@ -291,7 +317,7 @@ export async function handleClassificationResponse(
       }
     }
 
-    // Try to match as category name
+    // Try to match as category name (fallback for shorter inputs)
     const match = findBestMatch(msg);
     if (match) {
       return await classifyGroup(ctx, txIds, match.name, type);
@@ -307,6 +333,20 @@ export async function handleClassificationResponse(
         message: `🤔 לא מצאתי "${msg}".\n\nאולי התכוונת ל:\n${list}\n\nכתוב מספר (1-3) או נסה שוב.`,
       });
       return { success: true };
+    }
+
+    // AI fallback - suggest (don't auto-classify) when rule-based fails
+    if (msg.length >= 3 && msg.length <= 40) {
+      const aiCategory = await matchCategoryWithAI(msg, 'expense');
+      if (aiCategory) {
+        console.log(`[AI Category] Suggesting expense: "${msg}" → "${aiCategory}"`);
+        await saveSuggestionsToCache(ctx.userId, [aiCategory]);
+        await greenAPI.sendMessage({
+          phoneNumber: ctx.phone,
+          message: `🤖 הבנתי *"${aiCategory}"* — נכון?\n\nכתוב *"כן"* לאשר, או כתוב קטגוריה אחרת.`,
+        });
+        return { success: true };
+      }
     }
 
     // Use as-is if reasonable length
@@ -339,7 +379,7 @@ export async function handleClassificationResponse(
 
   // Skip command - mark as confirmed with 'skipped' note to avoid infinite loop
   if (isCommand(msg, ['דלג', 'תדלג', 'הבא', 'skip', '⏭️ דלג', 'דלג ⏭️'])) {
-    await supabase
+    const { error: skipError } = await supabase
       .from('transactions')
       .update({
         status: 'confirmed',
@@ -349,11 +389,32 @@ export async function handleClassificationResponse(
       })
       .eq('id', currentTx.id);
 
+    if (skipError) {
+      console.error('[Classification] Failed to skip income transaction:', skipError, 'txId:', currentTx.id);
+    }
+
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `⏭️ דילגתי`,
     });
     return await showNextTransaction(ctx, type);
+  }
+
+  // Fix last classification
+  if (isCommand(msg, ['תקן', 'תיקון', 'fix', 'חזור', 'טעות', 'לא נכון'])) {
+    const reopened = await reopenLastClassified(ctx.userId, 'income', supabase);
+    if (reopened) {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `↩️ פתחתי מחדש: *${reopened.vendor}* (${Math.abs(reopened.amount).toLocaleString('he-IL')} ₪)\nהיה: *${reopened.category}*\n\nכתוב קטגוריה חדשה:`,
+      });
+      return await showNextTransaction(ctx, type);
+    }
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `אין תנועה אחרונה לתקן.`,
+    });
+    return { success: true };
   }
 
   // Show categories list
@@ -381,6 +442,14 @@ export async function handleClassificationResponse(
     return { success: true };
   }
 
+  // ---- FAST INTENT: category match before confirm (prevents "הכנס" matching "כנ") ----
+  if (msg.length > 3) {
+    const earlyIncomeMatch = findBestIncomeMatch(msg);
+    if (earlyIncomeMatch) {
+      return await classifyTransaction(ctx, currentTx.id, earlyIncomeMatch.name, type);
+    }
+  }
+
   // Confirm suggestion ("כן")
   if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes', '✅ כן', 'כן ✅', 'confirm'])) {
     const suggestions = await getSuggestionsFromCache(ctx.userId);
@@ -402,7 +471,7 @@ export async function handleClassificationResponse(
     }
   }
 
-  // Try to match as income category name
+  // Try to match as income category name (fallback for shorter inputs)
   const incomeMatch = findBestIncomeMatch(msg);
   if (incomeMatch) {
     return await classifyTransaction(ctx, currentTx.id, incomeMatch.name, type);
@@ -418,6 +487,20 @@ export async function handleClassificationResponse(
       message: `🤔 לא מצאתי "${msg}".\n\nאולי התכוונת ל:\n${list}\n\nכתוב מספר (1-3) או נסה שוב.`,
     });
     return { success: true };
+  }
+
+  // AI fallback - suggest (don't auto-classify) when rule-based fails
+  if (msg.length >= 3 && msg.length <= 40) {
+    const aiCategory = await matchCategoryWithAI(msg, 'income');
+    if (aiCategory) {
+      console.log(`[AI Category] Suggesting income: "${msg}" → "${aiCategory}"`);
+      await saveSuggestionsToCache(ctx.userId, [aiCategory]);
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `🤖 הבנתי *"${aiCategory}"* — נכון?\n\nכתוב *"כן"* לאשר, או כתוב קטגוריה אחרת.`,
+      });
+      return { success: true };
+    }
   }
 
   // Use as-is if reasonable length
@@ -1149,4 +1232,112 @@ async function autoClassifyWithRules(userId: string, supabase: any): Promise<num
   }
 
   return classified;
+}
+
+// ============================================================================
+// AI Category Matcher (fallback when rule-based fails)
+// ============================================================================
+
+// Cache category name lists to avoid rebuilding on every call
+const _expenseCategoryNames = CATEGORIES.map(c => c.name);
+const _incomeCategoryNames = INCOME_CATEGORIES.map(c => c.name);
+
+/**
+ * Use Gemini Flash to match user input to a known category.
+ * Only called as fallback when rule-based matching fails.
+ * Has a 3-second timeout to avoid blocking the conversation.
+ * Returns the matched category name or null.
+ */
+async function matchCategoryWithAI(
+  userInput: string,
+  type: 'income' | 'expense'
+): Promise<string | null> {
+  const categoryNames = type === 'income' ? _incomeCategoryNames : _expenseCategoryNames;
+
+  const prompt = `אתה מנוע סיווג פיננסי. המשתמש כתב: "${userInput}"
+הקטגוריות האפשריות:
+${categoryNames.join(', ')}
+
+אם ההודעה מתאימה לאחת הקטגוריות, החזר את שם הקטגוריה בדיוק כפי שהוא ברשימה.
+אם ההודעה היא פקודה (כמו כן, לא, דלג, רשימה) או שאינה קטגוריה - החזר null.
+החזר רק את שם הקטגוריה או null, בלי הסבר.`;
+
+  try {
+    const result = await Promise.race([
+      chatWithGeminiFlashMinimal(prompt, ''),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('AI timeout')), 3000)
+      ),
+    ]);
+
+    const cleaned = result.trim().replace(/^["']|["']$/g, '');
+
+    if (cleaned === 'null' || cleaned === '' || cleaned.length > 50) {
+      return null;
+    }
+
+    // Verify the AI returned an actual category from our list
+    const exactMatch = categoryNames.find(n => n === cleaned);
+    if (exactMatch) return exactMatch;
+
+    // Fuzzy verify - AI might slightly vary the name
+    const fuzzyMatch = categoryNames.find(n =>
+      n.includes(cleaned) || cleaned.includes(n)
+    );
+    if (fuzzyMatch) return fuzzyMatch;
+
+    console.log(`[AI Category] AI returned "${cleaned}" which is not in the list, ignoring`);
+    return null;
+  } catch (error) {
+    console.log(`[AI Category] Fallback failed (${(error as Error).message}), skipping`);
+    return null;
+  }
+}
+
+// ============================================================================
+// reopenLastClassified - undo last classification
+// ============================================================================
+
+/**
+ * Reopen the most recently classified transaction (set back to pending).
+ * Returns the transaction info for display, or null if nothing to reopen.
+ */
+async function reopenLastClassified(
+  userId: string,
+  type: 'income' | 'expense',
+  supabase: any
+): Promise<{ vendor: string; amount: number; category: string } | null> {
+  // Find the most recently classified transaction (by classified_at or updated timestamp)
+  const { data: lastTx } = await supabase
+    .from('transactions')
+    .select('id, vendor, amount, category')
+    .eq('user_id', userId)
+    .eq('status', 'confirmed')
+    .eq('type', type)
+    .eq('learned_from_pattern', false)
+    .order('classified_at', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .single();
+
+  if (!lastTx) return null;
+
+  // Reopen it
+  await supabase
+    .from('transactions')
+    .update({
+      status: 'pending',
+      category: null,
+      expense_category: null,
+      income_category: null,
+      notes: null,
+    })
+    .eq('id', lastTx.id);
+
+  console.log(`[Classification] Reopened tx ${lastTx.id}: "${lastTx.vendor}" was "${lastTx.category}"`);
+
+  return {
+    vendor: lastTx.vendor,
+    amount: lastTx.amount,
+    category: lastTx.category,
+  };
 }
