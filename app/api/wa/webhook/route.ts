@@ -24,6 +24,23 @@ function maskUserId(id: string): string {
   return id.slice(0, 4) + '...' + id.slice(-4);
 }
 
+// Helper: convert DD/MM/YYYY or other date formats → YYYY-MM-DD safely
+function safeParseDateToISO(dateStr: string | undefined): string {
+  if (!dateStr) return new Date().toISOString().split('T')[0];
+  // DD/MM/YYYY format (from Gemini OCR)
+  const ddmmyyyy = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyy) {
+    const [, d, m, y] = ddmmyyyy;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  // Try native parsing as last resort
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+  return new Date().toISOString().split('T')[0];
+}
+
 // ============================================================================
 // 🛡️ Rate limiting per user_id
 // ============================================================================
@@ -319,12 +336,24 @@ export async function POST(request: NextRequest) {
       // 🆕 Auto-create new user from WhatsApp
       console.log('🆕 New user from WhatsApp:', maskPhone(phoneNumber));
 
+      // Extract name from WhatsApp profile BEFORE insert (name is NOT NULL in DB)
+      const senderName = payload.senderData?.senderName || '';
+      const cleanName = senderName && senderName !== phoneNumber && !/^\d+$/.test(senderName)
+        ? senderName.trim()
+        : '';
+
+      const initialName = cleanName || 'משתמש חדש';
+      const initialState = cleanName ? 'waiting_for_document' : 'waiting_for_name';
+      console.log(`[Webhook] CREATE_USER: name="${initialName}", state=${initialState}, hasProfileName=${!!cleanName}`);
+
       const { data: newUser, error: createError } = await supabase
         .from('users')
         .insert({
           phone: phoneNumber,
+          name: initialName,
+          full_name: cleanName || null,
           wa_opt_in: true,
-          onboarding_state: 'waiting_for_name',
+          onboarding_state: initialState,
           phase: 'data_collection',
         })
         .select('id, name, wa_opt_in, phone')
@@ -344,18 +373,7 @@ export async function POST(request: NextRequest) {
       // 🆕 Send welcome message and return early - don't process the first message as name
       const greenAPIWelcome = getGreenAPIClient();
 
-      // Try to extract name from WhatsApp profile (senderName)
-      const senderName = payload.senderData?.senderName || '';
-      const cleanName = senderName && senderName !== phoneNumber && !/^\d+$/.test(senderName)
-        ? senderName.trim()
-        : '';
-
       if (cleanName) {
-        // Save the WhatsApp profile name
-        await supabase
-          .from('users')
-          .update({ name: cleanName, full_name: cleanName, onboarding_state: 'waiting_for_document' })
-          .eq('id', newUser.id);
 
         await greenAPIWelcome.sendMessage({
           phoneNumber,
@@ -752,7 +770,7 @@ export async function POST(request: NextRequest) {
           }
 
           // שימוש בתאריך מהקבלה (לא מהיום!)
-          const receiptDate = ocrData.receipt_date || transactions[0]?.date || new Date().toISOString().split('T')[0];
+          const receiptDate = safeParseDateToISO(ocrData.receipt_date || transactions[0]?.date);
           const receiptTotal = ocrData.receipt_total || transactions[0]?.amount || null;
           const receiptVendor = ocrData.vendor_name || transactions[0]?.vendor || null;
           const receiptNumber = ocrData.receipt_number || null; // ⭐ מספר הקבלה
@@ -791,7 +809,7 @@ export async function POST(request: NextRequest) {
             
             for (const tx of transactions) {
               // שימוש בתאריך מהקבלה (לא מהיום!)
-              const txDate = tx.date || receiptDate;
+              const txDate = safeParseDateToISO(tx.date) || receiptDate;
               
               const { data: insertedTx, error: insertError } = await (supabase as any)
                 .from('transactions')
@@ -855,7 +873,7 @@ export async function POST(request: NextRequest) {
             // תדפיס אשראי/בנק עם הרבה תנועות
             for (const tx of transactions) {
               // שימוש בתאריך מהקבלה (לא מהיום!)
-              const txDate = tx.date || receiptDate;
+              const txDate = safeParseDateToISO(tx.date) || receiptDate;
               
               await (supabase as any)
                 .from('transactions')
@@ -1359,7 +1377,7 @@ export async function POST(request: NextRequest) {
           const duplicateSuspects: Array<{ vendor: string; amount: number; date: string }> = [];
 
           for (const tx of allTransactions) {
-            const txDate = tx.date || new Date().toISOString().split('T')[0];
+            const txDate = safeParseDateToISO(tx.date);
             const txType = tx.type || 'expense';
             // 🔧 FIX: category חובה - נשתמש בקטגוריה מה-AI או ברירת מחדל
             const category = tx.expense_category || tx.income_category || tx.category ||
