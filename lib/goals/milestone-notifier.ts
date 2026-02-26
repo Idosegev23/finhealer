@@ -9,7 +9,7 @@ import { sendWhatsAppMessage } from '@/lib/greenapi/client';
 interface Milestone {
   id: string;
   goal_id: string;
-  milestone_percent: number;
+  percent_reached: number;
   reached_at: string;
   celebrated: boolean;
   goal: {
@@ -40,7 +40,7 @@ export async function sendMilestoneNotifications(): Promise<void> {
       .select(`
         id,
         goal_id,
-        milestone_percent,
+        percent_reached,
         reached_at,
         celebrated,
         goal:goals(
@@ -105,7 +105,7 @@ async function celebrateMilestone(milestone: any): Promise<void> {
     
     // בנה הודעת חגיגה
     const message = buildCelebrationMessage(
-      milestone.milestone_percent,
+      milestone.percent_reached,
       goal.name,
       goal.current_amount,
       goal.target_amount,
@@ -135,7 +135,7 @@ async function celebrateMilestone(milestone: any): Promise<void> {
     }
     
     console.log(
-      `[Milestone Notifier] 🎉 Celebrated ${milestone.milestone_percent}% for "${goal.name}" ` +
+      `[Milestone Notifier] 🎉 Celebrated ${milestone.percent_reached}% for "${goal.name}" ` +
       `(${goal.current_amount.toLocaleString('he-IL')}/${goal.target_amount.toLocaleString('he-IL')} ₪)`
     );
     
@@ -253,7 +253,7 @@ export async function celebrateMilestoneNow(milestoneId: string): Promise<boolea
     .select(`
       id,
       goal_id,
-      milestone_percent,
+      percent_reached,
       reached_at,
       celebrated,
       goal:goals(
@@ -286,12 +286,12 @@ export async function checkNewMilestone(goalId: string): Promise<void> {
     .from('goal_milestones')
     .select(`
       id,
-      milestone_percent,
+      percent_reached,
       goal:goals(name, current_amount, target_amount, user_id)
     `)
     .eq('goal_id', goalId)
     .eq('celebrated', false)
-    .order('milestone_percent', { ascending: false })
+    .order('percent_reached', { ascending: false })
     .limit(1)
     .single();
   
