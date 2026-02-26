@@ -4,6 +4,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
+import { chatWithGeminiFlashMinimal } from '@/lib/ai/gemini-client';
 import type { GoalType, BudgetSource, Goal } from '@/types/goals';
 
 /**
@@ -184,6 +185,108 @@ export async function startAdvancedGoal(
 }
 
 /**
+ * 🆕 ניסיון פרסור חכם של טקסט חופשי ליעד
+ * מחלץ: שם, סוג, סכום, מועד מתוך משפט טבעי
+ */
+async function trySmartGoalParse(msg: string): Promise<{
+  goalType: GoalType;
+  goalName: string;
+  goalGroup?: string;
+  targetAmount?: number;
+  deadline?: string;
+} | null> {
+  // 1. Rule-based extraction first (fast)
+  const msgLower = msg.toLowerCase().trim();
+
+  // Extract amount from text
+  let amount: number | undefined;
+  const amountMatch = msg.match(/(\d[\d,]*\.?\d*)\s*(אלף|k|שקל|ש״ח|₪)?/i);
+  if (amountMatch) {
+    amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+    if (amountMatch[2] && (amountMatch[2] === 'אלף' || amountMatch[2].toLowerCase() === 'k')) {
+      amount *= 1000;
+    }
+  }
+
+  // Extract deadline from text
+  let deadline: string | undefined;
+  const deadlineMatch = msg.match(/(?:עוד|בעוד|תוך)\s+(\d+)\s*(חודשים?|שנים?|שנה)/);
+  if (deadlineMatch) {
+    const num = parseInt(deadlineMatch[1]);
+    const unit = deadlineMatch[2];
+    const d = new Date();
+    if (unit.includes('שנ')) {
+      d.setFullYear(d.getFullYear() + num);
+    } else {
+      d.setMonth(d.getMonth() + num);
+    }
+    deadline = d.toISOString().split('T')[0];
+  }
+
+  // Try to match goal type from keywords
+  const typeMatches: Array<{ keywords: RegExp; type: GoalType; name: string; group?: string }> = [
+    { keywords: /קרן חירום|חירום/, type: 'emergency_fund', name: 'קרן חירום' },
+    { keywords: /חובות|הלוואה|debt/, type: 'debt_payoff', name: 'סגירת חובות' },
+    { keywords: /שיפוץ|שדרוג דירה/, type: 'renovation', name: 'שיפוץ דירה', group: 'נדל״ן' },
+    { keywords: /נכס|דירה להשקעה/, type: 'real_estate_investment', name: 'נכס להשקעה', group: 'נדל״ן' },
+    { keywords: /רכב|אוטו|מכונית|car/, type: 'vehicle', name: 'רכב', group: 'רכבים' },
+    { keywords: /חופשה|טיול|vacation/, type: 'vacation', name: 'חופשה', group: 'בילויים' },
+    { keywords: /חיסכון לילד|לילד/, type: 'child_savings', name: 'חיסכון לילד', group: 'ילדים' },
+    { keywords: /משפחתי|משפחה/, type: 'family_savings', name: 'חיסכון משפחתי', group: 'משפחה' },
+    { keywords: /חתונה|wedding/, type: 'wedding', name: 'חתונה', group: 'אירועים' },
+    { keywords: /לימודים|education|קורס|תואר/, type: 'education', name: 'לימודים', group: 'חינוך' },
+    { keywords: /פנסיה|pension|פרישה/, type: 'pension_increase', name: 'הגדלת פנסיה', group: 'פנסיה וחיסכון' },
+  ];
+
+  for (const tm of typeMatches) {
+    if (tm.keywords.test(msgLower)) {
+      return {
+        goalType: tm.type,
+        goalName: tm.name,
+        goalGroup: tm.group,
+        targetAmount: amount,
+        deadline,
+      };
+    }
+  }
+
+  // 2. If rule-based didn't match a type but has amount, try AI (with 3s timeout)
+  if (msg.length > 5) {
+    try {
+      const aiPromise = chatWithGeminiFlashMinimal(
+        `המשתמש רוצה ליצור יעד חיסכון. הודעתו: "${msg}"\n\nחלץ JSON:\n{"goalName": "שם קצר ליעד", "goalType": "savings_goal|vehicle|vacation|renovation|education|wedding|emergency_fund|debt_payoff", "amount": number|null, "months": number|null}`,
+        'אתה מחלץ פרטי יעד חיסכון מטקסט חופשי בעברית. החזר JSON בלבד, ללא markdown.'
+      );
+      const timeout = new Promise<string>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000));
+      const aiResult = await Promise.race([aiPromise, timeout]);
+
+      const parsed = JSON.parse(aiResult.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+      if (parsed.goalName) {
+        let deadlineFromAI: string | undefined;
+        if (parsed.months && parsed.months > 0) {
+          const d = new Date();
+          d.setMonth(d.getMonth() + parsed.months);
+          deadlineFromAI = d.toISOString().split('T')[0];
+        }
+
+        const matchedType = GOAL_TYPES_EXTENDED[parsed.goalType];
+        return {
+          goalType: matchedType ? parsed.goalType : 'savings_goal',
+          goalName: parsed.goalName,
+          goalGroup: matchedType?.group,
+          targetAmount: parsed.amount || amount,
+          deadline: deadlineFromAI || deadline,
+        };
+      }
+    } catch {
+      // AI failed, continue to number matching
+    }
+  }
+
+  return null;
+}
+
+/**
  * טיפול בבחירת סוג יעד מתקדם
  */
 export async function handleAdvancedGoalTypeSelection(
@@ -198,65 +301,63 @@ export async function handleAdvancedGoalTypeSelection(
   let goalName: string | null = null;
   let goalGroup: string | null = null;
   let requiresChild = false;
+  let smartAmount: number | undefined;
+  let smartDeadline: string | undefined;
 
-  // זיהוי לפי מספר
-  const msgLower = msg.toLowerCase().trim();
-  if (msg === '1' || msgLower.includes('קרן חירום') || msgLower.includes('חירום')) {
-    goalType = 'emergency_fund';
-    goalName = 'קרן חירום';
-  } else if (msg === '2' || msgLower.includes('חובות') || msgLower.includes('debt')) {
-    goalType = 'debt_payoff';
-    goalName = 'סגירת חובות';
-  } else if (msg === '3' || msgLower.includes('שיפוץ')) {
-    goalType = 'renovation';
-    goalName = 'שיפוץ דירה';
-    goalGroup = 'נדל״ן';
-  } else if (msg === '4' || msgLower.includes('נכס') || msgLower.includes('השקעה')) {
-    goalType = 'real_estate_investment';
-    goalName = 'נכס להשקעה';
-    goalGroup = 'נדל״ן';
-  } else if (msg === '5' || msgLower.includes('רכב') || msgLower.includes('car')) {
-    goalType = 'vehicle';
-    goalName = 'רכב חדש';
-    goalGroup = 'רכבים';
-  } else if (msg === '6' || msgLower.includes('חופשה') || msgLower.includes('vacation')) {
-    goalType = 'vacation';
-    goalName = 'חופשה משפחתית';
-    goalGroup = 'בילויים';
-  } else if (msg === '7' || msgLower.includes('חיסכון לילד') || msgLower.includes('לילד')) {
-    goalType = 'child_savings';
-    goalName = 'חיסכון לילד';
-    goalGroup = 'ילדים';
-    requiresChild = true;
-  } else if (msg === '8' || msgLower.includes('משפחתי')) {
-    goalType = 'family_savings';
-    goalName = 'חיסכון משפחתי';
-    goalGroup = 'משפחה';
-  } else if (msg === '9' || msgLower.includes('חתונה') || msgLower.includes('wedding')) {
-    goalType = 'wedding';
-    goalName = 'חתונה';
-    goalGroup = 'אירועים';
-  } else if (msg === '10' || msgLower.includes('לימודים') || msgLower.includes('education')) {
-    goalType = 'education';
-    goalName = 'לימודים';
-    goalGroup = 'חינוך';
-  } else if (msg === '11' || msgLower.includes('פנסיה') || msgLower.includes('pension')) {
-    goalType = 'pension_increase';
-    goalName = 'הגדלת פנסיה';
-    goalGroup = 'פנסיה וחיסכון';
-  } else if (msg === '12' || msgLower.includes('חיסכון')) {
-    goalType = 'savings_goal';
-    goalName = 'חיסכון למטרה';
-  } else if (msg === '13' || msgLower.includes('שיפור') || msgLower.includes('איזון')) {
-    goalType = 'general_improvement';
-    goalName = 'שיפור תקציבי';
-  } else {
-    // לא זוהה - נראה אם זה טקסט חופשי
-    await greenAPI.sendMessage({
-      phoneNumber: phone,
-      message: `❌ לא הבנתי.\n\nכתוב מספר (1-13) או שם היעד.`,
-    });
-    return false;
+  // 🆕 First try smart parsing from natural language
+  const smartResult = await trySmartGoalParse(msg);
+  if (smartResult) {
+    goalType = smartResult.goalType;
+    goalName = smartResult.goalName;
+    goalGroup = smartResult.goalGroup || null;
+    smartAmount = smartResult.targetAmount;
+    smartDeadline = smartResult.deadline;
+    requiresChild = goalType === 'child_savings';
+  }
+
+  // Fallback: number-based selection
+  if (!goalType) {
+    const msgLower = msg.toLowerCase().trim();
+    if (msg === '1') { goalType = 'emergency_fund'; goalName = 'קרן חירום'; }
+    else if (msg === '2') { goalType = 'debt_payoff'; goalName = 'סגירת חובות'; }
+    else if (msg === '3') { goalType = 'renovation'; goalName = 'שיפוץ דירה'; goalGroup = 'נדל״ן'; }
+    else if (msg === '4') { goalType = 'real_estate_investment'; goalName = 'נכס להשקעה'; goalGroup = 'נדל״ן'; }
+    else if (msg === '5') { goalType = 'vehicle'; goalName = 'רכב חדש'; goalGroup = 'רכבים'; }
+    else if (msg === '6') { goalType = 'vacation'; goalName = 'חופשה משפחתית'; goalGroup = 'בילויים'; }
+    else if (msg === '7') { goalType = 'child_savings'; goalName = 'חיסכון לילד'; goalGroup = 'ילדים'; requiresChild = true; }
+    else if (msg === '8') { goalType = 'family_savings'; goalName = 'חיסכון משפחתי'; goalGroup = 'משפחה'; }
+    else if (msg === '9') { goalType = 'wedding'; goalName = 'חתונה'; goalGroup = 'אירועים'; }
+    else if (msg === '10') { goalType = 'education'; goalName = 'לימודים'; goalGroup = 'חינוך'; }
+    else if (msg === '11') { goalType = 'pension_increase'; goalName = 'הגדלת פנסיה'; goalGroup = 'פנסיה וחיסכון'; }
+    else if (msg === '12') { goalType = 'savings_goal'; goalName = 'חיסכון למטרה'; }
+    else if (msg === '13') { goalType = 'general_improvement'; goalName = 'שיפור תקציבי'; }
+    else {
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `❌ לא הבנתי.\n\nתוכל לכתוב בחופשיות, למשל:\n` +
+          `• *"חופשה 10000 שקל"*\n` +
+          `• *"רכב בעוד שנה"*\n` +
+          `• *"חיסכון לילדים 50000"*\n\n` +
+          `או לבחור מספר (1-13).`,
+      });
+      return false;
+    }
+  }
+
+  // 🆕 If smart parse got amount+deadline, skip straight to confirm
+  if (smartAmount && smartAmount > 0 && !requiresChild) {
+    const ctx: AdvancedGoalContext = {
+      step: 'confirm',
+      goalType: goalType!,
+      goalName: goalName!,
+      goalGroup: goalGroup || undefined,
+      targetAmount: smartAmount,
+      deadline: smartDeadline,
+    };
+
+    await mergeClassificationContext(userId, { advancedGoalCreation: ctx });
+    await confirmAndCreateGoal(userId, phone, ctx);
+    return true;
   }
 
   // אם צריך לבחור ילד - נבקש
@@ -541,38 +642,85 @@ export async function createAdvancedGoal(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
-  // צור את היעד
-  const { error } = await supabase
-    .from('goals')
-    .insert({
-      user_id: userId,
-      name: context.goalName!,
-      goal_type: context.goalType,
-      target_amount: context.targetAmount || 0,
-      current_amount: 0,
-      deadline: context.deadline || null,
-      priority: context.priority || 5,
-      status: 'active',
-      budget_source: context.budgetSource,
-      funding_notes: context.fundingNotes,
-      child_id: context.childId,
-      goal_group: context.goalGroup,
-      is_flexible: true,
-      min_allocation: 0,
-      monthly_allocation: 0,
-      auto_adjust: true,
-    });
+  // 🔧 Validate required fields before insert
+  const goalName = context.goalName || context.goalType || 'יעד חדש';
+  const targetAmount = context.targetAmount || 0;
 
-  if (error) {
-    console.error('[Advanced Goals] Error creating goal:', error);
+  if (!goalName || targetAmount <= 0) {
+    console.error('[Advanced Goals] Missing required fields:', { goalName, targetAmount, context });
     await greenAPI.sendMessage({
       phoneNumber: phone,
-      message: `❌ שגיאה ביצירת היעד. נסה שוב.`,
+      message: `❌ חסרים פרטים ליעד.\n\n` +
+        (!goalName ? `• שם היעד חסר\n` : '') +
+        (targetAmount <= 0 ? `• סכום היעד חסר\n` : '') +
+        `\nכתוב *"יעד חדש"* להתחיל שוב.`,
     });
+    // Clean context
+    await cleanAdvancedGoalContext(userId);
     return;
   }
 
-  // נקה רק את advancedGoalCreation מה-context
+  // Build insert payload with only defined fields
+  const insertPayload: Record<string, any> = {
+    user_id: userId,
+    name: goalName,
+    target_amount: targetAmount,
+    current_amount: 0,
+    priority: context.priority || 5,
+    status: 'active',
+    is_flexible: true,
+    min_allocation: 0,
+    monthly_allocation: 0,
+    auto_adjust: true,
+  };
+
+  // Add optional fields only if defined
+  if (context.goalType) insertPayload.goal_type = context.goalType;
+  if (context.deadline) insertPayload.deadline = context.deadline;
+  if (context.budgetSource) insertPayload.budget_source = context.budgetSource;
+  if (context.fundingNotes) insertPayload.funding_notes = context.fundingNotes;
+  if (context.childId) insertPayload.child_id = context.childId;
+  if (context.goalGroup) insertPayload.goal_group = context.goalGroup;
+
+  console.log('[Advanced Goals] Inserting goal:', JSON.stringify(insertPayload));
+
+  const { error } = await supabase
+    .from('goals')
+    .insert(insertPayload);
+
+  if (error) {
+    console.error('[Advanced Goals] Error creating goal:', error, 'payload:', JSON.stringify(insertPayload));
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `❌ שגיאה בשמירת היעד.\n\n` +
+        `פרטים: ${error.message || 'שגיאת מסד נתונים'}\n\n` +
+        `כתוב *"יעד חדש"* לנסות שוב.`,
+    });
+    await cleanAdvancedGoalContext(userId);
+    return;
+  }
+
+  await cleanAdvancedGoalContext(userId);
+
+  const emoji = GOAL_TYPES_EXTENDED[context.goalType!]?.emoji || '🎯';
+
+  await greenAPI.sendMessage({
+    phoneNumber: phone,
+    message: `✅ *נוצר בהצלחה!*\n\n` +
+      `${emoji} *${goalName}*\n` +
+      `💰 ${targetAmount.toLocaleString('he-IL')} ₪\n\n` +
+      `φ תחשב הקצאה אוטומטית בקרוב!\n\n` +
+      `• כתוב *"יעד חדש"* להוסיף עוד\n` +
+      `• כתוב *"יעדים"* לראות הקצאות\n` +
+      `• כתוב *"סיימתי"* להמשיך`,
+  });
+}
+
+/**
+ * ניקוי context של יצירת יעד
+ */
+async function cleanAdvancedGoalContext(userId: string): Promise<void> {
+  const supabase = createServiceClient();
   const { data: existingUser } = await supabase
     .from('users')
     .select('classification_context')
@@ -580,7 +728,7 @@ export async function createAdvancedGoal(
     .single();
 
   const existingCtx = existingUser?.classification_context || {};
-  const { advancedGoalCreation, ...restCtx } = existingCtx as any;
+  const { advancedGoalCreation: _removed, ...restCtx } = existingCtx as any;
 
   await supabase
     .from('users')
@@ -588,17 +736,4 @@ export async function createAdvancedGoal(
       classification_context: Object.keys(restCtx).length > 0 ? restCtx : null
     })
     .eq('id', userId);
-
-  const emoji = GOAL_TYPES_EXTENDED[context.goalType!]?.emoji || '🎯';
-
-  await greenAPI.sendMessage({
-    phoneNumber: phone,
-    message: `✅ *נוצר בהצלחה!*\n\n` +
-      `${emoji} *${context.goalName}*\n` +
-      `💰 ${context.targetAmount?.toLocaleString('he-IL')} ₪\n\n` +
-      `φ תחשב הקצאה אוטומטית בקרוב!\n\n` +
-      `• כתוב *"יעד חדש"* להוסיף עוד\n` +
-      `• כתוב *"יעדים"* לראות הקצאות\n` +
-      `• כתוב *"סיימתי"* להמשיך`,
-  });
 }

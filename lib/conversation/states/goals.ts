@@ -107,11 +107,11 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
 
     // Amount step
     if (advancedGoalCreation.step === 'amount') {
-      const amount = parseFloat(msg.replace(/[^\d.]/g, ''));
+      const amount = parseGoalAmount(msg);
       if (isNaN(amount) || amount <= 0) {
         await greenAPI.sendMessage({
           phoneNumber: phone,
-          message: `❌ סכום לא תקין. כתוב מספר חיובי בשקלים.`,
+          message: `❌ סכום לא תקין.\n\nדוגמאות: *15000*, *50 אלף*, *100K*`,
         });
         return { success: true };
       }
@@ -143,28 +143,7 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
 
     // Deadline step
     if (advancedGoalCreation.step === 'deadline') {
-      let deadline: string | null = null;
-      const msgLower = msg.toLowerCase().trim();
-
-      if (msgLower === 'אין' || msgLower === 'no' || msgLower === 'none') {
-        deadline = null;
-      } else if (msgLower.includes('עוד')) {
-        const months = parseInt(msg.match(/\d+/)?.[0] || '0');
-        if (months > 0) {
-          const d = new Date();
-          d.setMonth(d.getMonth() + months);
-          deadline = d.toISOString().split('T')[0];
-        }
-      } else if (msgLower.includes('שנה')) {
-        const d = new Date();
-        d.setFullYear(d.getFullYear() + 1);
-        deadline = d.toISOString().split('T')[0];
-      } else {
-        const parsed = new Date(msg);
-        if (!isNaN(parsed.getTime())) {
-          deadline = parsed.toISOString().split('T')[0];
-        }
-      }
+      const deadline = parseGoalDeadline(msg);
 
       const updatedCtx = {
         ...advancedGoalCreation,
@@ -281,27 +260,7 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
         return { success: true };
       }
       case 'deadline': {
-        let deadline: string | null = null;
-        const msgLower = msg.toLowerCase().trim();
-        if (msgLower === 'אין' || msgLower === 'no' || msgLower === 'none') {
-          deadline = null;
-        } else if (msgLower.includes('עוד')) {
-          const months = parseInt(msg.match(/\d+/)?.[0] || '0');
-          if (months > 0) {
-            const d = new Date();
-            d.setMonth(d.getMonth() + months);
-            deadline = d.toISOString().split('T')[0];
-          }
-        } else if (msgLower.includes('שנה')) {
-          const d = new Date();
-          d.setFullYear(d.getFullYear() + 1);
-          deadline = d.toISOString().split('T')[0];
-        } else {
-          const parsed = new Date(msg);
-          if (!isNaN(parsed.getTime())) {
-            deadline = parsed.toISOString().split('T')[0];
-          }
-        }
+        const deadline = parseGoalDeadline(msg);
         const updatedCtx = { ...advancedGoalCreation, step: 'confirm' as const, deadline };
         const { data: eu } = await supabase.from('users').select('classification_context').eq('id', userId).single();
         const ex = eu?.classification_context || {};
@@ -683,11 +642,11 @@ export async function handleGoalAmountInput(ctx: RouterContext, msg: string): Pr
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
 
-  const amount = parseFloat(msg.replace(/[^\d.]/g, ''));
+  const amount = parseGoalAmount(msg);
   if (isNaN(amount) || amount <= 0) {
     await greenAPI.sendMessage({
       phoneNumber: phone,
-      message: `❌ סכום לא תקין. כתוב מספר חיובי בשקלים.\n\nדוגמה: *"15000"*`,
+      message: `❌ סכום לא תקין.\n\nדוגמאות: *15000*, *50 אלף*, *100K*`,
     });
     return { success: true };
   }
@@ -723,37 +682,7 @@ export async function handleGoalDeadlineInput(ctx: RouterContext, msg: string): 
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
 
-  let deadline: string | null = null;
-  const msgLower = msg.toLowerCase().trim();
-
-  if (msgLower === 'אין' || msgLower === 'no' || msgLower === 'none' || msgLower === 'ללא') {
-    deadline = null;
-  } else if (msgLower.includes('עוד')) {
-    const months = parseInt(msg.match(/\d+/)?.[0] || '0');
-    if (months > 0) {
-      const d = new Date();
-      d.setMonth(d.getMonth() + months);
-      deadline = d.toISOString().split('T')[0];
-    }
-  } else if (msgLower.includes('שנה') && !msgLower.match(/\d{4}/)) {
-    const years = parseInt(msg.match(/\d+/)?.[0] || '1');
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + years);
-    deadline = d.toISOString().split('T')[0];
-  } else {
-    // Try DD/MM/YYYY
-    const ddmmyyyy = msg.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
-    if (ddmmyyyy) {
-      const [, day, month, year] = ddmmyyyy;
-      const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      if (!isNaN(d.getTime())) deadline = d.toISOString().split('T')[0];
-    } else {
-      const parsed = new Date(msg);
-      if (!isNaN(parsed.getTime())) {
-        deadline = parsed.toISOString().split('T')[0];
-      }
-    }
-  }
+  const deadline = parseGoalDeadline(msg);
 
   const currentCtx = await getGoalCreationCtx(userId);
   const updatedCtx = { ...currentCtx, step: 'confirm', deadline };
@@ -793,27 +722,43 @@ export async function handleGoalConfirmation(ctx: RouterContext, msg: string): P
   const currentCtx = await getGoalCreationCtx(userId);
 
   if (msgLower === 'כן' || msgLower === 'yes' || msgLower.includes('אשר')) {
-    // Create goal in DB
-    const { error } = await supabase.from('goals').insert({
+    // Validate required fields
+    const goalName = currentCtx.goalName || currentCtx.goalType || 'יעד חדש';
+    const targetAmount = currentCtx.targetAmount || 0;
+
+    if (targetAmount <= 0) {
+      console.error('[Goals State] Missing targetAmount in context:', currentCtx);
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `❌ חסר סכום יעד. כתוב *"יעד חדש"* להתחיל שוב.`,
+      });
+      return { success: true };
+    }
+
+    // Build payload with only defined fields
+    const insertPayload: Record<string, any> = {
       user_id: userId,
-      name: currentCtx.goalName || 'יעד חדש',
-      goal_type: currentCtx.goalType || 'savings_goal',
-      target_amount: currentCtx.targetAmount || 0,
+      name: goalName,
+      target_amount: targetAmount,
       current_amount: 0,
-      deadline: currentCtx.deadline || null,
       priority: 5,
       status: 'active',
       is_flexible: true,
       min_allocation: 0,
       monthly_allocation: 0,
       auto_adjust: true,
-    });
+    };
+    if (currentCtx.goalType) insertPayload.goal_type = currentCtx.goalType;
+    if (currentCtx.deadline) insertPayload.deadline = currentCtx.deadline;
+
+    console.log('[Goals State] Inserting goal:', JSON.stringify(insertPayload));
+    const { error } = await supabase.from('goals').insert(insertPayload);
 
     if (error) {
-      console.error('[Goals State] Error creating goal:', error);
+      console.error('[Goals State] Error creating goal:', error, 'payload:', JSON.stringify(insertPayload));
       await greenAPI.sendMessage({
         phoneNumber: phone,
-        message: `❌ שגיאה ביצירת היעד. נסה שוב.`,
+        message: `❌ שגיאה בשמירת היעד.\n\nפרטים: ${error.message || 'שגיאת מסד נתונים'}\n\nכתוב *"יעד חדש"* לנסות שוב.`,
       });
       return { success: true };
     }
@@ -1159,6 +1104,113 @@ export async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult
 // ============================================================================
 // Internal helpers
 // ============================================================================
+
+/**
+ * 🆕 Parse amount from Hebrew text - handles K, אלף, commas, currency symbols
+ */
+function parseGoalAmount(msg: string): number {
+  // Remove currency symbols and whitespace
+  let cleaned = msg.replace(/[₪ש״ח]/g, '').replace(/שקל(ים)?/g, '').trim();
+
+  // Handle "X אלף" (X thousand)
+  const elefMatch = cleaned.match(/(\d[\d,.]*)\s*אלף/);
+  if (elefMatch) {
+    return parseFloat(elefMatch[1].replace(/,/g, '')) * 1000;
+  }
+
+  // Handle "Xk" or "XK"
+  const kMatch = cleaned.match(/(\d[\d,.]*)\s*[kK]/);
+  if (kMatch) {
+    return parseFloat(kMatch[1].replace(/,/g, '')) * 1000;
+  }
+
+  // Handle "X מיליון" (X million)
+  const milMatch = cleaned.match(/(\d[\d,.]*)\s*מיליון/);
+  if (milMatch) {
+    return parseFloat(milMatch[1].replace(/,/g, '')) * 1000000;
+  }
+
+  // Standard number with possible commas
+  const numMatch = cleaned.match(/(\d[\d,.]*)/);
+  if (numMatch) {
+    return parseFloat(numMatch[1].replace(/,/g, ''));
+  }
+
+  return NaN;
+}
+
+/**
+ * 🆕 Parse deadline from Hebrew text
+ */
+function parseGoalDeadline(msg: string): string | null {
+  const msgLower = msg.toLowerCase().trim();
+
+  // "אין" / "ללא" / "no"
+  if (/^(אין|ללא|no|none|לא|בלי)$/i.test(msgLower)) return null;
+
+  // "עוד X חודשים/שנים"
+  const relativeMatch = msg.match(/(?:עוד|בעוד|תוך)\s+(\d+)\s*(חודשים?|שנים?|שנה)/);
+  if (relativeMatch) {
+    const num = parseInt(relativeMatch[1]);
+    const d = new Date();
+    if (relativeMatch[2].includes('שנ')) {
+      d.setFullYear(d.getFullYear() + num);
+    } else {
+      d.setMonth(d.getMonth() + num);
+    }
+    return d.toISOString().split('T')[0];
+  }
+
+  // "עוד שנה" without number
+  if (/עוד שנה/.test(msgLower)) {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    return d.toISOString().split('T')[0];
+  }
+
+  // "עוד חצי שנה"
+  if (/חצי שנה/.test(msgLower)) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 6);
+    return d.toISOString().split('T')[0];
+  }
+
+  // Hebrew month names
+  const hebrewMonths: Record<string, number> = {
+    'ינואר': 0, 'פברואר': 1, 'מרץ': 2, 'אפריל': 3,
+    'מאי': 4, 'יוני': 5, 'יולי': 6, 'אוגוסט': 7,
+    'ספטמבר': 8, 'אוקטובר': 9, 'נובמבר': 10, 'דצמבר': 11,
+  };
+
+  for (const [monthName, monthNum] of Object.entries(hebrewMonths)) {
+    if (msgLower.includes(monthName)) {
+      const yearMatch = msg.match(/(\d{4})/);
+      const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
+      const d = new Date(year, monthNum, 1);
+      // If date is in the past, push to next year
+      if (d < new Date()) d.setFullYear(d.getFullYear() + 1);
+      return d.toISOString().split('T')[0];
+    }
+  }
+
+  // "סוף השנה"
+  if (/סוף (ה)?שנה/.test(msgLower)) {
+    return `${new Date().getFullYear()}-12-31`;
+  }
+
+  // DD/MM/YYYY or DD.MM.YYYY
+  const ddmmyyyy = msg.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+  if (ddmmyyyy) {
+    const d = new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // Generic date parse
+  const parsed = new Date(msg);
+  if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+
+  return null;
+}
 
 /**
  * Get the current goalCreation context for a user
