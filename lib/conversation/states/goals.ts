@@ -12,6 +12,8 @@ import { findBestIncomeMatch } from '@/lib/finance/income-categories';
 // ============================================================================
 
 export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  console.log(`[Goals] ═══════════════════════════════════════`);
+  console.log(`[Goals] handleGoalsSetup: userId=${ctx.userId.substring(0,8)}..., msg="${msg.substring(0, 80)}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
@@ -25,11 +27,14 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
 
   const classCtx = user?.classification_context || {};
   const advancedGoalCreation = classCtx.advancedGoalCreation;
+  console.log(`[Goals] USER_CONTEXT (setup): advancedGoalCreation=${advancedGoalCreation ? JSON.stringify(advancedGoalCreation).substring(0, 200) : 'none'}, classCtx keys=${Object.keys(classCtx).join(',') || 'empty'}`);
 
   // --- Active advancedGoalCreation flow ---
   if (advancedGoalCreation) {
+    console.log(`[Goals] SETUP_ACTIVE_FLOW: step=${advancedGoalCreation.step}, goalType=${advancedGoalCreation.goalType || 'none'}, goalName=${advancedGoalCreation.goalName || 'none'}, targetAmount=${advancedGoalCreation.targetAmount || 'none'}`);
     // Cancel
     if (isCommand(msg, ['ביטול', 'בטל', 'cancel'])) {
+      console.log(`[Goals] STEP_TRANSITION: ${advancedGoalCreation.step} → CANCELLED`);
       const { advancedGoalCreation: _removed, ...restCtx } = classCtx as any;
       await supabase
         .from('users')
@@ -45,6 +50,7 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
 
     // Skip / finish → move on to loan detection
     if (isCommand(msg, ['סיימתי', 'דלג', 'skip', 'done'])) {
+      console.log(`[Goals] STEP_TRANSITION: ${advancedGoalCreation.step} → SKIP/DONE (loan detection)`);
       const { advancedGoalCreation: _removed, ...restCtx } = classCtx as any;
       await supabase
         .from('users')
@@ -57,12 +63,14 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
     // Confirmation step
     if (advancedGoalCreation.step === 'confirm') {
       const msgLower = msg.toLowerCase().trim();
+      console.log(`[Goals] CONFIRM_STEP: msgLower="${msgLower}", context=`, JSON.stringify(advancedGoalCreation).substring(0, 300));
       if (
         msgLower === 'כן' ||
         msgLower === 'yes' ||
         msgLower.includes('אשר') ||
         msgLower.includes('confirm')
       ) {
+        console.log(`[Goals] STEP_TRANSITION: confirm → CREATE_GOAL`);
         const { createAdvancedGoal } = await import('../advanced-goals-handler');
         await createAdvancedGoal(userId, phone, advancedGoalCreation);
         return { success: true };
@@ -108,7 +116,9 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
     // Amount step
     if (advancedGoalCreation.step === 'amount') {
       const amount = parseGoalAmount(msg);
+      console.log(`[Goals] AMOUNT_STEP (setup): input="${msg}", parsed=${amount}`);
       if (isNaN(amount) || amount <= 0) {
+        console.log(`[Goals] AMOUNT_STEP: INVALID amount, staying on amount step`);
         await greenAPI.sendMessage({
           phoneNumber: phone,
           message: `❌ סכום לא תקין.\n\nדוגמאות: *15000*, *50 אלף*, *100K*`,
@@ -117,6 +127,7 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
       }
 
       // Move to deadline step
+      console.log(`[Goals] STEP_TRANSITION: amount → deadline (amount=${amount})`);
       const updatedCtx = {
         ...advancedGoalCreation,
         step: 'deadline' as const,
@@ -144,6 +155,8 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
     // Deadline step
     if (advancedGoalCreation.step === 'deadline') {
       const deadline = parseGoalDeadline(msg);
+      console.log(`[Goals] DEADLINE_STEP (setup): input="${msg}", parsed=${deadline || 'null'}`);
+      console.log(`[Goals] STEP_TRANSITION: deadline → confirm`);
 
       const updatedCtx = {
         ...advancedGoalCreation,
@@ -168,12 +181,14 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
     }
 
     // All other steps → delegate to type selection handler
+    console.log(`[Goals] SETUP_DELEGATE: step=${advancedGoalCreation.step} → handleAdvancedGoalTypeSelection`);
     const { handleAdvancedGoalTypeSelection } = await import('../advanced-goals-handler');
     await handleAdvancedGoalTypeSelection(userId, phone, msg);
     return { success: true };
   }
 
   // --- No active context ---
+  console.log(`[Goals] SETUP_NO_ACTIVE_CONTEXT: checking commands for msg="${msg.substring(0, 40)}"`);
   if (isCommand(msg, ['דלג', 'סיימתי', 'skip', 'done'])) {
     return await detectLoansFromClassifiedTransactions(ctx);
   }
@@ -199,6 +214,8 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
 // ============================================================================
 
 export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  console.log(`[Goals] ═══════════════════════════════════════`);
+  console.log(`[Goals] handleGoalsPhase: userId=${ctx.userId.substring(0,8)}..., msg="${msg.substring(0, 80)}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
@@ -211,10 +228,12 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
     .single();
 
   const classCtx = user?.classification_context || {};
+  console.log(`[Goals] USER_CONTEXT (phase): classCtx keys=${Object.keys(classCtx).join(',') || 'empty'}`);
 
   // --- advancedGoalCreation flow ---
   const advancedGoalCreation = classCtx.advancedGoalCreation;
   if (advancedGoalCreation) {
+    console.log(`[Goals] PHASE_ACTIVE_FLOW: step=${advancedGoalCreation.step}, goalType=${advancedGoalCreation.goalType || 'none'}, goalName=${advancedGoalCreation.goalName || 'none'}, targetAmount=${advancedGoalCreation.targetAmount || 'none'}`);
     if (isCommand(msg, ['ביטול', 'בטל', 'cancel'])) {
       const { advancedGoalCreation: _removed, ...restCtx } = classCtx as any;
       await supabase
@@ -231,24 +250,29 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
 
     switch (advancedGoalCreation.step) {
       case 'type': {
+        console.log(`[Goals] PHASE_SWITCH: type → handleAdvancedGoalTypeSelection`);
         const { handleAdvancedGoalTypeSelection } = await import('../advanced-goals-handler');
         await handleAdvancedGoalTypeSelection(userId, phone, msg);
         return { success: true };
       }
       case 'child': {
+        console.log(`[Goals] PHASE_SWITCH: child → handleChildSelection`);
         const { handleChildSelection } = await import('../advanced-goals-handler');
         await handleChildSelection(userId, phone, msg, advancedGoalCreation);
         return { success: true };
       }
       case 'amount': {
         const amount = parseFloat(msg.replace(/[^\d.]/g, ''));
+        console.log(`[Goals] PHASE_AMOUNT: input="${msg}", parsed=${amount}`);
         if (isNaN(amount) || amount <= 0) {
+          console.log(`[Goals] PHASE_AMOUNT: INVALID, staying on amount step`);
           await greenAPI.sendMessage({
             phoneNumber: phone,
             message: `❌ סכום לא תקין. כתוב מספר חיובי בשקלים.`,
           });
           return { success: true };
         }
+        console.log(`[Goals] STEP_TRANSITION: amount → deadline (amount=${amount})`);
         const updatedCtx = { ...advancedGoalCreation, step: 'deadline' as const, targetAmount: amount };
         const { data: eu } = await supabase.from('users').select('classification_context').eq('id', userId).single();
         const ex = eu?.classification_context || {};
@@ -261,6 +285,8 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
       }
       case 'deadline': {
         const deadline = parseGoalDeadline(msg);
+        console.log(`[Goals] PHASE_DEADLINE: input="${msg}", parsed=${deadline || 'null'}`);
+        console.log(`[Goals] STEP_TRANSITION: deadline → confirm`);
         const updatedCtx = { ...advancedGoalCreation, step: 'confirm' as const, deadline };
         const { data: eu } = await supabase.from('users').select('classification_context').eq('id', userId).single();
         const ex = eu?.classification_context || {};
@@ -276,10 +302,13 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
       }
       case 'confirm': {
         const msgLower = msg.toLowerCase().trim();
+        console.log(`[Goals] PHASE_CONFIRM: msgLower="${msgLower}", context=`, JSON.stringify(advancedGoalCreation).substring(0, 300));
         if (msgLower === 'כן' || msgLower === 'yes' || msgLower.includes('אשר') || msgLower.includes('confirm')) {
+          console.log(`[Goals] STEP_TRANSITION: confirm → CREATE_GOAL`);
           const { createAdvancedGoal } = await import('../advanced-goals-handler');
           await createAdvancedGoal(userId, phone, advancedGoalCreation);
         } else if (msgLower === 'לא' || msgLower === 'no' || msgLower.includes('ביטול')) {
+          console.log(`[Goals] STEP_TRANSITION: confirm → CANCELLED`);
           const { advancedGoalCreation: _removed, ...restCtx } = classCtx as any;
           await supabase
             .from('users')
@@ -527,6 +556,7 @@ export async function startNewGoal(ctx: RouterContext): Promise<RouterResult> {
 // ============================================================================
 
 export async function handleGoalTypeSelection(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  console.log(`[Goals] handleGoalTypeSelection: msg="${msg}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
@@ -638,11 +668,13 @@ export async function handleGoalNameInput(ctx: RouterContext, msg: string): Prom
 // ============================================================================
 
 export async function handleGoalAmountInput(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  console.log(`[Goals] handleGoalAmountInput: msg="${msg}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
 
   const amount = parseGoalAmount(msg);
+  console.log(`[Goals] LEGACY_AMOUNT: input="${msg}", parsed=${amount}`);
   if (isNaN(amount) || amount <= 0) {
     await greenAPI.sendMessage({
       phoneNumber: phone,
@@ -678,11 +710,13 @@ export async function handleGoalAmountInput(ctx: RouterContext, msg: string): Pr
 // ============================================================================
 
 export async function handleGoalDeadlineInput(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  console.log(`[Goals] handleGoalDeadlineInput: msg="${msg}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
 
   const deadline = parseGoalDeadline(msg);
+  console.log(`[Goals] LEGACY_DEADLINE: input="${msg}", parsed=${deadline || 'null'}`);
 
   const currentCtx = await getGoalCreationCtx(userId);
   const updatedCtx = { ...currentCtx, step: 'confirm', deadline };
@@ -714,12 +748,14 @@ export async function handleGoalDeadlineInput(ctx: RouterContext, msg: string): 
 // ============================================================================
 
 export async function handleGoalConfirmation(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  console.log(`[Goals] handleGoalConfirmation: msg="${msg}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
   const msgLower = msg.toLowerCase().trim();
 
   const currentCtx = await getGoalCreationCtx(userId);
+  console.log(`[Goals] LEGACY_CONFIRM: msgLower="${msgLower}", context=`, JSON.stringify(currentCtx).substring(0, 300));
 
   if (msgLower === 'כן' || msgLower === 'yes' || msgLower.includes('אשר')) {
     // Validate required fields
@@ -751,8 +787,9 @@ export async function handleGoalConfirmation(ctx: RouterContext, msg: string): P
     if (currentCtx.goalType) insertPayload.goal_type = currentCtx.goalType;
     if (currentCtx.deadline) insertPayload.deadline = currentCtx.deadline;
 
-    console.log('[Goals State] Inserting goal:', JSON.stringify(insertPayload));
-    const { error } = await supabase.from('goals').insert(insertPayload);
+    console.log(`[Goals] DB_INSERT: table=goals, payload=`, JSON.stringify(insertPayload).substring(0, 500));
+    const { data: insertData, error } = await supabase.from('goals').insert(insertPayload).select('id').single();
+    console.log(`[Goals] DB_RESULT: success=${!error}, id=${insertData?.id || 'none'}, error=${error?.message || 'none'}`);
 
     if (error) {
       console.error('[Goals State] Error creating goal:', error, 'payload:', JSON.stringify(insertPayload));
@@ -1049,6 +1086,8 @@ export async function detectLoansFromClassifiedTransactions(ctx: RouterContext):
 // ============================================================================
 
 export async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult> {
+  console.log(`[Goals] ═══════════════════════════════════════`);
+  console.log(`[Goals] moveToGoalsSetup: userId=${ctx.userId.substring(0,8)}...`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
@@ -1109,33 +1148,44 @@ export async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult
  * 🆕 Parse amount from Hebrew text - handles K, אלף, commas, currency symbols
  */
 function parseGoalAmount(msg: string): number {
+  console.log(`[Goals] PARSE_AMOUNT: raw input="${msg}"`);
   // Remove currency symbols and whitespace
   let cleaned = msg.replace(/[₪ש״ח]/g, '').replace(/שקל(ים)?/g, '').trim();
+  console.log(`[Goals] PARSE_AMOUNT: cleaned="${cleaned}"`);
 
   // Handle "X אלף" (X thousand)
   const elefMatch = cleaned.match(/(\d[\d,.]*)\s*אלף/);
   if (elefMatch) {
-    return parseFloat(elefMatch[1].replace(/,/g, '')) * 1000;
+    const result = parseFloat(elefMatch[1].replace(/,/g, '')) * 1000;
+    console.log(`[Goals] PARSE_AMOUNT: input="${msg}", parsed=${result} (אלף match)`);
+    return result;
   }
 
   // Handle "Xk" or "XK"
   const kMatch = cleaned.match(/(\d[\d,.]*)\s*[kK]/);
   if (kMatch) {
-    return parseFloat(kMatch[1].replace(/,/g, '')) * 1000;
+    const result = parseFloat(kMatch[1].replace(/,/g, '')) * 1000;
+    console.log(`[Goals] PARSE_AMOUNT: input="${msg}", parsed=${result} (K match)`);
+    return result;
   }
 
   // Handle "X מיליון" (X million)
   const milMatch = cleaned.match(/(\d[\d,.]*)\s*מיליון/);
   if (milMatch) {
-    return parseFloat(milMatch[1].replace(/,/g, '')) * 1000000;
+    const result = parseFloat(milMatch[1].replace(/,/g, '')) * 1000000;
+    console.log(`[Goals] PARSE_AMOUNT: input="${msg}", parsed=${result} (מיליון match)`);
+    return result;
   }
 
   // Standard number with possible commas
   const numMatch = cleaned.match(/(\d[\d,.]*)/);
   if (numMatch) {
-    return parseFloat(numMatch[1].replace(/,/g, ''));
+    const result = parseFloat(numMatch[1].replace(/,/g, ''));
+    console.log(`[Goals] PARSE_AMOUNT: input="${msg}", parsed=${result} (standard number)`);
+    return result;
   }
 
+  console.log(`[Goals] PARSE_AMOUNT: input="${msg}", parsed=NaN (no match)`);
   return NaN;
 }
 
@@ -1143,10 +1193,14 @@ function parseGoalAmount(msg: string): number {
  * 🆕 Parse deadline from Hebrew text
  */
 function parseGoalDeadline(msg: string): string | null {
+  console.log(`[Goals] PARSE_DEADLINE: raw input="${msg}"`);
   const msgLower = msg.toLowerCase().trim();
 
   // "אין" / "ללא" / "no"
-  if (/^(אין|ללא|no|none|לא|בלי)$/i.test(msgLower)) return null;
+  if (/^(אין|ללא|no|none|לא|בלי)$/i.test(msgLower)) {
+    console.log(`[Goals] PARSE_DEADLINE: input="${msg}", parsed=null (no deadline requested)`);
+    return null;
+  }
 
   // "עוד X חודשים/שנים"
   const relativeMatch = msg.match(/(?:עוד|בעוד|תוך)\s+(\d+)\s*(חודשים?|שנים?|שנה)/);
@@ -1158,21 +1212,27 @@ function parseGoalDeadline(msg: string): string | null {
     } else {
       d.setMonth(d.getMonth() + num);
     }
-    return d.toISOString().split('T')[0];
+    const result = d.toISOString().split('T')[0];
+    console.log(`[Goals] PARSE_DEADLINE: input="${msg}", parsed=${result} (relative: ${num} ${relativeMatch[2]})`);
+    return result;
   }
 
   // "עוד שנה" without number
   if (/עוד שנה/.test(msgLower)) {
     const d = new Date();
     d.setFullYear(d.getFullYear() + 1);
-    return d.toISOString().split('T')[0];
+    const result = d.toISOString().split('T')[0];
+    console.log(`[Goals] PARSE_DEADLINE: input="${msg}", parsed=${result} (עוד שנה)`);
+    return result;
   }
 
   // "עוד חצי שנה"
   if (/חצי שנה/.test(msgLower)) {
     const d = new Date();
     d.setMonth(d.getMonth() + 6);
-    return d.toISOString().split('T')[0];
+    const result = d.toISOString().split('T')[0];
+    console.log(`[Goals] PARSE_DEADLINE: input="${msg}", parsed=${result} (חצי שנה)`);
+    return result;
   }
 
   // Hebrew month names
@@ -1189,26 +1249,39 @@ function parseGoalDeadline(msg: string): string | null {
       const d = new Date(year, monthNum, 1);
       // If date is in the past, push to next year
       if (d < new Date()) d.setFullYear(d.getFullYear() + 1);
-      return d.toISOString().split('T')[0];
+      const result = d.toISOString().split('T')[0];
+      console.log(`[Goals] PARSE_DEADLINE: input="${msg}", parsed=${result} (Hebrew month: ${monthName} ${year})`);
+      return result;
     }
   }
 
   // "סוף השנה"
   if (/סוף (ה)?שנה/.test(msgLower)) {
-    return `${new Date().getFullYear()}-12-31`;
+    const result = `${new Date().getFullYear()}-12-31`;
+    console.log(`[Goals] PARSE_DEADLINE: input="${msg}", parsed=${result} (סוף השנה)`);
+    return result;
   }
 
   // DD/MM/YYYY or DD.MM.YYYY
   const ddmmyyyy = msg.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
   if (ddmmyyyy) {
     const d = new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
-    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    if (!isNaN(d.getTime())) {
+      const result = d.toISOString().split('T')[0];
+      console.log(`[Goals] PARSE_DEADLINE: input="${msg}", parsed=${result} (DD/MM/YYYY)`);
+      return result;
+    }
   }
 
   // Generic date parse
   const parsed = new Date(msg);
-  if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+  if (!isNaN(parsed.getTime())) {
+    const result = parsed.toISOString().split('T')[0];
+    console.log(`[Goals] PARSE_DEADLINE: input="${msg}", parsed=${result} (generic Date parse)`);
+    return result;
+  }
 
+  console.log(`[Goals] PARSE_DEADLINE: input="${msg}", parsed=null (no match found)`);
   return null;
 }
 

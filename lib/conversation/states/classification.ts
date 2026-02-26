@@ -24,12 +24,15 @@ import { chatWithGeminiFlashMinimal } from '@/lib/ai/gemini-client';
  * Shown when user is in the classification state but no sub-type is active yet.
  */
 export async function handleClassificationState(ctx: RouterContext, msg: string): Promise<RouterResult> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] handleClassificationState: userId=${ctx.userId.substring(0,8)}..., msg="${msg.substring(0, 80)}"`);
   const greenAPI = getGreenAPIClient();
 
   if (isCommand(msg, [
     'נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג', 'start_classify',
     '▶️ נתחיל לסווג', 'נתחיל לסווג ▶️', '▶️ נמשיך לסווג', 'נמשיך לסווג ▶️',
   ])) {
+    console.log(`[Classification] handleClassificationState: matched START command, calling startClassification`);
     return await startClassification(ctx);
   }
 
@@ -38,11 +41,13 @@ export async function handleClassificationState(ctx: RouterContext, msg: string)
     '📄 עוד דוח בנק', 'עוד דוח בנק 📄', '💳 דוח אשראי', 'דוח אשראי 💳',
     '📄 שלח עוד מסמך', 'שלח עוד מסמך 📄',
   ])) {
+    console.log(`[Classification] handleClassificationState: matched ADD_DOC command`);
     await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: `📄 מעולה! שלח לי את המסמך.` });
     return { success: true };
   }
 
   // Default - show options with buttons
+  console.log(`[Classification] handleClassificationState: no command matched, showing default options`);
   try {
     await greenAPI.sendInteractiveButtons({
       phoneNumber: ctx.phone,
@@ -71,6 +76,8 @@ export async function handleClassificationState(ctx: RouterContext, msg: string)
  * Entry point: check for documents, count pending, start flow.
  */
 export async function startClassification(ctx: RouterContext): Promise<RouterResult> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] START: userId=${ctx.userId.substring(0,8)}..., phone=${ctx.phone}`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -80,7 +87,9 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
     .select('id', { count: 'exact', head: true })
     .eq('user_id', ctx.userId);
 
+  console.log(`[Classification] START: uploadedDocs=${uploadedDocs || 0}`);
   if (!uploadedDocs || uploadedDocs === 0) {
+    console.log(`[Classification] START: no uploaded docs, aborting classification`);
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `📄 *אין עדיין דוחות במערכת!*\n\nשלח לי דוח בנק או דוח אשראי קודם.\n\n💡 אפשר לשלוח PDF, Excel או תמונה.`,
@@ -89,7 +98,9 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
   }
 
   // Auto-classify transactions using learned rules before showing manual flow
+  console.log(`[Classification] START: running autoClassifyWithRules...`);
   const autoClassified = await autoClassifyWithRules(ctx.userId, supabase);
+  console.log(`[Classification] AUTO_CLASSIFY: userId=${ctx.userId.substring(0,8)}..., autoClassified=${autoClassified}`);
   if (autoClassified > 0) {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
@@ -106,16 +117,19 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
   const incomeCount = incomeTransactions.length;
   const expenseCount = expenseTransactions.length;
 
-  console.log(`📊 Classifiable transactions: ${incomeCount} income, ${expenseCount} expense (${autoClassified} auto-classified)`);
+  console.log(`[Classification] PENDING_TX: total=${incomeCount + expenseCount}, income=${incomeCount}, expense=${expenseCount}, autoClassified=${autoClassified}`);
 
   if (incomeCount === 0 && expenseCount === 0) {
+    console.log(`[Classification] START: no classifiable transactions, checking total transactions...`);
     // Check if there are ANY transactions in the system (including confirmed)
     const { count: totalTransactions } = await supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', ctx.userId);
 
+    console.log(`[Classification] START: totalTransactions=${totalTransactions || 0}`);
     if (!totalTransactions || totalTransactions === 0) {
+      console.log(`[Classification] START: no transactions at all, asking for documents`);
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
         message: `אין תנועות לסיווג! 🤷\n\nשלח לי דוח בנק או דוח אשראי קודם.`,
@@ -124,11 +138,14 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
     }
 
     // There are transactions but all classified - check for missing documents
+    console.log(`[Classification] START: all classified, checking missing docs...`);
     const { checkAndRequestMissingDocuments } = await import('../classification-flow');
     const hasMoreDocs = await checkAndRequestMissingDocuments(ctx.userId, ctx.phone);
+    console.log(`[Classification] START: hasMoreDocs=${hasMoreDocs}`);
 
     if (!hasMoreDocs) {
       // All done - move to next phase
+      console.log(`[Classification] COMPLETE: userId=${ctx.userId.substring(0,8)}..., all transactions classified, moving to goals`);
       await supabase
         .from('users')
         .update({ onboarding_state: 'goals_setup', phase: 'goals' })
@@ -157,6 +174,7 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
 
   // Set state and show first transaction
   const newState = incomeCount > 0 ? 'classification_income' : 'classification_expense';
+  console.log(`[Classification] START: setting newState=${newState}, showing first transaction`);
 
   await supabase
     .from('users')
@@ -181,11 +199,14 @@ export async function handleClassificationResponse(
   msg: string,
   type: 'income' | 'expense'
 ): Promise<RouterResult> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] RESPONSE: type=${type}, userId=${ctx.userId.substring(0,8)}..., msg="${msg.substring(0, 80)}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
   // ---- FINISH EARLY (works in both income and expense) ----
   if (isCommand(msg, ['סיימתי', 'סיום', 'מספיק', 'finish', 'done', 'הספיק', 'נגמר'])) {
+    console.log(`[Classification] RESPONSE: FINISH_EARLY command detected for type=${type}`);
     // Mark all remaining pending as 'לא מסווג'
     const { count } = await supabase
       .from('transactions')
@@ -194,7 +215,9 @@ export async function handleClassificationResponse(
       .eq('status', 'pending')
       .eq('type', type);
 
+    console.log(`[Classification] FINISH_EARLY: remaining pending count=${count || 0} for type=${type}`);
     if (count && count > 0) {
+      console.log(`[Classification] FINISH_EARLY: marking ${count} pending tx as 'לא מסווג'`);
       await supabase
         .from('transactions')
         .update({
@@ -214,19 +237,24 @@ export async function handleClassificationResponse(
       });
     }
 
+    console.log(`[Classification] FINISH_EARLY: calling moveToNextPhase for type=${type}`);
     return await moveToNextPhase(ctx, type);
   }
 
   // ---- EXPENSE ----
   if (type === 'expense') {
+    console.log(`[Classification] RESPONSE: handling EXPENSE flow`);
     // Group classification - get group from cache
     const txIds = await getCurrentGroupFromCache(ctx.userId);
+    console.log(`[Classification] RESPONSE: expense group from cache, txIds=${txIds ? txIds.length : 0} items: [${(txIds || []).slice(0,3).join(', ')}${(txIds || []).length > 3 ? '...' : ''}]`);
     if (!txIds || txIds.length === 0) {
+      console.log(`[Classification] RESPONSE: no group in cache, showing next expense group`);
       return await showNextExpenseGroup(ctx);
     }
 
     // Skip command - mark entire group as confirmed with 'skipped' to avoid infinite loop
     if (isCommand(msg, ['דלג', 'skip', '⏭️ דלג', 'דלג ⏭️'])) {
+      console.log(`[Classification] RESPONSE: SKIP expense group, txIds=${txIds.length}`);
       await supabase
         .from('transactions')
         .update({
@@ -248,6 +276,7 @@ export async function handleClassificationResponse(
 
     // Fix last classification - reopen the most recent confirmed transaction
     if (isCommand(msg, ['תקן', 'תיקון', 'fix', 'חזור', 'טעות', 'לא נכון'])) {
+      console.log(`[Classification] RESPONSE: FIX/UNDO command for expense`);
       const reopened = await reopenLastClassified(ctx.userId, 'expense', supabase);
       if (reopened) {
         await greenAPI.sendMessage({
@@ -292,6 +321,7 @@ export async function handleClassificationResponse(
     if (msg.length > 3) {
       const earlyMatch = findBestMatch(msg);
       if (earlyMatch) {
+        console.log(`[Classification] CATEGORY_MATCH: input="${msg}", matched="${earlyMatch.name}" (early/fast match, expense)`);
         return await classifyGroup(ctx, txIds, earlyMatch.name, type);
       }
     }
@@ -299,20 +329,26 @@ export async function handleClassificationResponse(
     // Confirm suggestion ("כן")
     if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes', '✅ כן', 'כן ✅', 'confirm'])) {
       const suggestions = await getSuggestionsFromCache(ctx.userId);
+      console.log(`[Classification] RESPONSE: CONFIRM expense, cached suggestions=[${(suggestions || []).join(', ')}]`);
       if (suggestions && suggestions[0]) {
+        console.log(`[Classification] CATEGORY_MATCH: input="confirm", matched="${suggestions[0]}" (from cache, expense)`);
         return await classifyGroup(ctx, txIds, suggestions[0], type);
       }
+      console.log(`[Classification] RESPONSE: CONFIRM but no cached suggestions found`);
     }
 
     // Numeric selection from suggestions cache (1, 2, 3)
     const numChoice = parseInt(msg);
     if (!isNaN(numChoice) && numChoice >= 1 && numChoice <= 3) {
       const cachedSuggestions = await getSuggestionsFromCache(ctx.userId);
+      console.log(`[Classification] RESPONSE: numeric choice=${numChoice}, cached=[${(cachedSuggestions || []).join(', ')}]`);
       if (cachedSuggestions && cachedSuggestions[numChoice - 1]) {
+        console.log(`[Classification] CATEGORY_MATCH: input="${numChoice}", matched="${cachedSuggestions[numChoice - 1]}" (numeric from cache, expense)`);
         return await classifyGroup(ctx, txIds, cachedSuggestions[numChoice - 1], type);
       }
       // Numeric from full CATEGORIES list
       if (numChoice >= 1 && numChoice <= CATEGORIES.length) {
+        console.log(`[Classification] CATEGORY_MATCH: input="${numChoice}", matched="${CATEGORIES[numChoice - 1].name}" (numeric from full list, expense)`);
         return await classifyGroup(ctx, txIds, CATEGORIES[numChoice - 1].name, type);
       }
     }
@@ -320,12 +356,14 @@ export async function handleClassificationResponse(
     // Try to match as category name (fallback for shorter inputs)
     const match = findBestMatch(msg);
     if (match) {
+      console.log(`[Classification] CATEGORY_MATCH: input="${msg}", matched="${match.name}" (bestMatch fallback, expense)`);
       return await classifyGroup(ctx, txIds, match.name, type);
     }
 
     // Try top matches and offer suggestions
     const topMatches = findTopMatches(msg, 3);
     if (topMatches.length > 0) {
+      console.log(`[Classification] RESPONSE: topMatches for "${msg}": [${topMatches.map(m => m.name).join(', ')}]`);
       await saveSuggestionsToCache(ctx.userId, topMatches.map(m => m.name));
       const list = topMatches.map((m, i) => `${i + 1}. ${m.name}`).join('\n');
       await greenAPI.sendMessage({
@@ -337,9 +375,10 @@ export async function handleClassificationResponse(
 
     // AI fallback - suggest (don't auto-classify) when rule-based fails
     if (msg.length >= 3 && msg.length <= 40) {
+      console.log(`[Classification] RESPONSE: no rule match for "${msg}", trying AI fallback (expense)...`);
       const aiCategory = await matchCategoryWithAI(msg, 'expense');
       if (aiCategory) {
-        console.log(`[AI Category] Suggesting expense: "${msg}" → "${aiCategory}"`);
+        console.log(`[Classification] AI_CLASSIFY: input="${msg}", aiResult="${aiCategory}" (expense)`);
         await saveSuggestionsToCache(ctx.userId, [aiCategory]);
         await greenAPI.sendMessage({
           phoneNumber: ctx.phone,
@@ -351,9 +390,11 @@ export async function handleClassificationResponse(
 
     // Use as-is if reasonable length
     if (msg.length >= 2 && msg.length <= 30) {
+      console.log(`[Classification] RESPONSE: using raw msg as category="${msg}" (expense, no match found)`);
       return await classifyGroup(ctx, txIds, msg, type);
     }
 
+    console.log(`[Classification] RESPONSE: unrecognized input="${msg}" (expense), asking user to retry`);
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `❓ לא הבנתי. כתוב שם קטגוריה, או *"רשימה"* לאפשרויות.`,
@@ -362,6 +403,7 @@ export async function handleClassificationResponse(
   }
 
   // ---- INCOME ----
+  console.log(`[Classification] RESPONSE: handling INCOME flow`);
   // Get current pending income transaction
   const { data: currentTx } = await supabase
     .from('transactions')
@@ -373,12 +415,16 @@ export async function handleClassificationResponse(
     .limit(1)
     .single();
 
+  console.log(`[Classification] CURRENT_TX: vendor=${currentTx?.vendor || 'none'}, amount=${currentTx?.amount || 'none'}, type=${currentTx?.type || 'none'}, txId=${currentTx?.id || 'none'}`);
+
   if (!currentTx) {
+    console.log(`[Classification] RESPONSE: no pending income tx, moving to next phase`);
     return await moveToNextPhase(ctx, 'income');
   }
 
   // Skip command - mark as confirmed with 'skipped' note to avoid infinite loop
   if (isCommand(msg, ['דלג', 'תדלג', 'הבא', 'skip', '⏭️ דלג', 'דלג ⏭️'])) {
+    console.log(`[Classification] RESPONSE: SKIP income tx, txId=${currentTx.id}, vendor=${currentTx.vendor}`);
     const { error: skipError } = await supabase
       .from('transactions')
       .update({
@@ -402,6 +448,7 @@ export async function handleClassificationResponse(
 
   // Fix last classification
   if (isCommand(msg, ['תקן', 'תיקון', 'fix', 'חזור', 'טעות', 'לא נכון'])) {
+    console.log(`[Classification] RESPONSE: FIX/UNDO command for income`);
     const reopened = await reopenLastClassified(ctx.userId, 'income', supabase);
     if (reopened) {
       await greenAPI.sendMessage({
@@ -446,6 +493,7 @@ export async function handleClassificationResponse(
   if (msg.length > 3) {
     const earlyIncomeMatch = findBestIncomeMatch(msg);
     if (earlyIncomeMatch) {
+      console.log(`[Classification] CATEGORY_MATCH: input="${msg}", matched="${earlyIncomeMatch.name}" (early/fast match, income)`);
       return await classifyTransaction(ctx, currentTx.id, earlyIncomeMatch.name, type);
     }
   }
@@ -453,20 +501,26 @@ export async function handleClassificationResponse(
   // Confirm suggestion ("כן")
   if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes', '✅ כן', 'כן ✅', 'confirm'])) {
     const suggestions = await getSuggestionsFromCache(ctx.userId);
+    console.log(`[Classification] RESPONSE: CONFIRM income, cached suggestions=[${(suggestions || []).join(', ')}]`);
     if (suggestions && suggestions[0]) {
+      console.log(`[Classification] CATEGORY_MATCH: input="confirm", matched="${suggestions[0]}" (from cache, income)`);
       return await classifyTransaction(ctx, currentTx.id, suggestions[0], type);
     }
+    console.log(`[Classification] RESPONSE: CONFIRM but no cached suggestions found (income)`);
   }
 
   // Numeric selection (1, 2, 3) from suggestions cache
   const numIncome = parseInt(msg);
   if (!isNaN(numIncome) && numIncome >= 1 && numIncome <= 3) {
     const cachedSuggestions = await getSuggestionsFromCache(ctx.userId);
+    console.log(`[Classification] RESPONSE: numeric choice=${numIncome}, cached=[${(cachedSuggestions || []).join(', ')}] (income)`);
     if (cachedSuggestions && cachedSuggestions[numIncome - 1]) {
+      console.log(`[Classification] CATEGORY_MATCH: input="${numIncome}", matched="${cachedSuggestions[numIncome - 1]}" (numeric from cache, income)`);
       return await classifyTransaction(ctx, currentTx.id, cachedSuggestions[numIncome - 1], type);
     }
     // Numeric from full INCOME_CATEGORIES list
     if (numIncome >= 1 && numIncome <= INCOME_CATEGORIES.length) {
+      console.log(`[Classification] CATEGORY_MATCH: input="${numIncome}", matched="${INCOME_CATEGORIES[numIncome - 1].name}" (numeric from full list, income)`);
       return await classifyTransaction(ctx, currentTx.id, INCOME_CATEGORIES[numIncome - 1].name, type);
     }
   }
@@ -474,12 +528,14 @@ export async function handleClassificationResponse(
   // Try to match as income category name (fallback for shorter inputs)
   const incomeMatch = findBestIncomeMatch(msg);
   if (incomeMatch) {
+    console.log(`[Classification] CATEGORY_MATCH: input="${msg}", matched="${incomeMatch.name}" (bestMatch fallback, income)`);
     return await classifyTransaction(ctx, currentTx.id, incomeMatch.name, type);
   }
 
   // Try top income matches and offer suggestions
   const topIncomeMatches = findTopIncomeMatches(msg, 3);
   if (topIncomeMatches.length > 0) {
+    console.log(`[Classification] RESPONSE: topIncomeMatches for "${msg}": [${topIncomeMatches.map(m => m.name).join(', ')}]`);
     await saveSuggestionsToCache(ctx.userId, topIncomeMatches.map(m => m.name));
     const list = topIncomeMatches.map((m, i) => `${i + 1}. ${m.name}`).join('\n');
     await greenAPI.sendMessage({
@@ -491,9 +547,10 @@ export async function handleClassificationResponse(
 
   // AI fallback - suggest (don't auto-classify) when rule-based fails
   if (msg.length >= 3 && msg.length <= 40) {
+    console.log(`[Classification] RESPONSE: no rule match for "${msg}", trying AI fallback (income)...`);
     const aiCategory = await matchCategoryWithAI(msg, 'income');
     if (aiCategory) {
-      console.log(`[AI Category] Suggesting income: "${msg}" → "${aiCategory}"`);
+      console.log(`[Classification] AI_CLASSIFY: input="${msg}", aiResult="${aiCategory}" (income)`);
       await saveSuggestionsToCache(ctx.userId, [aiCategory]);
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
@@ -505,9 +562,11 @@ export async function handleClassificationResponse(
 
   // Use as-is if reasonable length
   if (msg.length >= 2 && msg.length <= 30) {
+    console.log(`[Classification] RESPONSE: using raw msg as category="${msg}" (income, no match found)`);
     return await classifyTransaction(ctx, currentTx.id, msg, type);
   }
 
+  console.log(`[Classification] RESPONSE: unrecognized input="${msg}" (income), asking user to retry`);
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `❓ לא הבנתי. כתוב שם קטגוריה, או *"רשימה"* לאפשרויות.`,
@@ -529,6 +588,8 @@ export async function classifyTransaction(
   category: string,
   type: 'income' | 'expense'
 ): Promise<RouterResult> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] classifyTransaction: txId=${txId}, category="${category}", type=${type}`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -539,6 +600,7 @@ export async function classifyTransaction(
     .eq('id', txId)
     .single();
 
+  console.log(`[Classification] DB_UPDATE: txId=${txId}, vendor="${tx?.vendor || 'unknown'}", category="${category}", expense_type="${type === 'expense' ? category : 'null'}"`);
   // Save classification
   const { error } = await supabase
     .from('transactions')
@@ -562,9 +624,11 @@ export async function classifyTransaction(
 
   // Learn the rule
   if (tx?.vendor) {
+    console.log(`[Classification] LEARN_RULE: vendor="${tx.vendor}", category="${category}", type=${type}`);
     await learnUserRule(ctx.userId, tx.vendor, category, type);
   }
 
+  console.log(`[Classification] classifyTransaction: SUCCESS, sending confirmation and showing next`);
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `✅ *${category}*`,
@@ -587,6 +651,8 @@ export async function classifyGroup(
   category: string,
   type: 'income' | 'expense'
 ): Promise<RouterResult> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] GROUP: classifyGroup, txIds=${txIds.length}, category="${category}", type=${type}`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -596,8 +662,10 @@ export async function classifyGroup(
     .select('vendor')
     .eq('id', txIds[0])
     .single();
+  console.log(`[Classification] GROUP: vendor="${firstTx?.vendor || 'unknown'}", groupSize=${txIds.length}, action=classify`);
 
   // Classify all transactions in the group
+  console.log(`[Classification] DB_UPDATE: group of ${txIds.length} txs, category="${category}", expense_type="${type === 'expense' ? category : 'null'}", txIds=[${txIds.slice(0,5).join(', ')}${txIds.length > 5 ? '...' : ''}]`);
   const { error } = await supabase
     .from('transactions')
     .update({
@@ -610,7 +678,7 @@ export async function classifyGroup(
     .in('id', txIds);
 
   if (error) {
-    console.error('[Classification] Failed to classify group:', error);
+    console.error('[Classification] DB_UPDATE FAILED for group:', error);
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `❌ משהו השתבש. נסה שוב.`,
@@ -620,10 +688,12 @@ export async function classifyGroup(
 
   // Learn the rule from the vendor
   if (firstTx?.vendor) {
+    console.log(`[Classification] LEARN_RULE: vendor="${firstTx.vendor}", category="${category}", type=${type} (from group)`);
     await learnUserRule(ctx.userId, firstTx.vendor, category, type);
   }
 
   const count = txIds.length;
+  console.log(`[Classification] GROUP: SUCCESS, classified ${count} tx(s) as "${category}", showing next`);
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: count > 1
@@ -645,8 +715,11 @@ export async function showNextTransaction(
   ctx: RouterContext,
   type: 'income' | 'expense'
 ): Promise<RouterResult> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] showNextTransaction: type=${type}, userId=${ctx.userId.substring(0,8)}...`);
   // Expenses are handled as groups by vendor
   if (type === 'expense') {
+    console.log(`[Classification] showNextTransaction: delegating to showNextExpenseGroup`);
     return await showNextExpenseGroup(ctx);
   }
 
@@ -665,6 +738,7 @@ export async function showNextTransaction(
     .single();
 
   if (!nextTx) {
+    console.log(`[Classification] NEXT_TX: no more pending income, moving to next phase`);
     return await moveToNextPhase(ctx, 'income');
   }
 
@@ -677,12 +751,14 @@ export async function showNextTransaction(
     .eq('type', 'income');
 
   const remaining = count || 0;
+  console.log(`[Classification] NEXT_TX: remaining=${remaining}, moving to txId=${nextTx.id}, vendor="${nextTx.vendor}", amount=${nextTx.amount}`);
 
   // Get suggestion: user rules first, then system suggestion
   const userRule = await getUserRuleSuggestion(ctx.userId, nextTx.vendor);
   const systemSuggestion = findBestIncomeMatch(nextTx.vendor)?.name;
   const suggestion = nextTx.income_category || userRule || systemSuggestion;
   const isLearnedSuggestion = !!userRule;
+  console.log(`[Classification] NEXT_TX: suggestion="${suggestion || 'none'}", source=${nextTx.income_category ? 'existing_category' : userRule ? 'user_rule' : systemSuggestion ? 'system_match' : 'none'}, isLearned=${isLearnedSuggestion}`);
 
   let message = `💚 *${nextTx.vendor}*\n`;
   message += `${Math.abs(nextTx.amount).toLocaleString('he-IL')} ₪ | ${nextTx.tx_date}\n\n`;
@@ -750,6 +826,8 @@ export async function showNextTransaction(
  * Credit card charges (visa/mastercard/etc.) are skipped and marked as needs_credit_detail.
  */
 export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterResult> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] showNextExpenseGroup: userId=${ctx.userId.substring(0,8)}...`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -762,7 +840,10 @@ export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterRe
     .eq('type', 'expense')
     .order('tx_date', { ascending: false });
 
+  console.log(`[Classification] showNextExpenseGroup: total pending expenses=${expenses?.length || 0}`);
+
   if (!expenses || expenses.length === 0) {
+    console.log(`[Classification] showNextExpenseGroup: no pending expenses, moving to next phase`);
     return await moveToNextPhase(ctx, 'expense');
   }
 
@@ -777,6 +858,7 @@ export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterRe
     );
 
     const creditIds = creditTxs.map(t => t.id);
+    console.log(`[Classification] showNextExpenseGroup: CREDIT_SKIP: ${creditTxs.length} credit tx(s) detected, vendor="${firstTx.vendor}", marking as needs_credit_detail`);
 
     const { error: updateError } = await supabase
       .from('transactions')
@@ -821,11 +903,14 @@ export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterRe
   // Count how many groups remain
   const uniqueVendors = new Set(expenses.map(e => e.vendor));
   const groupsRemaining = uniqueVendors.size;
+  console.log(`[Classification] NEXT_TX: expense group vendor="${vendor}", groupSize=${vendorTxs.length}, totalAmount=${totalAmount}, groupsRemaining=${groupsRemaining}, uniqueVendors=[${Array.from(uniqueVendors).slice(0,5).join(', ')}${uniqueVendors.size > 5 ? '...' : ''}]`);
 
   // Get suggestion: user rules first, then system suggestion
   const userRule = await getUserRuleSuggestion(ctx.userId, vendor);
-  const suggestion = firstTx.expense_category || userRule || findBestMatch(vendor)?.name;
+  const systemMatch = findBestMatch(vendor)?.name;
+  const suggestion = firstTx.expense_category || userRule || systemMatch;
   const isLearnedSuggestion = !!userRule;
+  console.log(`[Classification] NEXT_TX: expense suggestion="${suggestion || 'none'}", source=${firstTx.expense_category ? 'existing_category' : userRule ? 'user_rule' : systemMatch ? 'system_match' : 'none'}, isLearned=${isLearnedSuggestion}`);
 
   let message = '';
 
@@ -908,6 +993,8 @@ export async function moveToNextPhase(
   ctx: RouterContext,
   completedType: 'income' | 'expense'
 ): Promise<RouterResult> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] moveToNextPhase: completedType=${completedType}, userId=${ctx.userId.substring(0,8)}...`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -918,8 +1005,10 @@ export async function moveToNextPhase(
   if (completedType === 'income') {
     // Check if there are any classifiable expenses
     const expenseTransactions = await getClassifiableTransactions(ctx.userId, 'expense');
+    console.log(`[Classification] moveToNextPhase: income done, remaining expenses=${expenseTransactions.length}`);
 
     if (expenseTransactions.length > 0) {
+      console.log(`[Classification] moveToNextPhase: transitioning from income to expense classification`);
       await supabase
         .from('users')
         .update({ onboarding_state: 'classification_expense' })
@@ -936,9 +1025,11 @@ export async function moveToNextPhase(
 
   // Check for missing documents first
   const hasMoreDocs = await checkAndRequestMissingDocuments(ctx.userId, ctx.phone);
+  console.log(`[Classification] moveToNextPhase: hasMoreDocs=${hasMoreDocs}`);
 
   if (hasMoreDocs) {
     // Still waiting for missing documents
+    console.log(`[Classification] moveToNextPhase: waiting for missing documents, staying in current state`);
     return { success: true };
   }
 
@@ -949,7 +1040,9 @@ export async function moveToNextPhase(
     .eq('user_id', ctx.userId)
     .eq('status', 'needs_credit_detail');
 
+  console.log(`[Classification] moveToNextPhase: pendingCreditCount=${pendingCreditCount || 0}`);
   if (pendingCreditCount && pendingCreditCount > 0) {
+    console.log(`[Classification] moveToNextPhase: ${pendingCreditCount} pending credit tx(s), requesting credit statements`);
     // Credit detail required - ask user to upload credit statements
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
@@ -985,6 +1078,7 @@ export async function moveToNextPhase(
   }
 
   // All done - move to goals setup
+  console.log(`[Classification] COMPLETE: userId=${ctx.userId.substring(0,8)}..., all classification done, moving to goals setup`);
   return await moveToGoalsSetup(ctx);
 }
 
@@ -997,6 +1091,8 @@ export async function moveToNextPhase(
  * Sends a summary message and kicks off advanced goal creation.
  */
 async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] moveToGoalsSetup: userId=${ctx.userId.substring(0,8)}...`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -1017,6 +1113,7 @@ async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult> {
 
   const balance = totalIncome - totalExpenses;
   const balanceEmoji = balance >= 0 ? '✨' : '📉';
+  console.log(`[Classification] moveToGoalsSetup: totalIncome=${totalIncome}, totalExpenses=${totalExpenses}, balance=${balance}`);
 
   // Update state to goals_setup
   await supabase
@@ -1062,10 +1159,12 @@ export async function learnUserRule(
   category: string,
   type: 'income' | 'expense'
 ): Promise<void> {
+  console.log(`[Classification] learnUserRule: userId=${userId.substring(0,8)}..., vendor="${vendor}", category="${category}", type=${type}`);
   const supabase = createServiceClient();
 
   // Normalize vendor - remove trailing numbers, lowercase
   const vendorPattern = normalizeVendor(vendor);
+  console.log(`[Classification] learnUserRule: normalized vendor="${vendorPattern}"`);
 
   if (!vendorPattern || vendorPattern.length < 2) {
     return; // Too short - don't save
@@ -1184,6 +1283,8 @@ export async function getUserRuleSuggestion(
  * Returns the number of transactions auto-classified.
  */
 async function autoClassifyWithRules(userId: string, supabase: any): Promise<number> {
+  console.log(`[Classification] ═══════════════════════════════════════`);
+  console.log(`[Classification] autoClassifyWithRules: userId=${userId.substring(0,8)}...`);
   // Get auto-approved rules
   const { data: rules } = await supabase
     .from('user_category_rules')
@@ -1191,6 +1292,7 @@ async function autoClassifyWithRules(userId: string, supabase: any): Promise<num
     .eq('user_id', userId)
     .eq('auto_approved', true);
 
+  console.log(`[Classification] autoClassifyWithRules: auto-approved rules=${rules?.length || 0}${rules?.length > 0 ? `, rules=[${rules.slice(0,5).map((r: any) => `"${r.vendor_pattern}"->"${r.category}"`).join(', ')}${rules.length > 5 ? '...' : ''}]` : ''}`);
   if (!rules || rules.length === 0) return 0;
 
   // Get pending transactions
@@ -1200,6 +1302,7 @@ async function autoClassifyWithRules(userId: string, supabase: any): Promise<num
     .eq('user_id', userId)
     .eq('status', 'pending');
 
+  console.log(`[Classification] autoClassifyWithRules: pending transactions=${pending?.length || 0}`);
   if (!pending || pending.length === 0) return 0;
 
   let classified = 0;
@@ -1215,6 +1318,7 @@ async function autoClassifyWithRules(userId: string, supabase: any): Promise<num
     );
 
     if (matchingRule) {
+      console.log(`[Classification] AUTO_CLASSIFY: txId=${tx.id}, vendor="${tx.vendor}", matched rule="${matchingRule.vendor_pattern}"->"${matchingRule.category}"`);
       await supabase
         .from('transactions')
         .update({
@@ -1231,6 +1335,7 @@ async function autoClassifyWithRules(userId: string, supabase: any): Promise<num
     }
   }
 
+  console.log(`[Classification] AUTO_CLASSIFY: userId=${userId.substring(0,8)}..., autoClassified=${classified} out of ${pending.length} pending`);
   return classified;
 }
 
@@ -1252,6 +1357,7 @@ async function matchCategoryWithAI(
   userInput: string,
   type: 'income' | 'expense'
 ): Promise<string | null> {
+  console.log(`[Classification] AI_CLASSIFY: calling matchCategoryWithAI, input="${userInput}", type=${type}`);
   const categoryNames = type === 'income' ? _incomeCategoryNames : _expenseCategoryNames;
 
   const prompt = `אתה מנוע סיווג פיננסי. המשתמש כתב: "${userInput}"
@@ -1271,25 +1377,33 @@ ${categoryNames.join(', ')}
     ]);
 
     const cleaned = result.trim().replace(/^["']|["']$/g, '');
+    console.log(`[Classification] AI_CLASSIFY: raw AI result="${result.substring(0, 80)}", cleaned="${cleaned}"`);
 
     if (cleaned === 'null' || cleaned === '' || cleaned.length > 50) {
+      console.log(`[Classification] AI_CLASSIFY: result rejected (null/empty/too long)`);
       return null;
     }
 
     // Verify the AI returned an actual category from our list
     const exactMatch = categoryNames.find(n => n === cleaned);
-    if (exactMatch) return exactMatch;
+    if (exactMatch) {
+      console.log(`[Classification] AI_CLASSIFY: exact match found="${exactMatch}"`);
+      return exactMatch;
+    }
 
     // Fuzzy verify - AI might slightly vary the name
     const fuzzyMatch = categoryNames.find(n =>
       n.includes(cleaned) || cleaned.includes(n)
     );
-    if (fuzzyMatch) return fuzzyMatch;
+    if (fuzzyMatch) {
+      console.log(`[Classification] AI_CLASSIFY: fuzzy match found="${fuzzyMatch}" for cleaned="${cleaned}"`);
+      return fuzzyMatch;
+    }
 
-    console.log(`[AI Category] AI returned "${cleaned}" which is not in the list, ignoring`);
+    console.log(`[Classification] AI_CLASSIFY: AI returned "${cleaned}" which is not in the list, ignoring`);
     return null;
   } catch (error) {
-    console.log(`[AI Category] Fallback failed (${(error as Error).message}), skipping`);
+    console.log(`[Classification] AI_CLASSIFY: fallback failed (${(error as Error).message}), skipping`);
     return null;
   }
 }
@@ -1307,6 +1421,7 @@ async function reopenLastClassified(
   type: 'income' | 'expense',
   supabase: any
 ): Promise<{ vendor: string; amount: number; category: string } | null> {
+  console.log(`[Classification] reopenLastClassified: userId=${userId.substring(0,8)}..., type=${type}`);
   // Find the most recently classified transaction (by classified_at or updated timestamp)
   const { data: lastTx } = await supabase
     .from('transactions')

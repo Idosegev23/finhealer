@@ -222,7 +222,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('📱 GreenAPI Webhook received:', payload.typeWebhook);
+    console.log(`[Webhook] ═══════════════════════════════════════`);
+    console.log(`[Webhook] INCOMING: type=${payload.typeWebhook}, msgId=${payload.idMessage}`);
+    console.log(`[Webhook] FROM: chatId=${payload.senderData?.chatId}, name=${payload.senderData?.senderName || 'unknown'}`);
+    console.log(`[Webhook] MSG_TYPE: ${payload.messageData?.typeMessage || 'none'}`);
+    console.log(`[Webhook] CONTENT: ${JSON.stringify(payload.messageData || {}).substring(0, 300)}`);
 
     // 🛡️ בדיקה ראשונה - התעלם מכל מה שלא הודעה נכנסת
     if (payload.typeWebhook !== 'incomingMessageReceived') {
@@ -368,6 +372,7 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('✅ User found:', maskUserId((user as any).id));
       userData = user as any;
+      console.log(`[Webhook] USER: id=${maskUserId(userData.id)}, name=${userData.name || 'none'}, wa_opt_in=${userData.wa_opt_in}`);
     }
 
     // 🆕 אם המשתמש לא אישר עדיין WhatsApp - מאשר אוטומטית ומתחיל אונבורדינג
@@ -487,7 +492,9 @@ export async function POST(request: NextRequest) {
             .eq('id', userData.id);
         }
 
-        return NextResponse.json({ status: 'receipt_button_handled', action: messageToRoute.startsWith('confirm_') ? 'confirmed' : 'editing' });
+        const btnAction = messageToRoute.startsWith('confirm_') ? 'confirmed' : 'editing';
+        console.log(`[Webhook] RESPONSE: receipt_button_handled action=${btnAction}`);
+        return NextResponse.json({ status: 'receipt_button_handled', action: btnAction });
       }
 
       const { routeMessage } = await import('@/lib/conversation/phi-router');
@@ -569,18 +576,21 @@ export async function POST(request: NextRequest) {
           // הודעה כבר נשמרה ב-wa_messages בשלב הגנרי (שורה 355)
           // 🎯 קריאה ל-φ Router - לוגיקה נקייה וקשיחה
           const { routeMessage } = await import('@/lib/conversation/phi-router');
+          console.log(`[Webhook] ROUTING_TEXT: userId=${maskUserId(userData.id)}, text="${text.substring(0, 100)}", length=${text.length}`);
           const result = await routeMessage(userData.id, phoneNumber, text);
           
-          console.log(`[φ Router] Result: success=${result.success}, newState=${result.newState || 'unchanged'}`);
+          console.log(`[Webhook] ROUTER_RESULT: success=${result.success}, newState=${result.newState || 'unchanged'}, responded=${result.responded ?? 'N/A'}`);
 
           // Fallback if router didn't match any state
           if (!result.success) {
+            console.log(`[Webhook] RESPONSE: router_fallback (no match)`);
             await greenAPI.sendMessage({
               phoneNumber,
               message: `לא הבנתי 🤔\n\nכתוב *"עזרה"* לראות מה אפשר לעשות.`,
             });
           }
 
+          console.log(`[Webhook] RESPONSE: rigid_router_response success=${result.success}, newState=${result.newState || null}`);
           return NextResponse.json({
             status: 'rigid_router_response',
             success: result.success,
@@ -606,6 +616,7 @@ export async function POST(request: NextRequest) {
 
       console.log('📥 Download URL:', downloadUrl);
       console.log('📝 Caption:', caption);
+      console.log(`[Webhook] IMAGE_RECEIVED: downloadUrl=${downloadUrl ? 'yes' : 'no'}, caption="${(caption || '').substring(0, 50)}"`);
 
       // 🆕 If user is in waiting_for_name and sends an image, auto-set name and advance
       {
@@ -1127,6 +1138,8 @@ export async function POST(request: NextRequest) {
           const buffer = Buffer.from(pdfBuffer);
           
           console.log(`🤖 Starting PDF analysis (type: ${documentType}) with Gemini 3.1 Pro...`);
+          console.log(`[Webhook] PDF_ANALYSIS_START: docType=${documentType}, fileSize=${buffer.length} bytes, fileName=${fileName}`);
+          const pdfStartTime = Date.now();
 
           // 🆕 טען קטגוריות ובחר את הפרומפט המתאים לסוג המסמך
           const { getPromptForDocumentType } = await import('@/lib/ai/document-prompts');
@@ -1166,6 +1179,7 @@ export async function POST(request: NextRequest) {
             content = await Promise.race([aiPromise, timeoutPromise]);
 
             console.log('✅ Gemini Pro PDF analysis succeeded');
+            console.log(`[Webhook] PDF_ANALYSIS_DONE: time=${Date.now() - pdfStartTime}ms, resultLength=${content.length} chars`);
           } catch (geminiError: any) {
             if (geminiError.message === 'PDF_AI_TIMEOUT') {
               console.error('⏱️ PDF AI call timed out after 240 seconds');
@@ -1432,6 +1446,10 @@ export async function POST(request: NextRequest) {
           }
           
           console.log(`✅ Saved ${insertedIds.length}/${allTransactions.length} transactions`);
+          console.log(`[Webhook] TX_INSERT_COMPLETE: saved=${insertedIds.length}/${allTransactions.length}, errors=${insertErrors.length}, batchId=${pendingBatchId}`);
+          if (insertErrors.length > 0) {
+            console.log(`[Webhook] TX_INSERT_ERRORS:`, JSON.stringify(insertErrors.slice(0, 5)));
+          }
 
           // 🔍 Notify user about duplicate suspects
           if (duplicateSuspects.length > 0) {

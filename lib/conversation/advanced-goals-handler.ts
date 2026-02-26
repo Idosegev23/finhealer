@@ -149,13 +149,17 @@ export async function startAdvancedGoal(
   userId: string,
   phone: string
 ): Promise<void> {
+  console.log(`[AdvGoals] ═══════════════════════════════════════`);
+  console.log(`[AdvGoals] startAdvancedGoal: userId=${userId.substring(0,8)}..., phone=${phone}`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
   await mergeClassificationContext(userId, {
     advancedGoalCreation: { step: 'type' as const }
   });
+  console.log(`[AdvGoals] STEP_TRANSITION: (none) → type`);
 
+  console.log(`[AdvGoals] SEND_MSG: "🎯 *יעד חדש* - showing type selection menu..."`);
   await greenAPI.sendMessage({
     phoneNumber: phone,
     message: `🎯 *יעד חדש*\n\n` +
@@ -195,6 +199,7 @@ async function trySmartGoalParse(msg: string): Promise<{
   targetAmount?: number;
   deadline?: string;
 } | null> {
+  console.log(`[AdvGoals] SMART_PARSE_START: input="${msg}"`);
   // 1. Rule-based extraction first (fast)
   const msgLower = msg.toLowerCase().trim();
 
@@ -207,6 +212,7 @@ async function trySmartGoalParse(msg: string): Promise<{
       amount *= 1000;
     }
   }
+  console.log(`[AdvGoals] SMART_PARSE_AMOUNT: extracted=${amount || 'none'}`);
 
   // Extract deadline from text
   let deadline: string | undefined;
@@ -222,6 +228,7 @@ async function trySmartGoalParse(msg: string): Promise<{
     }
     deadline = d.toISOString().split('T')[0];
   }
+  console.log(`[AdvGoals] SMART_PARSE_DEADLINE: extracted=${deadline || 'none'}`);
 
   // Try to match goal type from keywords
   const typeMatches: Array<{ keywords: RegExp; type: GoalType; name: string; group?: string }> = [
@@ -240,13 +247,15 @@ async function trySmartGoalParse(msg: string): Promise<{
 
   for (const tm of typeMatches) {
     if (tm.keywords.test(msgLower)) {
-      return {
+      const result = {
         goalType: tm.type,
         goalName: tm.name,
         goalGroup: tm.group,
         targetAmount: amount,
         deadline,
       };
+      console.log(`[AdvGoals] SMART_PARSE: input="${msg}", result=`, JSON.stringify(result));
+      return result;
     }
   }
 
@@ -261,6 +270,7 @@ async function trySmartGoalParse(msg: string): Promise<{
       const aiResult = await Promise.race([aiPromise, timeout]);
 
       const parsed = JSON.parse(aiResult.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+      console.log(`[AdvGoals] SMART_PARSE_AI_RAW:`, JSON.stringify(parsed));
       if (parsed.goalName) {
         let deadlineFromAI: string | undefined;
         if (parsed.months && parsed.months > 0) {
@@ -270,19 +280,23 @@ async function trySmartGoalParse(msg: string): Promise<{
         }
 
         const matchedType = GOAL_TYPES_EXTENDED[parsed.goalType];
-        return {
+        const result = {
           goalType: matchedType ? parsed.goalType : 'savings_goal',
           goalName: parsed.goalName,
           goalGroup: matchedType?.group,
           targetAmount: parsed.amount || amount,
           deadline: deadlineFromAI || deadline,
         };
+        console.log(`[AdvGoals] SMART_PARSE: input="${msg}", result=`, JSON.stringify(result));
+        return result;
       }
-    } catch {
+    } catch (aiError) {
       // AI failed, continue to number matching
+      console.log(`[AdvGoals] SMART_PARSE_AI_FAILED: ${aiError instanceof Error ? aiError.message : 'unknown'}`);
     }
   }
 
+  console.log(`[AdvGoals] SMART_PARSE: input="${msg}", result=null (no match)`);
   return null;
 }
 
@@ -294,6 +308,8 @@ export async function handleAdvancedGoalTypeSelection(
   phone: string,
   msg: string
 ): Promise<boolean> {
+  console.log(`[AdvGoals] ═══════════════════════════════════════`);
+  console.log(`[AdvGoals] handleAdvancedGoalTypeSelection: userId=${userId.substring(0,8)}..., msg="${msg.substring(0, 80)}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -313,10 +329,12 @@ export async function handleAdvancedGoalTypeSelection(
     smartAmount = smartResult.targetAmount;
     smartDeadline = smartResult.deadline;
     requiresChild = goalType === 'child_savings';
+    console.log(`[AdvGoals] TYPE_SELECTION: smart parse matched: type=${goalType}, name=${goalName}, amount=${smartAmount || 'none'}, deadline=${smartDeadline || 'none'}`);
   }
 
   // Fallback: number-based selection
   if (!goalType) {
+    console.log(`[AdvGoals] TYPE_SELECTION: smart parse failed, trying number-based selection`);
     const msgLower = msg.toLowerCase().trim();
     if (msg === '1') { goalType = 'emergency_fund'; goalName = 'קרן חירום'; }
     else if (msg === '2') { goalType = 'debt_payoff'; goalName = 'סגירת חובות'; }
@@ -346,6 +364,7 @@ export async function handleAdvancedGoalTypeSelection(
 
   // 🆕 If smart parse got amount+deadline, skip straight to confirm
   if (smartAmount && smartAmount > 0 && !requiresChild) {
+    console.log(`[AdvGoals] STEP_TRANSITION: type → confirm (fast track: amount=${smartAmount}, deadline=${smartDeadline || 'none'})`);
     const ctx: AdvancedGoalContext = {
       step: 'confirm',
       goalType: goalType!,
@@ -429,6 +448,7 @@ export async function handleAdvancedGoalTypeSelection(
   }
 
   // המשך לשלב הבא (סכום)
+  console.log(`[AdvGoals] STEP_TRANSITION: type → amount (goalType=${goalType}, goalName=${goalName})`);
   await mergeClassificationContext(userId, {
     advancedGoalCreation: {
       step: 'amount',
@@ -438,10 +458,12 @@ export async function handleAdvancedGoalTypeSelection(
     }
   });
 
+  const sendMsg = `${GOAL_TYPES_EXTENDED[goalType]?.emoji || '🎯'} *${goalName}*\n\n` +
+    `כמה כסף צריך ליעד הזה?\n(כתוב סכום בשקלים)`;
+  console.log(`[AdvGoals] SEND_MSG: "${sendMsg.substring(0, 100)}..."`);
   await greenAPI.sendMessage({
     phoneNumber: phone,
-    message: `${GOAL_TYPES_EXTENDED[goalType]?.emoji || '🎯'} *${goalName}*\n\n` +
-      `כמה כסף צריך ליעד הזה?\n(כתוב סכום בשקלים)`,
+    message: sendMsg,
   });
 
   return true;
@@ -456,6 +478,7 @@ export async function handleChildSelection(
   msg: string,
   context: AdvancedGoalContext
 ): Promise<boolean> {
+  console.log(`[AdvGoals] handleChildSelection: userId=${userId.substring(0,8)}..., msg="${msg}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -544,6 +567,7 @@ export async function handleBudgetSourceSelection(
   msg: string,
   context: AdvancedGoalContext
 ): Promise<boolean> {
+  console.log(`[AdvGoals] handleBudgetSourceSelection: userId=${userId.substring(0,8)}..., msg="${msg}", currentContext=`, JSON.stringify(context).substring(0, 200));
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -577,6 +601,7 @@ export async function handleBudgetSourceSelection(
   }
 
   // עדכן context ועבור לאישור סופי
+  console.log(`[AdvGoals] STEP_TRANSITION: budget_source → confirm (source=${budgetSource}, name=${sourceName})`);
   await mergeClassificationContext(userId, {
     advancedGoalCreation: {
       ...context,
@@ -599,6 +624,9 @@ export async function confirmAndCreateGoal(
   phone: string,
   context: AdvancedGoalContext
 ): Promise<void> {
+  console.log(`[AdvGoals] ═══════════════════════════════════════`);
+  console.log(`[AdvGoals] confirmAndCreateGoal: userId=${userId.substring(0,8)}...`);
+  console.log(`[AdvGoals] CONTEXT: step=${context?.step || 'none'}, type=${context?.goalType || 'none'}, name=${context?.goalName || 'none'}, amount=${context?.targetAmount || 'none'}, deadline=${context?.deadline || 'none'}`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -625,6 +653,7 @@ export async function confirmAndCreateGoal(
   }
   summary += `\n✅ *אשר* ליצירה\n❌ *ביטול* לביטול`;
 
+  console.log(`[AdvGoals] SEND_MSG: "${summary.substring(0, 100)}..."`);
   await greenAPI.sendMessage({
     phoneNumber: phone,
     message: summary,
@@ -639,21 +668,27 @@ export async function createAdvancedGoal(
   phone: string,
   context: AdvancedGoalContext
 ): Promise<void> {
+  console.log(`[AdvGoals] ═══════════════════════════════════════`);
+  console.log(`[AdvGoals] FLOW_START: userId=${userId.substring(0,8)}..., creating goal`);
+  console.log(`[AdvGoals] CONTEXT: step=${context?.step || 'none'}, type=${context?.goalType || 'none'}, name=${context?.goalName || 'none'}, amount=${context?.targetAmount || 'none'}, deadline=${context?.deadline || 'none'}, budgetSource=${context?.budgetSource || 'none'}, childId=${context?.childId || 'none'}`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
   // 🔧 Validate required fields before insert
   const goalName = context.goalName || context.goalType || 'יעד חדש';
   const targetAmount = context.targetAmount || 0;
+  console.log(`[AdvGoals] VALIDATION: goalName="${goalName}", targetAmount=${targetAmount}`);
 
   if (!goalName || targetAmount <= 0) {
-    console.error('[Advanced Goals] Missing required fields:', { goalName, targetAmount, context });
+    console.error(`[AdvGoals] VALIDATION_FAILED: goalName="${goalName}", targetAmount=${targetAmount}, fullContext=`, JSON.stringify(context).substring(0, 500));
+    const errorMsg = `❌ חסרים פרטים ליעד.\n\n` +
+      (!goalName ? `• שם היעד חסר\n` : '') +
+      (targetAmount <= 0 ? `• סכום היעד חסר\n` : '') +
+      `\nכתוב *"יעד חדש"* להתחיל שוב.`;
+    console.log(`[AdvGoals] SEND_MSG: "${errorMsg.substring(0, 100)}..."`);
     await greenAPI.sendMessage({
       phoneNumber: phone,
-      message: `❌ חסרים פרטים ליעד.\n\n` +
-        (!goalName ? `• שם היעד חסר\n` : '') +
-        (targetAmount <= 0 ? `• סכום היעד חסר\n` : '') +
-        `\nכתוב *"יעד חדש"* להתחיל שוב.`,
+      message: errorMsg,
     });
     // Clean context
     await cleanAdvancedGoalContext(userId);
@@ -682,37 +717,46 @@ export async function createAdvancedGoal(
   if (context.childId) insertPayload.child_id = context.childId;
   if (context.goalGroup) insertPayload.goal_group = context.goalGroup;
 
-  console.log('[Advanced Goals] Inserting goal:', JSON.stringify(insertPayload));
+  console.log(`[AdvGoals] CREATE_GOAL: payload=`, JSON.stringify(insertPayload).substring(0, 500));
 
-  const { error } = await supabase
+  const { data: insertData, error } = await supabase
     .from('goals')
-    .insert(insertPayload);
+    .insert(insertPayload)
+    .select('id')
+    .single();
+
+  console.log(`[AdvGoals] CREATE_RESULT: success=${!error}, goalId=${insertData?.id || 'none'}, error=${error?.message || 'none'}`);
 
   if (error) {
-    console.error('[Advanced Goals] Error creating goal:', error, 'payload:', JSON.stringify(insertPayload));
+    console.error('[AdvGoals] CREATE_GOAL_ERROR_DETAIL:', error, 'payload:', JSON.stringify(insertPayload));
+    const dbErrorMsg = `❌ שגיאה בשמירת היעד.\n\n` +
+      `פרטים: ${error.message || 'שגיאת מסד נתונים'}\n\n` +
+      `כתוב *"יעד חדש"* לנסות שוב.`;
+    console.log(`[AdvGoals] SEND_MSG: "${dbErrorMsg.substring(0, 100)}..."`);
     await greenAPI.sendMessage({
       phoneNumber: phone,
-      message: `❌ שגיאה בשמירת היעד.\n\n` +
-        `פרטים: ${error.message || 'שגיאת מסד נתונים'}\n\n` +
-        `כתוב *"יעד חדש"* לנסות שוב.`,
+      message: dbErrorMsg,
     });
     await cleanAdvancedGoalContext(userId);
     return;
   }
 
+  console.log(`[AdvGoals] CLEANUP: cleaning advancedGoalCreation context`);
   await cleanAdvancedGoalContext(userId);
 
   const emoji = GOAL_TYPES_EXTENDED[context.goalType!]?.emoji || '🎯';
 
+  const successMsg = `✅ *נוצר בהצלחה!*\n\n` +
+    `${emoji} *${goalName}*\n` +
+    `💰 ${targetAmount.toLocaleString('he-IL')} ₪\n\n` +
+    `φ תחשב הקצאה אוטומטית בקרוב!\n\n` +
+    `• כתוב *"יעד חדש"* להוסיף עוד\n` +
+    `• כתוב *"יעדים"* לראות הקצאות\n` +
+    `• כתוב *"סיימתי"* להמשיך`;
+  console.log(`[AdvGoals] SEND_MSG: "${successMsg.substring(0, 100)}..."`);
   await greenAPI.sendMessage({
     phoneNumber: phone,
-    message: `✅ *נוצר בהצלחה!*\n\n` +
-      `${emoji} *${goalName}*\n` +
-      `💰 ${targetAmount.toLocaleString('he-IL')} ₪\n\n` +
-      `φ תחשב הקצאה אוטומטית בקרוב!\n\n` +
-      `• כתוב *"יעד חדש"* להוסיף עוד\n` +
-      `• כתוב *"יעדים"* לראות הקצאות\n` +
-      `• כתוב *"סיימתי"* להמשיך`,
+    message: successMsg,
   });
 }
 
@@ -720,6 +764,7 @@ export async function createAdvancedGoal(
  * ניקוי context של יצירת יעד
  */
 async function cleanAdvancedGoalContext(userId: string): Promise<void> {
+  console.log(`[AdvGoals] cleanAdvancedGoalContext: userId=${userId.substring(0,8)}...`);
   const supabase = createServiceClient();
   const { data: existingUser } = await supabase
     .from('users')
@@ -729,6 +774,7 @@ async function cleanAdvancedGoalContext(userId: string): Promise<void> {
 
   const existingCtx = existingUser?.classification_context || {};
   const { advancedGoalCreation: _removed, ...restCtx } = existingCtx as any;
+  console.log(`[AdvGoals] CLEANUP_CONTEXT: removed advancedGoalCreation, remaining keys=${Object.keys(restCtx).join(',') || 'empty'}`);
 
   await supabase
     .from('users')

@@ -49,7 +49,8 @@ export async function routeMessage(
   const greenAPI = getGreenAPIClient();
   const msg = message.trim();
 
-  console.log(`[φ Router] userId=${userId}, message="${msg}"`);
+  console.log(`[Router] ═══════════════════════════════════════`);
+  console.log(`[Router] INCOMING: userId=${userId.substring(0,8)}..., phone=${phone.substring(0,6)}..., msg="${msg.substring(0, 80)}"`);
 
   // Load conversation context for continuity
   const conversationCtx = await getOrCreateContext(userId);
@@ -57,7 +58,7 @@ export async function routeMessage(
   // Check if context is stale (no interaction for 24+ hours)
   if (isContextStale(conversationCtx)) {
     const { context: resumedCtx, message: resumeMsg } = await resumeStaleContext(userId);
-    console.log(`[φ Router] Stale context resumed for ${userId}`);
+    console.log(`[Router] STALE_CONTEXT: resumed for userId=${userId.substring(0,8)}...`);
     if (resumeMsg) {
       await greenAPI.sendMessage({ phoneNumber: phone, message: resumeMsg });
     }
@@ -74,7 +75,7 @@ export async function routeMessage(
   const state = (user?.onboarding_state || 'waiting_for_name') as UserState;
   const ctx: RouterContext = { userId, phone, state, userName };
 
-  console.log(`[φ Router] state=${state}, userName=${userName}`);
+  console.log(`[Router] USER_STATE: state=${state}, name=${userName || 'null'}, raw_onboarding=${user?.onboarding_state || 'null'}`);
 
   // ══════════════════════════════════════════════════════════════════════════
   // UNIVERSAL: "עזרה" / "תפריט" works in ALL states (escape hatch)
@@ -143,60 +144,100 @@ export async function routeMessage(
   // ══════════════════════════════════════════════════════════════════════════
 
   if (state === 'start') {
-    return await handleStart(ctx, supabase, greenAPI);
+    console.log(`[Router] DISPATCH: state=start → handleStart()`);
+    const result = await handleStart(ctx, supabase, greenAPI);
+    console.log(`[Router] RESULT: state=start, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'waiting_for_name') {
-    return await handleWaitingForName(ctx, msg, supabase, greenAPI);
+    console.log(`[Router] DISPATCH: state=waiting_for_name → handleWaitingForName()`);
+    const result = await handleWaitingForName(ctx, msg, supabase, greenAPI);
+    console.log(`[Router] RESULT: state=waiting_for_name, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'waiting_for_document') {
-    return await handleWaitingForDocument(ctx, msg, supabase, greenAPI, startClassification);
+    console.log(`[Router] DISPATCH: state=waiting_for_document → handleWaitingForDocument()`);
+    const result = await handleWaitingForDocument(ctx, msg, supabase, greenAPI, startClassification);
+    console.log(`[Router] RESULT: state=waiting_for_document, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'classification') {
-    return await handleClassificationState(ctx, msg);
+    console.log(`[Router] DISPATCH: state=classification → handleClassificationState()`);
+    const result = await handleClassificationState(ctx, msg);
+    console.log(`[Router] RESULT: state=classification, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'classification_income') {
-    return await handleClassificationResponse(ctx, msg, 'income');
+    console.log(`[Router] DISPATCH: state=classification_income → handleClassificationResponse(type=income)`);
+    const result = await handleClassificationResponse(ctx, msg, 'income');
+    console.log(`[Router] RESULT: state=classification_income, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'classification_expense') {
-    return await handleClassificationResponse(ctx, msg, 'expense');
+    console.log(`[Router] DISPATCH: state=classification_expense → handleClassificationResponse(type=expense)`);
+    const result = await handleClassificationResponse(ctx, msg, 'expense');
+    console.log(`[Router] RESULT: state=classification_expense, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'behavior') {
-    return await handleBehaviorPhase(ctx, msg);
+    console.log(`[Router] DISPATCH: state=behavior → handleBehaviorPhase()`);
+    const result = await handleBehaviorPhase(ctx, msg);
+    console.log(`[Router] RESULT: state=behavior, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'goals_setup') {
-    return await handleGoalsSetup(ctx, msg);
+    console.log(`[Router] DISPATCH: state=goals_setup → handleGoalsSetup()`);
+    const result = await handleGoalsSetup(ctx, msg);
+    console.log(`[Router] RESULT: state=goals_setup, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'goals') {
-    return await handleGoalsPhase(ctx, msg);
+    console.log(`[Router] DISPATCH: state=goals → handleGoalsPhase()`);
+    const result = await handleGoalsPhase(ctx, msg);
+    console.log(`[Router] RESULT: state=goals, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'budget') {
-    return await handleBudgetPhase(ctx, msg);
+    console.log(`[Router] DISPATCH: state=budget → handleBudgetPhase()`);
+    const result = await handleBudgetPhase(ctx, msg);
+    console.log(`[Router] RESULT: state=budget, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'loan_consolidation_offer') {
-    return await handleLoanConsolidationOffer(ctx, msg);
+    console.log(`[Router] DISPATCH: state=loan_consolidation_offer → handleLoanConsolidationOffer()`);
+    const result = await handleLoanConsolidationOffer(ctx, msg);
+    console.log(`[Router] RESULT: state=loan_consolidation_offer, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'waiting_for_loan_docs') {
-    return await handleWaitingForLoanDocs(ctx, msg);
+    console.log(`[Router] DISPATCH: state=waiting_for_loan_docs → handleWaitingForLoanDocs()`);
+    const result = await handleWaitingForLoanDocs(ctx, msg);
+    console.log(`[Router] RESULT: state=waiting_for_loan_docs, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   if (state === 'monitoring') {
-    return await handleMonitoring(ctx, msg, userName, startClassification);
+    console.log(`[Router] DISPATCH: state=monitoring → handleMonitoring()`);
+    const result = await handleMonitoring(ctx, msg, userName, startClassification);
+    console.log(`[Router] RESULT: state=monitoring, success=${result.success}, newState=${result.newState || 'unchanged'}`);
+    return result;
   }
 
   // Update conversation context on every message
   await updateContext(userId, { currentState: state as any, lastInteraction: new Date() });
 
+  console.log(`[Router] NO_MATCH: state="${state}" did not match any handler. msg="${msg.substring(0, 50)}"`);
   return { success: false };
 }
 
@@ -205,6 +246,7 @@ export async function routeMessage(
 // ============================================================================
 
 export async function onClassificationComplete(userId: string, phone: string): Promise<void> {
+  console.log(`[Router] HOOK: onClassificationComplete userId=${userId.substring(0,8)}...`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -217,6 +259,7 @@ export async function onClassificationComplete(userId: string, phone: string): P
     .limit(1);
 
   if (existingGoals && existingGoals.length > 0) {
+    console.log(`[Router] TRANSITION: classification → behavior (has ${existingGoals.length} existing goals)`);
     await supabase
       .from('users')
       .update({
@@ -231,6 +274,7 @@ export async function onClassificationComplete(userId: string, phone: string): P
       message: `🎉 *סיימנו לסווג!*\n\nעכשיו φ ינתח את דפוסי ההוצאות שלך.\n\nכתוב *"ניתוח"* להתחיל`,
     });
   } else {
+    console.log(`[Router] TRANSITION: classification → goals_setup (no existing goals)`);
     await supabase
       .from('users')
       .update({
@@ -248,6 +292,7 @@ export async function onClassificationComplete(userId: string, phone: string): P
 }
 
 export async function onDocumentProcessed(userId: string, phone: string, documentId?: string): Promise<void> {
+  console.log(`[Router] HOOK: onDocumentProcessed userId=${userId.substring(0,8)}..., docId=${documentId || 'none'}`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
@@ -279,9 +324,11 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
   const totalIncome = transactions?.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
   const totalExpenses = transactions?.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0) || 0;
 
+  console.log(`[Router] DOC_PROCESSED: wasWaiting=${wasWaitingForDocument}, incomeCount=${incomeCount}, expenseCount=${expenseCount}, totalIncome=${totalIncome}, totalExpenses=${totalExpenses}`);
+
   // If we were waiting for a document - start classification
   if (wasWaitingForDocument && (incomeCount > 0 || expenseCount > 0)) {
-    console.log(`🎯 Document was requested - starting interactive classification for ${incomeCount + expenseCount} transactions`);
+    console.log(`[Router] DOC_ACTION: starting interactive classification for ${incomeCount + expenseCount} pending transactions`);
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
