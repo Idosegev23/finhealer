@@ -3,6 +3,7 @@
 import { MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { WHATSAPP_BOT_NUMBER } from '@/lib/constants';
 
 interface FloatingWhatsAppButtonProps {
   prefilledMessage?: string;
@@ -11,8 +12,7 @@ interface FloatingWhatsAppButtonProps {
 export default function FloatingWhatsAppButton({
   prefilledMessage = 'היי',
 }: FloatingWhatsAppButtonProps) {
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
-  let whatsappUrl = `https://wa.me/${whatsappNumber}`;
+  let whatsappUrl = `https://wa.me/${WHATSAPP_BOT_NUMBER}`;
 
   if (prefilledMessage) {
     whatsappUrl += `?text=${encodeURIComponent(prefilledMessage)}`;

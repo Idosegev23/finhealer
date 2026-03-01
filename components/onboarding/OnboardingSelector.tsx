@@ -7,6 +7,7 @@ import Stepper, { Step } from '@/components/ui/stepper';
 import { Smartphone, Zap, Crown, CheckCircle, MessageCircle, ExternalLink, CreditCard, Lock, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { WHATSAPP_BOT_NUMBER } from '@/lib/constants';
 
 type Plan = 'basic' | 'premium';
 
@@ -265,8 +266,7 @@ export function OnboardingSelector() {
 
   // WhatsApp Redirect Screen
   if (showWhatsAppRedirect) {
-    const botPhoneNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
-    const waLink = `https://wa.me/${botPhoneNumber}?text=היי`;
+    const waLink = `https://wa.me/${WHATSAPP_BOT_NUMBER}?text=היי`;
     const displayPhone = formattedPhone.startsWith('972') 
       ? `0${formattedPhone.slice(3)}` 
       : formattedPhone;

@@ -27,6 +27,21 @@ export const metadata: Metadata = {
     maximumScale: 1,
   },
   themeColor: '#2E3440',
+  openGraph: {
+    title: 'Phi (ϕ) - היחס הזהב של הכסף שלך',
+    description: 'פלטפורמה חכמה לבריאות פיננסית עם ליווי אישי, מעקב אוטומטי ובוט WhatsApp חכם.',
+    url: 'https://finhealer.vercel.app',
+    siteName: 'Phi - FinHealer',
+    locale: 'he_IL',
+    type: 'website',
+    images: [{ url: '/logo.png', width: 512, height: 512, alt: 'Phi Logo' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Phi (ϕ) - היחס הזהב של הכסף שלך',
+    description: 'פלטפורמה חכמה לבריאות פיננסית עם ליווי אישי',
+    images: ['/logo.png'],
+  },
 }
 
 export default function RootLayout({

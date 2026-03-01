@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /onboarding/
+Disallow: /settings/
+Disallow: /payment/
+Disallow: /plan-selection/
+
+Sitemap: https://finhealer.vercel.app/sitemap.xml

@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { CheckCircle, MessageCircle, ExternalLink, Smartphone } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { WHATSAPP_BOT_NUMBER } from '@/lib/constants';
 
 interface WhatsAppRedirectProps {
   phone: string;
@@ -12,8 +13,7 @@ interface WhatsAppRedirectProps {
 
 export function WhatsAppRedirect({ phone, userName }: WhatsAppRedirectProps) {
   // מספר הWhatsApp של הבוט (Phi)
-  const botPhoneNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
-  const waLink = `https://wa.me/${botPhoneNumber}?text=היי`;
+  const waLink = `https://wa.me/${WHATSAPP_BOT_NUMBER}?text=היי`;
   
   // פורמט מספר הטלפון להצגה
   const displayPhone = phone.startsWith('972') 

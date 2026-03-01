@@ -85,7 +85,8 @@ export async function GET(request: NextRequest) {
 
         // שלח הודעה ב-WhatsApp
         if (user.phone && user.wa_opt_in) {
-          const message = `🎯 ${user.name || 'היי'}!\n\nהתקציב שלך לחודש הבא מוכן! 🎉\n\n💰 תקציב כולל: ₪${budgetData.budget.total_budget.toLocaleString()}\n\n📊 התקציב נבנה על בסיס ההתנהלות שלך ב-3 החודשים האחרונים.\n\nהכנס לדשבורד לראות את הפירוט המלא! 💪\n\nhttps://finhealer.vercel.app/dashboard/budget`;
+          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app';
+          const message = `🎯 ${user.name || 'היי'}!\n\nהתקציב שלך לחודש הבא מוכן! 🎉\n\n💰 תקציב כולל: ₪${budgetData.budget.total_budget.toLocaleString()}\n\n📊 התקציב נבנה על בסיס ההתנהלות שלך ב-3 החודשים האחרונים.\n\nהכנס לדשבורד לראות את הפירוט המלא! 💪\n\n${siteUrl}/dashboard/budget`;
 
           await greenAPI.sendMessage({
             phoneNumber: user.phone,

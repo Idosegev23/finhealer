@@ -226,10 +226,10 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text();
     const payload: GreenAPIWebhookPayload = JSON.parse(rawBody);
 
-    // אימות webhook signature (feature flag: WEBHOOK_SIGNATURE_REQUIRED)
+    // אימות webhook signature
     // Must happen BEFORE any processing, using the raw wire-format body
     const webhookSecret = process.env.GREEN_API_WEBHOOK_SECRET;
-    if (webhookSecret && process.env.WEBHOOK_SIGNATURE_REQUIRED === 'true') {
+    if (webhookSecret) {
       const signature = request.headers.get('x-webhook-signature') || '';
       const { createHmac } = await import('crypto');
       const expected = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
@@ -237,6 +237,8 @@ export async function POST(request: NextRequest) {
         console.warn('⚠️ Webhook signature mismatch - rejecting request');
         return NextResponse.json({ status: 'unauthorized' }, { status: 401 });
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      console.warn('⚠️ GREEN_API_WEBHOOK_SECRET not set - webhook signature verification disabled');
     }
 
     console.log(`[Webhook] ═══════════════════════════════════════`);

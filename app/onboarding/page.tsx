@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { Loader2, MessageCircle, CheckCircle2, ArrowLeft, ChevronLeft } from 'lucide-react'
+import { WHATSAPP_BOT_NUMBER } from '@/lib/constants'
 
 // ϕ = U+03D5 (mathematical phi)
 const PHI = 'ϕ'
@@ -101,8 +102,7 @@ export default function OnboardingPage() {
     }
   }
 
-  const botPhoneNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506'
-  const waLink = `https://wa.me/${botPhoneNumber}`
+  const waLink = `https://wa.me/${WHATSAPP_BOT_NUMBER}`
 
   return (
     <div className="min-h-screen bg-phi-bg flex items-center justify-center p-4" dir="rtl">

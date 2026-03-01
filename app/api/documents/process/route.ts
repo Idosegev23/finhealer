@@ -38,11 +38,18 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   let statementId: string = '';
-  
+
   try {
+    // Verify internal API secret (set by upload route)
+    const internalSecret = request.headers.get('x-internal-secret');
+    const validSecret = process.env.INTERNAL_API_SECRET || process.env.CRON_SECRET;
+    if (!validSecret || internalSecret !== validSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     statementId = body.statementId;
-    
+
     if (!statementId) {
       throw new Error('Missing statementId in request body');
     }
@@ -2710,7 +2717,7 @@ async function sendWhatsAppNotification(userId: string, itemsCount: number, docT
     // Other document types - send simple message
     const greenAPI = getGreenAPIClient();
     const userName = user.name || 'שלום';
-    const url = 'https://finhealer.vercel.app/dashboard';
+    const url = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app'}/dashboard`;
     
     let message = '';
     

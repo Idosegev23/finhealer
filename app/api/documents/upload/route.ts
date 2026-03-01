@@ -167,7 +167,10 @@ export async function POST(request: NextRequest) {
       // קריאה אסינכרונית ל-Background Function (לא ממתינים לתוצאה)
       fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app'}/api/documents/process`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': process.env.INTERNAL_API_SECRET || process.env.CRON_SECRET || '',
+        },
         body: JSON.stringify({ statementId: statement.id }),
       }).catch((error) => {
         console.error('Failed to trigger background processing:', error);

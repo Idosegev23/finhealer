@@ -2,6 +2,7 @@
 
 import { MessageCircle } from 'lucide-react';
 import Link from 'next/link';
+import { WHATSAPP_BOT_NUMBER } from '@/lib/constants';
 
 interface WhatsAppActionButtonProps {
   text: string;
@@ -18,8 +19,7 @@ export default function WhatsAppActionButton({
   size = 'md',
   className = '',
 }: WhatsAppActionButtonProps) {
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
-  let whatsappUrl = `https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`;
+  let whatsappUrl = `https://wa.me/${WHATSAPP_BOT_NUMBER.replace(/[^0-9]/g, '')}`;
 
   if (prefilledMessage) {
     whatsappUrl += `?text=${encodeURIComponent(prefilledMessage)}`;

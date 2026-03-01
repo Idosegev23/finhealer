@@ -2,6 +2,7 @@
 
 import { MessageCircle, Sparkles, Eye, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { WHATSAPP_BOT_NUMBER } from '@/lib/constants';
 
 interface WhatsAppBannerProps {
   message?: string;
@@ -12,8 +13,7 @@ export default function WhatsAppBanner({
   message = 'כל הפעולות מתבצעות דרך WhatsApp - הדשבורד הוא לצפייה בלבד 👀',
   showButton = true,
 }: WhatsAppBannerProps) {
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=היי`;
+  const whatsappUrl = `https://wa.me/${WHATSAPP_BOT_NUMBER}?text=היי`;
 
   return (
     <div className="bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 border-2 border-green-200 rounded-2xl p-5 mb-6 shadow-sm">

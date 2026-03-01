@@ -307,7 +307,7 @@ export async function sendLeadToAdvisor(requestId: string): Promise<boolean> {
     const resend = getResendClient();
     const { data, error } = await resend.emails.send({
       from: 'Phi System <phi@finhealer.com>',
-      to: process.env.ADVISOR_EMAIL || 'gadi@example.com',
+      to: process.env.ADVISOR_EMAIL || 'gadi@finhealer.com',
       subject: `🎯 ליד חדש - איחוד ${leadData.loans_count} הלוואות - ${leadData.user_name}`,
       html: emailHtml,
       replyTo: leadData.user_email || undefined,

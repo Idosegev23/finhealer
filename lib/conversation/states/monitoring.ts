@@ -1678,7 +1678,8 @@ async function showAdvisorCTA(ctx: RouterContext): Promise<RouterResult> {
     .filter((t: any) => t.type === 'expense')
     .reduce((s: number, t: any) => s + Math.abs(t.amount), 0);
 
-  const waNumber = process.env.NEXT_PUBLIC_WHATSAPP_ADVISOR_NUMBER || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '972544266506';
+  const { WHATSAPP_ADVISOR_NUMBER } = await import('@/lib/constants');
+  const waNumber = WHATSAPP_ADVISOR_NUMBER;
 
   let msg = `💼 *ייעוץ פיננסי עם גדי*\n\n`;
   msg += `גדי הוא יועץ פיננסי מוסמך שיכול לעזור לך:\n\n`;
