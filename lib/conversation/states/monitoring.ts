@@ -21,6 +21,8 @@ import type { CategoryData } from '@/lib/ai/chart-prompts';
 import { loadConversationHistory } from '../history-loader';
 import { getUserPeriodCoverage } from '@/lib/documents/period-tracker';
 import { projectCashFlow } from '@/lib/finance/cash-flow-projector';
+import { parseMonitoringIntent, type MonitoringIntent, type MonitoringIntentType } from '@/lib/ai/monitoring-intent';
+import { buildUserSnapshot } from '@/lib/ai/user-snapshot';
 
 // ============================================================================
 // Main Monitoring Handler
@@ -45,7 +47,12 @@ export async function handleMonitoring(
   const userId = ctx.userId;
   const phone = ctx.phone;
 
-  // ── 1. Loan consolidation context – pending decision ─────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // LAYER 0: Structural checks (no AI, no latency)
+  // Handles system-generated inputs: loan context, button/list IDs, regex patterns
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // 0a. Loan consolidation context – pending decision
   const { data: userData } = await supabase
     .from('users')
     .select('classification_context')
@@ -70,28 +77,36 @@ export async function handleMonitoring(
     }
   }
 
-  // ── 2. Loan / consolidation commands – show active request status ─────────
-  if (isCommand(msg, ['הלוואה', 'הלוואות', 'איחוד', 'מסמכים', 'גדי', 'מסמך', 'מצב הבקשה'])) {
-    const { data: activeRequest } = await supabase
-      .from('loan_consolidation_requests')
-      .select('id, documents_received, documents_needed')
-      .eq('user_id', userId)
-      .eq('status', 'pending_documents')
-      .single();
-
-    if (activeRequest) {
-      await greenAPI.sendMessage({
-        phoneNumber: phone,
-        message:
-          `💡 יש לך בקשת איחוד פעילה - ממתין למסמכי ההלוואות שלך ` +
-          `(${activeRequest.documents_received || 0}/${activeRequest.documents_needed}).\n\n` +
-          `שלח לי את המסמכים כדי שאוכל להעביר לגדי את הבקשה! 📄`,
-      });
+  // 0b. Button/list IDs from WhatsApp UI (exact matches for system-generated rowIds)
+  const listRowActions: Record<string, () => Promise<RouterResult>> = {
+    'summary': () => showMonitoringSummary(ctx),
+    'expense_chart': () => generateAndSendExpenseChart(ctx),
+    'income_chart': () => generateAndSendIncomeChart(ctx),
+    'cash_flow': () => showCashFlowProjection(ctx),
+    'phi_score': () => showPhiScore(ctx),
+    'budget_status': () => showBudgetStatus(ctx),
+    'to_goals': async () => {
+      const { transitionToGoals } = await import('./behavior');
+      return await transitionToGoals(ctx);
+    },
+    'unclassified': () => showUnclassifiedTransactions(ctx),
+    'add_doc': async () => {
+      await greenAPI.sendMessage({ phoneNumber: phone, message: `📄 מעולה! שלח לי את המסמך.` });
       return { success: true };
-    }
+    },
+    'advisor': () => showAdvisorCTA(ctx),
+    'available_months': () => showAvailableMonths(ctx),
+    'duplicates': () => showDuplicateSuspects(ctx),
+    'credit_pending': () => showNeedsCreditDetail(ctx),
+  };
+
+  const msgTrimmed = msg.trim();
+  if (listRowActions[msgTrimmed]) {
+    console.log(`[Monitoring] LIST_ROW: "${msgTrimmed}" → direct handler`);
+    return await listRowActions[msgTrimmed]();
   }
 
-  // ── 3. Document commands – prompt user to send a document ─────────────────
+  // 0c. Legacy button/command IDs
   if (
     isCommand(msg, [
       'add_bank', 'add_credit', 'add_doc', 'add_more', 'add_docs',
@@ -99,15 +114,10 @@ export async function handleMonitoring(
       '📄 עוד מסמכים', '📄 עוד דוחות',
     ])
   ) {
-    await greenAPI.sendMessage({
-      phoneNumber: phone,
-      message: `📄 מעולה! שלח לי את המסמך.`,
-    });
+    await greenAPI.sendMessage({ phoneNumber: phone, message: `📄 מעולה! שלח לי את המסמך.` });
     return { success: true };
   }
 
-  // ── 4. Classify commands – delegate to startClassification callback ────────
-  // NOTE: Only specific classification triggers here - NOT generic words like "כן"/"דלג"
   if (
     isCommand(msg, [
       'start_classify', 'נתחיל לסווג', '▶️ נתחיל לסווג', 'נתחיל לסווג ▶️',
@@ -117,96 +127,7 @@ export async function handleMonitoring(
     return await startClassification(ctx);
   }
 
-  // ── 5. "נמשיך" – check for pending transactions, else guide user ──────────
-  if (isCommand(msg, ['נמשיך', 'נמשיך לסווג', 'נמשיך לסווג ▶️'])) {
-    const { getClassifiableTransactions } = await import('../classification-flow');
-    const pendingIncome = await getClassifiableTransactions(userId, 'income');
-    const pendingExpense = await getClassifiableTransactions(userId, 'expense');
-
-    if (pendingIncome.length > 0 || pendingExpense.length > 0) {
-      return await startClassification(ctx);
-    }
-
-    await greenAPI.sendMessage({
-      phoneNumber: phone,
-      message: `✅ כל התנועות מסווגות!\n\nכתוב *"עזרה"* לראות מה אפשר לעשות, או שאל אותי שאלה פיננסית 😊`,
-    });
-    return { success: true };
-  }
-
-  // ── 6. Analyze → switch to behavior phase ─────────────────────────────────
-  if (isCommand(msg, ['analyze', 'ניתוח', '🔍 ניתוח התנהגות'])) {
-    await supabase
-      .from('users')
-      .update({ onboarding_state: 'behavior', phase: 'behavior' })
-      .eq('id', userId);
-
-    const { handleBehaviorPhase } = await import('./behavior');
-    return await handleBehaviorPhase({ ...ctx, state: 'behavior' }, msg);
-  }
-
-  // ── 7. "to_goals" / "יעדים" – transition to goals phase ───────────────────
-  if (isCommand(msg, ['to_goals', 'יעדים', '▶️ המשך ליעדים'])) {
-    const { transitionToGoals } = await import('./behavior');
-    return await transitionToGoals(ctx);
-  }
-
-  // ── 8. "הפקדה ליעד" – deposit into a goal ─────────────────────────────────
-  if (msg.includes('הפקדה ליעד') || msg.startsWith('הפקדה:')) {
-    return await handleGoalDeposit(ctx, msg);
-  }
-
-  // ── 9. Help / "עזרה" – full command list ──────────────────────────────────
-  if (isCommand(msg, ['עזרה', 'פקודות', 'help', 'תפריט', 'מה אפשר', '?'])) {
-    await greenAPI.sendMessage({
-      phoneNumber: phone,
-      message:
-        `📋 *הפקודות שלי:*\n\n` +
-        `📄 *מסמכים:*\n` +
-        `• שלח קובץ PDF לניתוח\n\n` +
-        `📊 *סיכומים וגרפים:*\n` +
-        `• *"סיכום"* - סיכום החודש הנוכחי\n` +
-        `• *"חודשים"* - הצג חודשים זמינים\n` +
-        `• *"דוח MM/YYYY"* - סיכום חודש ספציפי\n` +
-        `• *"גרף הוצאות"* - התפלגות הוצאות 💸\n` +
-        `• *"גרף הכנסות"* - התפלגות הכנסות 💚\n` +
-        `• *"תקציב"* - מצב התקציב\n` +
-        `• *"תזרים"* - תחזית תזרים 3 חודשים 📈\n` +
-        `• *"ציון"* - ציון הבריאות הפיננסית שלך 🏆\n\n` +
-        `📋 *סיווג ותנועות:*\n` +
-        `• *"לא מסווג"* - תנועות שממתינות לסיווג\n` +
-        `• *"אשראי"* - תנועות שממתינות לפירוט אשראי\n` +
-        `• *"כפל תשלום"* - חשד לכפילויות\n` +
-        `• *"רשימה"* - רשימת קטגוריות\n\n` +
-        `💰 *שאלות:*\n` +
-        `• "כמה הוצאתי על [קטגוריה]?"\n\n` +
-        `🎯 *יעדים:*\n` +
-        `• *"יעדים"* / *"הגדר יעד"* - ניהול יעדים\n` +
-        `• *"הפקדה ליעד [שם] [סכום]"*\n\n` +
-        `🔄 *ניווט:*\n` +
-        `• *"נמשיך"* - להמשיך תהליך\n` +
-        `• *"דלג"* - לדלג על תנועה\n\n` +
-        `φ *Phi - היחס הזהב של הכסף שלך*`,
-    });
-    return { success: true };
-  }
-
-  // ── 10. "לא מסווג" – show unclassified transactions ──────────────────────
-  if (isCommand(msg, ['לא מסווג', 'ממתין לסיווג', 'לא מסווגים', 'unclassified', 'סווג עכשיו'])) {
-    return await showUnclassifiedTransactions(ctx);
-  }
-
-  // ── 11. "סיכום" – monthly summary ─────────────────────────────────────────
-  if (isCommand(msg, ['סיכום', 'מצב', 'סטטוס', 'summary'])) {
-    return await showMonitoringSummary(ctx);
-  }
-
-  // ── 13. "חודשים" – list covered months ────────────────────────────────────
-  if (isCommand(msg, ['חודשים', 'months', 'תקופות'])) {
-    return await showAvailableMonths(ctx);
-  }
-
-  // ── 14. Monthly report regex – "דוח MM/YYYY" or "דוח YYYY-MM" ─────────────
+  // 0d. Regex patterns with parameters (can't be handled by AI)
   const monthReportMatch = msg.match(/^דוח\s+(\d{1,2})[\/\-](\d{4})$/);
   const monthReportMatch2 = msg.match(/^דוח\s+(\d{4})[\/\-](\d{1,2})$/);
   if (monthReportMatch) {
@@ -220,12 +141,6 @@ export async function handleMonitoring(
     return await showMonitoringSummary(ctx, `${year}-${month}`);
   }
 
-  // ── 15. "אשראי" – show needs_credit_detail transactions ───────────────────
-  if (isCommand(msg, ['אשראי', 'ממתין לאשראי', 'credit', 'needs credit'])) {
-    return await showNeedsCreditDetail(ctx);
-  }
-
-  // ── 16. "בטל אשראי N" – mark specific credit transaction as confirmed ──────
   const cancelCreditMatch = msg.match(/^בטל אשראי\s+(\d+)$/);
   if (cancelCreditMatch) {
     const idx = parseInt(cancelCreditMatch[1]) - 1;
@@ -254,12 +169,6 @@ export async function handleMonitoring(
     return { success: true };
   }
 
-  // ── 17. "כפל תשלום" – show duplicate suspects ─────────────────────────────
-  if (isCommand(msg, ['כפל תשלום', 'כפילויות', 'duplicates'])) {
-    return await showDuplicateSuspects(ctx);
-  }
-
-  // ── 18. "אשר כפל N" – delete a duplicate transaction ─────────────────────
   const confirmDupMatch = msg.match(/^אשר כפל\s+(\d+)$/);
   if (confirmDupMatch) {
     const idx = parseInt(confirmDupMatch[1]) - 1;
@@ -285,7 +194,6 @@ export async function handleMonitoring(
     return { success: true };
   }
 
-  // ── 19. "לא כפל N" – mark as a separate transaction ──────────────────────
   const denyDupMatch = msg.match(/^לא כפל\s+(\d+)$/);
   if (denyDupMatch) {
     const idx = parseInt(denyDupMatch[1]) - 1;
@@ -314,103 +222,65 @@ export async function handleMonitoring(
     return { success: true };
   }
 
-  // ── 20. "תקציב" – show budget status ──────────────────────────────────────
-  if (isCommand(msg, ['תקציב', 'budget', 'יתרות'])) {
-    return await showBudgetStatus(ctx);
+  // ══════════════════════════════════════════════════════════════════════════
+  // LAYER 1: Rule-based intent from router (free, instant)
+  // ══════════════════════════════════════════════════════════════════════════
+  let resolvedIntent: MonitoringIntent | null = null;
+
+  if (ctx.intent && ctx.intent.confidence > 0.8) {
+    resolvedIntent = mapRouterIntentToMonitoring(ctx.intent);
+    if (resolvedIntent) {
+      console.log(`[Monitoring] RULE_INTENT: ${ctx.intent.type} → ${resolvedIntent.intent} (${resolvedIntent.confidence})`);
+    }
   }
 
-  // ── 20a. "תזרים" – cash flow projection ──────────────────────────────────
-  if (isCommand(msg, ['תזרים', 'cash flow', 'תחזית', 'תחזית תזרים'])) {
-    return await showCashFlowProjection(ctx);
+  // ══════════════════════════════════════════════════════════════════════════
+  // LAYER 2: AI Intent Detection (Gemini Flash - THE MAIN BRAIN)
+  // Only fires if rule-based didn't resolve or had low confidence
+  // ══════════════════════════════════════════════════════════════════════════
+  if (!resolvedIntent || resolvedIntent.confidence < 0.7) {
+    const aiIntent = await parseMonitoringIntent(msg);
+    console.log(`[Monitoring] AI_INTENT: ${aiIntent.intent} (${aiIntent.confidence}) params=${JSON.stringify(aiIntent.params || {})}`);
+
+    if (!resolvedIntent || aiIntent.confidence > resolvedIntent.confidence) {
+      resolvedIntent = aiIntent;
+    }
   }
 
-  // ── 20b. "ציון" – Phi financial health score ────────────────────────────
-  if (isCommand(msg, ['ציון', 'phi score', 'score', 'ציון פיננסי', 'בריאות פיננסית'])) {
-    return await showPhiScore(ctx);
+  // ══════════════════════════════════════════════════════════════════════════
+  // DISPATCH: Map resolved intent to handler
+  // ══════════════════════════════════════════════════════════════════════════
+  if (resolvedIntent && resolvedIntent.confidence >= 0.6) {
+    const result = await dispatchMonitoringIntent(
+      resolvedIntent, ctx, msg, userName, startClassification
+    );
+    if (result) return result;
   }
 
-  // ── 20c. "ייעוץ" – advisor lead ─────────────────────────────────────────
-  if (isCommand(msg, ['ייעוץ', 'יועץ', 'advisor', 'רוצה ייעוץ'])) {
-    return await showAdvisorCTA(ctx);
-  }
-
-  // ── 21. Charts ─────────────────────────────────────────────────────────────
-  const msgLower = msg.trim().toLowerCase();
-
-  if (msgLower === 'גרף הכנסות' || msgLower === 'הכנסות גרף' || msgLower === 'income chart') {
-    return await generateAndSendIncomeChart(ctx);
-  }
-
-  if (
-    msgLower === 'גרף הוצאות' ||
-    msgLower === 'הוצאות גרף' ||
-    msgLower === 'גרף' ||
-    msgLower === 'expense chart'
-  ) {
-    return await generateAndSendExpenseChart(ctx);
-  }
-
-  // ── 22a. Category question (findBestMatch) - only if no command matched ───
-  // Placed after all commands to avoid intercepting "כמה הוצאתי על מזון" style questions
-  const categoryMatch = findBestMatch(msg);
-  if (categoryMatch) {
-    return await answerCategoryQuestion(ctx, categoryMatch.name);
-  }
-
-  // ── 22b. Default – Gemini Flash AI response with financial context ──────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // LAYER 3: AI Chat Fallback (Gemini Flash with FULL financial context)
+  // The AI gets the complete user snapshot — knows everything about the user
+  // ══════════════════════════════════════════════════════════════════════════
   try {
-    const history = await loadConversationHistory(userId, 10);
-
-    // Build the current-month expense and active-goals context
-    const { data: monthTx } = await supabase
-      .from('transactions')
-      .select('amount, type')
-      .eq('user_id', userId)
-      .gte(
-        'tx_date',
-        new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-          .toISOString()
-          .split('T')[0]
-      );
-
-    const monthExpenses = (monthTx || [])
-      .filter(t => t.type === 'expense' || t.amount < 0)
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    const { data: activeGoals } = await supabase
-      .from('goals')
-      .select('name')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .limit(5);
-
-    const goalsText =
-      activeGoals && activeGoals.length > 0
-        ? activeGoals.map(g => g.name).join(', ')
-        : 'אין יעדים פעילים';
+    const [history, snapshot] = await Promise.all([
+      loadConversationHistory(userId, 10),
+      buildUserSnapshot(userId),
+    ]);
 
     const phiSystemPrompt =
-      `אתה φ (פי) - מאמן פיננסי אישי חם ומקצועי. ענה בעברית, בקצרה ובחום.\n\n` +
-      `פקודות זמינות למשתמש:\n` +
-      `- "סיכום" / "מצב" - סטטוס פיננסי\n` +
-      `- "גרף הוצאות" / "גרף הכנסות" - גרפים\n` +
-      `- "כמה הוצאתי על [קטגוריה]?" - שאלות על הוצאות\n` +
-      `- "הפקדה ליעד [שם] [סכום]" - הפקדה ליעד\n` +
-      `- "יעדים" / "הגדר יעד" - ניהול יעדים\n` +
-      `- "תקציב" - ניהול תקציב\n` +
-      `- "עזרה" - רשימת פקודות\n\n` +
-      `אם המשתמש שואל שאלה פיננסית - ענה על סמך הנתונים.\n` +
-      `אם המשתמש רוצה לבצע פעולה - הנחה אותו לפקודה הנכונה.\n` +
-      `אם לא ברור - שאל שאלה מבהירה קצרה.\n` +
-      `תשובה קצרה בלבד - עד 3 משפטים.`;
+      `אתה φ (פי) - מאמן פיננסי אישי חם ומקצועי בוואטסאפ. ענה בעברית, בקצרה ובחום.\n\n` +
+      `יש לך גישה לנתונים הפיננסיים המלאים של המשתמש (למטה).\n` +
+      `ענה על סמך הנתונים האמיתיים - אל תמציא מספרים.\n` +
+      `אם המשתמש רוצה פעולה - תציע לו ישירות (למשל "רוצה שאראה לך סיכום?").\n` +
+      `אם יש פעולות ממתינות - הזכר אותן בעדינות.\n` +
+      `תשובה קצרה - עד 4 משפטים. חם ואישי.`;
 
-    const userContext =
-      `שם: ${userName || 'משתמש'}\n` +
-      `שלב: monitoring\n` +
-      `יעדים פעילים: ${goalsText}\n` +
-      `הוצאות החודש: ₪${monthExpenses.toLocaleString('he-IL')}`;
-
-    const aiResponse = await chatWithGeminiFlash(msg, phiSystemPrompt, userContext, history);
+    const aiResponse = await chatWithGeminiFlash(
+      msg,
+      phiSystemPrompt,
+      snapshot.contextText,
+      history
+    );
 
     if (aiResponse) {
       await greenAPI.sendMessage({ phoneNumber: phone, message: aiResponse });
@@ -423,10 +293,184 @@ export async function handleMonitoring(
   // Final fallback
   await greenAPI.sendMessage({
     phoneNumber: phone,
-    message: `לא הבנתי 🤔\n\nכתוב *"עזרה"* לראות את כל הפקודות`,
+    message: `לא הבנתי 🤔\n\nכתוב *"עזרה"* לראות תפריט, או שאל אותי בחופשיות!`,
   });
 
   return { success: true };
+}
+
+// ============================================================================
+// Intent Mapping & Dispatch Helpers
+// ============================================================================
+
+/**
+ * Maps the router's rule-based IntentType to MonitoringIntentType
+ */
+function mapRouterIntentToMonitoring(
+  intent: { type: string; confidence: number }
+): MonitoringIntent | null {
+  const map: Record<string, MonitoringIntentType> = {
+    'summary_request': 'summary',
+    'chart_request': 'expense_chart',
+    'budget_request': 'budget_status',
+    'goal_request': 'goals',
+    'loan_consolidation': 'loans',
+    'continue': 'continue',
+    'upload_document': 'add_document',
+    'question_spending': 'category_question',
+  };
+
+  const mapped = map[intent.type];
+  if (mapped) {
+    return { intent: mapped, confidence: intent.confidence };
+  }
+  return null;
+}
+
+/**
+ * Dispatches a resolved MonitoringIntent to the appropriate handler function.
+ * Returns null if the intent should fall through to AI chat.
+ */
+async function dispatchMonitoringIntent(
+  intent: MonitoringIntent,
+  ctx: RouterContext,
+  msg: string,
+  userName: string | null,
+  startClassification: (ctx: RouterContext) => Promise<RouterResult>
+): Promise<RouterResult | null> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+
+  console.log(`[Monitoring] DISPATCH: intent=${intent.intent}, confidence=${intent.confidence}`);
+
+  switch (intent.intent) {
+    case 'summary':
+      return await showMonitoringSummary(ctx);
+
+    case 'summary_month':
+      return await showMonitoringSummary(ctx, intent.params?.month);
+
+    case 'available_months':
+      return await showAvailableMonths(ctx);
+
+    case 'expense_chart':
+      return await generateAndSendExpenseChart(ctx);
+
+    case 'income_chart':
+      return await generateAndSendIncomeChart(ctx);
+
+    case 'budget_status':
+      return await showBudgetStatus(ctx);
+
+    case 'cash_flow':
+      return await showCashFlowProjection(ctx);
+
+    case 'phi_score':
+      return await showPhiScore(ctx);
+
+    case 'advisor':
+      return await showAdvisorCTA(ctx);
+
+    case 'goals': {
+      const { transitionToGoals } = await import('./behavior');
+      return await transitionToGoals(ctx);
+    }
+
+    case 'goal_deposit':
+      return await handleGoalDeposit(ctx, msg);
+
+    case 'unclassified':
+      return await showUnclassifiedTransactions(ctx);
+
+    case 'credit_pending':
+      return await showNeedsCreditDetail(ctx);
+
+    case 'duplicates':
+      return await showDuplicateSuspects(ctx);
+
+    case 'loans': {
+      const { data: activeRequest } = await supabase
+        .from('loan_consolidation_requests')
+        .select('id, documents_received, documents_needed')
+        .eq('user_id', ctx.userId)
+        .eq('status', 'pending_documents')
+        .single();
+
+      if (activeRequest) {
+        await greenAPI.sendMessage({
+          phoneNumber: ctx.phone,
+          message:
+            `💡 יש לך בקשת איחוד פעילה - ממתין למסמכי ההלוואות שלך ` +
+            `(${activeRequest.documents_received || 0}/${activeRequest.documents_needed}).\n\n` +
+            `שלח לי את המסמכים כדי שאוכל להעביר לגדי את הבקשה! 📄`,
+        });
+        return { success: true };
+      }
+      // No active request - fall through to AI chat
+      return null;
+    }
+
+    case 'add_document':
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `📄 מעולה! שלח לי את המסמך (PDF או תמונה).`,
+      });
+      return { success: true };
+
+    case 'start_classify':
+      return await startClassification(ctx);
+
+    case 'continue': {
+      const { getClassifiableTransactions } = await import('../classification-flow');
+      const pendingIncome = await getClassifiableTransactions(ctx.userId, 'income');
+      const pendingExpense = await getClassifiableTransactions(ctx.userId, 'expense');
+
+      if (pendingIncome.length > 0 || pendingExpense.length > 0) {
+        return await startClassification(ctx);
+      }
+
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `✅ כל התנועות מסווגות!\n\nמה תרצה לעשות? כתוב *"עזרה"* לראות תפריט 😊`,
+      });
+      return { success: true };
+    }
+
+    case 'analyze': {
+      await supabase
+        .from('users')
+        .update({ onboarding_state: 'behavior', phase: 'behavior' })
+        .eq('id', ctx.userId);
+
+      const { handleBehaviorPhase } = await import('./behavior');
+      return await handleBehaviorPhase({ ...ctx, state: 'behavior' }, msg);
+    }
+
+    case 'category_question': {
+      // Try AI-extracted category first, then findBestMatch fallback
+      const category = intent.params?.category;
+      if (category) {
+        // Try exact match first
+        const match = findBestMatch(category);
+        if (match) {
+          return await answerCategoryQuestion(ctx, match.name);
+        }
+        // Use the AI-extracted category name directly
+        return await answerCategoryQuestion(ctx, category);
+      }
+      // Try findBestMatch on the original message
+      const msgMatch = findBestMatch(msg);
+      if (msgMatch) {
+        return await answerCategoryQuestion(ctx, msgMatch.name);
+      }
+      return null; // Fall to AI chat
+    }
+
+    case 'general_question':
+    case 'unknown':
+    default:
+      return null; // Fall through to AI chat (Layer 3)
+  }
 }
 
 // ============================================================================

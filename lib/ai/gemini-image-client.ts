@@ -27,10 +27,10 @@ const getGeminiClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-// Model configuration - Updated Dec 2025
+// Model configuration - Updated Mar 2026
 // See: https://ai.google.dev/gemini-api/docs/image-generation
-// Nano Banana Pro = Gemini 3 Pro Image Preview - יצירת תמונות מתקדמת באיכות גבוהה
-const IMAGE_MODEL = 'gemini-3-pro-image-preview';
+// Gemini 3.1 Flash Image - יצירת תמונות מהירה וזולה ($0.25 input / $0.067 output)
+const IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
 
 export type ChartType =
   | 'pie'

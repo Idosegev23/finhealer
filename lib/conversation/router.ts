@@ -21,6 +21,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { getOrCreateContext, updateContext, isContextStale, resumeStaleContext } from './context-manager';
 import { tryRuleBasedParsing, detectUserMood } from '@/lib/ai/intent-parser';
+import { buildUserSnapshot } from '@/lib/ai/user-snapshot';
 
 import type { RouterContext, RouterResult, UserState } from './shared';
 import { isCommand } from './shared';
@@ -118,11 +119,57 @@ export async function routeMessage(
   // UNIVERSAL INTENTS (handled in ANY state, before state dispatch)
   // ══════════════════════════════════════════════════════════════════════════
 
-  // Greeting - respond warmly and guide user
+  // Greeting - smart, context-aware response
   if (intent?.type === 'greeting' && intent.confidence > 0.8) {
     // Don't intercept greetings during name collection (it might be a name like "שלום")
     if (state !== 'waiting_for_name') {
       console.log(`[Router] UNIVERSAL: greeting in state=${state}`);
+
+      // In monitoring state - give a smart, personalized greeting with snapshot
+      if (state === 'monitoring') {
+        try {
+          const snapshot = await buildUserSnapshot(userId);
+          const d = snapshot.data;
+          let greeting = `היי ${d.name}! 😊\n\n`;
+
+          // Show quick status
+          if (d.currentMonthIncome > 0 || d.currentMonthExpenses > 0) {
+            const balance = d.currentMonthIncome - d.currentMonthExpenses;
+            greeting += `📊 החודש: הכנסות ₪${d.currentMonthIncome.toLocaleString('he-IL')} | הוצאות ₪${d.currentMonthExpenses.toLocaleString('he-IL')}`;
+            if (balance >= 0) {
+              greeting += ` | +₪${balance.toLocaleString('he-IL')} 💚\n`;
+            } else {
+              greeting += ` | ₪${balance.toLocaleString('he-IL')} ⚠️\n`;
+            }
+          }
+
+          // Proactive nudges (pick the most important one)
+          if (d.pendingActions.length > 0) {
+            greeting += `\n💡 ${d.pendingActions[0]}`;
+            if (d.pendingCount > 0) {
+              greeting += ` — רוצה לטפל בזה?`;
+            }
+            greeting += `\n`;
+          }
+
+          // Goal progress (show closest to completion)
+          const closestGoal = d.activeGoals.sort((a, b) => b.progress - a.progress)[0];
+          if (closestGoal && closestGoal.progress > 0) {
+            greeting += `\n🎯 ${closestGoal.name}: ${closestGoal.progress}%`;
+            if (closestGoal.progress >= 75) greeting += ` — כמעט שם! 🔥`;
+            greeting += `\n`;
+          }
+
+          greeting += `\nמה תרצה לעשות? כתוב *"עזרה"* לתפריט`;
+
+          await greenAPI.sendMessage({ phoneNumber: phone, message: greeting });
+          return { success: true };
+        } catch (err) {
+          console.error('[Router] Snapshot error in greeting:', err);
+          // Fall through to simple greeting
+        }
+      }
+
       await greenAPI.sendMessage({ phoneNumber: phone, message: getStateGuidance(state, userName) });
       return { success: true };
     }
@@ -179,14 +226,48 @@ export async function routeMessage(
       helpText += `📋 *"יעדים"* - לראות יעדים\n`;
       helpText += `✅ *"סיימתי"* - לעבור לשלב הבא\n`;
     } else if (state === 'monitoring') {
-      helpText += `📊 *"סיכום"* - סיכום חודשי\n`;
-      helpText += `📄 שלח מסמך - להוסיף דוח\n`;
-      helpText += `🎯 *"יעדים"* - ניהול יעדים\n`;
-      helpText += `💰 *"תקציב"* - מצב תקציב\n`;
-      helpText += `📈 *"תזרים"* - תחזית 3 חודשים\n`;
-      helpText += `🏆 *"ציון"* - ציון בריאות פיננסית\n`;
-      helpText += `📊 *"גרף הוצאות"* - גרף הוצאות\n`;
-      helpText += `💬 או שאל אותי כל שאלה פיננסית!\n`;
+      // Send interactive list message instead of text wall
+      try {
+        await greenAPI.sendListMessage({
+          phoneNumber: phone,
+          message: `היי ${userName || ''}! 😊\nאיך אפשר לעזור?`,
+          buttonText: 'בחר פעולה',
+          title: 'φ Phi - תפריט',
+          footer: 'או כתוב לי בחופשיות!',
+          sections: [
+            {
+              title: 'סיכומים וגרפים',
+              rows: [
+                { rowId: 'summary', title: '📊 סיכום חודשי', description: 'הכנסות, הוצאות ויתרה' },
+                { rowId: 'expense_chart', title: '📊 גרף הוצאות', description: 'התפלגות הוצאות ויזואלית' },
+                { rowId: 'income_chart', title: '💚 גרף הכנסות', description: 'מקורות הכנסה' },
+                { rowId: 'cash_flow', title: '📈 תזרים', description: 'תחזית 3 חודשים קדימה' },
+                { rowId: 'phi_score', title: '🏆 ציון פיננסי', description: 'בריאות פיננסית' },
+              ],
+            },
+            {
+              title: 'ניהול כספים',
+              rows: [
+                { rowId: 'budget_status', title: '💰 תקציב', description: 'מצב תקציב חודשי' },
+                { rowId: 'to_goals', title: '🎯 יעדים', description: 'ניהול יעדי חיסכון' },
+                { rowId: 'unclassified', title: '📋 לא מסווג', description: 'תנועות ממתינות לסיווג' },
+                { rowId: 'add_doc', title: '📄 מסמך חדש', description: 'שלח דוח בנק או אשראי' },
+              ],
+            },
+            {
+              title: 'עוד',
+              rows: [
+                { rowId: 'advisor', title: '💼 ייעוץ', description: 'שיחה עם גדי' },
+                { rowId: 'available_months', title: '📅 חודשים', description: 'חודשים עם נתונים' },
+              ],
+            },
+          ],
+        });
+      } catch (listError) {
+        // Fallback handled by sendListMessage internally
+        console.error('[Router] List message error:', listError);
+      }
+      return { success: true };
     } else {
       helpText += `📄 שלח מסמך - להוסיף דוח\n`;
       helpText += `⏭️ *"דלג"* / *"נמשיך"* - לדלג קדימה\n`;
