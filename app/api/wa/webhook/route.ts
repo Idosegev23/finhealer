@@ -749,7 +749,7 @@ export async function POST(request: NextRequest) {
 
           const userPrompt = 'נתח את הקבלה/תדפיס הזה וחלץ את כל המידע. **שים לב מיוחד לתאריך!**\n\n**חשוב מאוד - זיהוי הסכום הנכון:**\n- זהה את הסכום ששולם בפועל - זה נמצא ליד "סה״כ כולל מע״מ" או "סה״כ" בתחתית הקבלה\n- אל תשתמש במספר הקבלה כעלות! (מספר קבלה = 36401)\n- אל תשתמש במספר הקופה כעלות! (מספר קופה = 000083)\n- דוגמה: אם רשום "מספר קופה: 000083" ו"סה״כ כולל מע״מ: 79" - הסכום הוא 79, לא 83!\n- מספר קופה/קבלה ≠ סכום כסף\n\n**חשוב מאוד - פורמט תאריכים ישראלי:**\n- תאריכים ישראליים הם בפורמט: יום.חודש.שנה (DD.MM.YY)\n- **לא** כמו בארה"ב! אם רשום "10.11.20" זה יום 10, חודש 11 (נובמבר), שנה 2020\n- החזר בפורמט ISO: "YYYY-MM-DD" (למשל: "2020-11-10")\n\nהחזר תשובה בפורמט JSON.';
 
-          // 🆕 Gemini 3.1 Pro Vision for receipt OCR
+          // 🆕 Gemini Flash Vision for receipt OCR
           const { chatWithGeminiProVision } = await import('@/lib/ai/gemini-client');
           const aiText = await chatWithGeminiProVision(
             base64Image,
@@ -1162,7 +1162,7 @@ export async function POST(request: NextRequest) {
           const pdfBuffer = await pdfResponse.arrayBuffer();
           const buffer = Buffer.from(pdfBuffer);
           
-          console.log(`🤖 Starting PDF analysis (type: ${documentType}) with Gemini 3.1 Pro...`);
+          console.log(`🤖 Starting PDF analysis (type: ${documentType}) with Gemini Flash...`);
           console.log(`[Webhook] PDF_ANALYSIS_START: docType=${documentType}, fileSize=${buffer.length} bytes, fileName=${fileName}`);
           const pdfStartTime = Date.now();
 
@@ -1189,10 +1189,10 @@ export async function POST(request: NextRequest) {
 
           console.log(`📝 Using prompt for document type: ${documentType} (${prompt.length} chars)`);
 
-          // 🆕 Gemini 3.1 Pro - direct PDF analysis via inline data
+          // 🆕 Gemini Flash - direct PDF analysis via inline data
           let content = '';
           try {
-            console.log('🔄 Analyzing PDF with Gemini 3.1 Pro...');
+            console.log('🔄 Analyzing PDF with Gemini Flash...');
             const base64Pdf = buffer.toString('base64');
             const { chatWithGeminiProVision } = await import('@/lib/ai/gemini-client');
 
@@ -1852,9 +1852,9 @@ export async function POST(request: NextRequest) {
             expenseCategories
           );
           
-          console.log(`🤖 Sending Excel data to Gemini 3.1 Pro (${excelText.length} chars)...`);
+          console.log(`🤖 Sending Excel data to Gemini Flash (${excelText.length} chars)...`);
 
-          // 🆕 Gemini 3.1 Pro for text-based document analysis
+          // 🆕 Gemini Flash for text-based document analysis
           const { chatWithGeminiProDeep } = await import('@/lib/ai/gemini-client');
 
           // ⏱️ With timeout to prevent Vercel 300s limit

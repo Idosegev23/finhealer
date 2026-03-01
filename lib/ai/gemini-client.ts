@@ -1,12 +1,11 @@
 /**
  * Gemini 3 Chat Client
  *
- * Replaces GPT-5-nano (fast chat) and GPT-5.2 (deep analysis) with:
- * - Gemini 3 Flash: fast chat, intent detection, tips ($0.50/1M tokens)
- * - Gemini 3.1 Pro: document OCR, deep financial analysis ($2/1M tokens)
+ * All tasks use Gemini 3 Flash for speed and cost efficiency:
+ * - Fast chat, intent detection, tips
+ * - Document OCR, PDF analysis, deep financial analysis
  *
  * Gemini 3 Pro Image (charts) stays in gemini-image-client.ts
- * Whisper-1 (voice) stays in gpt5-client.ts
  */
 
 import { GoogleGenAI } from '@google/genai';
@@ -22,9 +21,8 @@ function getClient(): GoogleGenAI {
   return _client;
 }
 
-// Model constants
+// Model constant - Flash for all tasks (fast + cheap)
 const FLASH_MODEL = 'gemini-3-flash-preview';
-const PRO_MODEL = 'gemini-3.1-pro-preview';
 
 /**
  * Retry with exponential backoff for Gemini API calls.
@@ -168,12 +166,12 @@ export async function chatWithGeminiFlashMinimal(
 }
 
 // ============================================================================
-// Gemini 3.1 Pro - Deep Analysis (replaces GPT-5.2)
+// Gemini Flash - Deep Analysis (conversation with history)
 // ============================================================================
 
 /**
- * Deep analysis with Gemini Pro
- * Use for: Document analysis, budget building, complex financial reasoning
+ * Deep analysis chat with Gemini Flash (with conversation history)
+ * Use for: Budget building, complex financial reasoning
  */
 export async function chatWithGeminiPro(
   message: string,
@@ -217,27 +215,26 @@ export async function chatWithGeminiPro(
     });
 
     const response = await client.models.generateContent({
-      model: PRO_MODEL,
+      model: FLASH_MODEL,
       contents,
       config: {
-        thinkingConfig: { thinkingLevel: 'high' as any },
         maxOutputTokens: 2000,
       },
     });
 
     return response.text || '';
   } catch (error) {
-    console.error('[Gemini Pro] Error:', error);
+    console.error('[Gemini Flash Deep Chat] Error:', error);
     throw new Error('AI analysis service temporarily unavailable');
   }
 }
 
 // ============================================================================
-// Gemini 3.1 Pro Vision - Image/Document OCR (replaces GPT-5.2 vision)
+// Gemini Flash Vision - Image/Document OCR
 // ============================================================================
 
 /**
- * Vision analysis with Gemini Pro for receipt/document OCR
+ * Vision analysis with Gemini Flash for receipt/document OCR
  * Use for: Receipt images, bank statements, credit card statements
  *
  * @param base64Image - Base64 encoded image data
@@ -254,7 +251,7 @@ export async function chatWithGeminiProVision(
       const client = getClient();
 
       const response = await client.models.generateContent({
-        model: PRO_MODEL,
+        model: FLASH_MODEL,
         contents: [
           {
             role: 'user',
@@ -270,16 +267,15 @@ export async function chatWithGeminiProVision(
           },
         ],
         config: {
-          thinkingConfig: { thinkingLevel: 'high' as any },
           maxOutputTokens: 32000,
           responseMimeType: 'application/json',
         },
       });
 
       const text = response.text || '{}';
-      console.log(`[Gemini Pro Vision] Response length: ${text.length} chars`);
+      console.log(`[Gemini Flash Vision] Response length: ${text.length} chars`);
       return text;
-    }, 'Gemini Pro Vision');
+    }, 'Gemini Flash Vision');
   } catch (error) {
     console.error('[Gemini Pro Vision] Error:', error);
     throw new Error('Document analysis service temporarily unavailable');
@@ -299,7 +295,7 @@ export async function chatWithGeminiProVisionText(
       const client = getClient();
 
       const response = await client.models.generateContent({
-        model: PRO_MODEL,
+        model: FLASH_MODEL,
         contents: [
           {
             role: 'user',
@@ -315,13 +311,12 @@ export async function chatWithGeminiProVisionText(
           },
         ],
         config: {
-          thinkingConfig: { thinkingLevel: 'high' as any },
           maxOutputTokens: 8000,
         },
       });
 
       return response.text || '';
-    }, 'Gemini Pro Vision Text');
+    }, 'Gemini Flash Vision Text');
   } catch (error) {
     console.error('[Gemini Pro Vision Text] Error:', error);
     throw new Error('Document analysis service temporarily unavailable');
@@ -341,7 +336,7 @@ export async function chatWithGeminiProDeep(
       const client = getClient();
 
       const response = await client.models.generateContent({
-        model: PRO_MODEL,
+        model: FLASH_MODEL,
         contents: [
           {
             role: 'user',
@@ -349,13 +344,12 @@ export async function chatWithGeminiProDeep(
           },
         ],
         config: {
-          thinkingConfig: { thinkingLevel: 'high' as any },
           maxOutputTokens: 64000,
         },
       });
 
       return response.text || '{}';
-    }, 'Gemini Pro Deep');
+    }, 'Gemini Flash Deep');
   } catch (error) {
     console.error('[Gemini Pro Deep] Error:', error);
     throw new Error('Deep analysis service temporarily unavailable');

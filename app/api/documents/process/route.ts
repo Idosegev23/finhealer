@@ -527,7 +527,7 @@ async function analyzeLargePDF(buffer: Buffer, fileType: string, fileName: strin
       const chunkPrompt = getPromptForDocumentType(fileType, chunks[i], expenseCategories);
 
       const startChunk = Date.now();
-      // 🆕 Gemini 3.1 Pro for chunk analysis
+      // 🆕 Gemini Flash for chunk analysis
       const { chatWithGeminiProDeep } = await import('@/lib/ai/gemini-client');
       const chunkResponse = await chatWithGeminiProDeep(chunkPrompt, '');
 
@@ -715,8 +715,8 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Get appropriate prompt for document type (direct PDF analysis - no text)
     const prompt = getPromptForDocumentType(fileType, null, expenseCategories);
 
-    // 🆕 Gemini 3.1 Pro - Direct PDF analysis via inline base64
-    console.log(`🤖 Analyzing PDF with Gemini 3.1 Pro (${fileSizeMB.toFixed(2)} MB)...`);
+    // 🆕 Gemini Flash - Direct PDF analysis via inline base64
+    console.log(`🤖 Analyzing PDF with Gemini Flash (${fileSizeMB.toFixed(2)} MB)...`);
     console.log(`📊 Prompt length: ${prompt.length} chars`);
 
     const startAI = Date.now();
@@ -728,11 +728,11 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
       const base64Pdf = buffer.toString('base64');
       const { chatWithGeminiProVision } = await import('@/lib/ai/gemini-client');
       content = await chatWithGeminiProVision(base64Pdf, 'application/pdf', prompt);
-      usedModel = 'gemini-3.1-pro';
-      console.log(`✅ Gemini 3.1 Pro succeeded`);
+      usedModel = 'gemini-3-flash';
+      console.log(`✅ Gemini Flash succeeded`);
     } catch (geminiError: any) {
-      console.log(`❌ Gemini 3.1 Pro failed: ${geminiError.message}`);
-      throw new Error(`Gemini 3.1 Pro failed: ${geminiError.message}`);
+      console.log(`❌ Gemini Flash failed: ${geminiError.message}`);
+      throw new Error(`Gemini Flash failed: ${geminiError.message}`);
     }
 
     const aiDuration = ((Date.now() - startAI) / 1000).toFixed(1);
@@ -786,18 +786,18 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
 
 async function analyzeImageWithAI(buffer: Buffer, mimeType: string, documentType: string) {
   try {
-    console.log(`🖼️  Analyzing image with Gemini 3.1 Pro Vision (${documentType})...`);
+    console.log(`🖼️  Analyzing image with Gemini Flash Vision (${documentType})...`);
 
     const base64Image = buffer.toString('base64');
 
     // Get appropriate prompt (images are usually credit/bank/receipt)
     const prompt = getPromptForDocumentType(documentType, null);
 
-    // 🆕 Gemini 3.1 Pro Vision
+    // 🆕 Gemini Flash Vision
     const { chatWithGeminiProVision } = await import('@/lib/ai/gemini-client');
     const content = await chatWithGeminiProVision(base64Image, mimeType, prompt);
 
-    console.log(`✅ Gemini 3.1 Pro Vision analysis complete`);
+    console.log(`✅ Gemini Flash Vision analysis complete`);
     
     // Parse JSON with cleanup
     try {
@@ -900,15 +900,15 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
     // 4. Get appropriate prompt
     const prompt = getPromptForDocumentType(documentType, excelText);
     
-    // 5. 🆕 Gemini 3.1 Pro for Excel analysis
-    console.log(`🤖 Analyzing with Gemini 3.1 Pro...`);
+    // 5. 🆕 Gemini Flash for Excel analysis
+    console.log(`🤖 Analyzing with Gemini Flash...`);
 
     const fullPrompt = `אתה מומחה בניתוח מסמכים פיננסיים. החזר תמיד JSON תקין בלבד, ללא טקסט נוסף.\n\n${prompt}`;
 
     const { chatWithGeminiProDeep } = await import('@/lib/ai/gemini-client');
     const content = await chatWithGeminiProDeep(fullPrompt, '');
 
-    console.log(`✅ Gemini 3.1 Pro analysis complete`);
+    console.log(`✅ Gemini Flash analysis complete`);
     
     // Parse JSON response with improved error handling
     try {
