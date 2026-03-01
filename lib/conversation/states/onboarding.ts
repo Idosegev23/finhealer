@@ -127,6 +127,38 @@ export async function handleWaitingForDocument(
     return { success: true };
   }
 
+  // Skip - user doesn't have a document right now (command or AI intent)
+  if (
+    isCommand(msg, ['דלג', 'skip', 'אין לי', 'אין לי עכשיו', 'מאוחר יותר', 'אחר כך', 'לא עכשיו', 'לא רוצה']) ||
+    ctx.intent?.type === 'postpone' ||
+    ctx.intent?.type === 'skip'
+  ) {
+    // Check if there are any existing transactions to work with
+    const { data: existingTx } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('user_id', ctx.userId)
+      .limit(1);
+
+    if (existingTx && existingTx.length > 0) {
+      // Has transactions - go to classification
+      await supabase.from('users').update({ onboarding_state: 'classification' }).eq('id', ctx.userId);
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `בסדר! 😊\n\nיש לך תנועות שמחכות - בוא נסווג אותן.\nכתוב *"נתחיל"* כשתהיה מוכן.`,
+      });
+      return { success: true, newState: 'classification' as any };
+    } else {
+      // No transactions - go to monitoring with limited functionality
+      await supabase.from('users').update({ onboarding_state: 'monitoring', phase: 'monitoring' }).eq('id', ctx.userId);
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `בסדר! 😊\n\nתוכל לשלוח מסמכים בכל עת.\n\nבינתיים, אפשר לשאול אותי שאלות פיננסיות או לכתוב *"עזרה"* לראות מה אפשר לעשות.`,
+      });
+      return { success: true, newState: 'monitoring' as any };
+    }
+  }
+
   // Default - waiting for document
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,

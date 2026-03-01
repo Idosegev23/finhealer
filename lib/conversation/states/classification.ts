@@ -31,8 +31,9 @@ export async function handleClassificationState(ctx: RouterContext, msg: string)
   if (isCommand(msg, [
     'נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג', 'start_classify',
     '▶️ נתחיל לסווג', 'נתחיל לסווג ▶️', '▶️ נמשיך לסווג', 'נמשיך לסווג ▶️',
+    'קבל הכל', 'accept_all', 'סווג הכל', 'אשר הכל',
   ])) {
-    console.log(`[Classification] handleClassificationState: matched START command, calling startClassification`);
+    console.log(`[Classification] handleClassificationState: matched START/ACCEPT command, calling startClassification`);
     return await startClassification(ctx);
   }
 
@@ -163,7 +164,8 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
     return { success: true, newState: 'goals_setup' };
   }
 
-  // Send intro message
+  // Send intro message with accept-all option
+  const total = incomeCount + expenseCount;
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message:
@@ -171,6 +173,23 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
       `יש לך ${incomeCount} הכנסות ו-${expenseCount} הוצאות.\n\n` +
       (incomeCount > 0 ? `נתחיל עם ההכנסות 💚` : `נתחיל עם ההוצאות 💸`),
   });
+
+  // Offer accept-all shortcut
+  try {
+    await greenAPI.sendInteractiveButtons({
+      phoneNumber: ctx.phone,
+      message: `רוצה שאסווג הכל אוטומטית?\nאו שנעבור אחד-אחד?`,
+      buttons: [
+        { buttonId: 'accept_all', buttonText: '🚀 סווג הכל' },
+        { buttonId: 'start_classify', buttonText: '👆 אחד-אחד' },
+      ],
+    });
+  } catch {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `💡 *טיפ:* כתוב *"קבל הכל"* ואני אסווג את כולם אוטומטית!`,
+    });
+  }
 
   // Set state and show first transaction
   const newState = incomeCount > 0 ? 'classification_income' : 'classification_expense';
@@ -203,6 +222,102 @@ export async function handleClassificationResponse(
   console.log(`[Classification] RESPONSE: type=${type}, userId=${ctx.userId.substring(0,8)}..., msg="${msg.substring(0, 80)}"`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
+
+  // ---- ACCEPT ALL: auto-classify everything with AI suggestions ----
+  if (isCommand(msg, ['קבל הכל', 'accept_all', 'סווג הכל', 'אשר הכל', 'קבל את הכל', 'אוטומטי'])) {
+    console.log(`[Classification] ACCEPT_ALL: userId=${ctx.userId.substring(0,8)}..., type=${type}`);
+
+    // Get all pending transactions of this type
+    const { data: pendingTx } = await supabase
+      .from('transactions')
+      .select('id, vendor, amount, expense_category, income_category, category')
+      .eq('user_id', ctx.userId)
+      .eq('status', 'pending')
+      .eq('type', type);
+
+    if (!pendingTx || pendingTx.length === 0) {
+      await moveToNextPhase(ctx, type);
+      return { success: true };
+    }
+
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🚀 *מסווג ${pendingTx.length} תנועות אוטומטית...*`,
+    });
+
+    let classified = 0;
+    const categories = type === 'income' ? INCOME_CATEGORIES : CATEGORIES;
+    const matchFn = type === 'income' ? findBestIncomeMatch : findBestMatch;
+
+    for (const tx of pendingTx) {
+      // Try existing AI category from OCR
+      let category = tx.expense_category || tx.income_category || tx.category;
+
+      // If no category, try rule-based matching on vendor name
+      if (!category && tx.vendor) {
+        // Check user rules first
+        const { data: userRule } = await supabase
+          .from('user_category_rules')
+          .select('category')
+          .eq('user_id', ctx.userId)
+          .ilike('vendor_pattern', `%${normalizeVendor(tx.vendor)}%`)
+          .limit(1)
+          .single();
+
+        if (userRule?.category) {
+          category = userRule.category;
+        } else {
+          // Try vendor name matching
+          const match = matchFn(tx.vendor);
+          if (match) category = match;
+        }
+      }
+
+      // Fallback to AI classification
+      if (!category && tx.vendor) {
+        try {
+          const aiCategory = await matchCategoryWithAI(tx.vendor, type);
+          if (aiCategory) category = aiCategory;
+        } catch { /* timeout is OK */ }
+      }
+
+      // Last resort
+      if (!category) {
+        category = type === 'income' ? 'הכנסה אחרת' : 'אחר';
+      }
+
+      // Update transaction
+      const updateData: any = {
+        status: 'confirmed',
+        auto_categorized: true,
+      };
+      if (type === 'income') {
+        updateData.income_category = category;
+      } else {
+        updateData.expense_category = category;
+      }
+      updateData.category = category;
+
+      await supabase.from('transactions').update(updateData).eq('id', tx.id);
+
+      // Learn the rule for next time
+      if (tx.vendor && category) {
+        await learnUserRule(ctx.userId, tx.vendor, category, type);
+      }
+
+      classified++;
+    }
+
+    console.log(`[Classification] ACCEPT_ALL_DONE: classified=${classified}/${pendingTx.length}`);
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `✅ *סיווגתי ${classified} תנועות!*\n\nנמשיך לשלב הבא 🎯`,
+    });
+
+    // Move to next phase
+    await moveToNextPhase(ctx, type);
+    return { success: true };
+  }
 
   // ---- FINISH EARLY (works in both income and expense) ----
   if (isCommand(msg, ['סיימתי', 'סיום', 'מספיק', 'finish', 'done', 'הספיק', 'נגמר'])) {

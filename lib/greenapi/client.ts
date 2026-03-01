@@ -257,16 +257,45 @@ export class GreenAPIClient {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`GreenAPI list error: ${response.statusText}`);
+      const data = await response.json();
+
+      // Check for errors in response body
+      if (data.error) {
+        console.error('❌ sendListMessage error in response:', data.error);
+        throw new Error(data.error);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        console.error('❌ sendListMessage HTTP error:', response.status, response.statusText, data);
+        throw new Error(`GreenAPI list error: ${response.statusText} - ${JSON.stringify(data)}`);
+      }
+
       console.log(`✅ GreenAPI list message sent to ${normalizedPhone}@c.us:`, data.idMessage);
       return data;
     } catch (error) {
       console.error('❌ GreenAPI list error:', error);
-      throw error;
+      // Fallback: send as numbered text message
+      console.log('📝 List fallback: sending as numbered text...');
+
+      let fallbackText = '';
+      if (title) fallbackText += `*${title}*\n`;
+      if (message) fallbackText += `${message}\n`;
+      fallbackText += '\n';
+
+      for (const section of sections) {
+        if (section.title) fallbackText += `*${section.title}:*\n`;
+        section.rows.forEach((row, index) => {
+          fallbackText += `${index + 1}. ${row.title}`;
+          if (row.description) fallbackText += ` - ${row.description}`;
+          fallbackText += '\n';
+        });
+        fallbackText += '\n';
+      }
+
+      if (footer) fallbackText += `${footer}\n`;
+      fallbackText += 'כתוב את המספר לבחירה';
+
+      return this.sendMessage({ phoneNumber, message: fallbackText.trim() });
     }
   }
 

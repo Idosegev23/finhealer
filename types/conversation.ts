@@ -85,9 +85,13 @@ export type IntentType =
   | "greeting"
   | "help"
   | "upload_document"
-  | "budget_request"      // 🆕 בקשת תקציב / הגדרת תקציב
-  | "goal_request"        // 🆕 בקשת יעד / הגדרת יעד חיסכון
-  | "loan_consolidation"  // 🆕 שאלה/בקשה לאיחוד הלוואות
+  | "budget_request"      // בקשת תקציב / הגדרת תקציב
+  | "goal_request"        // בקשת יעד / הגדרת יעד חיסכון
+  | "loan_consolidation"  // שאלה/בקשה לאיחוד הלוואות
+  | "summary_request"     // סיכום / מצב / סטטוס
+  | "continue"            // נמשיך / הלאה / קדימה
+  | "thanks"              // תודה / תודה רבה
+  | "chart_request"       // גרף / תרשים
   | "unknown";
 
 export interface Entity {

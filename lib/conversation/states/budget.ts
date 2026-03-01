@@ -19,12 +19,12 @@ export async function handleBudgetPhase(ctx: RouterContext, msg: string): Promis
   const command = msg.toLowerCase().trim();
 
   // Check for auto budget commands
-  if (command === 'auto_budget' || command === 'תקציב אוטומטי') {
+  if (command === 'auto_budget' || command === 'תקציב אוטומטי' || command === 'אוטומטי' || command === 'אוטו') {
     return createAutoBudget(ctx);
   }
 
   // Check for manual budget commands
-  if (command === 'manual_budget' || command === 'הגדרה ידנית') {
+  if (command === 'manual_budget' || command === 'הגדרה ידנית' || command === 'ידני') {
     const manualMsg = `📝 *הגדרת תקציב ידנית*\n\nשלח לי את התקציב בפורמט:\n*שם קטגוריה: סכום*\n\nדוגמה:\n• מזון: 2000\n• תחזוקה: 1500\n• בידור: 800\n\nכתוב משהו כמו:\n"מזון: 2000"`;
     await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: manualMsg });
     return { success: true };
@@ -49,9 +49,23 @@ export async function handleBudgetPhase(ctx: RouterContext, msg: string): Promis
     return setBudgetCategory(ctx, category, amount);
   }
 
-  // Default: show help
-  const helpMsg = `🎯 *ברוכים הבאים לשלב התקציב!*\n\nבחר אופציה:\n\n1️⃣ *auto_budget* - יצירת תקציב אוטומטי מהיסטוריה\n2️⃣ *manual_budget* - הגדרה ידנית של קטגוריות\n3️⃣ *skip_budget* - דילוג על שלב זה\n\nאו שלח לי: *סיימתי* כשתסיים`;
-  await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: helpMsg });
+  // Default: show budget options with buttons
+  try {
+    await greenAPI.sendInteractiveButtons({
+      phoneNumber: ctx.phone,
+      message: `💰 *בוא נבנה תקציב!*\n\nתקציב הוא התוכנית הפיננסית שלך.\nאני יכול לבנות אחד אוטומטית מהנתונים שלך.`,
+      buttons: [
+        { buttonId: 'auto_budget', buttonText: '🚀 אוטומטי' },
+        { buttonId: 'manual_budget', buttonText: '✏️ ידני' },
+        { buttonId: 'skip_budget', buttonText: '⏭️ דלג' },
+      ],
+    });
+  } catch {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `💰 *בוא נבנה תקציב!*\n\nכתוב:\n• *"אוטומטי"* - אני אבנה לך תקציב\n• *"ידני"* - תגדיר בעצמך\n• *"דלג"* - לשלב הבא`,
+    });
+  }
 
   return { success: true };
 }
@@ -116,36 +130,36 @@ export async function createAutoBudget(ctx: RouterContext): Promise<RouterResult
     }
   }
 
-  // Send 4 messages: profile summary, expense breakdown, top vendors, target
+  // Consolidated budget summary (2 messages instead of 4)
 
-  // Message 1
+  // Message 1: Overview + expenses breakdown
   let msg1 = `✨ *התקציב שלך מוכן!*\n\n`;
-  msg1 += `👨‍👩‍👧‍👦 *הפרופיל שלך:*\n• ${profileContext.numPeople} נפשות\n• ${profileContext.housingType}\n• רמת הכנסה: ${profileContext.incomeLevel}\n\n`;
-  msg1 += `📊 *ממוצע חודשי (12 חודשים):*\n• הכנסות: ₪${totalIncome.toLocaleString('he-IL')}\n• הוצאות: ₪${totalExpenses.toLocaleString('he-IL')}\n• יתרה: ₪${(totalIncome - totalExpenses).toLocaleString('he-IL')}`;
+  msg1 += `📊 *ממוצע חודשי:*\n`;
+  msg1 += `💚 הכנסות: ₪${totalIncome.toLocaleString('he-IL')}\n`;
+  msg1 += `💸 הוצאות: ₪${totalExpenses.toLocaleString('he-IL')}\n`;
+  msg1 += `${totalIncome >= totalExpenses ? '✅' : '⚠️'} יתרה: ₪${(totalIncome - totalExpenses).toLocaleString('he-IL')}\n\n`;
+
+  msg1 += `📁 *הוצאות:*\n`;
+  msg1 += `🔒 קבועות: ₪${profileContext.fixedExpenses.toLocaleString('he-IL')}\n`;
+  msg1 += `🔄 משתנות: ₪${profileContext.variableExpenses.toLocaleString('he-IL')}\n`;
+  if (profileContext.specialExpenses > 0) msg1 += `⭐ מיוחדות: ₪${profileContext.specialExpenses.toLocaleString('he-IL')}\n`;
+
+  if (vendorBreakdown.length > 0) {
+    msg1 += `\n💳 *הוצאות עיקריות:*\n`;
+    vendorBreakdown.slice(0, 5).forEach(v => { msg1 += `• ${v.vendor}: ₪${v.avgAmount.toLocaleString('he-IL')}\n`; });
+  }
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: msg1 });
 
-  // Message 2
-  let msg2 = `📁 *הוצאות לפי סוג:*\n\n🔒 *קבועות:* ₪${profileContext.fixedExpenses.toLocaleString('he-IL')}\n`;
-  categories.filter(c => c.expenseType === 'fixed').slice(0, 3).forEach(c => { msg2 += `   • ${c.name}: ₪${c.amount.toLocaleString('he-IL')}\n`; });
-  msg2 += `\n🔄 *משתנות:* ₪${profileContext.variableExpenses.toLocaleString('he-IL')}\n`;
-  categories.filter(c => c.expenseType === 'variable' || c.expenseType === 'temporary').slice(0, 3).forEach(c => { msg2 += `   • ${c.name}: ₪${c.amount.toLocaleString('he-IL')}\n`; });
-  if (profileContext.specialExpenses > 0) msg2 += `\n⭐ *מיוחדות:* ₪${profileContext.specialExpenses.toLocaleString('he-IL')}`;
-  await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: msg2 });
-
-  // Message 3 - Top vendors
-  if (vendorBreakdown.length > 0) {
-    let msg3 = `💳 *הוצאות עיקריות (ממוצע חודשי):*\n\n`;
-    vendorBreakdown.slice(0, 8).forEach(v => { msg3 += `• ${v.vendor}: ₪${v.avgAmount.toLocaleString('he-IL')}\n`; });
-    await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: msg3 });
-  }
-
-  // Message 4 - Target
+  // Message 2: Target + recommendation
   const savingsPercentDisplay = Math.round(savingsPercent * 100);
-  let msg4 = `🎯 *היעד שלך:*\n\n• יעד חיסכון (${savingsPercentDisplay}%): ₪${savingsTarget.toLocaleString('he-IL')}/חודש\n• תקציב זמין: ₪${availableBudget.toLocaleString('he-IL')}/חודש\n\n💡 *המלצת φ:*\n`;
-  if (totalExpenses > totalIncome) msg4 += `⚠️ ההוצאות גבוהות מההכנסות!\nמומלץ לבדוק את ההוצאות המשתנות.`;
-  else if (profileContext.variableExpenses > profileContext.fixedExpenses) msg4 += `ההוצאות המשתנות גבוהות.\nיש פוטנציאל לחיסכון משמעותי!`;
-  else msg4 += `מצב טוב! רוב ההוצאות קבועות ויציבות.`;
-  await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: msg4 });
+  let msg2 = `🎯 *היעד שלך:*\n\n`;
+  msg2 += `• חיסכון (${savingsPercentDisplay}%): ₪${savingsTarget.toLocaleString('he-IL')}/חודש\n`;
+  msg2 += `• תקציב זמין: ₪${availableBudget.toLocaleString('he-IL')}/חודש\n\n`;
+  msg2 += `💡 *המלצת φ:* `;
+  if (totalExpenses > totalIncome) msg2 += `ההוצאות גבוהות מההכנסות! מומלץ לבדוק את ההוצאות המשתנות.`;
+  else if (profileContext.variableExpenses > profileContext.fixedExpenses) msg2 += `ההוצאות המשתנות גבוהות. יש פוטנציאל לחיסכון!`;
+  else msg2 += `מצב טוב! רוב ההוצאות קבועות ויציבות.`;
+  await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: msg2 });
 
   // Confirmation buttons
   try {

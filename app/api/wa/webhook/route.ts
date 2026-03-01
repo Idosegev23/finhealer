@@ -386,7 +386,12 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      return NextResponse.json({ status: 'new_user_greeted', userId: newUser.id });
+      // If the first message is a document/image, don't return early - let it be processed
+      if (messageType === 'documentMessage' || messageType === 'imageMessage') {
+        console.log('[Webhook] FIRST_MSG_DOC: processing document from new user');
+      } else {
+        return NextResponse.json({ status: 'new_user_greeted', userId: newUser.id });
+      }
     } else {
       console.log('✅ User found:', maskUserId((user as any).id));
       userData = user as any;
@@ -2163,9 +2168,22 @@ export async function POST(request: NextRequest) {
         phoneNumber,
         message: `🎬 קיבלתי וידאו!\n\nאני לא יכול לעבד וידאו.\n\n💡 שלח תמונה של הקבלה/דוח במקום.`,
       });
+    } else if (messageType === 'listResponseMessage') {
+      // Handle list selection responses - route selectedRowId to phi-router
+      const selectedRowId = payload.messageData?.listResponseMessage?.selectedRowId || '';
+      console.log('[Webhook] LIST_RESPONSE: rowId=' + selectedRowId);
+
+      if (selectedRowId) {
+        const { routeMessage } = await import('@/lib/conversation/phi-router');
+        const routerResult = await routeMessage(userData.id, phoneNumber, selectedRowId);
+
+        return NextResponse.json({
+          status: 'list_response',
+          success: routerResult.success,
+        });
+      }
     } else if (messageType === 'stickerMessage' || messageType === 'contactMessage' ||
-               messageType === 'locationMessage' || messageType === 'pollMessage' ||
-               messageType === 'listResponseMessage') {
+               messageType === 'locationMessage' || messageType === 'pollMessage') {
       // Catch-all for unsupported but known message types
       const greenAPI = getGreenAPIClient();
       await greenAPI.sendMessage({

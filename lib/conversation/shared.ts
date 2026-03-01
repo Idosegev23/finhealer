@@ -28,6 +28,7 @@ export interface RouterContext {
   phone: string;
   state: UserState;
   userName: string | null;
+  intent?: { type: string; confidence: number } | null;
 }
 
 export interface RouterResult {

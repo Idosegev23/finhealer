@@ -22,12 +22,13 @@ export async function parseIntent(
 
 /**
  * Fast rule-based parsing for common patterns
+ * Exported so the router can call it without the AI fallback (zero latency)
  */
-function tryRuleBasedParsing(message: string): Intent | null {
+export function tryRuleBasedParsing(message: string): Intent | null {
   const msg = message.trim().toLowerCase();
 
   // Greeting patterns
-  if (/^(שלום|היי|הי|בוקר טוב|ערב טוב|מה קורה)/.test(msg)) {
+  if (/^(שלום|היי|הי|בוקר טוב|ערב טוב|מה קורה|מה נשמע|אהלן)/.test(msg)) {
     return {
       type: "greeting",
       confidence: 0.95,
@@ -35,8 +36,17 @@ function tryRuleBasedParsing(message: string): Intent | null {
     };
   }
 
+  // Thanks patterns
+  if (/^(תודה|תודה רבה|מעולה|יופי של|אחלה|סבבה|נהדר|מדהים)/.test(msg)) {
+    return {
+      type: "thanks",
+      confidence: 0.9,
+      entities: [],
+    };
+  }
+
   // Yes/Approval patterns
-  if (/^(כן|נכון|אישור|יופי|מסכים|אוקיי|אוקי|ok|טוב|בסדר|יאללה)$/.test(msg)) {
+  if (/^(כן|נכון|אישור|יופי|מסכים|אוקיי|אוקי|ok|טוב|בסדר|יאללה|בטח|ודאי|כמובן|זה נכון)$/.test(msg)) {
     return {
       type: "approval",
       confidence: 0.9,
@@ -44,8 +54,26 @@ function tryRuleBasedParsing(message: string): Intent | null {
     };
   }
 
-  // Skip/Postpone patterns
-  if (/^(לא עכשיו|אחר כך|מאוחר יותר|לא|תזכיר לי|דחה|לא רוצה)/.test(msg)) {
+  // Continue/Next patterns
+  if (/^(נמשיך|המשך|הלאה|קדימה|הבא|נתחיל|התחל|בוא נמשיך|בוא נתחיל|start)$/.test(msg)) {
+    return {
+      type: "continue",
+      confidence: 0.9,
+      entities: [],
+    };
+  }
+
+  // Skip patterns (specific, not general "no")
+  if (/^(דלג|לדלג|עבור|תדלג|skip|פאס)$/.test(msg)) {
+    return {
+      type: "skip",
+      confidence: 0.9,
+      entities: [],
+    };
+  }
+
+  // Skip/Postpone patterns (softer "not now")
+  if (/^(לא עכשיו|אחר כך|מאוחר יותר|תזכיר לי|דחה|לא רוצה|לא צריך|אין לי|אין לי עכשיו)/.test(msg)) {
     return {
       type: "postpone",
       confidence: 0.9,
@@ -54,7 +82,7 @@ function tryRuleBasedParsing(message: string): Intent | null {
   }
 
   // Help patterns
-  if (/(עזרה|מה אתה יכול|מה את יכולה|איך|הסבר)/i.test(msg)) {
+  if (/(עזרה|מה אתה יכול|מה את יכולה|הסבר|מה אפשר|תפריט|פקודות)/i.test(msg)) {
     return {
       type: "help",
       confidence: 0.85,
@@ -62,7 +90,25 @@ function tryRuleBasedParsing(message: string): Intent | null {
     };
   }
 
-  // 🆕 Budget request patterns
+  // Summary/Status request patterns
+  if (/^(סיכום|מצב|סטטוס|status|מה המצב|איפה אני עומד|תראה סיכום)/.test(msg)) {
+    return {
+      type: "summary_request",
+      confidence: 0.9,
+      entities: [],
+    };
+  }
+
+  // Chart request patterns
+  if (/(גרף|תרשים|chart|דיאגרמה|גרף הוצאות|גרף הכנסות)/i.test(msg)) {
+    return {
+      type: "chart_request",
+      confidence: 0.9,
+      entities: [],
+    };
+  }
+
+  // Budget request patterns
   if (/(תקציב|בוא נבנה תקציב|כמה להוציא|כמה לתת ל|תכנון תקציב|להגדיר תקציב)/i.test(msg)) {
     return {
       type: "budget_request",
@@ -71,7 +117,7 @@ function tryRuleBasedParsing(message: string): Intent | null {
     };
   }
 
-  // 🆕 Goal request patterns
+  // Goal request patterns
   if (/(יעד|חיסכון|רוצה לחסוך|להגדיר יעד|יש לי מטרה|מטרות פיננסיות|רוצה להגיע ל)/i.test(msg)) {
     return {
       type: "goal_request",
@@ -80,7 +126,7 @@ function tryRuleBasedParsing(message: string): Intent | null {
     };
   }
 
-  // 🆕 Loan consolidation patterns
+  // Loan consolidation patterns
   if (/(הלוואות|איחוד הלוואות|יש לי הלוואות|חובות|משכנתא|לאחד הלוואות|מחזור)/i.test(msg)) {
     return {
       type: "loan_consolidation",
@@ -89,7 +135,7 @@ function tryRuleBasedParsing(message: string): Intent | null {
     };
   }
 
-  // 🆕 Document upload patterns
+  // Document upload patterns
   if (/(שלחתי|מצרף|הנה|דוח|תדפיס|קבלה|צילום)/i.test(msg)) {
     return {
       type: "upload_document",
@@ -102,7 +148,7 @@ function tryRuleBasedParsing(message: string): Intent | null {
   const expenseMatch = msg.match(
     /(קניתי|הוצאתי|שילמתי|בזבזתי|עלה לי|עלו לי|בילויתי|רכשתי).*?(\d+\.?\d*)\s*(שקל|ש״ח|₪)?/i
   );
-  
+
   if (expenseMatch) {
     const entities = extractEntitiesFromExpense(message);
     return {

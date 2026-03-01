@@ -1,31 +1,31 @@
 // @ts-nocheck
 /**
- * φ Router - Thin conversation router
+ * φ Router - AI-powered conversation router
  *
- * ~200 lines. All business logic lives in:
+ * Architecture:
+ *   1. Parse intent (rule-based first, AI fallback)
+ *   2. Handle universal intents (greeting, help, thanks, frustration)
+ *   3. Handle cross-state intents (e.g. goal_request from monitoring)
+ *   4. Dispatch to state handler with intent context
+ *
+ * State handlers:
  *   - states/onboarding.ts
  *   - states/classification.ts
  *   - states/behavior.ts
  *   - states/goals.ts
  *   - states/budget.ts
  *   - states/monitoring.ts
- *
- * Services layer at:
- *   - lib/services/PhaseService.ts
- *   - lib/services/TransactionService.ts
- *   - lib/services/NotificationService.ts
- *   - lib/services/GoalService.ts
- *   - lib/services/ClassificationService.ts
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { getOrCreateContext, updateContext, isContextStale, resumeStaleContext } from './context-manager';
+import { tryRuleBasedParsing, detectUserMood } from '@/lib/ai/intent-parser';
 
 import type { RouterContext, RouterResult, UserState } from './shared';
 import { isCommand } from './shared';
 
-// State handlers (lazy imports for tree-shaking)
+// State handlers
 import { handleStart, handleWaitingForName, handleWaitingForDocument } from './states/onboarding';
 import { handleClassificationState, handleClassificationResponse, startClassification } from './states/classification';
 import { handleBehaviorPhase } from './states/behavior';
@@ -35,6 +35,35 @@ import { handleMonitoring, handleLoanConsolidationOffer, handleWaitingForLoanDoc
 
 // Re-export types for consumers
 export type { RouterContext, RouterResult, UserState };
+
+// ============================================================================
+// State guidance messages (what to do next in each state)
+// ============================================================================
+
+function getStateGuidance(state: UserState, userName: string | null): string {
+  const name = userName || '';
+  switch (state) {
+    case 'waiting_for_name':
+      return `היי! 👋 איך קוראים לך?`;
+    case 'waiting_for_document':
+      return `היי ${name}! 👋\n\n📄 שלח לי דוח בנק או אשראי (PDF/תמונה) ואני אנתח את התנועות שלך.\n\nאין לך עכשיו? כתוב *"דלג"* ונמשיך.`;
+    case 'classification':
+    case 'classification_income':
+    case 'classification_expense':
+      return `אנחנו בסיווג תנועות 📊\n\nאשר את הקטגוריה, כתוב קטגוריה אחרת, או *"דלג"*.\nרוצה לאשר הכל? כתוב *"קבל הכל"*.`;
+    case 'goals_setup':
+    case 'goals':
+      return `אנחנו בהגדרת יעדים 🎯\n\nכתוב *"יעד חדש"* להוסיף יעד, או *"סיימתי"* להמשיך.`;
+    case 'behavior':
+      return `אנחנו בשלב ניתוח ההתנהגות 📈\n\nכתוב *"ניתוח"* לראות תובנות, או *"המשך"* לשלב הבא.`;
+    case 'budget':
+      return `אנחנו בבניית תקציב 💰\n\nבחר *"אוטומטי"* שאני אבנה לך, או *"דלג"* להמשיך.`;
+    case 'monitoring':
+      return `היי ${name}! 😊\n\nמה תרצה לעשות?\n📊 *סיכום* - מצב חודשי\n🎯 *יעדים* - ניהול יעדים\n💰 *תקציב* - מצב תקציב\n📄 *שלח מסמך* - להוסיף דוח`;
+    default:
+      return `היי ${name}! 👋 איך אפשר לעזור?`;
+  }
+}
 
 // ============================================================================
 // Main Router
@@ -73,19 +102,52 @@ export async function routeMessage(
 
   const userName = user?.name || user?.full_name || null;
   const state = (user?.onboarding_state || 'waiting_for_name') as UserState;
-  const ctx: RouterContext = { userId, phone, state, userName };
-
-  console.log(`[Router] USER_STATE: state=${state}, name=${userName || 'null'}, raw_onboarding=${user?.onboarding_state || 'null'}`);
 
   // ══════════════════════════════════════════════════════════════════════════
-  // UNIVERSAL: "עזרה" / "תפריט" works in ALL states (escape hatch)
+  // AI INTENT DETECTION (rule-based, instant, no API call)
   // ══════════════════════════════════════════════════════════════════════════
-  const helpKeywords = ['עזרה', 'help', 'תפריט', 'מה אפשר', 'פקודות'];
-  if (helpKeywords.some(k => msg === k || msg.startsWith(k))) {
+  const intent = tryRuleBasedParsing(msg);
+  const mood = detectUserMood(msg);
+
+  console.log(`[Router] USER_STATE: state=${state}, name=${userName || 'null'}, intent=${intent?.type || 'none'}(${intent?.confidence?.toFixed(2) || '0'}), mood=${mood}`);
+
+  // Pass intent to state handlers via context
+  const ctx: RouterContext = { userId, phone, state, userName, intent };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UNIVERSAL INTENTS (handled in ANY state, before state dispatch)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Greeting - respond warmly and guide user
+  if (intent?.type === 'greeting' && intent.confidence > 0.8) {
+    // Don't intercept greetings during name collection (it might be a name like "שלום")
+    if (state !== 'waiting_for_name') {
+      console.log(`[Router] UNIVERSAL: greeting in state=${state}`);
+      await greenAPI.sendMessage({ phoneNumber: phone, message: getStateGuidance(state, userName) });
+      return { success: true };
+    }
+  }
+
+  // Thanks - respond warmly and guide
+  if (intent?.type === 'thanks' && intent.confidence > 0.8) {
+    if (state !== 'waiting_for_name') {
+      console.log(`[Router] UNIVERSAL: thanks in state=${state}`);
+      const responses = [
+        `בשמחה! 😊 ${getStateGuidance(state, userName)}`,
+        `תמיד כאן בשבילך! 😊\n\n${getStateGuidance(state, userName)}`,
+      ];
+      await greenAPI.sendMessage({ phoneNumber: phone, message: responses[Math.floor(Math.random() * responses.length)] });
+      return { success: true };
+    }
+  }
+
+  // Help - context-sensitive help
+  if (intent?.type === 'help' && intent.confidence > 0.8) {
+    console.log(`[Router] UNIVERSAL: help in state=${state}`);
     const stateLabels: Record<string, string> = {
       start: 'התחלה',
       waiting_for_name: 'המתנה לשם',
-      waiting_for_document: 'המתנה למסמך',
+      waiting_for_document: 'העלאת מסמך',
       classification: 'סיווג תנועות',
       classification_income: 'סיווג הכנסות',
       classification_expense: 'סיווג הוצאות',
@@ -93,41 +155,39 @@ export async function routeMessage(
       behavior: 'ניתוח התנהגות',
       goals: 'ניהול יעדים',
       budget: 'תקציב',
-      monitoring: 'ניטור',
+      monitoring: 'ניטור שוטף',
       loan_consolidation_offer: 'איחוד הלוואות',
-      waiting_for_loan_docs: 'המתנה למסמכי הלוואה',
+      waiting_for_loan_docs: 'מסמכי הלוואה',
     };
-    const currentLabel = stateLabels[state] || state;
 
     let helpText = `🆘 *עזרה - φ Phi*\n\n`;
-    helpText += `📍 אתה נמצא בשלב: *${currentLabel}*\n\n`;
+    helpText += `📍 שלב: *${stateLabels[state] || state}*\n\n`;
 
     if (state === 'waiting_for_document' || state === 'start') {
-      helpText += `*מה אפשר לעשות:*\n`;
       helpText += `📄 שלח תמונה או PDF של דוח בנק/אשראי\n`;
-      helpText += `✏️ כתוב *"נתחיל"* - לסווג תנועות קיימות\n`;
-      helpText += `📊 כתוב *"סיכום"* - לראות מצב כללי\n`;
+      helpText += `✏️ *"נתחיל"* - לסווג תנועות קיימות\n`;
+      helpText += `⏭️ *"דלג"* - אם אין לך מסמך עכשיו\n`;
     } else if (state === 'classification_income' || state === 'classification_expense') {
-      helpText += `*מה אפשר לעשות:*\n`;
       helpText += `✅ כתוב שם קטגוריה (כמו "משכורת" או "מכולת")\n`;
-      helpText += `⏭️ כתוב *"דלג"* - לדלג על תנועה\n`;
-      helpText += `📋 כתוב *"רשימה"* - לראות קטגוריות אפשריות\n`;
+      helpText += `👍 *"כן"* - לאשר הצעה\n`;
+      helpText += `⏭️ *"דלג"* - לדלג על תנועה\n`;
+      helpText += `🚀 *"קבל הכל"* - לאשר את כל ההצעות\n`;
+      helpText += `📋 *"רשימה"* - קטגוריות אפשריות\n`;
+      helpText += `🔙 *"תקן"* - לתקן את האחרון\n`;
     } else if (state === 'goals_setup' || state === 'goals') {
-      helpText += `*מה אפשר לעשות:*\n`;
-      helpText += `🎯 כתוב *"יעד חדש"* - ליצור יעד\n`;
-      helpText += `📋 כתוב *"יעדים"* - לראות יעדים קיימים\n`;
-      helpText += `✅ כתוב *"סיימתי"* - לעבור לשלב הבא\n`;
+      helpText += `🎯 *"יעד חדש"* - ליצור יעד\n`;
+      helpText += `📋 *"יעדים"* - לראות יעדים\n`;
+      helpText += `✅ *"סיימתי"* - לעבור לשלב הבא\n`;
     } else if (state === 'monitoring') {
-      helpText += `*מה אפשר לעשות:*\n`;
       helpText += `📊 *"סיכום"* - סיכום חודשי\n`;
-      helpText += `📄 *שלח מסמך* - להוסיף דוח\n`;
-      helpText += `🎯 *"יעדים"* - לראות יעדים\n`;
-      helpText += `💰 *"תקציב"* - לראות תקציב\n`;
+      helpText += `📄 שלח מסמך - להוסיף דוח\n`;
+      helpText += `🎯 *"יעדים"* - ניהול יעדים\n`;
+      helpText += `💰 *"תקציב"* - מצב תקציב\n`;
       helpText += `📈 *"תזרים"* - תחזית 3 חודשים\n`;
       helpText += `🏆 *"ציון"* - ציון בריאות פיננסית\n`;
-      helpText += `📈 *"ניתוח"* - ניתוח התנהגות\n`;
+      helpText += `📊 *"גרף הוצאות"* - גרף הוצאות\n`;
+      helpText += `💬 או שאל אותי כל שאלה פיננסית!\n`;
     } else {
-      helpText += `*פקודות כלליות:*\n`;
       helpText += `📄 שלח מסמך - להוסיף דוח\n`;
       helpText += `⏭️ *"דלג"* / *"נמשיך"* - לדלג קדימה\n`;
       helpText += `📊 *"סיכום"* - סיכום מצב\n`;
@@ -139,8 +199,51 @@ export async function routeMessage(
     return { success: true };
   }
 
+  // Frustration / Tiredness - offer a break
+  if (mood === 'tired' && state !== 'waiting_for_name') {
+    console.log(`[Router] UNIVERSAL: user seems tired/frustrated in state=${state}`);
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `אני כאן כשתרצה להמשיך 😊\n\nכתוב הודעה כשתהיה מוכן, ונמשיך מאיפה שעצרנו.`,
+    });
+    return { success: true };
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
-  // STATE DISPATCH
+  // CROSS-STATE ROUTING (intent-based state transitions)
+  // Only in "free" states where the user isn't in the middle of a flow
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const freeStates: UserState[] = ['monitoring', 'behavior', 'goals', 'budget'];
+  if (freeStates.includes(state) && intent && intent.confidence > 0.8) {
+    // Summary request from any free state → handle directly
+    if (intent.type === 'summary_request' && state !== 'monitoring') {
+      console.log(`[Router] CROSS_STATE: summary_request from ${state} → routing to monitoring handler`);
+      const result = await handleMonitoring(ctx, 'סיכום', userName, startClassification);
+      return result;
+    }
+
+    // Goal request from monitoring → go to goals
+    if (intent.type === 'goal_request' && state === 'monitoring') {
+      console.log(`[Router] CROSS_STATE: goal_request from monitoring → goals`);
+      await supabase.from('users').update({ onboarding_state: 'goals' }).eq('id', userId);
+      const goalsCtx = { ...ctx, state: 'goals' as UserState };
+      const result = await handleGoalsPhase(goalsCtx, msg);
+      return result;
+    }
+
+    // Budget request from monitoring → go to budget
+    if (intent.type === 'budget_request' && state === 'monitoring') {
+      console.log(`[Router] CROSS_STATE: budget_request from monitoring → budget`);
+      await supabase.from('users').update({ onboarding_state: 'budget' }).eq('id', userId);
+      const budgetCtx = { ...ctx, state: 'budget' as UserState };
+      const result = await handleBudgetPhase(budgetCtx, msg);
+      return result;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STATE DISPATCH (existing handlers, now with intent in ctx)
   // ══════════════════════════════════════════════════════════════════════════
 
   if (state === 'start') {

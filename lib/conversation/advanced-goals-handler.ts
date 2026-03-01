@@ -159,33 +159,56 @@ export async function startAdvancedGoal(
   });
   console.log(`[AdvGoals] STEP_TRANSITION: (none) → type`);
 
-  console.log(`[AdvGoals] SEND_MSG: "🎯 *יעד חדש* - showing type selection menu..."`);
-  await greenAPI.sendMessage({
-    phoneNumber: phone,
-    message: `🎯 *יעד חדש*\n\n` +
-      `בחר סוג יעד:\n\n` +
-      `*🛡️ בסיס:*\n` +
-      `1️⃣ קרן חירום\n` +
-      `2️⃣ סגירת חובות\n\n` +
-      `*🏠 נדל״ן:*\n` +
-      `3️⃣ שיפוץ דירה\n` +
-      `4️⃣ נכס להשקעה\n\n` +
-      `*🚗 רכבים:*\n` +
-      `5️⃣ רכב חדש\n\n` +
-      `*👨\u200d👩\u200d👧 משפחה:*\n` +
-      `6️⃣ חופשה\n` +
-      `7️⃣ חיסכון לילד\n` +
-      `8️⃣ חיסכון משפחתי\n` +
-      `9️⃣ חתונה\n\n` +
-      `*📚 חינוך:*\n` +
-      `🔟 לימודים\n\n` +
-      `*📈 פנסיה:*\n` +
-      `1️⃣1️⃣ הגדלת פנסיה\n\n` +
-      `*אחר:*\n` +
-      `1️⃣2️⃣ חיסכון למטרה כללית\n` +
-      `1️⃣3️⃣ שיפור תקציבי כללי\n\n` +
-      `כתוב מספר או שם היעד:`,
-  });
+  console.log(`[AdvGoals] SEND_MSG: "🎯 *יעד חדש* - showing type selection list..."`);
+
+  // Try sending as WhatsApp list message (much better UX on mobile)
+  try {
+    await greenAPI.sendListMessage({
+      phoneNumber: phone,
+      message: `🎯 *יעד חדש*\n\nבחר את סוג היעד שמתאים לך:`,
+      buttonText: 'בחר יעד',
+      title: 'יעד פיננסי חדש',
+      footer: 'φ Phi - המאמן הפיננסי שלך',
+      sections: [
+        {
+          title: '🛡️ ביטחון פיננסי',
+          rows: [
+            { rowId: 'goal_1', title: 'קרן חירום', description: 'כרית ביטחון להוצאות בלתי צפויות' },
+            { rowId: 'goal_2', title: 'סגירת חובות', description: 'סילוק הלוואות וחובות' },
+          ],
+        },
+        {
+          title: '🏠 נדל"ן',
+          rows: [
+            { rowId: 'goal_3', title: 'שיפוץ דירה', description: 'שיפוץ או שדרוג הבית' },
+            { rowId: 'goal_4', title: 'נכס להשקעה', description: 'רכישת נכס להשקעה' },
+          ],
+        },
+        {
+          title: '👨‍👩‍👧 משפחה וחיים',
+          rows: [
+            { rowId: 'goal_5', title: 'רכב חדש', description: 'רכישת רכב או החלפה' },
+            { rowId: 'goal_6', title: 'חופשה', description: 'חופשה משפחתית' },
+            { rowId: 'goal_7', title: 'חיסכון לילד', description: 'חיסכון לעתיד הילדים' },
+            { rowId: 'goal_8', title: 'חיסכון משפחתי', description: 'חיסכון משפחתי כללי' },
+            { rowId: 'goal_9', title: 'חתונה', description: 'חתונה או אירוע משפחתי' },
+          ],
+        },
+        {
+          title: '📚 השכלה ופנסיה',
+          rows: [
+            { rowId: 'goal_10', title: 'לימודים', description: 'לימודים אקדמאיים או מקצועיים' },
+            { rowId: 'goal_11', title: 'הגדלת פנסיה', description: 'הגדלת החיסכון הפנסיוני' },
+            { rowId: 'goal_12', title: 'חיסכון כללי', description: 'חיסכון למטרה כללית' },
+            { rowId: 'goal_13', title: 'שיפור תקציבי', description: 'איזון תקציבי כללי' },
+          ],
+        },
+      ],
+    });
+  } catch (err) {
+    console.log(`[AdvGoals] List message failed, falling back to text: ${err}`);
+    // Fallback happens automatically inside sendListMessage
+  }
 }
 
 /**
@@ -332,23 +355,24 @@ export async function handleAdvancedGoalTypeSelection(
     console.log(`[AdvGoals] TYPE_SELECTION: smart parse matched: type=${goalType}, name=${goalName}, amount=${smartAmount || 'none'}, deadline=${smartDeadline || 'none'}`);
   }
 
-  // Fallback: number-based selection
+  // Fallback: number-based or list rowId selection
   if (!goalType) {
-    console.log(`[AdvGoals] TYPE_SELECTION: smart parse failed, trying number-based selection`);
-    const msgLower = msg.toLowerCase().trim();
-    if (msg === '1') { goalType = 'emergency_fund'; goalName = 'קרן חירום'; }
-    else if (msg === '2') { goalType = 'debt_payoff'; goalName = 'סגירת חובות'; }
-    else if (msg === '3') { goalType = 'renovation'; goalName = 'שיפוץ דירה'; goalGroup = 'נדל״ן'; }
-    else if (msg === '4') { goalType = 'real_estate_investment'; goalName = 'נכס להשקעה'; goalGroup = 'נדל״ן'; }
-    else if (msg === '5') { goalType = 'vehicle'; goalName = 'רכב חדש'; goalGroup = 'רכבים'; }
-    else if (msg === '6') { goalType = 'vacation'; goalName = 'חופשה משפחתית'; goalGroup = 'בילויים'; }
-    else if (msg === '7') { goalType = 'child_savings'; goalName = 'חיסכון לילד'; goalGroup = 'ילדים'; requiresChild = true; }
-    else if (msg === '8') { goalType = 'family_savings'; goalName = 'חיסכון משפחתי'; goalGroup = 'משפחה'; }
-    else if (msg === '9') { goalType = 'wedding'; goalName = 'חתונה'; goalGroup = 'אירועים'; }
-    else if (msg === '10') { goalType = 'education'; goalName = 'לימודים'; goalGroup = 'חינוך'; }
-    else if (msg === '11') { goalType = 'pension_increase'; goalName = 'הגדלת פנסיה'; goalGroup = 'פנסיה וחיסכון'; }
-    else if (msg === '12') { goalType = 'savings_goal'; goalName = 'חיסכון למטרה'; }
-    else if (msg === '13') { goalType = 'general_improvement'; goalName = 'שיפור תקציבי'; }
+    console.log(`[AdvGoals] TYPE_SELECTION: smart parse failed, trying number/rowId selection`);
+    // Normalize: "goal_5" → "5", plain numbers stay as-is
+    const normalizedMsg = msg.replace(/^goal_/, '');
+    if (normalizedMsg === '1') { goalType = 'emergency_fund'; goalName = 'קרן חירום'; }
+    else if (normalizedMsg === '2') { goalType = 'debt_payoff'; goalName = 'סגירת חובות'; }
+    else if (normalizedMsg === '3') { goalType = 'renovation'; goalName = 'שיפוץ דירה'; goalGroup = 'נדל״ן'; }
+    else if (normalizedMsg === '4') { goalType = 'real_estate_investment'; goalName = 'נכס להשקעה'; goalGroup = 'נדל״ן'; }
+    else if (normalizedMsg === '5') { goalType = 'vehicle'; goalName = 'רכב חדש'; goalGroup = 'רכבים'; }
+    else if (normalizedMsg === '6') { goalType = 'vacation'; goalName = 'חופשה משפחתית'; goalGroup = 'בילויים'; }
+    else if (normalizedMsg === '7') { goalType = 'child_savings'; goalName = 'חיסכון לילד'; goalGroup = 'ילדים'; requiresChild = true; }
+    else if (normalizedMsg === '8') { goalType = 'family_savings'; goalName = 'חיסכון משפחתי'; goalGroup = 'משפחה'; }
+    else if (normalizedMsg === '9') { goalType = 'wedding'; goalName = 'חתונה'; goalGroup = 'אירועים'; }
+    else if (normalizedMsg === '10') { goalType = 'education'; goalName = 'לימודים'; goalGroup = 'חינוך'; }
+    else if (normalizedMsg === '11') { goalType = 'pension_increase'; goalName = 'הגדלת פנסיה'; goalGroup = 'פנסיה וחיסכון'; }
+    else if (normalizedMsg === '12') { goalType = 'savings_goal'; goalName = 'חיסכון למטרה'; }
+    else if (normalizedMsg === '13') { goalType = 'general_improvement'; goalName = 'שיפור תקציבי'; }
     else {
       await greenAPI.sendMessage({
         phoneNumber: phone,
