@@ -1,39 +1,56 @@
 // @ts-nocheck
 import type { RouterContext, RouterResult } from '../shared';
-import { isCommand } from '../shared';
+import { parseStateIntent } from '@/lib/ai/state-intent';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient, sendWhatsAppInteractiveButtons } from '@/lib/greenapi/client';
 
 export async function handleBehaviorPhase(ctx: RouterContext, msg: string): Promise<RouterResult> {
   const greenAPI = getGreenAPIClient();
 
-  if (isCommand(msg, ['נתח', 'ניתוח', 'analyze', 'התחל', 'start', '🔍 ניתוח התנהגות', 'ניתוח התנהגות 🔍', 'add_more', 'add_docs'])) {
-    if (msg === 'add_more' || msg === 'add_docs') {
-      await greenAPI.sendMessage({
-        phoneNumber: ctx.phone,
-        message: `📄 מעולה! שלח לי עוד מסמך.`,
-      });
-      return { success: true };
-    }
-    return await startBehaviorAnalysis(ctx);
+  // ── Layer 0: Button IDs (instant) ──
+  if (msg === 'add_more' || msg === 'add_docs') {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📄 מעולה! שלח לי עוד מסמך.`,
+    });
+    return { success: true };
   }
-
-  if (isCommand(msg, ['סיכום', 'תובנות', 'insights', 'summary'])) {
-    return await showBehaviorSummary(ctx);
-  }
-
-  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'יעדים', 'goals', '▶️ המשך ליעדים', 'המשך ליעדים ▶️', 'to_goals'])) {
+  if (msg === 'to_goals') {
     return await transitionToGoals(ctx);
   }
 
-  if (isCommand(msg, ['עזרה', 'help', '?'])) {
+  // ── Layer 1: AI Intent ──
+  const intent = await parseStateIntent(msg, 'behavior');
+  console.log(`[Behavior] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
+
+  if (intent.intent === 'analyze' && intent.confidence >= 0.6) {
+    return await startBehaviorAnalysis(ctx);
+  }
+
+  if (intent.intent === 'summary' && intent.confidence >= 0.6) {
+    return await showBehaviorSummary(ctx);
+  }
+
+  if (intent.intent === 'next_phase' && intent.confidence >= 0.6) {
+    return await transitionToGoals(ctx);
+  }
+
+  if (intent.intent === 'add_docs' && intent.confidence >= 0.6) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📄 מעולה! שלח לי עוד מסמך.`,
+    });
+    return { success: true };
+  }
+
+  if (intent.intent === 'help') {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `📊 *שלב 2: ניתוח התנהגות*\n\n` +
-        `*פקודות:*\n` +
-        `• *"ניתוח"* - הרץ ניתוח מלא\n` +
-        `• *"סיכום"* - הצג תובנות\n` +
-        `• *"המשך"* - עבור לשלב היעדים\n\n` +
+        `*מה אני יכול לעשות:*\n` +
+        `• *ניתוח* - הרץ ניתוח מלא\n` +
+        `• *סיכום* - הצג תובנות\n` +
+        `• *המשך* - עבור לשלב היעדים\n\n` +
         `φ מזהה דפוסים בהוצאות שלך`,
     });
     return { success: true };

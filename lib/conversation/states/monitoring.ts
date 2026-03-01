@@ -11,7 +11,6 @@
  */
 
 import type { RouterContext, RouterResult } from '../shared';
-import { isCommand } from '../shared';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient, sendWhatsAppInteractiveButtons, sendWhatsAppImage } from '@/lib/greenapi/client';
 import { findBestMatch } from '@/lib/finance/categories';
@@ -22,6 +21,7 @@ import { loadConversationHistory } from '../history-loader';
 import { getUserPeriodCoverage } from '@/lib/documents/period-tracker';
 import { projectCashFlow } from '@/lib/finance/cash-flow-projector';
 import { parseMonitoringIntent, type MonitoringIntent, type MonitoringIntentType } from '@/lib/ai/monitoring-intent';
+import { parseStateIntent } from '@/lib/ai/state-intent';
 import { buildUserSnapshot } from '@/lib/ai/user-snapshot';
 
 // ============================================================================
@@ -63,14 +63,16 @@ export async function handleMonitoring(
 
   if (loanContext?.pending) {
     const { handleConsolidationResponse } = await import('@/lib/loans/consolidation-handler');
+    const loanIntent = await parseStateIntent(msg, 'loan_decision');
+    console.log(`[Monitoring] LOAN_INTENT: intent="${loanIntent.intent}", confidence=${loanIntent.confidence}`);
 
-    if (isCommand(msg, ['כן', 'yes', 'מעוניין', 'בטח', 'אשמח'])) {
+    if (loanIntent.intent === 'yes' && loanIntent.confidence >= 0.6) {
       const response = await handleConsolidationResponse(userId, phone, 'yes');
       await greenAPI.sendMessage({ phoneNumber: phone, message: response });
       return { success: true };
     }
 
-    if (isCommand(msg, ['לא', 'no', 'לא מעוניין', 'תודה לא'])) {
+    if ((loanIntent.intent === 'no' || loanIntent.intent === 'skip') && loanIntent.confidence >= 0.6) {
       const response = await handleConsolidationResponse(userId, phone, 'no');
       await greenAPI.sendMessage({ phoneNumber: phone, message: response });
       return { success: true };
@@ -100,31 +102,31 @@ export async function handleMonitoring(
     'credit_pending': () => showNeedsCreditDetail(ctx),
   };
 
-  const msgTrimmed = msg.trim();
-  if (listRowActions[msgTrimmed]) {
-    console.log(`[Monitoring] LIST_ROW: "${msgTrimmed}" → direct handler`);
-    return await listRowActions[msgTrimmed]();
-  }
-
-  // 0c. Legacy button/command IDs
-  if (
-    isCommand(msg, [
-      'add_bank', 'add_credit', 'add_doc', 'add_more', 'add_docs',
-      '📄 עוד דוח בנק', '💳 דוח אשראי', '📄 שלח עוד מסמך',
-      '📄 עוד מסמכים', '📄 עוד דוחות',
-    ])
-  ) {
+  // 0c. Legacy button/command IDs (merged into listRowActions)
+  const addDocHandler = async () => {
     await greenAPI.sendMessage({ phoneNumber: phone, message: `📄 מעולה! שלח לי את המסמך.` });
-    return { success: true };
-  }
+    return { success: true } as RouterResult;
+  };
+  const classifyHandler = () => startClassification(ctx);
 
-  if (
-    isCommand(msg, [
-      'start_classify', 'נתחיל לסווג', '▶️ נתחיל לסווג', 'נתחיל לסווג ▶️',
-      '▶️ נמשיך לסווג', 'נמשיך לסווג ▶️',
-    ])
-  ) {
-    return await startClassification(ctx);
+  const legacyActions: Record<string, () => Promise<RouterResult>> = {
+    'add_bank': addDocHandler,
+    'add_credit': addDocHandler,
+    'add_more': addDocHandler,
+    'add_docs': addDocHandler,
+    'start_classify': classifyHandler,
+    'נתחיל לסווג': classifyHandler,
+    '▶️ נתחיל לסווג': classifyHandler,
+    'נתחיל לסווג ▶️': classifyHandler,
+    '▶️ נמשיך לסווג': classifyHandler,
+    'נמשיך לסווג ▶️': classifyHandler,
+  };
+
+  const allActions = { ...listRowActions, ...legacyActions };
+  const msgTrimmed = msg.trim();
+  if (allActions[msgTrimmed]) {
+    console.log(`[Monitoring] BUTTON_ID: "${msgTrimmed}" → direct handler`);
+    return await allActions[msgTrimmed]();
   }
 
   // 0d. Regex patterns with parameters (can't be handled by AI)
@@ -489,8 +491,12 @@ export async function handleLoanConsolidationOffer(
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
 
+  // ── AI Intent Detection ──────────────────────────────────────────────────
+  const loanIntent = await parseStateIntent(msg, 'loan_decision');
+  console.log(`[LoanOffer] AI_INTENT: intent="${loanIntent.intent}", confidence=${loanIntent.confidence}`);
+
   // ── Yes – create a consolidation request and move to waiting_for_loan_docs ─
-  if (isCommand(msg, ['כן', 'yes', 'מעוניין', 'רוצה', 'בטח'])) {
+  if (loanIntent.intent === 'yes' && loanIntent.confidence >= 0.6) {
     const { data: contextData } = await supabase
       .from('users')
       .select('classification_context')
@@ -554,12 +560,7 @@ export async function handleLoanConsolidationOffer(
   }
 
   // ── No / skip ──────────────────────────────────────────────────────────────
-  if (
-    isCommand(msg, [
-      'לא', 'no', 'תודה', 'לא מעוניין', 'בינתיים לא',
-      'נמשיך', 'המשך', 'דלג', 'skip',
-    ])
-  ) {
+  if ((loanIntent.intent === 'no' || loanIntent.intent === 'skip') && loanIntent.confidence >= 0.6) {
     await greenAPI.sendMessage({
       phoneNumber: phone,
       message: `בסדר גמור! 👍\n\nאם תרצה בעתיד - תמיד אפשר לחזור לזה.`,
@@ -592,11 +593,10 @@ export async function handleWaitingForLoanDocs(
 ): Promise<RouterResult> {
   const greenAPI = getGreenAPIClient();
 
-  if (
-    isCommand(msg, [
-      'המשך', 'נמשיך', 'דלג', 'skip', 'בינתיים לא', 'אין לי', 'next', 'done',
-    ])
-  ) {
+  const docsIntent = await parseStateIntent(msg, 'waiting_for_docs');
+  console.log(`[WaitingForLoanDocs] AI_INTENT: intent="${docsIntent.intent}", confidence=${docsIntent.confidence}`);
+
+  if (docsIntent.intent === 'skip' && docsIntent.confidence >= 0.6) {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `בסדר! גדי ייצור קשר בהמשך לקבלת המסמכים. 👍`,

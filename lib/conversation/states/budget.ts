@@ -1,9 +1,9 @@
 // @ts-nocheck
 
 import type { RouterContext, RouterResult } from '../shared';
-import { isCommand } from '../shared';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient, sendWhatsAppInteractiveButtons } from '@/lib/greenapi/client';
+import { parseStateIntent } from '@/lib/ai/state-intent';
 
 interface BudgetData {
   totalIncome: number;
@@ -18,35 +18,57 @@ export async function handleBudgetPhase(ctx: RouterContext, msg: string): Promis
   const greenAPI = getGreenAPIClient();
   const command = msg.toLowerCase().trim();
 
-  // Check for auto budget commands
-  if (command === 'auto_budget' || command === 'תקציב אוטומטי' || command === 'אוטומטי' || command === 'אוטו') {
+  // ── Layer 0: Button IDs (instant, no AI) ──
+  const buttonActions: Record<string, string> = {
+    'auto_budget': 'auto_budget',
+    'manual_budget': 'manual_budget',
+    'skip_budget': 'skip',
+    'confirm_budget': 'finish',
+  };
+
+  let resolvedIntent = buttonActions[command] || null;
+
+  // ── Layer 0b: Regex pattern for category:amount ──
+  const categoryRegex = /^(.+?):\s*(\d+)$/;
+  const categoryMatch = msg.match(categoryRegex);
+  if (categoryMatch) {
+    const category = categoryMatch[1].trim();
+    const amount = parseInt(categoryMatch[2], 10);
+    return setBudgetCategory(ctx, category, amount);
+  }
+
+  // ── Layer 1: AI Intent Detection ──
+  if (!resolvedIntent) {
+    const intent = await parseStateIntent(msg, 'budget');
+    console.log(`[Budget] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
+
+    if (intent.confidence >= 0.6) {
+      resolvedIntent = intent.intent;
+
+      // AI detected category_set with params
+      if (intent.intent === 'category_set' && intent.params?.category && intent.params?.amount) {
+        return setBudgetCategory(ctx, intent.params.category, intent.params.amount);
+      }
+    }
+  }
+
+  // ── Dispatch ──
+  if (resolvedIntent === 'auto_budget') {
     return createAutoBudget(ctx);
   }
 
-  // Check for manual budget commands
-  if (command === 'manual_budget' || command === 'הגדרה ידנית' || command === 'ידני') {
+  if (resolvedIntent === 'manual_budget') {
     const manualMsg = `📝 *הגדרת תקציב ידנית*\n\nשלח לי את התקציב בפורמט:\n*שם קטגוריה: סכום*\n\nדוגמה:\n• מזון: 2000\n• תחזוקה: 1500\n• בידור: 800\n\nכתוב משהו כמו:\n"מזון: 2000"`;
     await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: manualMsg });
     return { success: true };
   }
 
-  // Check for skip budget commands
-  if (command === 'skip_budget' || command === 'דלג') {
+  if (resolvedIntent === 'skip') {
     return skipBudget(ctx);
   }
 
-  // Check for finish/confirm budget commands
-  if (command === 'סיימתי' || command === 'finish' || command === 'confirm_budget') {
+  if (resolvedIntent === 'finish') {
     return finishBudget(ctx);
-  }
-
-  // Check for category:amount pattern (e.g., "מזון: 2000")
-  const categoryRegex = /^(.+?):\s*(\d+)$/;
-  const match = msg.match(categoryRegex);
-  if (match) {
-    const category = match[1].trim();
-    const amount = parseInt(match[2], 10);
-    return setBudgetCategory(ctx, category, amount);
   }
 
   // Default: show budget options with buttons

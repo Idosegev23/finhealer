@@ -2,7 +2,6 @@
 
 import type { RouterContext, RouterResult } from '../shared';
 import {
-  isCommand,
   saveSuggestionsToCache,
   getSuggestionsFromCache,
   saveCurrentGroupToCache,
@@ -14,6 +13,7 @@ import { getGreenAPIClient, sendWhatsAppInteractiveButtons } from '@/lib/greenap
 import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categories';
 import { INCOME_CATEGORIES, findBestIncomeMatch, findTopIncomeMatches } from '@/lib/finance/income-categories';
 import { chatWithGeminiFlashMinimal } from '@/lib/ai/gemini-client';
+import { parseStateIntent } from '@/lib/ai/state-intent';
 
 // ============================================================================
 // handleClassificationState
@@ -28,21 +28,28 @@ export async function handleClassificationState(ctx: RouterContext, msg: string)
   console.log(`[Classification] handleClassificationState: userId=${ctx.userId.substring(0,8)}..., msg="${msg.substring(0, 80)}"`);
   const greenAPI = getGreenAPIClient();
 
-  if (isCommand(msg, [
-    'נתחיל', 'נמשיך', 'התחל', 'לסווג', 'סיווג', 'start_classify',
-    '▶️ נתחיל לסווג', 'נתחיל לסווג ▶️', '▶️ נמשיך לסווג', 'נמשיך לסווג ▶️',
-    'קבל הכל', 'accept_all', 'סווג הכל', 'אשר הכל',
-  ])) {
-    console.log(`[Classification] handleClassificationState: matched START/ACCEPT command, calling startClassification`);
+  // ── Layer 0: Button IDs (instant) ──
+  const msgLower = msg.toLowerCase().trim();
+  if (['start_classify', 'accept_all'].includes(msgLower)) {
+    console.log(`[Classification] handleClassificationState: button ID "${msgLower}", starting classification`);
     return await startClassification(ctx);
   }
+  if (['add_doc', 'add_bank', 'add_credit'].includes(msgLower)) {
+    console.log(`[Classification] handleClassificationState: button ID "${msgLower}", prompting for document`);
+    await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: `📄 מעולה! שלח לי את המסמך.` });
+    return { success: true };
+  }
 
-  if (isCommand(msg, [
-    'עוד דוח', 'דוח נוסף', 'add_bank', 'add_credit', 'add_doc',
-    '📄 עוד דוח בנק', 'עוד דוח בנק 📄', '💳 דוח אשראי', 'דוח אשראי 💳',
-    '📄 שלח עוד מסמך', 'שלח עוד מסמך 📄',
-  ])) {
-    console.log(`[Classification] handleClassificationState: matched ADD_DOC command`);
+  // ── Layer 1: AI Intent ──
+  const intent = await parseStateIntent(msg, 'classification_start');
+  console.log(`[Classification] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
+
+  if (intent.intent === 'start' && intent.confidence >= 0.6) {
+    console.log(`[Classification] handleClassificationState: AI detected START intent`);
+    return await startClassification(ctx);
+  }
+  if (intent.intent === 'add_document' && intent.confidence >= 0.6) {
+    console.log(`[Classification] handleClassificationState: AI detected ADD_DOCUMENT intent`);
     await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: `📄 מעולה! שלח לי את המסמך.` });
     return { success: true };
   }
@@ -223,8 +230,12 @@ export async function handleClassificationResponse(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
+  // ── AI Intent Detection ──
+  const intent = await parseStateIntent(msg, `classification_${type}`);
+  console.log(`[Classification] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}, params=${JSON.stringify(intent.params || {})}`);
+
   // ---- ACCEPT ALL: auto-classify everything with AI suggestions ----
-  if (isCommand(msg, ['קבל הכל', 'accept_all', 'סווג הכל', 'אשר הכל', 'קבל את הכל', 'אוטומטי'])) {
+  if (intent.intent === 'accept_all' && intent.confidence >= 0.6) {
     console.log(`[Classification] ACCEPT_ALL: userId=${ctx.userId.substring(0,8)}..., type=${type}`);
 
     // Get all pending transactions of this type
@@ -320,7 +331,7 @@ export async function handleClassificationResponse(
   }
 
   // ---- FINISH EARLY (works in both income and expense) ----
-  if (isCommand(msg, ['סיימתי', 'סיום', 'מספיק', 'finish', 'done', 'הספיק', 'נגמר'])) {
+  if (intent.intent === 'finish' && intent.confidence >= 0.6) {
     console.log(`[Classification] RESPONSE: FINISH_EARLY command detected for type=${type}`);
     // Mark all remaining pending as 'לא מסווג'
     const { count } = await supabase
@@ -368,7 +379,7 @@ export async function handleClassificationResponse(
     }
 
     // Skip command - mark entire group as confirmed with 'skipped' to avoid infinite loop
-    if (isCommand(msg, ['דלג', 'skip', '⏭️ דלג', 'דלג ⏭️'])) {
+    if (intent.intent === 'skip' && intent.confidence >= 0.6) {
       console.log(`[Classification] RESPONSE: SKIP expense group, txIds=${txIds.length}`);
       await supabase
         .from('transactions')
@@ -390,7 +401,7 @@ export async function handleClassificationResponse(
     }
 
     // Fix last classification - reopen the most recent confirmed transaction
-    if (isCommand(msg, ['תקן', 'תיקון', 'fix', 'חזור', 'טעות', 'לא נכון'])) {
+    if (intent.intent === 'fix' && intent.confidence >= 0.6) {
       console.log(`[Classification] RESPONSE: FIX/UNDO command for expense`);
       const reopened = await reopenLastClassified(ctx.userId, 'expense', supabase);
       if (reopened) {
@@ -408,7 +419,7 @@ export async function handleClassificationResponse(
     }
 
     // Show categories list
-    if (isCommand(msg, ['רשימה', 'list', '📋 רשימה', 'רשימה 📋', 'קטגוריות', 'אפשרויות', 'categories'])) {
+    if (intent.intent === 'list_categories' && intent.confidence >= 0.6) {
       const groups = Array.from(new Set(CATEGORIES.map(c => c.group)));
       const messages: string[] = [];
       let currentMsg = `💸 *קטגוריות הוצאה:*\n\n`;
@@ -442,7 +453,7 @@ export async function handleClassificationResponse(
     }
 
     // Confirm suggestion ("כן")
-    if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes', '✅ כן', 'כן ✅', 'confirm'])) {
+    if (intent.intent === 'approve' && intent.confidence >= 0.6) {
       const suggestions = await getSuggestionsFromCache(ctx.userId);
       console.log(`[Classification] RESPONSE: CONFIRM expense, cached suggestions=[${(suggestions || []).join(', ')}]`);
       if (suggestions && suggestions[0]) {
@@ -538,7 +549,7 @@ export async function handleClassificationResponse(
   }
 
   // Skip command - mark as confirmed with 'skipped' note to avoid infinite loop
-  if (isCommand(msg, ['דלג', 'תדלג', 'הבא', 'skip', '⏭️ דלג', 'דלג ⏭️'])) {
+  if (intent.intent === 'skip' && intent.confidence >= 0.6) {
     console.log(`[Classification] RESPONSE: SKIP income tx, txId=${currentTx.id}, vendor=${currentTx.vendor}`);
     const { error: skipError } = await supabase
       .from('transactions')
@@ -562,7 +573,7 @@ export async function handleClassificationResponse(
   }
 
   // Fix last classification
-  if (isCommand(msg, ['תקן', 'תיקון', 'fix', 'חזור', 'טעות', 'לא נכון'])) {
+  if (intent.intent === 'fix' && intent.confidence >= 0.6) {
     console.log(`[Classification] RESPONSE: FIX/UNDO command for income`);
     const reopened = await reopenLastClassified(ctx.userId, 'income', supabase);
     if (reopened) {
@@ -580,7 +591,7 @@ export async function handleClassificationResponse(
   }
 
   // Show categories list
-  if (isCommand(msg, ['רשימה', 'list', '📋 רשימה', 'רשימה 📋', 'קטגוריות', 'אפשרויות', 'categories'])) {
+  if (intent.intent === 'list_categories' && intent.confidence >= 0.6) {
     const groups = Array.from(new Set(INCOME_CATEGORIES.map(c => c.group)));
     const messages: string[] = [];
     let currentMsg = `💚 *קטגוריות הכנסה:*\n\n`;
@@ -614,7 +625,7 @@ export async function handleClassificationResponse(
   }
 
   // Confirm suggestion ("כן")
-  if (isCommand(msg, ['כן', 'כנ', 'נכון', 'אשר', 'אישור', 'ok', 'yes', '✅ כן', 'כן ✅', 'confirm'])) {
+  if (intent.intent === 'approve' && intent.confidence >= 0.6) {
     const suggestions = await getSuggestionsFromCache(ctx.userId);
     console.log(`[Classification] RESPONSE: CONFIRM income, cached suggestions=[${(suggestions || []).join(', ')}]`);
     if (suggestions && suggestions[0]) {

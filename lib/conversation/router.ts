@@ -24,7 +24,6 @@ import { tryRuleBasedParsing, detectUserMood } from '@/lib/ai/intent-parser';
 import { buildUserSnapshot } from '@/lib/ai/user-snapshot';
 
 import type { RouterContext, RouterResult, UserState } from './shared';
-import { isCommand } from './shared';
 
 // State handlers
 import { handleStart, handleWaitingForName, handleWaitingForDocument } from './states/onboarding';
@@ -125,49 +124,69 @@ export async function routeMessage(
     if (state !== 'waiting_for_name') {
       console.log(`[Router] UNIVERSAL: greeting in state=${state}`);
 
-      // In monitoring state - give a smart, personalized greeting with snapshot
-      if (state === 'monitoring') {
-        try {
-          const snapshot = await buildUserSnapshot(userId);
-          const d = snapshot.data;
-          let greeting = `היי ${d.name}! 😊\n\n`;
+      // Smart greeting with financial snapshot for ALL states
+      try {
+        const snapshot = await buildUserSnapshot(userId);
+        const d = snapshot.data;
+        let greeting = `היי ${d.name}! 😊\n\n`;
 
-          // Show quick status
+        // State-specific context
+        if (state === 'monitoring') {
           if (d.currentMonthIncome > 0 || d.currentMonthExpenses > 0) {
             const balance = d.currentMonthIncome - d.currentMonthExpenses;
             greeting += `📊 החודש: הכנסות ₪${d.currentMonthIncome.toLocaleString('he-IL')} | הוצאות ₪${d.currentMonthExpenses.toLocaleString('he-IL')}`;
-            if (balance >= 0) {
-              greeting += ` | +₪${balance.toLocaleString('he-IL')} 💚\n`;
-            } else {
-              greeting += ` | ₪${balance.toLocaleString('he-IL')} ⚠️\n`;
-            }
+            greeting += balance >= 0 ? ` | +₪${balance.toLocaleString('he-IL')} 💚\n` : ` | ₪${balance.toLocaleString('he-IL')} ⚠️\n`;
           }
-
-          // Proactive nudges (pick the most important one)
           if (d.pendingActions.length > 0) {
             greeting += `\n💡 ${d.pendingActions[0]}`;
-            if (d.pendingCount > 0) {
-              greeting += ` — רוצה לטפל בזה?`;
-            }
+            if (d.pendingCount > 0) greeting += ` — רוצה לטפל בזה?`;
             greeting += `\n`;
           }
-
-          // Goal progress (show closest to completion)
           const closestGoal = d.activeGoals.sort((a, b) => b.progress - a.progress)[0];
           if (closestGoal && closestGoal.progress > 0) {
             greeting += `\n🎯 ${closestGoal.name}: ${closestGoal.progress}%`;
             if (closestGoal.progress >= 75) greeting += ` — כמעט שם! 🔥`;
             greeting += `\n`;
           }
-
           greeting += `\nמה תרצה לעשות? כתוב *"עזרה"* לתפריט`;
-
-          await greenAPI.sendMessage({ phoneNumber: phone, message: greeting });
-          return { success: true };
-        } catch (err) {
-          console.error('[Router] Snapshot error in greeting:', err);
-          // Fall through to simple greeting
+        } else if (state === 'classification' || state === 'classification_income' || state === 'classification_expense') {
+          if (d.pendingCount > 0) {
+            greeting += `📋 יש לך ${d.pendingCount} תנועות שממתינות לסיווג.\n`;
+            greeting += `${d.confirmedCount > 0 ? `כבר סיווגת ${d.confirmedCount} תנועות — כל הכבוד! ` : ''}`;
+            greeting += `\nכתוב *"נמשיך"* להתחיל`;
+          } else {
+            greeting += `✅ אין תנועות ממתינות! כל הכבוד.\nכתוב *"נמשיך"* להמשך`;
+          }
+        } else if (state === 'goals' || state === 'goals_setup') {
+          if (d.activeGoals.length > 0) {
+            greeting += `🎯 יש לך ${d.activeGoals.length} יעדים פעילים:\n`;
+            d.activeGoals.slice(0, 3).forEach(g => {
+              greeting += `• ${g.name}: ${g.progress}%\n`;
+            });
+            greeting += `\nמה תרצה לעשות?`;
+          } else {
+            greeting += `🎯 בוא נגדיר יעדי חיסכון!\nכתוב *"יעד חדש"* להתחלה`;
+          }
+        } else if (state === 'behavior') {
+          greeting += `📊 בוא ננתח את ההתנהגות הפיננסית שלך.\nכתוב *"ניתוח"* להתחיל`;
+        } else if (state === 'budget') {
+          if (d.budgetUsedPercent !== null) {
+            greeting += `💰 התקציב שלך: ${d.budgetUsedPercent}% נוצל`;
+            if (d.budgetOverCategories.length > 0) {
+              greeting += `\n⚠ חריגה ב: ${d.budgetOverCategories.join(', ')}`;
+            }
+            greeting += `\n`;
+          }
+          greeting += `מה תרצה לעשות?`;
+        } else {
+          greeting += getStateGuidance(state, d.name);
         }
+
+        await greenAPI.sendMessage({ phoneNumber: phone, message: greeting });
+        return { success: true };
+      } catch (err) {
+        console.error('[Router] Snapshot error in greeting:', err);
+        // Fall through to simple greeting
       }
 
       await greenAPI.sendMessage({ phoneNumber: phone, message: getStateGuidance(state, userName) });

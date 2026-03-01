@@ -1,7 +1,8 @@
 // @ts-nocheck
 
 import type { RouterContext, RouterResult } from '../shared';
-import { isCommand, mergeGoalCreationContext } from '../shared';
+import { mergeGoalCreationContext } from '../shared';
+import { parseStateIntent } from '@/lib/ai/state-intent';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient, sendWhatsAppInteractiveButtons } from '@/lib/greenapi/client';
 import { findBestMatch } from '@/lib/finance/categories';
@@ -32,8 +33,13 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
   // --- Active advancedGoalCreation flow ---
   if (advancedGoalCreation) {
     console.log(`[Goals] SETUP_ACTIVE_FLOW: step=${advancedGoalCreation.step}, goalType=${advancedGoalCreation.goalType || 'none'}, goalName=${advancedGoalCreation.goalName || 'none'}, targetAmount=${advancedGoalCreation.targetAmount || 'none'}`);
-    // Cancel
-    if (isCommand(msg, ['ביטול', 'בטל', 'cancel'])) {
+
+    // ── AI Intent for cancel/skip detection ──
+    const intent = await parseStateIntent(msg, 'goals_setup');
+    console.log(`[Goals] AI_INTENT (setup): intent="${intent.intent}", confidence=${intent.confidence}`);
+
+    // Cancel at any step
+    if (intent.intent === 'cancel' && intent.confidence >= 0.6) {
       console.log(`[Goals] STEP_TRANSITION: ${advancedGoalCreation.step} → CANCELLED`);
       const { advancedGoalCreation: _removed, ...restCtx } = classCtx as any;
       await supabase
@@ -49,7 +55,7 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
     }
 
     // Skip / finish → move on to loan detection
-    if (isCommand(msg, ['סיימתי', 'דלג', 'skip', 'done'])) {
+    if (intent.intent === 'skip' && intent.confidence >= 0.6) {
       console.log(`[Goals] STEP_TRANSITION: ${advancedGoalCreation.step} → SKIP/DONE (loan detection)`);
       const { advancedGoalCreation: _removed, ...restCtx } = classCtx as any;
       await supabase
@@ -60,25 +66,18 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
       return await detectLoansFromClassifiedTransactions(ctx);
     }
 
-    // Confirmation step
+    // Confirmation step — use AI to understand yes/no
     if (advancedGoalCreation.step === 'confirm') {
-      const msgLower = msg.toLowerCase().trim();
-      console.log(`[Goals] CONFIRM_STEP: msgLower="${msgLower}", context=`, JSON.stringify(advancedGoalCreation).substring(0, 300));
-      if (
-        msgLower === 'כן' ||
-        msgLower === 'yes' ||
-        msgLower.includes('אשר') ||
-        msgLower.includes('confirm')
-      ) {
+      console.log(`[Goals] CONFIRM_STEP: intent="${intent.intent}", context=`, JSON.stringify(advancedGoalCreation).substring(0, 300));
+      const isAffirmative = ['new_goal', 'confirm'].includes(intent.intent) && intent.confidence >= 0.6;
+      const isNegative = ['cancel', 'decline'].includes(intent.intent) && intent.confidence >= 0.6;
+
+      if (isAffirmative) {
         console.log(`[Goals] STEP_TRANSITION: confirm → CREATE_GOAL`);
         const { createAdvancedGoal } = await import('../advanced-goals-handler');
         await createAdvancedGoal(userId, phone, advancedGoalCreation);
         return { success: true };
-      } else if (
-        msgLower === 'לא' ||
-        msgLower === 'no' ||
-        msgLower.includes('ביטול')
-      ) {
+      } else if (isNegative) {
         const { advancedGoalCreation: _removed, ...restCtx } = classCtx as any;
         await supabase
           .from('users')
@@ -189,17 +188,24 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
 
   // --- No active context ---
   console.log(`[Goals] SETUP_NO_ACTIVE_CONTEXT: checking commands for msg="${msg.substring(0, 40)}"`);
-  if (isCommand(msg, ['דלג', 'סיימתי', 'skip', 'done'])) {
+
+  // ── AI Intent ──
+  const intent = await parseStateIntent(msg, 'goals_setup');
+  console.log(`[Goals] AI_INTENT (setup/no-ctx): intent="${intent.intent}", confidence=${intent.confidence}`);
+
+  if ((intent.intent === 'skip' || intent.intent === 'decline' || intent.intent === 'cancel') && intent.confidence >= 0.6) {
     return await detectLoansFromClassifiedTransactions(ctx);
   }
 
-  if (isCommand(msg, ['לא', 'no'])) {
-    return await detectLoansFromClassifiedTransactions(ctx);
-  }
-
-  if (isCommand(msg, ['כן', 'yes', 'יעד חדש', 'הוסף יעד'])) {
+  if (intent.intent === 'new_goal' && intent.confidence >= 0.6) {
     const { startAdvancedGoal } = await import('../advanced-goals-handler');
     await startAdvancedGoal(userId, phone);
+    return { success: true };
+  }
+
+  if (intent.intent === 'show_goals' && intent.confidence >= 0.6) {
+    const { showGoalsWithAllocations } = await import('../goals-wa-handler');
+    await showGoalsWithAllocations(ctx);
     return { success: true };
   }
 
@@ -234,7 +240,12 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
   const advancedGoalCreation = classCtx.advancedGoalCreation;
   if (advancedGoalCreation) {
     console.log(`[Goals] PHASE_ACTIVE_FLOW: step=${advancedGoalCreation.step}, goalType=${advancedGoalCreation.goalType || 'none'}, goalName=${advancedGoalCreation.goalName || 'none'}, targetAmount=${advancedGoalCreation.targetAmount || 'none'}`);
-    if (isCommand(msg, ['ביטול', 'בטל', 'cancel'])) {
+
+    // ── AI Intent for cancel/skip/confirm ──
+    const goalIntent = await parseStateIntent(msg, 'goals');
+    console.log(`[Goals] AI_INTENT (phase/creation): intent="${goalIntent.intent}", confidence=${goalIntent.confidence}`);
+
+    if (goalIntent.intent === 'cancel' && goalIntent.confidence >= 0.6) {
       const { advancedGoalCreation: _removed, ...restCtx } = classCtx as any;
       await supabase
         .from('users')
@@ -301,13 +312,15 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
         return { success: true };
       }
       case 'confirm': {
-        const msgLower = msg.toLowerCase().trim();
-        console.log(`[Goals] PHASE_CONFIRM: msgLower="${msgLower}", context=`, JSON.stringify(advancedGoalCreation).substring(0, 300));
-        if (msgLower === 'כן' || msgLower === 'yes' || msgLower.includes('אשר') || msgLower.includes('confirm')) {
+        console.log(`[Goals] PHASE_CONFIRM: intent="${goalIntent.intent}", context=`, JSON.stringify(advancedGoalCreation).substring(0, 300));
+        const isAffirmative = ['confirm', 'new_goal'].includes(goalIntent.intent) && goalIntent.confidence >= 0.6;
+        const isNegative = ['cancel', 'decline'].includes(goalIntent.intent) && goalIntent.confidence >= 0.6;
+
+        if (isAffirmative) {
           console.log(`[Goals] STEP_TRANSITION: confirm → CREATE_GOAL`);
           const { createAdvancedGoal } = await import('../advanced-goals-handler');
           await createAdvancedGoal(userId, phone, advancedGoalCreation);
-        } else if (msgLower === 'לא' || msgLower === 'no' || msgLower.includes('ביטול')) {
+        } else if (isNegative) {
           console.log(`[Goals] STEP_TRANSITION: confirm → CANCELLED`);
           const { advancedGoalCreation: _removed, ...restCtx } = classCtx as any;
           await supabase
@@ -392,23 +405,19 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
     // Fall through to regular handling if not a recognized response
   }
 
-  // --- "יעד חדש" ---
-  if (isCommand(msg, ['יעד חדש', 'new goal', 'new_goal', 'הוסף יעד', 'יצור יעד'])) {
-    const { startAdvancedGoal } = await import('../advanced-goals-handler');
-    await startAdvancedGoal(userId, phone);
-    return { success: true };
-  }
-
-  // --- "עריכה" ---
-  if (isCommand(msg, ['עריכה', 'ערוך', 'שנה יעד', 'edit'])) {
-    const { startEditGoal } = await import('../edit-goal-handler');
-    await startEditGoal(userId, phone);
-    return { success: true };
-  }
+  // ── Layer 0: Button IDs (instant) ──
+  const goalButtonActions: Record<string, string> = {
+    'new_goal': 'new_goal',
+    'show_goals': 'show_goals',
+    'finish_goals': 'finish',
+    'simulate': 'simulate',
+    'optimize': 'optimize',
+  };
+  const buttonIntent = goalButtonActions[msg.trim()];
 
   // --- Legacy goalCreation context routing ---
   const goalCreation = classCtx.goalCreation;
-  if (goalCreation) {
+  if (!buttonIntent && goalCreation) {
     switch (goalCreation.step) {
       case 'type':
         return await handleGoalTypeSelection(ctx, msg);
@@ -425,48 +434,7 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
     }
   }
 
-  // --- "יעדים" ---
-  if (isCommand(msg, ['יעדים', 'הצג יעדים', 'show goals', 'show_goals', 'מה היעדים'])) {
-    const { showGoalsWithAllocations } = await import('../goals-wa-handler');
-    await showGoalsWithAllocations(ctx);
-    return { success: true };
-  }
-
-  // --- "סימולציה" ---
-  if (isCommand(msg, ['סימולציה', 'simulate', 'מה יקרה אם', 'תרחיש'])) {
-    const { runSimulation } = await import('../goals-wa-handler');
-    await runSimulation(ctx);
-    return { success: true };
-  }
-
-  // --- "אופטימיזציה" ---
-  if (isCommand(msg, ['אופטימיזציה', 'optimize', 'שפר', 'ייעל'])) {
-    const { runOptimization } = await import('../goals-wa-handler');
-    await runOptimization(ctx);
-    return { success: true };
-  }
-
-  // --- "אשר" with pending optimization ---
-  if (isCommand(msg, ['אשר', 'confirm'])) {
-    if (classCtx.optimization?.pending) {
-      const { confirmOptimization } = await import('../goals-wa-handler');
-      await confirmOptimization(ctx);
-      return { success: true };
-    }
-  }
-
-  // --- "המשך" / "תקציב" ---
-  if (isCommand(msg, ['המשך', 'נמשיך', 'הבא', 'next', 'תקציב', 'budget'])) {
-    const { transitionToBudget } = await import('./budget');
-    return await transitionToBudget(ctx);
-  }
-
-  // --- "סיימתי" ---
-  if (isCommand(msg, ['סיימתי', 'done', 'מספיק', 'finish', 'finish_goals'])) {
-    return await finishGoalsSetting(ctx);
-  }
-
-  // --- Numbers 1-4 → goal type selection ---
+  // ── Layer 0: Numbers 1-4 → goal type selection ──
   if (['1', '2', '3', '4'].includes(msg.trim())) {
     const { data: goalPhaseUser } = await supabase
       .from('users')
@@ -488,26 +456,71 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
     return await handleGoalTypeSelection(ctx, msg);
   }
 
-  // --- "עזרה" ---
-  if (isCommand(msg, ['עזרה', 'help', '?'])) {
+  // ── Layer 1: AI Intent ──
+  const intent = buttonIntent
+    ? { intent: buttonIntent, confidence: 1.0, params: {} }
+    : await parseStateIntent(msg, 'goals');
+  console.log(`[Goals] AI_INTENT (phase): intent="${intent.intent}", confidence=${intent.confidence}`);
+
+  if (intent.intent === 'new_goal' && intent.confidence >= 0.6) {
+    const { startAdvancedGoal } = await import('../advanced-goals-handler');
+    await startAdvancedGoal(userId, phone);
+    return { success: true };
+  }
+
+  if (intent.intent === 'edit_goal' && intent.confidence >= 0.6) {
+    const { startEditGoal } = await import('../edit-goal-handler');
+    await startEditGoal(userId, phone);
+    return { success: true };
+  }
+
+  if (intent.intent === 'show_goals' && intent.confidence >= 0.6) {
+    const { showGoalsWithAllocations } = await import('../goals-wa-handler');
+    await showGoalsWithAllocations(ctx);
+    return { success: true };
+  }
+
+  if (intent.intent === 'simulate' && intent.confidence >= 0.6) {
+    const { runSimulation } = await import('../goals-wa-handler');
+    await runSimulation(ctx);
+    return { success: true };
+  }
+
+  if (intent.intent === 'optimize' && intent.confidence >= 0.6) {
+    const { runOptimization } = await import('../goals-wa-handler');
+    await runOptimization(ctx);
+    return { success: true };
+  }
+
+  if (intent.intent === 'confirm' && intent.confidence >= 0.6) {
+    if (classCtx.optimization?.pending) {
+      const { confirmOptimization } = await import('../goals-wa-handler');
+      await confirmOptimization(ctx);
+      return { success: true };
+    }
+  }
+
+  if (intent.intent === 'next_phase' && intent.confidence >= 0.6) {
+    const { transitionToBudget } = await import('./budget');
+    return await transitionToBudget(ctx);
+  }
+
+  if (intent.intent === 'finish' && intent.confidence >= 0.6) {
+    return await finishGoalsSetting(ctx);
+  }
+
+  if (intent.intent === 'help') {
     await greenAPI.sendMessage({
       phoneNumber: phone,
       message:
         `🎯 *שלב 3: ניהול יעדים*\n\n` +
-        `*פקודות בסיסיות:*\n` +
-        `• *"יעד חדש"* - הוסף יעד חדש\n` +
-        `• *"יעדים"* - הצג יעדים + הקצאות מחושבות\n` +
-        `• *"עריכה"* - ערוך או מחק יעד\n` +
-        `• *"סיימתי"* - סיום והמשך לתקציב\n\n` +
-        `*כלים מתקדמים:*\n` +
-        `• *"סימולציה"* - בדוק תרחישי "מה יקרה אם"\n` +
-        `• *"אופטימיזציה"* - קבל המלצות אוטומטיות\n` +
-        `• *"אשר"* - אשר שינויים מוצעים\n\n` +
-        `*סוגי יעדים:*\n` +
-        `1️⃣ קרן חירום\n` +
-        `2️⃣ סגירת חובות\n` +
-        `3️⃣ חיסכון למטרה\n` +
-        `4️⃣ שיפור כללי`,
+        `*מה אני יכול לעשות:*\n` +
+        `• *יעד חדש* - הוסף יעד חדש\n` +
+        `• *יעדים* - הצג יעדים + הקצאות מחושבות\n` +
+        `• *עריכה* - ערוך או מחק יעד\n` +
+        `• *סימולציה* - בדוק תרחישי "מה יקרה אם"\n` +
+        `• *אופטימיזציה* - קבל המלצות\n` +
+        `• *סיימתי* - סיום והמשך לתקציב`,
     });
     return { success: true };
   }

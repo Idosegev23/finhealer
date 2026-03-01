@@ -1,6 +1,6 @@
 // @ts-nocheck
 import type { RouterContext, RouterResult } from '../shared';
-import { isCommand } from '../shared';
+import { parseStateIntent } from '@/lib/ai/state-intent';
 
 /**
  * Handles the 'start' onboarding state.
@@ -93,33 +93,23 @@ export async function handleWaitingForDocument(
   greenAPI: any,
   startClassification: (ctx: RouterContext) => Promise<RouterResult>
 ): Promise<RouterResult> {
-  // Check for start classification commands
-  if (isCommand(msg, [
-    'נתחיל',
-    'נמשיך',
-    'התחל',
-    'לסווג',
-    'סיווג',
-    'start_classify',
-    '▶️ נתחיל לסווג',
-    'נתחיל לסווג ▶️',
-    '▶️ נמשיך לסווג',
-    'נמשיך לסווג ▶️'
-  ])) {
+  // Layer 0: Button IDs (instant, no AI)
+  const buttonActions: Record<string, string> = {
+    'start_classify': 'start_classify',
+    '▶️ נתחיל לסווג': 'start_classify',
+    'נתחיל לסווג ▶️': 'start_classify',
+    '▶️ נמשיך לסווג': 'start_classify',
+    'נמשיך לסווג ▶️': 'start_classify',
+    'add_bank': 'add_document',
+    'add_credit': 'add_document',
+    'add_doc': 'add_document',
+  };
+
+  const buttonIntent = buttonActions[msg.trim()];
+  if (buttonIntent === 'start_classify') {
     return await startClassification(ctx);
   }
-
-  // Check for add document commands
-  if (isCommand(msg, [
-    'עוד דוח',
-    'דוח נוסף',
-    'add_bank',
-    'add_credit',
-    'add_doc',
-    '📄 עוד דוח בנק',
-    '💳 דוח אשראי',
-    '📄 שלח עוד מסמך'
-  ])) {
+  if (buttonIntent === 'add_document') {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `📄 מעולה! שלח לי את המסמך.`,
@@ -127,9 +117,25 @@ export async function handleWaitingForDocument(
     return { success: true };
   }
 
-  // Skip - user doesn't have a document right now (command or AI intent)
+  // Layer 1: AI Intent Detection
+  const intent = await parseStateIntent(msg, 'onboarding');
+  console.log(`[Onboarding] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
+
+  if (intent.intent === 'start_classify' && intent.confidence >= 0.6) {
+    return await startClassification(ctx);
+  }
+
+  if (intent.intent === 'add_document' && intent.confidence >= 0.6) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📄 מעולה! שלח לי את המסמך.`,
+    });
+    return { success: true };
+  }
+
+  // Skip - user doesn't have a document right now
   if (
-    isCommand(msg, ['דלג', 'skip', 'אין לי', 'אין לי עכשיו', 'מאוחר יותר', 'אחר כך', 'לא עכשיו', 'לא רוצה']) ||
+    (intent.intent === 'skip' && intent.confidence >= 0.6) ||
     ctx.intent?.type === 'postpone' ||
     ctx.intent?.type === 'skip'
   ) {
