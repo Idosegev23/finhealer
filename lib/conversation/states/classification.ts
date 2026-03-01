@@ -89,15 +89,20 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
-  // Check if there are any uploaded statements at all
+  // Check if there are any uploaded statements OR transactions
   const { count: uploadedDocs } = await supabase
     .from('uploaded_statements')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', ctx.userId);
 
-  console.log(`[Classification] START: uploadedDocs=${uploadedDocs || 0}`);
-  if (!uploadedDocs || uploadedDocs === 0) {
-    console.log(`[Classification] START: no uploaded docs, aborting classification`);
+  const { count: txCount } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId);
+
+  console.log(`[Classification] START: uploadedDocs=${uploadedDocs || 0}, txCount=${txCount || 0}`);
+  if ((!uploadedDocs || uploadedDocs === 0) && (!txCount || txCount === 0)) {
+    console.log(`[Classification] START: no uploaded docs AND no transactions, aborting classification`);
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `📄 *אין עדיין דוחות במערכת!*\n\nשלח לי דוח בנק או דוח אשראי קודם.\n\n💡 אפשר לשלוח PDF, Excel או תמונה.`,

@@ -1524,145 +1524,156 @@ export async function POST(request: NextRequest) {
           
           console.log(`📅 Document period: ${periodStart?.toISOString().split('T')[0] || 'unknown'} - ${periodEnd?.toISOString().split('T')[0] || 'unknown'}`);
           
-          // שמירת תקופה למסמך uploaded_statements
+          // שמירת מסמך ב-uploaded_statements — תמיד, גם בלי תקופה מדויקת
           let savedDocumentId: string | null = null;
-          
-          if (periodStart && periodEnd) {
-            console.log(`📄 Saving document with period: ${periodStart.toISOString().split('T')[0]} - ${periodEnd.toISOString().split('T')[0]}`);
-            
-            // יצירת רשומת מסמך
-            const { data: docRecord, error: docError } = await (supabase as any)
-              .from('uploaded_statements')
-              .insert({
-                user_id: userData.id,
-                file_name: fileName,
-                file_url: downloadUrl, // 🔧 FIX: חובה - URL המסמך המקורי
-                file_type: documentType === 'credit' ? 'credit_statement' : 'bank_statement',
-                document_type: documentType,
-                status: 'completed',
-                processed: true, // 🔧 FIX: סימון שהעיבוד הושלם
-                period_start: periodStart.toISOString().split('T')[0],
-                period_end: periodEnd.toISOString().split('T')[0],
-                transactions_extracted: allTransactions.length,
-                transactions_created: insertedIds.length, // 🔧 FIX: מספר התנועות שנוצרו בפועל
+
+          // Fallback: חישוב תקופה מתאריכי תנועות אם OCR לא חילץ
+          let effectivePeriodStart = periodStart;
+          let effectivePeriodEnd = periodEnd;
+          if (!effectivePeriodStart || !effectivePeriodEnd) {
+            const txDates = allTransactions
+              .map((tx: any) => new Date(tx.tx_date || tx.date))
+              .filter((d: Date) => !isNaN(d.getTime()));
+            if (txDates.length > 0) {
+              txDates.sort((a: Date, b: Date) => a.getTime() - b.getTime());
+              if (!effectivePeriodStart) effectivePeriodStart = txDates[0];
+              if (!effectivePeriodEnd) effectivePeriodEnd = txDates[txDates.length - 1];
+              console.log(`📅 Period fallback from transactions: ${effectivePeriodStart?.toISOString?.().split('T')[0]} - ${effectivePeriodEnd?.toISOString?.().split('T')[0]}`);
+            }
+          }
+
+          console.log(`📄 Saving document (period: ${effectivePeriodStart?.toISOString?.().split('T')[0] || 'unknown'} - ${effectivePeriodEnd?.toISOString?.().split('T')[0] || 'unknown'})`);
+
+          // יצירת רשומת מסמך
+          const { data: docRecord, error: docError } = await (supabase as any)
+            .from('uploaded_statements')
+            .insert({
+              user_id: userData.id,
+              file_name: fileName,
+              file_url: downloadUrl,
+              file_type: documentType === 'credit' ? 'credit_statement' : 'bank_statement',
+              document_type: documentType,
+              status: 'completed',
+              processed: true,
+              period_start: effectivePeriodStart?.toISOString?.().split('T')[0] || null,
+              period_end: effectivePeriodEnd?.toISOString?.().split('T')[0] || null,
+              transactions_extracted: allTransactions.length,
+              transactions_created: insertedIds.length,
+            })
+            .select('id')
+            .single();
+
+          if (docError) {
+            console.error('❌ Error saving document:', docError);
+          } else if (docRecord?.id) {
+            savedDocumentId = docRecord.id;
+            console.log(`✅ Document saved with id: ${savedDocumentId}`);
+
+            // עדכון תנועות עם document_id
+            await (supabase as any)
+              .from('transactions')
+              .update({ document_id: docRecord.id })
+              .eq('batch_id', pendingBatchId);
+
+            // עדכון ה-state ל-classification אחרי קבלת מסמך
+            await (supabase as any)
+              .from('users')
+              .update({
+                onboarding_state: 'classification',
+                phase: 'data_collection'
               })
-              .select('id')
-              .single();
-            
-            if (docError) {
-              console.error('❌ Error saving document:', docError);
-            } else if (docRecord?.id) {
-              savedDocumentId = docRecord.id;
-              console.log(`✅ Document saved with id: ${savedDocumentId}`);
-              
-              // עדכון תנועות עם document_id
-              await (supabase as any)
-                .from('transactions')
-                .update({ document_id: docRecord.id })
-                .eq('batch_id', pendingBatchId);
-              
-              // 🔧 FIX: עדכון ה-state ל-classification אחרי קבלת מסמך
-              await (supabase as any)
-                .from('users')
-                .update({ 
-                  onboarding_state: 'classification',
-                  phase: 'data_collection'
-                })
-                .eq('id', userData.id);
-              console.log(`✅ User state updated to classification`);
-              
-              // 🆕 סימון missing_document כ-uploaded
-              if (documentType === 'credit' || documentType === 'bank') {
-                const { markDocumentAsUploaded } = await import('@/lib/conversation/classification-flow');
-                
-                // חלץ כרטיס אשראי אם זה דוח אשראי
-                let cardLast4: string | null = null;
-                if (documentType === 'credit') {
-                  for (const tx of allTransactions) {
-                    const text = `${tx.vendor || ''} ${tx.description || ''}`;
-                    const cardMatch = text.match(/\d{4}$/);
-                    const starMatch = text.match(/\*{4}(\d{4})/);
-                    if (cardMatch) {
-                      cardLast4 = cardMatch[0];
-                      break;
-                    } else if (starMatch) {
-                      cardLast4 = starMatch[1];
-                      break;
-                    }
-                  }
-                }
-                
-                await markDocumentAsUploaded(
-                  userData.id,
-                  documentType,
-                  cardLast4,
-                  docRecord.id
-                );
-              }
-              
-              // 🆕 קישור דוח אשראי לתנועות שדולגו
+              .eq('id', userData.id);
+            console.log(`✅ User state updated to classification`);
+
+            // סימון missing_document כ-uploaded
+            if (documentType === 'credit' || documentType === 'bank') {
+              const { markDocumentAsUploaded } = await import('@/lib/conversation/classification-flow');
+
+              // חלץ כרטיס אשראי אם זה דוח אשראי
+              let cardLast4: string | null = null;
               if (documentType === 'credit') {
-                // חלץ 4 ספרות אחרונות של הכרטיס מהתנועות החדשות
-                const cardLast4Set = new Set<string>();
                 for (const tx of allTransactions) {
-                  // חפש מספרי כרטיס בvendor או בdescription
                   const text = `${tx.vendor || ''} ${tx.description || ''}`;
                   const cardMatch = text.match(/\d{4}$/);
-                  if (cardMatch) {
-                    cardLast4Set.add(cardMatch[0]);
-                  }
-                  // גם חפש פורמט ****1234
                   const starMatch = text.match(/\*{4}(\d{4})/);
-                  if (starMatch) {
-                    cardLast4Set.add(starMatch[1]);
+                  if (cardMatch) {
+                    cardLast4 = cardMatch[0];
+                    break;
+                  } else if (starMatch) {
+                    cardLast4 = starMatch[1];
+                    break;
                   }
                 }
-                
-                if (cardLast4Set.size > 0) {
-                  const cardNumbers = Array.from(cardLast4Set);
-                  console.log(`💳 Found credit card numbers: ${cardNumbers.join(', ')}`);
-                  
-                  // מצא תנועות שדולגו כי חיכו לפירוט אשראי
-                  for (const cardLast4 of cardNumbers) {
-                    const { data: skippedTx, error: skipErr } = await (supabase as any)
+              }
+
+              await markDocumentAsUploaded(
+                userData.id,
+                documentType,
+                cardLast4,
+                docRecord.id
+              );
+            }
+
+            // קישור דוח אשראי לתנועות שדולגו
+            if (documentType === 'credit') {
+              // חלץ 4 ספרות אחרונות של הכרטיס מהתנועות החדשות
+              const cardLast4Set = new Set<string>();
+              for (const tx of allTransactions) {
+                // חפש מספרי כרטיס בvendor או בdescription
+                const text = `${tx.vendor || ''} ${tx.description || ''}`;
+                const cardMatch = text.match(/\d{4}$/);
+                if (cardMatch) {
+                  cardLast4Set.add(cardMatch[0]);
+                }
+                // גם חפש פורמט ****1234
+                const starMatch = text.match(/\*{4}(\d{4})/);
+                if (starMatch) {
+                  cardLast4Set.add(starMatch[1]);
+                }
+              }
+
+              if (cardLast4Set.size > 0) {
+                const cardNumbers = Array.from(cardLast4Set);
+                console.log(`💳 Found credit card numbers: ${cardNumbers.join(', ')}`);
+
+                // מצא תנועות שדולגו כי חיכו לפירוט אשראי
+                for (const cardLast4 of cardNumbers) {
+                  const { data: skippedTx, error: skipErr } = await (supabase as any)
+                    .from('transactions')
+                    .select('id, vendor, amount')
+                    .eq('user_id', userData.id)
+                    .eq('status', 'needs_credit_detail')
+                    .or(`vendor.ilike.%${cardLast4}%,vendor.ilike.%ויזה ${cardLast4}%,vendor.ilike.%visa ${cardLast4}%`);
+
+                  if (!skipErr && skippedTx && skippedTx.length > 0) {
+                    console.log(`🔗 Found ${skippedTx.length} skipped transactions for card ${cardLast4}`);
+
+                    // עדכן אותן ל-confirmed (הפירוט כבר יש)
+                    await (supabase as any)
                       .from('transactions')
-                      .select('id, vendor, amount')
+                      .update({
+                        status: 'confirmed',
+                        notes: `קושר לדוח אשראי ${cardLast4}`,
+                      })
                       .eq('user_id', userData.id)
                       .eq('status', 'needs_credit_detail')
                       .or(`vendor.ilike.%${cardLast4}%,vendor.ilike.%ויזה ${cardLast4}%,vendor.ilike.%visa ${cardLast4}%`);
-                    
-                    if (!skipErr && skippedTx && skippedTx.length > 0) {
-                      console.log(`🔗 Found ${skippedTx.length} skipped transactions for card ${cardLast4}`);
-                      
-                      // עדכן אותן ל-status: linked_to_credit (לא צריך לסווג שוב - הפירוט כבר יש)
-                      await (supabase as any)
-                        .from('transactions')
-                        .update({ 
-                          status: 'confirmed',
-                          notes: `קושר לדוח אשראי ${cardLast4}`,
-                        })
-                        .eq('user_id', userData.id)
-                        .eq('status', 'needs_credit_detail')
-                        .or(`vendor.ilike.%${cardLast4}%,vendor.ilike.%ויזה ${cardLast4}%,vendor.ilike.%visa ${cardLast4}%`);
-                      
-                      console.log(`✅ Linked ${skippedTx.length} transactions to credit statement`);
-                    }
+
+                    console.log(`✅ Linked ${skippedTx.length} transactions to credit statement`);
                   }
                 }
               }
             }
-            // 🔗 Reconciliation: match credit detail to bank summaries
-            if (savedDocumentId && documentType === 'credit') {
-              try {
-                const { matchCreditTransactions } = await import('@/lib/reconciliation/credit-matcher');
-                await matchCreditTransactions(supabase, userData.id, savedDocumentId, 'credit_statement');
-                console.log('✅ Credit reconciliation completed');
-              } catch (reconErr) {
-                console.error('⚠️ Credit reconciliation error:', reconErr);
-              }
+          }
+          // 🔗 Reconciliation: match credit detail to bank summaries
+          if (savedDocumentId && documentType === 'credit') {
+            try {
+              const { matchCreditTransactions } = await import('@/lib/reconciliation/credit-matcher');
+              await matchCreditTransactions(supabase, userData.id, savedDocumentId, 'credit_statement');
+              console.log('✅ Credit reconciliation completed');
+            } catch (reconErr) {
+              console.error('⚠️ Credit reconciliation error:', reconErr);
             }
-          } else {
-            console.warn('⚠️ No period detected - document will not be saved');
           }
 
           // בדיקת כיסוי תקופות - האם יש 3 חודשים?
