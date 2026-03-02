@@ -772,12 +772,38 @@ export async function createAdvancedGoal(
   console.log(`[AdvGoals] CLEANUP: cleaning advancedGoalCreation context`);
   await cleanAdvancedGoalContext(userId);
 
+  // Auto-calculate allocations for all goals immediately
+  let allocationMsg = '';
+  try {
+    const { calculateOptimalAllocations, applyAllocations } = await import('@/lib/goals/goals-balancer');
+    const result = await calculateOptimalAllocations({ userId });
+
+    if (result.allocations.length > 0) {
+      await applyAllocations(result.allocations);
+      console.log(`[AdvGoals] AUTO_ALLOCATE: applied ${result.allocations.length} allocations`);
+
+      // Find this goal's allocation
+      const thisAlloc = result.allocations.find(a => a.goal_name === goalName);
+      if (thisAlloc && thisAlloc.monthly_allocation > 0) {
+        allocationMsg = `\n💸 הקצאה חודשית: ${Math.round(thisAlloc.monthly_allocation).toLocaleString('he-IL')} ₪`;
+        if (thisAlloc.months_to_complete > 0 && thisAlloc.months_to_complete < 600) {
+          allocationMsg += `\n📅 צפי השלמה: ${thisAlloc.months_to_complete} חודשים`;
+        }
+        if (!thisAlloc.is_achievable) {
+          allocationMsg += `\n⚠️ ייתכן שנדרש יותר זמן`;
+        }
+      }
+    }
+  } catch (allocErr) {
+    console.warn(`[AdvGoals] AUTO_ALLOCATE failed (non-critical):`, allocErr);
+  }
+
   const emoji = GOAL_TYPES_EXTENDED[context.goalType!]?.emoji || '🎯';
 
   const successMsg = `✅ *נוצר בהצלחה!*\n\n` +
     `${emoji} *${goalName}*\n` +
-    `💰 ${targetAmount.toLocaleString('he-IL')} ₪\n\n` +
-    `φ תחשב הקצאה אוטומטית בקרוב!\n\n` +
+    `💰 ${targetAmount.toLocaleString('he-IL')} ₪` +
+    allocationMsg + `\n\n` +
     `• כתוב *"יעד חדש"* להוסיף עוד\n` +
     `• כתוב *"יעדים"* לראות הקצאות\n` +
     `• כתוב *"סיימתי"* להמשיך`;
