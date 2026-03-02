@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const paymentMethod = searchParams.get('payment_method')
     const expenseFrequency = searchParams.get('expense_frequency')
     const status = searchParams.get('status')
-    const limit = parseInt(searchParams.get('limit') || '100')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500)
     const offset = parseInt(searchParams.get('offset') || '0')
 
     console.log('📊 Fetching expenses:', {

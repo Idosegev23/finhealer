@@ -24,6 +24,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 })
     }
 
+    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+    if (imageFile.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'הקובץ גדול מדי. מקסימום 10MB.' },
+        { status: 413 }
+      )
+    }
+
     console.log('📸 Analyzing receipt:', {
       userId: user.id,
       fileName: imageFile.name,

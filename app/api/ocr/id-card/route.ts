@@ -30,6 +30,20 @@ export async function POST(request: Request) {
       );
     }
 
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (idCardImage.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'הקובץ גדול מדי. מקסימום 10MB.' },
+        { status: 413 }
+      );
+    }
+    if (appendixImage && appendixImage.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'הקובץ גדול מדי. מקסימום 10MB.' },
+        { status: 413 }
+      );
+    }
+
     // Convert images to base64
     const idCardBuffer = await idCardImage.arrayBuffer();
     const idCardBase64 = Buffer.from(idCardBuffer).toString('base64');

@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const type = searchParams.get('type');
     const status = searchParams.get('status') || 'confirmed';
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 500);
 
     let query = supabase
       .from('transactions')

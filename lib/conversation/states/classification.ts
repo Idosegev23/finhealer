@@ -41,7 +41,12 @@ export async function handleClassificationState(ctx: RouterContext, msg: string)
   }
 
   // ── Layer 1: AI Intent ──
-  const intent = await parseStateIntent(msg, 'classification_start');
+  let intent = { intent: 'unknown', confidence: 0, params: {} };
+  try {
+    intent = await parseStateIntent(msg, 'classification_start');
+  } catch (intentErr) {
+    console.warn(`[Classification] parseStateIntent failed:`, intentErr);
+  }
   console.log(`[Classification] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
 
   if (intent.intent === 'start' && intent.confidence >= 0.6) {
@@ -157,23 +162,47 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
     console.log(`[Classification] START: hasMoreDocs=${hasMoreDocs}`);
 
     if (!hasMoreDocs) {
-      // All done - move to next phase
-      console.log(`[Classification] COMPLETE: userId=${ctx.userId.substring(0,8)}..., all transactions classified, moving to goals`);
+      // All done - determine next phase based on data coverage
+      const { calculatePhase } = await import('@/lib/services/PhaseService');
+      const nextPhase = await calculatePhase(ctx.userId);
+      console.log(`[Classification] COMPLETE: userId=${ctx.userId.substring(0,8)}..., calculated next phase=${nextPhase}`);
+
+      // Map phase to appropriate onboarding_state
+      const phaseToState: Record<string, string> = {
+        data_collection: 'waiting_for_document',
+        behavior: 'behavior',
+        budget: 'budget',
+        goals: 'goals_setup',
+        monitoring: 'monitoring',
+      };
+      const nextState = phaseToState[nextPhase] || 'behavior';
+
       await supabase
         .from('users')
-        .update({ onboarding_state: 'goals_setup', phase: 'goals' })
+        .update({ onboarding_state: nextState, phase: nextPhase })
         .eq('id', ctx.userId);
 
-      await greenAPI.sendMessage({
-        phoneNumber: ctx.phone,
-        message:
-          `✅ *סיימנו את הסיווג!*\n\nכל התנועות מסווגות 🎉\n\n` +
-          `עכשיו בוא נגדיר את היעדים הפיננסיים שלך! 🎯\n` +
-          `כתוב *"יעדים"* או *"הגדר יעד"* כדי להתחיל.`,
-      });
+      if (nextPhase === 'goals' || nextPhase === 'monitoring') {
+        await greenAPI.sendMessage({
+          phoneNumber: ctx.phone,
+          message:
+            `✅ *סיימנו את הסיווג!*\n\nכל התנועות מסווגות 🎉\n\n` +
+            `עכשיו בוא נגדיר את היעדים הפיננסיים שלך! 🎯\n` +
+            `כתוב *"יעדים"* או *"הגדר יעד"* כדי להתחיל.`,
+        });
+      } else {
+        await greenAPI.sendMessage({
+          phoneNumber: ctx.phone,
+          message:
+            `✅ *סיימנו את הסיווג!*\n\nכל התנועות מסווגות 🎉\n\n` +
+            (nextPhase === 'data_collection'
+              ? `📄 כדי להמשיך, שלח עוד דוחות (צריך לפחות 3 חודשים של נתונים).`
+              : `📊 עכשיו נעבור לנתח את ההתנהגות הפיננסית שלך.\n\nכתוב *"ניתוח"* כדי להתחיל.`),
+        });
+      }
     }
 
-    return { success: true, newState: 'goals_setup' };
+    return { success: true, newState: 'classification_complete' };
   }
 
   // Send intro message with accept-all option
@@ -236,7 +265,12 @@ export async function handleClassificationResponse(
   const greenAPI = getGreenAPIClient();
 
   // ── AI Intent Detection ──
-  const intent = await parseStateIntent(msg, `classification_${type}`);
+  let intent = { intent: 'unknown', confidence: 0, params: {} };
+  try {
+    intent = await parseStateIntent(msg, `classification_${type}`);
+  } catch (intentErr) {
+    console.warn(`[Classification] parseStateIntent failed:`, intentErr);
+  }
   console.log(`[Classification] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}, params=${JSON.stringify(intent.params || {})}`);
 
   // ---- ACCEPT ALL: auto-classify everything with AI suggestions ----
@@ -314,11 +348,19 @@ export async function handleClassificationResponse(
       }
       updateData.category = category;
 
-      await supabase.from('transactions').update(updateData).eq('id', tx.id);
+      const { error: updateErr } = await supabase.from('transactions').update(updateData).eq('id', tx.id);
+      if (updateErr) {
+        console.error(`❌ Failed to update tx ${tx.id}: ${updateErr.message}`);
+        continue; // Skip this transaction, keep going
+      }
 
       // Learn the rule for next time
       if (tx.vendor && category) {
-        await learnUserRule(ctx.userId, tx.vendor, category, type);
+        try {
+          await learnUserRule(ctx.userId, tx.vendor, category, type);
+        } catch (learnErr) {
+          console.warn(`⚠️ learnUserRule failed for ${tx.vendor}:`, learnErr);
+        }
       }
 
       classified++;
@@ -1246,12 +1288,25 @@ async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult> {
   const balanceEmoji = balance >= 0 ? '✨' : '📉';
   console.log(`[Classification] moveToGoalsSetup: totalIncome=${totalIncome}, totalExpenses=${totalExpenses}, balance=${balance}`);
 
-  // Update state to goals_setup
+  // Determine next phase based on actual data coverage
+  const { PhaseService } = await import('@/lib/services/PhaseService');
+  const nextPhase = await PhaseService.calculatePhase(ctx.userId);
+  console.log(`[Classification] moveToGoalsSetup: calculated nextPhase=${nextPhase}`);
+
+  const phaseToState: Record<string, string> = {
+    data_collection: 'waiting_for_document',
+    behavior: 'behavior',
+    budget: 'budget',
+    goals: 'goals_setup',
+    monitoring: 'monitoring',
+  };
+  const nextState = phaseToState[nextPhase] || 'behavior';
+
   await supabase
     .from('users')
     .update({
-      onboarding_state: 'goals_setup',
-      phase: 'goals',
+      onboarding_state: nextState,
+      phase: nextPhase,
       phase_updated_at: new Date().toISOString(),
     })
     .eq('id', ctx.userId);
@@ -1264,15 +1319,35 @@ async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult> {
       `📊 *הסיכום שלך:*\n` +
       `💚 הכנסות: ${totalIncome.toLocaleString('he-IL')} ₪\n` +
       `💸 הוצאות: ${totalExpenses.toLocaleString('he-IL')} ₪\n` +
-      `${balanceEmoji} יתרה: ${balance.toLocaleString('he-IL')} ₪\n\n` +
-      `🎯 *עכשיו בוא נגדיר מטרות!*`,
+      `${balanceEmoji} יתרה: ${balance.toLocaleString('he-IL')} ₪`,
   });
 
-  // Start advanced goal creation flow
-  const { startAdvancedGoal } = await import('../advanced-goals-handler');
-  await startAdvancedGoal(ctx.userId, ctx.phone);
+  // Only proceed to goals if phase allows it
+  if (nextPhase === 'goals' || nextPhase === 'monitoring') {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `🎯 *עכשיו בוא נגדיר מטרות!*`,
+    });
 
-  return { success: true, newState: 'goals_setup' };
+    try {
+      const { startAdvancedGoal } = await import('../advanced-goals-handler');
+      await startAdvancedGoal(ctx.userId, ctx.phone);
+    } catch (goalErr) {
+      console.error('[Classification] Failed to start advanced goal flow:', goalErr);
+    }
+  } else if (nextPhase === 'data_collection') {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📄 כדי להמשיך, צריך עוד דוחות (לפחות 3 חודשים של נתונים).\nשלח עוד דוח בנק או אשראי.`,
+    });
+  } else {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `📊 עכשיו נעבור לנתח את ההתנהגות הפיננסית שלך.\n\nכתוב *"ניתוח"* כדי להתחיל.`,
+    });
+  }
+
+  return { success: true, newState: nextState };
 }
 
 // ============================================================================
@@ -1450,7 +1525,7 @@ async function autoClassifyWithRules(userId: string, supabase: any): Promise<num
 
     if (matchingRule) {
       console.log(`[Classification] AUTO_CLASSIFY: txId=${tx.id}, vendor="${tx.vendor}", matched rule="${matchingRule.vendor_pattern}"->"${matchingRule.category}"`);
-      await supabase
+      const { error: autoErr } = await supabase
         .from('transactions')
         .update({
           status: 'confirmed',
@@ -1462,6 +1537,10 @@ async function autoClassifyWithRules(userId: string, supabase: any): Promise<num
         })
         .eq('id', tx.id);
 
+      if (autoErr) {
+        console.error(`❌ autoClassify failed for tx ${tx.id}: ${autoErr.message}`);
+        continue;
+      }
       classified++;
     }
   }

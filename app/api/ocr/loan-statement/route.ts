@@ -29,6 +29,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (statementImage.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'הקובץ גדול מדי. מקסימום 10MB.' },
+        { status: 413 }
+      );
+    }
+
     // Convert image to base64
     const buffer = await statementImage.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');

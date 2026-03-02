@@ -11,7 +11,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 // Types
 // ============================================================================
 
-export type TransactionStatus = 'pending' | 'confirmed' | 'needs_credit_detail';
+export type TransactionStatus = 'pending' | 'confirmed' | 'duplicate_suspect' | 'needs_credit_detail';
 export type TransactionType = 'income' | 'expense';
 
 export interface TransactionSummary {
