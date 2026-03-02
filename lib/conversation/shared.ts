@@ -125,22 +125,3 @@ export function createProgressBar(percent: number): string {
   return '▓'.repeat(filled) + '░'.repeat(10 - filled);
 }
 
-// ============================================================================
-// Goal Context Merge
-// ============================================================================
-
-export async function mergeGoalCreationContext(userId: string, goalCreation: Record<string, any>): Promise<void> {
-  const supabase = createServiceClient();
-  const { data: existing } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-
-  await supabase
-    .from('users')
-    .update({
-      classification_context: { ...existing?.classification_context, goalCreation }
-    })
-    .eq('id', userId);
-}
