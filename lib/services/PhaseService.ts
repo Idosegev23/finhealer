@@ -163,10 +163,14 @@ export async function getPhaseInfo(userId: string): Promise<PhaseInfo> {
  */
 export async function setPhase(userId: string, phase: Phase): Promise<void> {
   const supabase = createServiceClient();
-  await supabase
+  const { error } = await supabase
     .from('users')
     .update({ phase, phase_updated_at: new Date().toISOString() })
     .eq('id', userId);
+
+  if (error) {
+    console.error(`[PhaseService] setPhase failed for ${userId.substring(0,8)}:`, error.message);
+  }
 }
 
 /**
@@ -174,10 +178,14 @@ export async function setPhase(userId: string, phase: Phase): Promise<void> {
  */
 export async function setState(userId: string, state: OnboardingState): Promise<void> {
   const supabase = createServiceClient();
-  await supabase
+  const { error } = await supabase
     .from('users')
     .update({ onboarding_state: state })
     .eq('id', userId);
+
+  if (error) {
+    console.error(`[PhaseService] setState failed for ${userId.substring(0,8)}:`, error.message);
+  }
 }
 
 /**
@@ -189,7 +197,7 @@ export async function setPhaseAndState(
   state: OnboardingState
 ): Promise<void> {
   const supabase = createServiceClient();
-  await supabase
+  const { error } = await supabase
     .from('users')
     .update({
       phase,
@@ -197,6 +205,10 @@ export async function setPhaseAndState(
       phase_updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+
+  if (error) {
+    console.error(`[PhaseService] setPhaseAndState failed for ${userId.substring(0,8)}:`, error.message);
+  }
 }
 
 /**

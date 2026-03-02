@@ -23,12 +23,16 @@ async function mergeClassificationContext(
 
   const existing = user?.classification_context || {};
 
-  await supabase
+  const { error } = await supabase
     .from('users')
     .update({
       classification_context: { ...existing, ...update }
     })
     .eq('id', userId);
+
+  if (error) {
+    console.error(`[AdvGoals] mergeClassificationContext failed:`, error.message);
+  }
 }
 
 export interface AdvancedGoalContext {
@@ -800,10 +804,14 @@ async function cleanAdvancedGoalContext(userId: string): Promise<void> {
   const { advancedGoalCreation: _removed, ...restCtx } = existingCtx as any;
   console.log(`[AdvGoals] CLEANUP_CONTEXT: removed advancedGoalCreation, remaining keys=${Object.keys(restCtx).join(',') || 'empty'}`);
 
-  await supabase
+  const { error } = await supabase
     .from('users')
     .update({
       classification_context: Object.keys(restCtx).length > 0 ? restCtx : null
     })
     .eq('id', userId);
+
+  if (error) {
+    console.error(`[AdvGoals] cleanAdvancedGoalContext failed:`, error.message);
+  }
 }

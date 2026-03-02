@@ -35,7 +35,12 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
     console.log(`[Goals] SETUP_ACTIVE_FLOW: step=${advancedGoalCreation.step}, goalType=${advancedGoalCreation.goalType || 'none'}, goalName=${advancedGoalCreation.goalName || 'none'}, targetAmount=${advancedGoalCreation.targetAmount || 'none'}`);
 
     // ── AI Intent for cancel/skip detection ──
-    const intent = await parseStateIntent(msg, 'goals_setup');
+    let intent = { intent: 'unknown', confidence: 0, params: {} };
+    try {
+      intent = await parseStateIntent(msg, 'goals_setup');
+    } catch (intentErr) {
+      console.warn(`[Goals] parseStateIntent failed (setup):`, intentErr);
+    }
     console.log(`[Goals] AI_INTENT (setup): intent="${intent.intent}", confidence=${intent.confidence}`);
 
     // Cancel at any step
@@ -190,7 +195,12 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
   console.log(`[Goals] SETUP_NO_ACTIVE_CONTEXT: checking commands for msg="${msg.substring(0, 40)}"`);
 
   // ── AI Intent ──
-  const intent = await parseStateIntent(msg, 'goals_setup');
+  let intent = { intent: 'unknown', confidence: 0, params: {} };
+  try {
+    intent = await parseStateIntent(msg, 'goals_setup');
+  } catch (intentErr) {
+    console.warn(`[Goals] parseStateIntent failed (setup/no-ctx):`, intentErr);
+  }
   console.log(`[Goals] AI_INTENT (setup/no-ctx): intent="${intent.intent}", confidence=${intent.confidence}`);
 
   if ((intent.intent === 'skip' || intent.intent === 'decline' || intent.intent === 'cancel') && intent.confidence >= 0.6) {
@@ -242,7 +252,12 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
     console.log(`[Goals] PHASE_ACTIVE_FLOW: step=${advancedGoalCreation.step}, goalType=${advancedGoalCreation.goalType || 'none'}, goalName=${advancedGoalCreation.goalName || 'none'}, targetAmount=${advancedGoalCreation.targetAmount || 'none'}`);
 
     // ── AI Intent for cancel/skip/confirm ──
-    const goalIntent = await parseStateIntent(msg, 'goals');
+    let goalIntent = { intent: 'unknown', confidence: 0, params: {} };
+    try {
+      goalIntent = await parseStateIntent(msg, 'goals');
+    } catch (intentErr) {
+      console.warn(`[Goals] parseStateIntent failed (phase/creation):`, intentErr);
+    }
     console.log(`[Goals] AI_INTENT (phase/creation): intent="${goalIntent.intent}", confidence=${goalIntent.confidence}`);
 
     if (goalIntent.intent === 'cancel' && goalIntent.confidence >= 0.6) {
@@ -457,9 +472,16 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
   }
 
   // ── Layer 1: AI Intent ──
-  const intent = buttonIntent
+  let intent = buttonIntent
     ? { intent: buttonIntent, confidence: 1.0, params: {} }
-    : await parseStateIntent(msg, 'goals');
+    : { intent: 'unknown', confidence: 0, params: {} };
+  if (!buttonIntent) {
+    try {
+      intent = await parseStateIntent(msg, 'goals');
+    } catch (intentErr) {
+      console.warn(`[Goals] parseStateIntent failed (phase):`, intentErr);
+    }
+  }
   console.log(`[Goals] AI_INTENT (phase): intent="${intent.intent}", confidence=${intent.confidence}`);
 
   if (intent.intent === 'new_goal' && intent.confidence >= 0.6) {
@@ -952,16 +974,31 @@ export async function finishGoalsSetting(ctx: RouterContext): Promise<RouterResu
 
   const goalCount = count || 0;
 
-  // Update state to budget
-  await supabase
+  // Update state — use calculated phase (don't hardcode)
+  const { calculatePhase } = await import('@/lib/services/PhaseService');
+  const nextPhase = await calculatePhase(userId);
+  // Map phase to appropriate onboarding_state
+  const stateMap: Record<string, string> = {
+    data_collection: 'waiting_for_document',
+    behavior: 'behavior',
+    budget: 'budget',
+    goals: 'goals',
+    monitoring: 'monitoring',
+  };
+  const nextState = stateMap[nextPhase] || 'budget';
+
+  const { error: updateErr } = await supabase
     .from('users')
     .update({
-      onboarding_state: 'budget',
-      current_phase: 'budget',
-      phase: 'budget',
+      onboarding_state: nextState,
+      phase: nextPhase,
       phase_updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+
+  if (updateErr) {
+    console.error(`[Goals] finishGoalsSetting update failed:`, updateErr.message);
+  }
 
   // Send summary
   let summaryMsg = `✅ *סיכום יעדים*\n\n`;
@@ -1075,7 +1112,7 @@ export async function detectLoansFromClassifiedTransactions(ctx: RouterContext):
 
   const existingContext = existingUser?.classification_context || {};
 
-  await supabase
+  const { error: loanErr } = await supabase
     .from('users')
     .update({
       onboarding_state: 'loan_consolidation_offer',
@@ -1090,6 +1127,10 @@ export async function detectLoansFromClassifiedTransactions(ctx: RouterContext):
       },
     })
     .eq('id', userId);
+
+  if (loanErr) {
+    console.error(`[Goals] detectLoans update failed:`, loanErr.message);
+  }
 
   return { success: true, newState: 'loan_consolidation_offer' };
 }
@@ -1123,16 +1164,22 @@ export async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult
   const balance = totalIncome - totalExpenses;
   const balanceEmoji = balance >= 0 ? '✨' : '📉';
 
-  // Update state
-  await supabase
+  // Update state — use calculated phase (don't hardcode)
+  const { calculatePhase: calcPhase } = await import('@/lib/services/PhaseService');
+  const calculatedPhase = await calcPhase(userId);
+
+  const { error: stateErr } = await supabase
     .from('users')
     .update({
       onboarding_state: 'goals_setup',
-      phase: 'goals',
-      current_phase: 'goals',
+      phase: calculatedPhase,
       phase_updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+
+  if (stateErr) {
+    console.error(`[Goals] moveToGoalsSetup update failed:`, stateErr.message);
+  }
 
   // Send summary
   await greenAPI.sendMessage({
@@ -1319,15 +1366,30 @@ async function showFinalSummaryAndMonitoring(ctx: RouterContext): Promise<Router
   const greenAPI = getGreenAPIClient();
   const { userId, phone } = ctx;
 
-  // Update state to monitoring (final phase)
-  await supabase
+  // Update state — use calculated phase (don't hardcode)
+  const { calculatePhase: calcPhaseFinal } = await import('@/lib/services/PhaseService');
+  const finalPhase = await calcPhaseFinal(userId);
+  const finalStateMap: Record<string, string> = {
+    data_collection: 'waiting_for_document',
+    behavior: 'behavior',
+    budget: 'budget',
+    goals: 'goals',
+    monitoring: 'monitoring',
+  };
+  const finalState = finalStateMap[finalPhase] || 'monitoring';
+
+  const { error: finalErr } = await supabase
     .from('users')
     .update({
-      onboarding_state: 'monitoring',
-      phase: 'monitoring',
+      onboarding_state: finalState,
+      phase: finalPhase,
       phase_updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
+
+  if (finalErr) {
+    console.error(`[Goals] showFinalSummaryAndMonitoring update failed:`, finalErr.message);
+  }
 
   // Calculate summary
   const threeMonthsAgo = new Date();

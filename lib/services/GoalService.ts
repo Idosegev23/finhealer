@@ -151,10 +151,15 @@ export async function addDeposit(goalId: string, amount: number): Promise<Goal> 
  */
 export async function cancelGoal(goalId: string): Promise<void> {
   const supabase = createServiceClient();
-  await supabase
+  const { error } = await supabase
     .from('goals')
     .update({ status: 'cancelled' })
     .eq('id', goalId);
+
+  if (error) {
+    console.error(`[GoalService] cancelGoal failed for ${goalId}:`, error.message);
+    throw error;
+  }
 }
 
 /**
@@ -162,10 +167,15 @@ export async function cancelGoal(goalId: string): Promise<void> {
  */
 export async function setAllocation(goalId: string, amount: number): Promise<void> {
   const supabase = createServiceClient();
-  await supabase
+  const { error } = await supabase
     .from('goals')
     .update({ monthly_allocation: amount })
     .eq('id', goalId);
+
+  if (error) {
+    console.error(`[GoalService] setAllocation failed for ${goalId}:`, error.message);
+    throw error;
+  }
 }
 
 // ============================================================================
