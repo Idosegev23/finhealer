@@ -385,9 +385,21 @@ export async function postDocumentProcessing(
   console.log(`📊 Period coverage: ${actualCoverage.totalMonths} months, covered: ${actualCoverage.coveredMonths.join(', ')}, missing: ${actualCoverage.missingMonths.join(', ')}`);
 
   // Notify via φ Router
-  const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
-  await onDocumentProcessed(userId, phoneNumber);
-  console.log('✅ φ Router sent document summary message');
+  try {
+    const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+    await onDocumentProcessed(userId, phoneNumber);
+    console.log('✅ φ Router sent document summary message');
+  } catch (routerErr) {
+    console.error('❌ onDocumentProcessed failed (document was saved):', routerErr);
+    // Document is saved — don't let router failure break the flow
+    const { getGreenAPIClient } = await import('@/lib/greenapi/client');
+    try {
+      await getGreenAPIClient().sendMessage({
+        phoneNumber,
+        message: `✅ הדוח התקבל!\n\nכתוב *"נתחיל"* כדי לסדר את ההוצאות וההכנסות.`,
+      });
+    } catch { /* best effort */ }
+  }
 
   // Save missing documents from OCR
   if (opts.ocrData?.missing_documents?.length > 0) {

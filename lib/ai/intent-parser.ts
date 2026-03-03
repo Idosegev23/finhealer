@@ -90,6 +90,15 @@ export function tryRuleBasedParsing(message: string): Intent | null {
     };
   }
 
+  // Cancel / Back patterns
+  if (/^(ביטול|בטל|חזור|חזרה|ראשי|תפריט ראשי|cancel|back|בחזרה)$/i.test(msg)) {
+    return {
+      type: "cancel",
+      confidence: 0.9,
+      entities: [],
+    };
+  }
+
   // Summary/Status request patterns
   if (/^(סיכום|מצב|סטטוס|status|מה המצב|איפה אני עומד|תראה סיכום)/.test(msg)) {
     return {

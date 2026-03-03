@@ -161,6 +161,15 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
     const hasMoreDocs = await checkAndRequestMissingDocuments(ctx.userId, ctx.phone);
     console.log(`[Classification] START: hasMoreDocs=${hasMoreDocs}`);
 
+    if (hasMoreDocs) {
+      // Missing docs requested — transition to waiting_for_document so user can upload
+      await supabase
+        .from('users')
+        .update({ onboarding_state: 'waiting_for_document' })
+        .eq('id', ctx.userId);
+      return { success: true, newState: 'waiting_for_document' as any };
+    }
+
     if (!hasMoreDocs) {
       // All done - determine next phase based on data coverage
       const { calculatePhase } = await import('@/lib/services/PhaseService');
@@ -300,6 +309,7 @@ export async function handleClassificationResponse(
     });
 
     let classified = 0;
+    let fallbackCount = 0;
     const categories = type === 'income' ? INCOME_CATEGORIES : CATEGORIES;
     const matchFn = type === 'income' ? findBestIncomeMatch : findBestMatch;
 
@@ -332,12 +342,15 @@ export async function handleClassificationResponse(
         try {
           const aiCategory = await matchCategoryWithAI(tx.vendor, type);
           if (aiCategory) category = aiCategory;
-        } catch { /* timeout is OK */ }
+        } catch (aiErr) {
+          console.warn(`[Classification] AI classify timeout for vendor="${tx.vendor}"`);
+        }
       }
 
-      // Last resort
+      // Last resort — track for user notification
       if (!category) {
         category = type === 'income' ? 'הכנסה אחרת' : 'אחר';
+        fallbackCount++;
       }
 
       // Update transaction
@@ -370,10 +383,15 @@ export async function handleClassificationResponse(
       classified++;
     }
 
-    console.log(`[Classification] ACCEPT_ALL_DONE: classified=${classified}/${pendingTx.length}`);
+    console.log(`[Classification] ACCEPT_ALL_DONE: classified=${classified}/${pendingTx.length}, fallback=${fallbackCount}`);
+    let doneMsg = `✅ *סיווגתי ${classified} תנועות!*`;
+    if (fallbackCount > 0) {
+      doneMsg += `\n\n⚠️ ${fallbackCount} תנועות סווגו כ-"אחר" — תוכל לתקן אותן אחר כך.`;
+    }
+    doneMsg += `\n\nנמשיך לשלב הבא 🎯`;
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `✅ *סיווגתי ${classified} תנועות!*\n\nנמשיך לשלב הבא 🎯`,
+      message: doneMsg,
     });
 
     // Move to next phase

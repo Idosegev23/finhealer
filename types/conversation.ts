@@ -92,6 +92,7 @@ export type IntentType =
   | "continue"            // נמשיך / הלאה / קדימה
   | "thanks"              // תודה / תודה רבה
   | "chart_request"       // גרף / תרשים
+  | "cancel"              // ביטול / חזור / חזרה
   | "unknown";
 
 export interface Entity {

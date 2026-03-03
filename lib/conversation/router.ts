@@ -101,7 +101,8 @@ export async function routeMessage(
     .single();
 
   const userName = user?.name || user?.full_name || null;
-  const state = (user?.onboarding_state || 'waiting_for_name') as UserState;
+  const rawState = user?.onboarding_state;
+  const state = (rawState || 'start') as UserState;
 
   // ══════════════════════════════════════════════════════════════════════════
   // AI INTENT DETECTION (rule-based, instant, no API call)
@@ -297,6 +298,25 @@ export async function routeMessage(
 
     await greenAPI.sendMessage({ phoneNumber: phone, message: helpText });
     return { success: true };
+  }
+
+  // Cancel / Back — universal escape from any non-terminal state
+  if (intent?.type === 'cancel' && intent.confidence > 0.7) {
+    const cancellableStates: UserState[] = ['goals_setup', 'behavior', 'budget', 'loan_consolidation_offer', 'waiting_for_loan_docs'];
+    if (cancellableStates.includes(state)) {
+      console.log(`[Router] UNIVERSAL: cancel in state=${state} → monitoring`);
+      const { calculatePhase } = await import('@/lib/services/PhaseService');
+      const currentPhase = await calculatePhase(userId);
+      await supabase.from('users').update({
+        onboarding_state: 'monitoring',
+        phase: currentPhase,
+      }).eq('id', userId);
+      await greenAPI.sendMessage({
+        phoneNumber: phone,
+        message: `🔙 חזרנו לתפריט הראשי.\n\nכתוב *"עזרה"* לראות מה אפשר לעשות.`,
+      });
+      return { success: true, newState: 'monitoring' };
+    }
   }
 
   // Frustration / Tiredness - offer a break

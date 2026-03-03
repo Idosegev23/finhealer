@@ -122,13 +122,25 @@ export function normalizeVendor(vendor: string): string {
 
 /**
  * Merges an update into the user's classification_context JSONB field.
- * ALWAYS fetches existing context first to avoid overwriting other keys.
+ * Uses PostgreSQL's native || operator for atomic merge (no read-then-write race).
+ * Falls back to fetch-merge-write if RPC fails.
  */
 export async function mergeClassificationContext(
   userId: string,
   update: Record<string, any>
 ): Promise<void> {
   const supabase = createServiceClient();
+
+  // Try atomic JSONB merge via raw SQL (no race condition)
+  const { error: rpcError } = await supabase.rpc('merge_classification_context', {
+    p_user_id: userId,
+    p_update: update,
+  });
+
+  if (!rpcError) return;
+
+  // Fallback: fetch-merge-write (race possible under concurrent requests)
+  console.warn(`[shared] merge_classification_context RPC unavailable, using fallback:`, rpcError.message);
   const { data } = await supabase
     .from('users')
     .select('classification_context')
