@@ -91,7 +91,7 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Create expense error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
   }
 }
 

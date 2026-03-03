@@ -127,7 +127,12 @@ export async function POST(request: NextRequest) {
 
     if (deleteError) {
       console.error('Failed to delete detail transactions:', deleteError);
-      // לא נכשל כאן - הקישור עצמו הצליח
+      // הקישור הצליח אך מחיקת המקור נכשלה — מחזירים warning
+      return NextResponse.json({
+        success: true,
+        warning: 'הקישור הצליח אך תנועות המקור לא נמחקו. יש לפנות לתמיכה.',
+        parentTransaction: parentTx,
+      });
     }
 
     // 7. שלוף את התנועה המעודכנת + פירוט
@@ -150,9 +155,9 @@ export async function POST(request: NextRequest) {
       detailsCount: linkedDetails?.length || 0,
       detailsTotal: detailsTotal.toFixed(2),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Link transactions error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'שגיאה בקישור תנועות' }, { status: 500 });
   }
 }
 
@@ -252,9 +257,9 @@ export async function DELETE(request: NextRequest) {
       message: 'הקישור נותק והפירוט הוחזר לתנועות נפרדות',
       restoredCount: transactionsToRestore.length,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Unlink transactions error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'שגיאה בניתוק קישור' }, { status: 500 });
   }
 }
 

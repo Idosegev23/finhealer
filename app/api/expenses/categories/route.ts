@@ -75,9 +75,9 @@ export async function GET(request: Request) {
       total: categories?.length || 0,
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Categories API error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'שגיאה בטעינת קטגוריות' }, { status: 500 });
   }
 }
 
@@ -126,8 +126,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ category });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Create category error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'שגיאה ביצירת קטגוריה' }, { status: 500 });
   }
 }

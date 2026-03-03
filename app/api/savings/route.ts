@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("Error fetching savings:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     // Calculate totals and progress
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Error creating savings account:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data }, { status: 201 });
@@ -161,7 +161,7 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       console.error("Error updating savings account:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data });
@@ -202,7 +202,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error("Error deleting savings account:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

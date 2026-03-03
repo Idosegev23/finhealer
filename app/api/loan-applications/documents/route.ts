@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("Error fetching loan documents:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data: documents });
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Error creating loan document:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data: document }, { status: 201 });
@@ -137,7 +137,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error("Error deleting loan document:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

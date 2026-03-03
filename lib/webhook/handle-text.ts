@@ -36,8 +36,13 @@ export async function handleText(ctx: WebhookContext): Promise<NextResponse> {
 
       // Check for delete command
       if (editMsg === 'מחק' || editMsg === 'delete') {
-        await supabase.from('transactions').delete().eq('id', editingTxId).eq('user_id', userData.id);
-        await greenAPI.sendMessage({ phoneNumber, message: '🗑️ ההוצאה נמחקה.' });
+        const { error: delErr } = await supabase.from('transactions').delete().eq('id', editingTxId).eq('user_id', userData.id);
+        if (delErr) {
+          console.error('Failed to delete transaction:', delErr);
+          await greenAPI.sendMessage({ phoneNumber, message: '❌ לא הצלחתי למחוק. נסה שוב.' });
+        } else {
+          await greenAPI.sendMessage({ phoneNumber, message: '🗑️ ההוצאה נמחקה.' });
+        }
       } else {
         // Parse edit: look for amount, category, description
         const updates: any = {};
@@ -49,14 +54,20 @@ export async function handleText(ctx: WebhookContext): Promise<NextResponse> {
         if (categoryMatch) updates.expense_category = categoryMatch[1].trim();
         if (descMatch) updates.notes = descMatch[1].trim();
 
-        if (Object.keys(updates).length > 0) {
-          await supabase.from('transactions').update(updates).eq('id', editingTxId).eq('user_id', userData.id);
-          await greenAPI.sendMessage({ phoneNumber, message: '✅ ההוצאה עודכנה!' });
-        } else {
+        if (Object.keys(updates).length === 0) {
           // Treat the whole text as the category
           updates.expense_category = editMsg;
-          await supabase.from('transactions').update(updates).eq('id', editingTxId).eq('user_id', userData.id);
-          await greenAPI.sendMessage({ phoneNumber, message: `✅ הקטגוריה עודכנה ל-"${editMsg}"` });
+        }
+
+        const { error: updErr } = await supabase.from('transactions').update(updates).eq('id', editingTxId).eq('user_id', userData.id);
+        if (updErr) {
+          console.error('Failed to update transaction:', updErr);
+          await greenAPI.sendMessage({ phoneNumber, message: '❌ לא הצלחתי לעדכן. נסה שוב.' });
+        } else {
+          const label = updates.expense_category && Object.keys(updates).length === 1
+            ? `✅ הקטגוריה עודכנה ל-"${updates.expense_category}"`
+            : '✅ ההוצאה עודכנה!';
+          await greenAPI.sendMessage({ phoneNumber, message: label });
         }
       }
 

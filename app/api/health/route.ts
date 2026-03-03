@@ -11,7 +11,6 @@ export async function GET() {
 
     return NextResponse.json({
       status: 'ok',
-      environment: process.env.NODE_ENV || 'development',
       uptime_seconds: uptime,
       timestamp: new Date().toISOString(),
     });

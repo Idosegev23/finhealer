@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // אם המשתמש לא מחובר ומנסה לגשת לדפים מוגנים
-  const protectedPaths = ['/dashboard', '/onboarding', '/payment', '/transactions', '/goals', '/budget', '/reports', '/settings', '/loans-simulator', '/guide']
+  const protectedPaths = ['/dashboard', '/onboarding', '/payment', '/transactions', '/goals', '/budget', '/reports', '/settings', '/loans-simulator', '/guide', '/admin']
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
   
   if (!user && isProtectedPath) {
@@ -81,19 +81,6 @@ export async function middleware(request: NextRequest) {
     const hasActiveSubscription = userData?.subscription_status === 'active'
     // השלים אונבורדינג = יש מנוי פעיל + יש טלפון (name מגיע אוטומטית מGoogle)
     const hasCompletedOnboarding = hasActiveSubscription && !!userData?.phone
-
-    // Debug logging
-    console.log('🔐 Middleware check:', {
-      path: currentPath,
-      userId: user.id,
-      userEmail: user.email,
-      userExistsInDB,
-      hasActiveSubscription,
-      hasCompletedOnboarding,
-      userName: userData?.name,
-      userPhone: userData?.phone,
-      userError: userError?.message
-    })
 
     // תהליך: login (auth) → payment (בחירת תוכנית בתוכו) → users table נוצר → onboarding → dashboard
 

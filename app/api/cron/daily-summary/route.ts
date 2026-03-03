@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching users:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     const results = [];
@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Daily summary cron error:', error);
     return NextResponse.json(
-      { error: error.message },
+      { error: 'שגיאה פנימית' },
       { status: 500 }
     );
   }

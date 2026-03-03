@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("Error fetching loans:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data: data || [] });
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Error creating loan:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data }, { status: 201 });
@@ -132,7 +132,7 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       console.error("Error updating loan:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data });
@@ -173,7 +173,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error("Error deleting loan:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

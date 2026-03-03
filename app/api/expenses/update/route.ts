@@ -107,7 +107,7 @@ export async function PUT(request: Request) {
     });
   } catch (error: any) {
     console.error('Update expense error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
   }
 }
 

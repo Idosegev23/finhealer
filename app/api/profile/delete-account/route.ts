@@ -26,10 +26,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // מחיקת כל הנתונים של המשתמש (RLS ידאג שרק הנתונים שלו נמחקים)
+    // מחיקת כל הנתונים של המשתמש
+    // סדר חשוב: ילדים לפני הורים (FK constraints)
     const tablesToDelete = [
+      'transaction_details',   // FK → transactions
       'transactions',
-      'transaction_details',
       'loans',
       'goals',
       'budget_categories',
@@ -46,21 +47,33 @@ export async function POST(request: NextRequest) {
       'user_financial_profile',
       'user_category_rules',
       'audit_logs',
+      'reminders',
+      'conversation_context',
+      'loan_consolidation_requests',
     ];
 
-    // מחיקה מכל הטבלאות
+    const failedTables: string[] = [];
     for (const table of tablesToDelete) {
-      await supabase
+      const { error: delErr } = await supabase
         .from(table)
         .delete()
         .eq('user_id', user.id);
+      if (delErr) {
+        console.error(`Failed to delete from ${table}:`, delErr.message);
+        failedTables.push(table);
+      }
     }
 
     // מחיקת המשתמש מטבלת users
-    await supabase
+    const { error: userDelErr } = await supabase
       .from('users')
       .delete()
       .eq('id', user.id);
+
+    if (userDelErr) {
+      console.error('Failed to delete user record:', userDelErr.message);
+      failedTables.push('users');
+    }
 
     // מחיקת החשבון מ-Supabase Auth
     const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(
@@ -69,7 +82,10 @@ export async function POST(request: NextRequest) {
 
     if (deleteAuthError) {
       console.error('Error deleting auth user:', deleteAuthError);
-      // ממשיכים גם אם יש שגיאה, המשתמש כבר לא יכול להתחבר
+    }
+
+    if (failedTables.length > 0) {
+      console.error(`Account deletion incomplete for ${user.id}. Failed tables: ${failedTables.join(', ')}`);
     }
 
     return NextResponse.json({
@@ -77,10 +93,10 @@ export async function POST(request: NextRequest) {
       message: 'החשבון נמחק בהצלחה. נצטער לראות שאתה עוזב.',
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error deleting account:', error);
     return NextResponse.json(
-      { error: error.message || 'שגיאה במחיקת החשבון' },
+      { error: 'שגיאה במחיקת החשבון' },
       { status: 500 }
     );
   }

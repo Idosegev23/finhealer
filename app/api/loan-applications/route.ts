@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("Error fetching loan applications:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data: applications });
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Error creating loan application:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data: application }, { status: 201 });
@@ -104,7 +104,7 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       console.error("Error updating loan application:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data: application });

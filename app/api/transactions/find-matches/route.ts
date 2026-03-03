@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Find matches error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
   }
 }
 

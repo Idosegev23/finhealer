@@ -78,7 +78,7 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('❌ Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
   }
 }
 
@@ -140,7 +140,7 @@ ${text.substring(0, 5000)}
     });
   } catch (error: any) {
     console.error('❌ AI error:', error);
-    return NextResponse.json({ error: error.message || 'AI analysis failed' }, { status: 400 });
+    return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 400 });
   }
 }
 
@@ -214,7 +214,7 @@ async function analyzeImageWithAI(dataUrl: string, importType: string, source: '
       return NextResponse.json({ error: 'OpenAI quota exceeded' }, { status: 429 });
     }
     
-    return NextResponse.json({ error: error.message || 'Vision analysis failed' }, { status: 400 });
+    return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 400 });
   }
 }
 
