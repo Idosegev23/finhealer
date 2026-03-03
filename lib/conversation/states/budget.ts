@@ -39,7 +39,12 @@ export async function handleBudgetPhase(ctx: RouterContext, msg: string): Promis
 
   // ── Layer 1: AI Intent Detection ──
   if (!resolvedIntent) {
-    const intent = await parseStateIntent(msg, 'budget');
+    let intent = { intent: 'unknown', confidence: 0, params: {} };
+    try {
+      intent = await parseStateIntent(msg, 'budget');
+    } catch (intentErr) {
+      console.warn(`[Budget] parseStateIntent failed:`, intentErr);
+    }
     console.log(`[Budget] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
 
     if (intent.confidence >= 0.6) {
@@ -251,11 +256,15 @@ export async function skipBudget(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
+  // Use calculated phase (don't hardcode)
+  const { calculatePhase: calcPhaseSkip } = await import('@/lib/services/PhaseService');
+  const skipPhase = await calcPhaseSkip(ctx.userId);
+
   // Update user state
   await supabase.from('users')
     .update({
       onboarding_state: 'monitoring',
-      phase: 'monitoring', phase_updated_at: new Date().toISOString()
+      phase: skipPhase, phase_updated_at: new Date().toISOString()
     })
     .eq('id', ctx.userId);
 
@@ -288,11 +297,15 @@ export async function finishBudget(ctx: RouterContext): Promise<RouterResult> {
     categoryCount = count || 0;
   }
 
+  // Use calculated phase (don't hardcode)
+  const { calculatePhase: calcPhaseBudget } = await import('@/lib/services/PhaseService');
+  const budgetPhase = await calcPhaseBudget(ctx.userId);
+
   // Update user state to monitoring
   await supabase.from('users')
     .update({
       onboarding_state: 'monitoring',
-      phase: 'monitoring', phase_updated_at: new Date().toISOString()
+      phase: budgetPhase, phase_updated_at: new Date().toISOString()
     })
     .eq('id', ctx.userId);
 
@@ -306,11 +319,15 @@ export async function transitionToBudget(ctx: RouterContext): Promise<RouterResu
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
+  // Use calculated phase (don't hardcode)
+  const { calculatePhase: calcPhaseTrans } = await import('@/lib/services/PhaseService');
+  const transPhase = await calcPhaseTrans(ctx.userId);
+
   // Update user state
   await supabase.from('users')
     .update({
       onboarding_state: 'budget',
-      phase: 'budget', phase_updated_at: new Date().toISOString()
+      phase: transPhase, phase_updated_at: new Date().toISOString()
     })
     .eq('id', ctx.userId);
 

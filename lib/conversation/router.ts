@@ -46,16 +46,16 @@ function getStateGuidance(state: UserState, userName: string | null): string {
     case 'waiting_for_name':
       return `היי! 👋 איך קוראים לך?`;
     case 'waiting_for_document':
-      return `היי ${name}! 👋\n\n📄 שלח לי דוח בנק או אשראי (PDF/תמונה) ואני אנתח את התנועות שלך.\n\nאין לך עכשיו? כתוב *"דלג"* ונמשיך.`;
+      return `היי ${name}! 👋\n\n📄 שלח לי דוח מהבנק או מחברת האשראי (PDF/תמונה/Excel).\n\nאין לך עכשיו? כתוב *"דלג"* ונמשיך.`;
     case 'classification':
     case 'classification_income':
     case 'classification_expense':
-      return `אנחנו בסיווג תנועות 📊\n\nאשר את הקטגוריה, כתוב קטגוריה אחרת, או *"דלג"*.\nרוצה לאשר הכל? כתוב *"קבל הכל"*.`;
+      return `אנחנו מסדרים את ההוצאות וההכנסות שלך 📊\n\nאני מציע קטגוריה — אשר, כתוב אחרת, או *"דלג"*.\nרוצה לאשר הכל? כתוב *"קבל הכל"*.`;
     case 'goals_setup':
     case 'goals':
       return `אנחנו בהגדרת יעדים 🎯\n\nכתוב *"יעד חדש"* להוסיף יעד, או *"סיימתי"* להמשיך.`;
     case 'behavior':
-      return `אנחנו בשלב ניתוח ההתנהגות 📈\n\nכתוב *"ניתוח"* לראות תובנות, או *"המשך"* לשלב הבא.`;
+      return `אנחנו בשלב ניתוח ההוצאות שלך 📈\n\nכתוב *"ניתוח"* לראות תובנות, או *"המשך"* לשלב הבא.`;
     case 'budget':
       return `אנחנו בבניית תקציב 💰\n\nבחר *"אוטומטי"* שאני אבנה לך, או *"דלג"* להמשיך.`;
     case 'monitoring':
@@ -151,11 +151,11 @@ export async function routeMessage(
           greeting += `\nמה תרצה לעשות? כתוב *"עזרה"* לתפריט`;
         } else if (state === 'classification' || state === 'classification_income' || state === 'classification_expense') {
           if (d.pendingCount > 0) {
-            greeting += `📋 יש לך ${d.pendingCount} תנועות שממתינות לסיווג.\n`;
-            greeting += `${d.confirmedCount > 0 ? `כבר סיווגת ${d.confirmedCount} תנועות — כל הכבוד! ` : ''}`;
+            greeting += `📋 יש לך ${d.pendingCount} הוצאות/הכנסות שצריך לסדר.\n`;
+            greeting += `${d.confirmedCount > 0 ? `כבר סידרת ${d.confirmedCount} — כל הכבוד! ` : ''}`;
             greeting += `\nכתוב *"נמשיך"* להתחיל`;
           } else {
-            greeting += `✅ אין תנועות ממתינות! כל הכבוד.\nכתוב *"נמשיך"* להמשך`;
+            greeting += `✅ הכל מסודר! כל הכבוד.\nכתוב *"נמשיך"* להמשך`;
           }
         } else if (state === 'goals' || state === 'goals_setup') {
           if (d.activeGoals.length > 0) {
@@ -214,7 +214,7 @@ export async function routeMessage(
       start: 'התחלה',
       waiting_for_name: 'המתנה לשם',
       waiting_for_document: 'העלאת מסמך',
-      classification: 'סיווג תנועות',
+      classification: 'מיון הוצאות והכנסות',
       classification_income: 'סיווג הכנסות',
       classification_expense: 'סיווג הוצאות',
       goals_setup: 'הגדרת יעדים',
@@ -231,7 +231,7 @@ export async function routeMessage(
 
     if (state === 'waiting_for_document' || state === 'start') {
       helpText += `📄 שלח תמונה או PDF של דוח בנק/אשראי\n`;
-      helpText += `✏️ *"נתחיל"* - לסווג תנועות קיימות\n`;
+      helpText += `✏️ *"נתחיל"* - לסדר הוצאות והכנסות קיימות\n`;
       helpText += `⏭️ *"דלג"* - אם אין לך מסמך עכשיו\n`;
     } else if (state === 'classification_income' || state === 'classification_expense') {
       helpText += `✅ כתוב שם קטגוריה (כמו "משכורת" או "מכולת")\n`;
@@ -269,7 +269,7 @@ export async function routeMessage(
               rows: [
                 { rowId: 'budget_status', title: '💰 תקציב', description: 'מצב תקציב חודשי' },
                 { rowId: 'to_goals', title: '🎯 יעדים', description: 'ניהול יעדי חיסכון' },
-                { rowId: 'unclassified', title: '📋 לא מסווג', description: 'תנועות ממתינות לסיווג' },
+                { rowId: 'unclassified', title: '📋 לא מסודר', description: 'הוצאות שצריך למיין' },
                 { rowId: 'add_doc', title: '📄 מסמך חדש', description: 'שלח דוח בנק או אשראי' },
               ],
             },
@@ -461,20 +461,24 @@ export async function onClassificationComplete(userId: string, phone: string): P
     .eq('status', 'active')
     .limit(1);
 
+  // Use calculated phase (don't hardcode)
+  const { calculatePhase } = await import('@/lib/services/PhaseService');
+  const nextPhase = await calculatePhase(userId);
+
   if (existingGoals && existingGoals.length > 0) {
     console.log(`[Router] TRANSITION: classification → behavior (has ${existingGoals.length} existing goals)`);
     await supabase
       .from('users')
       .update({
         onboarding_state: 'behavior',
-        phase: 'behavior',
+        phase: nextPhase,
         phase_updated_at: new Date().toISOString()
       })
       .eq('id', userId);
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
-      message: `🎉 *סיימנו לסווג!*\n\nעכשיו φ ינתח את דפוסי ההוצאות שלך.\n\nכתוב *"ניתוח"* להתחיל`,
+      message: `🎉 *סיימנו לסדר!*\n\nעכשיו φ ינתח את דפוסי ההוצאות שלך.\n\nכתוב *"ניתוח"* להתחיל`,
     });
   } else {
     console.log(`[Router] TRANSITION: classification → goals_setup (no existing goals)`);
@@ -482,14 +486,14 @@ export async function onClassificationComplete(userId: string, phone: string): P
       .from('users')
       .update({
         onboarding_state: 'goals_setup',
-        phase: 'goals',
+        phase: nextPhase,
         phase_updated_at: new Date().toISOString()
       })
       .eq('id', userId);
 
     await greenAPI.sendMessage({
       phoneNumber: phone,
-      message: `🎉 *סיימנו לסווג!*\n\nעכשיו בוא נגדיר יעדים פיננסיים 🎯\n\nכתוב *"יעד חדש"* או *"דלג"* לשלב הבא.`,
+      message: `🎉 *סיימנו לסדר!*\n\nעכשיו בוא נגדיר מטרות חיסכון 🎯\n\nכתוב *"יעד חדש"* להתחיל, או *"דלג"* להמשיך.`,
     });
   }
 }
@@ -536,7 +540,7 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
     await greenAPI.sendMessage({
       phoneNumber: phone,
       message: `✅ *קיבלתי את הדוח!*\n\n` +
-        `📝 ${incomeCount + expenseCount} תנועות\n` +
+        `📝 ${incomeCount + expenseCount} פעולות נמצאו\n` +
         `💚 ${incomeCount} הכנסות (${totalIncome.toLocaleString('he-IL')} ₪)\n` +
         `💸 ${expenseCount} הוצאות (${totalExpenses.toLocaleString('he-IL')} ₪)\n\n` +
         `🎯 *בוא נעבור עליהן ביחד!*`,
@@ -580,10 +584,10 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
 
   let confirmMsg = `✅ *דוח ${docType} התקבל!*\n\n`;
   if (txCount > 0) {
-    confirmMsg += `📝 ${txCount} תנועות חדשות נוספו.\n`;
-    confirmMsg += `כתוב *"נתחיל"* כדי לסווג אותן.`;
+    confirmMsg += `📝 ${txCount} הוצאות/הכנסות חדשות נוספו.\n`;
+    confirmMsg += `כתוב *"נתחיל"* כדי לסדר אותן.`;
   } else {
-    confirmMsg += `לא נמצאו תנועות חדשות בדוח.`;
+    confirmMsg += `לא נמצאו הוצאות או הכנסות חדשות בדוח.`;
   }
 
   await greenAPI.sendMessage({ phoneNumber: phone, message: confirmMsg });

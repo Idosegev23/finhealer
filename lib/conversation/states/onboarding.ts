@@ -36,8 +36,8 @@ export async function handleStart(
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `היי ${ctx.userName || ''}! 👋\n\n` +
-        `יש לך תנועות שמחכות לסיווג.\n` +
-        `כתוב *"נתחיל"* כדי לעבור עליהן ביחד 🎯`,
+        `יש לך הוצאות והכנסות שצריך לסדר.\n` +
+        `כתוב *"נתחיל"* ונעבור עליהן ביחד 🎯`,
     });
 
     return { success: true, newState: 'classification' as any };
@@ -47,7 +47,10 @@ export async function handleStart(
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `היי ${ctx.userName || 'שם'}! 👋\n\n` +
-      `📄 שלח לי דוח בנק או אשראי (PDF/Excel) ואני אנתח את התנועות שלך.`,
+      `אני φ Phi, העוזר הפיננסי שלך 😊\n\n` +
+      `📄 כדי להתחיל, שלח לי דוח מהבנק או מחברת האשראי.\n` +
+      `מתאים PDF, תמונה, או קובץ Excel.\n\n` +
+      `💡 *איפה מוצאים את זה?*\nבאפליקציית הבנק → דוחות → ייצוא`,
   });
 
   return { success: true, newState: 'waiting_for_document' as any };
@@ -75,7 +78,8 @@ export async function handleWaitingForName(
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `נעים להכיר, ${msg}! 😊\n\n` +
-      `📄 שלח לי דוח בנק (PDF) ואני אנתח את התנועות שלך.`,
+      `אני φ Phi, ואני כאן לעזור לך לנהל את הכסף בקלות.\n\n` +
+      `📄 שלח לי דוח מהבנק או מחברת האשראי (PDF/תמונה/Excel) ונתחיל!`,
   });
 
   return { success: true, newState: 'waiting_for_document' as any };
@@ -118,7 +122,12 @@ export async function handleWaitingForDocument(
   }
 
   // Layer 1: AI Intent Detection
-  const intent = await parseStateIntent(msg, 'onboarding');
+  let intent = { intent: 'unknown', confidence: 0, params: {} };
+  try {
+    intent = await parseStateIntent(msg, 'onboarding');
+  } catch (intentErr) {
+    console.warn(`[Onboarding] parseStateIntent failed:`, intentErr);
+  }
   console.log(`[Onboarding] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
 
   if (intent.intent === 'start_classify' && intent.confidence >= 0.6) {
@@ -151,12 +160,15 @@ export async function handleWaitingForDocument(
       await supabase.from('users').update({ onboarding_state: 'classification' }).eq('id', ctx.userId);
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: `בסדר! 😊\n\nיש לך תנועות שמחכות - בוא נסווג אותן.\nכתוב *"נתחיל"* כשתהיה מוכן.`,
+        message: `בסדר! 😊\n\nיש לך הוצאות והכנסות שצריך לסדר.\nכתוב *"נתחיל"* כשתהיה מוכן.`,
       });
       return { success: true, newState: 'classification' as any };
     } else {
       // No transactions - go to monitoring with limited functionality
-      await supabase.from('users').update({ onboarding_state: 'monitoring', phase: 'monitoring' }).eq('id', ctx.userId);
+      // Use calculated phase (don't hardcode)
+      const { calculatePhase: calcPhaseSkip } = await import('@/lib/services/PhaseService');
+      const skipPhase = await calcPhaseSkip(ctx.userId);
+      await supabase.from('users').update({ onboarding_state: 'monitoring', phase: skipPhase }).eq('id', ctx.userId);
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
         message: `בסדר! 😊\n\nתוכל לשלוח מסמכים בכל עת.\n\nבינתיים, אפשר לשאול אותי שאלות פיננסיות או לכתוב *"עזרה"* לראות מה אפשר לעשות.`,
@@ -165,10 +177,16 @@ export async function handleWaitingForDocument(
     }
   }
 
-  // Default - waiting for document
+  // Default - waiting for document, provide clear guidance
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
-    message: `📄 מחכה לדוח בנק!\n\nשלח לי קובץ PDF ואני אנתח אותו.`,
+    message: `📄 אני מחכה לדוח מהבנק או מחברת האשראי.\n\n` +
+      `*מה מתאים:*\n` +
+      `• קובץ PDF\n` +
+      `• תמונה (צילום מסך)\n` +
+      `• קובץ Excel\n\n` +
+      `💡 אפשר למצוא את זה באפליקציית הבנק בחלק של "דוחות".\n\n` +
+      `אין לך עכשיו? כתוב *"דלג"* ונמשיך.`,
   });
 
   return { success: true };

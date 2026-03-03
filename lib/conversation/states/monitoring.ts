@@ -63,7 +63,12 @@ export async function handleMonitoring(
 
   if (loanContext?.pending) {
     const { handleConsolidationResponse } = await import('@/lib/loans/consolidation-handler');
-    const loanIntent = await parseStateIntent(msg, 'loan_decision');
+    let loanIntent = { intent: 'unknown', confidence: 0, params: {} };
+    try {
+      loanIntent = await parseStateIntent(msg, 'loan_decision');
+    } catch (intentErr) {
+      console.warn(`[Monitoring] parseStateIntent (loan_decision) failed:`, intentErr);
+    }
     console.log(`[Monitoring] LOAN_INTENT: intent="${loanIntent.intent}", confidence=${loanIntent.confidence}`);
 
     if (loanIntent.intent === 'yes' && loanIntent.confidence >= 0.6) {
@@ -270,7 +275,7 @@ export async function handleMonitoring(
     ]);
 
     const phiSystemPrompt =
-      `אתה φ (פי) - מאמן פיננסי אישי חם ומקצועי בוואטסאפ. ענה בעברית, בקצרה ובחום.\n\n` +
+      `אתה φ (פי) - עוזר פיננסי אישי חם ומקצועי בוואטסאפ. ענה בעברית, בקצרה ובחום.\n\n` +
       `יש לך גישה לנתונים הפיננסיים המלאים של המשתמש (למטה).\n` +
       `ענה על סמך הנתונים האמיתיים - אל תמציא מספרים.\n` +
       `אם המשתמש רוצה פעולה - תציע לו ישירות (למשל "רוצה שאראה לך סיכום?").\n` +
@@ -439,9 +444,13 @@ async function dispatchMonitoringIntent(
     }
 
     case 'analyze': {
+      // Use calculated phase (don't hardcode)
+      const { calculatePhase: calcPhaseAnalyze } = await import('@/lib/services/PhaseService');
+      const analyzePhase = await calcPhaseAnalyze(ctx.userId);
+
       await supabase
         .from('users')
-        .update({ onboarding_state: 'behavior', phase: 'behavior' })
+        .update({ onboarding_state: 'behavior', phase: analyzePhase })
         .eq('id', ctx.userId);
 
       const { handleBehaviorPhase } = await import('./behavior');
@@ -492,7 +501,12 @@ export async function handleLoanConsolidationOffer(
   const { userId, phone } = ctx;
 
   // ── AI Intent Detection ──────────────────────────────────────────────────
-  const loanIntent = await parseStateIntent(msg, 'loan_decision');
+  let loanIntent = { intent: 'unknown', confidence: 0, params: {} };
+  try {
+    loanIntent = await parseStateIntent(msg, 'loan_decision');
+  } catch (intentErr) {
+    console.warn(`[LoanOffer] parseStateIntent failed:`, intentErr);
+  }
   console.log(`[LoanOffer] AI_INTENT: intent="${loanIntent.intent}", confidence=${loanIntent.confidence}`);
 
   // ── Yes – create a consolidation request and move to waiting_for_loan_docs ─
@@ -593,7 +607,12 @@ export async function handleWaitingForLoanDocs(
 ): Promise<RouterResult> {
   const greenAPI = getGreenAPIClient();
 
-  const docsIntent = await parseStateIntent(msg, 'waiting_for_docs');
+  let docsIntent = { intent: 'unknown', confidence: 0, params: {} };
+  try {
+    docsIntent = await parseStateIntent(msg, 'waiting_for_docs');
+  } catch (intentErr) {
+    console.warn(`[WaitingForLoanDocs] parseStateIntent failed:`, intentErr);
+  }
   console.log(`[WaitingForLoanDocs] AI_INTENT: intent="${docsIntent.intent}", confidence=${docsIntent.confidence}`);
 
   if (docsIntent.intent === 'skip' && docsIntent.confidence >= 0.6) {
@@ -726,7 +745,6 @@ export async function showMonitoringSummary(
   }
 
   message += `\nכתוב *"חודשים"* לראות חודשים נוספים`;
-  message += `\nφ *Phi - היחס הזהב של הכסף שלך*`;
 
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message });
   return { success: true };
@@ -996,8 +1014,6 @@ export async function showBudgetStatus(ctx: RouterContext): Promise<RouterResult
     message += `\n✨ *מצוין!*\n`;
     message += `נשארו לך ₪${remaining.toLocaleString('he-IL')} לחודש`;
   }
-
-  message += `\n\nφ *Phi - היחס הזהב של הכסף שלך*`;
 
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message });
   return { success: true };
@@ -1351,12 +1367,16 @@ export async function showFinalSummary(ctx: RouterContext): Promise<RouterResult
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
+  // Use calculated phase (don't hardcode)
+  const { calculatePhase: calcPhaseFinal } = await import('@/lib/services/PhaseService');
+  const finalPhase = await calcPhaseFinal(ctx.userId);
+
   // Transition to behavior phase
   await supabase
     .from('users')
     .update({
       onboarding_state: 'behavior',
-      phase: 'behavior',
+      phase: finalPhase,
       phase_updated_at: new Date().toISOString(),
     })
     .eq('id', ctx.userId);
@@ -1692,8 +1712,8 @@ async function showAdvisorCTA(ctx: RouterContext): Promise<RouterResult> {
     msg += `📈 *הוצאות החודש שלך:* ${monthExpenses.toLocaleString('he-IL')} ₪\n\n`;
   }
 
-  msg += `📞 *ליצירת קשר עם גדי:*\nhttps://wa.me/${waNumber}?text=היי%20גדי%2C%20הגעתי%20מ-φ%20Phi\n\n`;
-  msg += `φ *Phi - היחס הזהב של הכסף שלך*`;
+  msg += `📞 *ליצירת קשר עם גדי:*\nhttps://wa.me/${waNumber}?text=היי%20גדי%2C%20הגעתי%20מהבוט\n\n`;
+  msg += `🤝 *גדי - העוזר הפיננסי שלך*`;
 
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: msg });
   return { success: true };

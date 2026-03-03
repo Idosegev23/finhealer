@@ -172,7 +172,7 @@ export async function startAdvancedGoal(
       message: `🎯 *יעד חדש*\n\nבחר את סוג היעד שמתאים לך:`,
       buttonText: 'בחר יעד',
       title: 'יעד פיננסי חדש',
-      footer: 'φ Phi - המאמן הפיננסי שלך',
+      footer: 'φ Phi - העוזר הפיננסי שלך',
       sections: [
         {
           title: '🛡️ ביטחון פיננסי',
@@ -757,9 +757,8 @@ export async function createAdvancedGoal(
 
   if (error) {
     console.error('[AdvGoals] CREATE_GOAL_ERROR_DETAIL:', error, 'payload:', JSON.stringify(insertPayload));
-    const dbErrorMsg = `❌ שגיאה בשמירת היעד.\n\n` +
-      `פרטים: ${error.message || 'שגיאת מסד נתונים'}\n\n` +
-      `כתוב *"יעד חדש"* לנסות שוב.`;
+    const dbErrorMsg = `❌ לא הצלחתי לשמור את היעד.\n\n` +
+      `נסה שוב עוד כמה דקות, או כתוב *"יעד חדש"* להתחיל מחדש.`;
     console.log(`[AdvGoals] SEND_MSG: "${dbErrorMsg.substring(0, 100)}..."`);
     await greenAPI.sendMessage({
       phoneNumber: phone,

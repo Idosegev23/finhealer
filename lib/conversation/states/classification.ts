@@ -236,9 +236,13 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
   const newState = incomeCount > 0 ? 'classification_income' : 'classification_expense';
   console.log(`[Classification] START: setting newState=${newState}, showing first transaction`);
 
+  // Use calculated phase (don't hardcode)
+  const { calculatePhase: calcPhaseClassify } = await import('@/lib/services/PhaseService');
+  const classifyPhase = await calcPhaseClassify(ctx.userId);
+
   await supabase
     .from('users')
-    .update({ onboarding_state: newState, phase: 'data_collection' })
+    .update({ onboarding_state: newState, phase: classifyPhase })
     .eq('id', ctx.userId);
 
   await showNextTransaction({ ...ctx, state: newState }, newState === 'classification_income' ? 'income' : 'expense');

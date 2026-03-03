@@ -20,7 +20,12 @@ export async function handleBehaviorPhase(ctx: RouterContext, msg: string): Prom
   }
 
   // ── Layer 1: AI Intent ──
-  const intent = await parseStateIntent(msg, 'behavior');
+  let intent = { intent: 'unknown', confidence: 0, params: {} };
+  try {
+    intent = await parseStateIntent(msg, 'behavior');
+  } catch (intentErr) {
+    console.warn(`[Behavior] parseStateIntent failed:`, intentErr);
+  }
   console.log(`[Behavior] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
 
   if (intent.intent === 'analyze' && intent.confidence >= 0.6) {
@@ -152,24 +157,28 @@ export async function transitionToGoals(ctx: RouterContext): Promise<RouterResul
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
+  // Use calculated phase (don't hardcode)
+  const { calculatePhase } = await import('@/lib/services/PhaseService');
+  const nextPhase = await calculatePhase(ctx.userId);
+
   await supabase
     .from('users')
     .update({
       onboarding_state: 'goals',
-      phase: 'goals',
+      phase: nextPhase,
       phase_updated_at: new Date().toISOString()
     })
     .eq('id', ctx.userId);
 
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
-    message: `🎯 *שלב 3: φ Goals Balancer*\n\n` +
-      `עכשיו נגדיר את היעדים הפיננסיים שלך!\n\n` +
-      `💡 *המערכת תעשה בשבילך:*\n` +
-      `• 📊 תחשב הקצאה אוטומטית לכל יעד\n` +
-      `• ⚖️ תשקלל לפי עדיפות ודחיפות\n` +
-      `• 🛡️ תוודא שנשאר לך לחיות (\"אוכל בצלחת\")\n` +
-      `• 🔄 תתאים אוטומטית לשינויי הכנסה\n\n` +
+    message: `🎯 *שלב 3: הגדרת מטרות חיסכון*\n\n` +
+      `עכשיו נגדיר יעדים — מה חשוב לך לחסוך בשבילו?\n\n` +
+      `💡 *מה φ יעשה בשבילך:*\n` +
+      `• 📊 יחשב כמה לשים בצד כל חודש\n` +
+      `• ⚖️ יתעדף לפי מה שדחוף יותר\n` +
+      `• 🛡️ יוודא שנשאר לך מספיק לחיות\n` +
+      `• 🔄 יתאים אוטומטית אם ההכנסה משתנה\n\n` +
       `*מה חשוב לך?*\n` +
       `1️⃣ חיסכון לקרן חירום\n` +
       `2️⃣ סגירת חובות\n` +
@@ -188,10 +197,10 @@ export async function transitionToGoals(ctx: RouterContext): Promise<RouterResul
     try {
       await greenAPI.sendInteractiveButtons({
         phoneNumber: ctx.phone,
-        message: `✨ *כלים מתקדמים זמינים:*\n\n` +
-          `• *יעדים* - הצג יעדים + הקצאות מחושבות\n` +
-          `• *סימולציה* - בדוק \"מה יקרה אם...\"\n` +
-          `• *אופטימיזציה* - קבל המלצות φ חכמות`,
+        message: `✨ *כלים נוספים:*\n\n` +
+          `• *יעדים* - ראה יעדים והקצאות חודשיות\n` +
+          `• *סימולציה* - בדוק "מה יקרה אם..."\n` +
+          `• *אופטימיזציה* - קבל המלצות חכמות מ-φ`,
         buttons: [
           { buttonId: 'show_goals', buttonText: 'יעדים' },
           { buttonId: 'simulate', buttonText: 'סימולציה' },

@@ -1096,8 +1096,8 @@ async function showFinalSummaryAndMonitoring(ctx: RouterContext): Promise<Router
   message +=
     `✅ *φ Phi מוכן לעזור לך!*\n\n` +
     `אשלח לך תזכורות ועדכונים שבועיים.\n` +
-    `תוכל לשאול אותי כל שאלה פיננסית.\n\n` +
-    `φ *Phi - היחס הזהב של הכסף שלך*`;
+    `תוכל לשאול אותי כל שאלה על הכסף שלך.\n\n` +
+    `כתוב *"עזרה"* בכל עת לראות מה אפשר לעשות 😊`;
 
   await greenAPI.sendMessage({ phoneNumber: phone, message });
 
