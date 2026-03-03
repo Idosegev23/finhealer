@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const { data: users, error: usersError } = await supabase
       .from('users')
       .select('id, name, email, phase')
-      .eq('subscription_status', 'active');
+      .in('subscription_status', ['active', 'trial']);
 
     if (usersError) {
       console.error('Error fetching users:', usersError);

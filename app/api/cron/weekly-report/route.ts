@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       .from('users')
       .select('id, name, phone')
       .eq('wa_opt_in', true)
-      .eq('subscription_status', 'active')
+      .in('subscription_status', ['active', 'trial'])
       .not('phone', 'is', null);
 
     const results = [];

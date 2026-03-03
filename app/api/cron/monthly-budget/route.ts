@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const { data: users } = await supabase
       .from('users')
       .select('id, name, phone, created_at')
-      .eq('subscription_status', 'active');
+      .in('subscription_status', ['active', 'trial']);
 
     const results = [];
 

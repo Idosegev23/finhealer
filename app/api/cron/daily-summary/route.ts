@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
       .from('users')
       .select('id, name, full_name, phone, wa_opt_in, phase')
       .eq('wa_opt_in', true)
+      .in('subscription_status', ['active', 'trial'])
       .not('phone', 'is', null);
 
     if (error) {

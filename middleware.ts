@@ -78,9 +78,18 @@ export async function middleware(request: NextRequest) {
       .maybeSingle()
 
     const userExistsInDB = !!userData && !userError
-    const hasActiveSubscription = userData?.subscription_status === 'active'
-    // השלים אונבורדינג = יש מנוי פעיל + יש טלפון (name מגיע אוטומטית מGoogle)
+    const hasActiveSubscription = userData?.subscription_status === 'active' || userData?.subscription_status === 'trial'
+    // השלים אונבורדינג = יש מנוי פעיל/trial + יש טלפון (name מגיע אוטומטית מGoogle)
     const hasCompletedOnboarding = hasActiveSubscription && !!userData?.phone
+
+    // Admin access — check email allowlist
+    if (currentPath.startsWith('/admin')) {
+      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+      const userEmail = user.email?.toLowerCase() || ''
+      if (!adminEmails.includes(userEmail)) {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+    }
 
     // תהליך: login (auth) → payment (בחירת תוכנית בתוכו) → users table נוצר → onboarding → dashboard
 

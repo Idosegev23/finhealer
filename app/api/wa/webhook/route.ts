@@ -10,6 +10,7 @@ import { handleText } from '@/lib/webhook/handle-text';
 import { handleImage } from '@/lib/webhook/handle-image';
 import { handleDocument } from '@/lib/webhook/handle-document';
 import { handleUnsupported } from '@/lib/webhook/handle-unsupported';
+import { checkSubscription, isAllowedWhenBlocked } from '@/lib/webhook/subscription-gate';
 
 /**
  * GreenAPI Webhook Handler
@@ -33,6 +34,18 @@ export async function POST(request: NextRequest) {
 
     const { userData, phoneNumber } = userResult;
 
+    // 2.5 Subscription gate
+    const subCheck = checkSubscription(userData);
+    if (!subCheck.allowed) {
+      const msgData = payload!.messageData;
+      const rawText = msgData?.textMessageData?.textMessage || msgData?.extendedTextMessageData?.text || '';
+      if (!isAllowedWhenBlocked(rawText)) {
+        const greenAPI = getGreenAPIClient();
+        await greenAPI.sendMessage({ phoneNumber: phoneNumber!, message: subCheck.message! });
+        return NextResponse.json({ status: 'subscription_blocked' });
+      }
+    }
+
     // 3. Rate limiting
     if (checkRateLimit(userData.id)) {
       console.warn(`⚠️ Rate limited user ${maskUserId(userData.id)}`);
@@ -52,6 +65,9 @@ export async function POST(request: NextRequest) {
     if (msgError) {
       return NextResponse.json({ status: 'error', message: msgError.message }, { status: 500 });
     }
+
+    // 4.5 Update last interaction timestamp (fire-and-forget)
+    supabase.from('users').update({ last_wa_interaction: new Date().toISOString() }).eq('id', userData.id).then(() => {});
 
     // 5. Build context object for handlers
     const ctx = { userData, phoneNumber: phoneNumber!, payload: payload!, messageId: messageId!, supabase, greenAPI: getGreenAPIClient() };

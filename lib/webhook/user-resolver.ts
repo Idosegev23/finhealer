@@ -39,7 +39,7 @@ export async function resolveUser(
 
   const { data: users } = await supabase
     .from('users')
-    .select('id, name, wa_opt_in, phone')
+    .select('id, name, wa_opt_in, phone, subscription_status, trial_expires_at')
     .in('phone', phoneVariants);
 
   const user = users?.[0];
@@ -67,8 +67,10 @@ export async function resolveUser(
         wa_opt_in: true,
         onboarding_state: initialState,
         phase: 'data_collection',
+        subscription_status: 'trial',
+        trial_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       })
-      .select('id, name, wa_opt_in, phone')
+      .select('id, name, wa_opt_in, phone, subscription_status, trial_expires_at')
       .single();
 
     if (createError || !newUser) {
