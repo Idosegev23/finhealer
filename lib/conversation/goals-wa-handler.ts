@@ -9,25 +9,9 @@ import {
   saveAllocationHistory,
   applyAllocations,
 } from '@/lib/goals/goals-balancer';
+import { mergeClassificationContext as mergeContext } from './shared';
 import type { RouterContext } from './phi-router';
 import type { Goal } from '@/types/goals';
-
-/**
- * Helper: merge into classification_context without overwriting other keys
- */
-async function mergeContext(userId: string, update: Record<string, any>): Promise<void> {
-  const supabase = createServiceClient();
-  const { data: user } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-  const existing = user?.classification_context || {};
-  await supabase
-    .from('users')
-    .update({ classification_context: { ...existing, ...update } })
-    .eq('id', userId);
-}
 
 /**
  * הצגת יעדים מתקדמת עם הקצאות מחושבות

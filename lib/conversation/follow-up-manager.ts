@@ -1,5 +1,5 @@
 import { ConversationContext } from "@/types/conversation";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * Smart Follow-up Manager
@@ -28,7 +28,7 @@ export async function scheduleReminder(
   contextData?: any
 ): Promise<string> {
   try {
-    const supabase = await createClient();
+    const supabase = createServiceClient();
 
     const { data, error } = await supabase
       .from("reminders")
@@ -60,7 +60,7 @@ export async function scheduleReminder(
  */
 export async function cancelReminder(reminderId: string): Promise<void> {
   try {
-    const supabase = await createClient();
+    const supabase = createServiceClient();
 
     await supabase.from("reminders").delete().eq("id", reminderId);
   } catch (error) {
@@ -73,7 +73,7 @@ export async function cancelReminder(reminderId: string): Promise<void> {
  */
 export async function getPendingReminders(userId: string): Promise<Reminder[]> {
   try {
-    const supabase = await createClient();
+    const supabase = createServiceClient();
 
     const { data, error } = await supabase
       .from("reminders")
@@ -103,7 +103,7 @@ export async function getPendingReminders(userId: string): Promise<Reminder[]> {
  */
 export async function getDueReminders(): Promise<Reminder[]> {
   try {
-    const supabase = await createClient();
+    const supabase = createServiceClient();
 
     const now = new Date().toISOString();
 
@@ -135,7 +135,7 @@ export async function getDueReminders(): Promise<Reminder[]> {
  */
 export async function markReminderSent(reminderId: string): Promise<void> {
   try {
-    const supabase = await createClient();
+    const supabase = createServiceClient();
 
     await supabase
       .from("reminders")

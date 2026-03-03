@@ -5,35 +5,8 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { chatWithGeminiFlashMinimal } from '@/lib/ai/gemini-client';
+import { mergeClassificationContext } from './shared';
 import type { GoalType, BudgetSource, Goal } from '@/types/goals';
-
-/**
- * עדכון classification_context בצורה בטוחה (merge, לא overwrite)
- */
-async function mergeClassificationContext(
-  userId: string,
-  update: Record<string, any>
-): Promise<void> {
-  const supabase = createServiceClient();
-  const { data: user } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-
-  const existing = user?.classification_context || {};
-
-  const { error } = await supabase
-    .from('users')
-    .update({
-      classification_context: { ...existing, ...update }
-    })
-    .eq('id', userId);
-
-  if (error) {
-    console.error(`[AdvGoals] mergeClassificationContext failed:`, error.message);
-  }
-}
 
 export interface AdvancedGoalContext {
   step: 'type' | 'name' | 'amount' | 'deadline' | 'priority' | 'budget_source' | 'child' | 'confirm';

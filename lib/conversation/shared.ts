@@ -117,11 +117,28 @@ export function normalizeVendor(vendor: string): string {
 }
 
 // ============================================================================
-// Progress Bar
+// Classification Context Merge Utility
 // ============================================================================
 
-export function createProgressBar(percent: number): string {
-  const filled = Math.round(Math.min(100, Math.max(0, percent)) / 10);
-  return '▓'.repeat(filled) + '░'.repeat(10 - filled);
+/**
+ * Merges an update into the user's classification_context JSONB field.
+ * ALWAYS fetches existing context first to avoid overwriting other keys.
+ */
+export async function mergeClassificationContext(
+  userId: string,
+  update: Record<string, any>
+): Promise<void> {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+
+  const existing = data?.classification_context || {};
+  await supabase
+    .from('users')
+    .update({ classification_context: { ...existing, ...update } })
+    .eq('id', userId);
 }
 

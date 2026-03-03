@@ -4,21 +4,8 @@
 
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
+import { mergeClassificationContext as mergeContext } from './shared';
 import type { Goal } from '@/types/goals';
-
-async function mergeContext(userId: string, update: Record<string, any>): Promise<void> {
-  const supabase = createServiceClient();
-  const { data: user } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-  const existing = user?.classification_context || {};
-  await supabase
-    .from('users')
-    .update({ classification_context: { ...existing, ...update } })
-    .eq('id', userId);
-}
 
 async function removeEditGoalContext(userId: string): Promise<void> {
   const supabase = createServiceClient();

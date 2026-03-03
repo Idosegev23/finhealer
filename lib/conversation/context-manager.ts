@@ -156,22 +156,6 @@ export async function updateContext(
 }
 
 /**
- * Clear context (reset conversation)
- */
-export async function clearContext(userId: string): Promise<void> {
-  try {
-    const supabase = createServiceClient();
-
-    await supabase
-      .from("conversation_context")
-      .delete()
-      .eq("user_id", userId);
-  } catch (error) {
-    console.error("Failed to clear context:", error);
-  }
-}
-
-/**
  * Get or create context for user
  */
 export async function getOrCreateContext(userId: string): Promise<ConversationContext> {
@@ -238,140 +222,13 @@ export async function resumeStaleContext(
   return { context, message };
 }
 
-/**
- * Track consecutive postponements
- */
-export async function trackPostponement(userId: string): Promise<number> {
-  try {
-    const supabase = createServiceClient();
-
-    // Get current count
-    const { data } = await supabase
-      .from("conversation_context")
-      .select("metadata")
-      .eq("user_id", userId)
-      .single();
-
-    const currentCount = data?.metadata?.consecutive_postponements || 0;
-    const newCount = currentCount + 1;
-
-    // Update count
-    await supabase
-      .from("conversation_context")
-      .update({
-        metadata: {
-          ...data?.metadata,
-          consecutive_postponements: newCount,
-          last_postponement: new Date().toISOString(),
-        },
-      })
-      .eq("user_id", userId);
-
-    return newCount;
-  } catch (error) {
-    console.error("Failed to track postponement:", error);
-    return 0;
-  }
-}
-
-/**
- * Reset postponement counter
- */
-export async function resetPostponementCounter(userId: string): Promise<void> {
-  try {
-    const supabase = createServiceClient();
-
-    const { data } = await supabase
-      .from("conversation_context")
-      .select("metadata")
-      .eq("user_id", userId)
-      .single();
-
-    await supabase
-      .from("conversation_context")
-      .update({
-        metadata: {
-          ...data?.metadata,
-          consecutive_postponements: 0,
-        },
-      })
-      .eq("user_id", userId);
-  } catch (error) {
-    console.error("Failed to reset postponement counter:", error);
-  }
-}
-
-/**
- * Get conversation statistics for user
- */
-export async function getConversationStats(userId: string): Promise<{
-  totalMessages: number;
-  lastActive: Date;
-  averageResponseTime: number;
-  completedTasks: number;
-}> {
-  try {
-    const supabase = createServiceClient();
-
-    const { data: messages } = await supabase
-      .from("conversation_history")
-      .select("timestamp, role")
-      .eq("user_id", userId)
-      .order("timestamp", { ascending: false });
-
-    if (!messages || messages.length === 0) {
-      return {
-        totalMessages: 0,
-        lastActive: new Date(),
-        averageResponseTime: 0,
-        completedTasks: 0,
-      };
-    }
-
-    // Calculate average response time
-    let totalResponseTime = 0;
-    let responseCount = 0;
-
-    for (let i = 1; i < messages.length; i++) {
-      if (messages[i].role === "user" && messages[i - 1].role === "assistant") {
-        const userTime = new Date(messages[i].timestamp).getTime();
-        const assistantTime = new Date(messages[i - 1].timestamp).getTime();
-        totalResponseTime += userTime - assistantTime;
-        responseCount++;
-      }
-    }
-
-    const averageResponseTime =
-      responseCount > 0 ? totalResponseTime / responseCount / 1000 : 0; // in seconds
-
-    return {
-      totalMessages: messages.length,
-      lastActive: new Date(messages[0].timestamp),
-      averageResponseTime,
-      completedTasks: 0, // TODO: Track completed tasks
-    };
-  } catch (error) {
-    console.error("Failed to get conversation stats:", error);
-    return {
-      totalMessages: 0,
-      lastActive: new Date(),
-      averageResponseTime: 0,
-      completedTasks: 0,
-    };
-  }
-}
-
 export default {
   saveContext,
   loadContext,
   createContext,
   updateContext,
-  clearContext,
   getOrCreateContext,
   isContextStale,
   resumeStaleContext,
-  trackPostponement,
-  resetPostponementCounter,
-  getConversationStats,
 };
 
