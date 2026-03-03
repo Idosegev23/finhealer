@@ -118,11 +118,21 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
     if (advancedGoalCreation.step === 'amount') {
       const amount = parseGoalAmount(msg);
       console.log(`[Goals] AMOUNT_STEP (setup): input="${msg}", parsed=${amount}`);
+      if (msg === 'ביטול' || msg === 'בטל' || msg === 'חזור') {
+        // Cancel goal creation
+        await mergeClassificationContext(userId, { advanced_goal_creation: null });
+        await greenAPI.sendMessage({
+          phoneNumber: phone,
+          message: `🔙 יצירת היעד בוטלה.\n\nכתוב *"יעד חדש"* כדי להתחיל שוב, או *"סיימתי"* כדי להמשיך.`,
+        });
+        return { success: true };
+      }
+
       if (isNaN(amount) || amount <= 0) {
         console.log(`[Goals] AMOUNT_STEP: INVALID amount, staying on amount step`);
         await greenAPI.sendMessage({
           phoneNumber: phone,
-          message: `❌ סכום לא תקין.\n\nדוגמאות: *15000*, *50 אלף*, *100K*`,
+          message: `❌ סכום לא תקין.\n\nדוגמאות: *15000*, *50 אלף*, *100K*\n\nלביטול כתוב *"ביטול"*`,
         });
         return { success: true };
       }
@@ -155,6 +165,15 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
 
     // Deadline step
     if (advancedGoalCreation.step === 'deadline') {
+      if (msg === 'ביטול' || msg === 'בטל' || msg === 'חזור') {
+        await mergeClassificationContext(userId, { advanced_goal_creation: null });
+        await greenAPI.sendMessage({
+          phoneNumber: phone,
+          message: `🔙 יצירת היעד בוטלה.\n\nכתוב *"יעד חדש"* כדי להתחיל שוב, או *"סיימתי"* כדי להמשיך.`,
+        });
+        return { success: true };
+      }
+
       const deadline = parseGoalDeadline(msg);
       console.log(`[Goals] DEADLINE_STEP (setup): input="${msg}", parsed=${deadline || 'null'}`);
       console.log(`[Goals] STEP_TRANSITION: deadline → confirm`);
@@ -1101,5 +1120,5 @@ async function showFinalSummaryAndMonitoring(ctx: RouterContext): Promise<Router
 
   await greenAPI.sendMessage({ phoneNumber: phone, message });
 
-  return { success: true, newState: 'behavior' };
+  return { success: true, newState: finalState as any };
 }

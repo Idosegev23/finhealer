@@ -61,8 +61,17 @@ export async function handleBehaviorPhase(ctx: RouterContext, msg: string): Prom
     return { success: true };
   }
 
-  // Default - run analysis
-  return await startBehaviorAnalysis(ctx);
+  // Default — show guidance instead of auto-running analysis
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `🤔 לא הבנתי.\n\n` +
+      `*אפשרויות:*\n` +
+      `• *"ניתוח"* - הרץ ניתוח התנהגות\n` +
+      `• *"סיכום"* - הצג תובנות\n` +
+      `• *"המשך"* - עבור לשלב הבא\n` +
+      `• *"עזרה"* - עוד אפשרויות`,
+  });
+  return { success: true };
 }
 
 export async function startBehaviorAnalysis(ctx: RouterContext): Promise<RouterResult> {

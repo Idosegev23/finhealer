@@ -113,6 +113,6 @@ export async function handleText(ctx: WebhookContext): Promise<NextResponse> {
       phoneNumber,
       message: 'סליחה, משהו השתבש 😅 נסה שוב בבקשה',
     });
-    return NextResponse.json({ status: 'error', error: String(routerError) });
+    return NextResponse.json({ status: 'error' });
   }
 }
