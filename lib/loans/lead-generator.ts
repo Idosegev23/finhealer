@@ -3,7 +3,7 @@
  * בונה ליד מלא ושולח לגדי (היועץ הפיננסי)
  */
 
-import { createClientServerClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import type { ConsolidationLeadData } from '@/types/loans';
 import { Resend } from 'resend';
 
@@ -16,7 +16,7 @@ function getResendClient() {
  * בניית נתוני ליד מלאים
  */
 export async function buildLeadData(requestId: string): Promise<ConsolidationLeadData | null> {
-  const supabase = await createClientServerClient();
+  const supabase = createServiceClient();
   
   // שלוף את הבקשה
   const { data: request, error: requestError } = await supabase
@@ -321,7 +321,7 @@ export async function sendLeadToAdvisor(requestId: string): Promise<boolean> {
     console.log('Lead email sent successfully:', data);
     
     // עדכן סטטוס בקשה
-    const supabase = await createClientServerClient();
+    const supabase = createServiceClient();
     await supabase
       .from('loan_consolidation_requests')
       .update({

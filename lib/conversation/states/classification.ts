@@ -211,7 +211,7 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
       }
     }
 
-    return { success: true, newState: 'classification_complete' };
+    return { success: true, newState: nextState as any };
   }
 
   // Send intro message with accept-all option
@@ -1311,8 +1311,8 @@ async function moveToGoalsSetup(ctx: RouterContext): Promise<RouterResult> {
   console.log(`[Classification] moveToGoalsSetup: totalIncome=${totalIncome}, totalExpenses=${totalExpenses}, balance=${balance}`);
 
   // Determine next phase based on actual data coverage
-  const { PhaseService } = await import('@/lib/services/PhaseService');
-  const nextPhase = await PhaseService.calculatePhase(ctx.userId);
+  const { calculatePhase } = await import('@/lib/services/PhaseService');
+  const nextPhase = await calculatePhase(ctx.userId);
   console.log(`[Classification] moveToGoalsSetup: calculated nextPhase=${nextPhase}`);
 
   const phaseToState: Record<string, string> = {

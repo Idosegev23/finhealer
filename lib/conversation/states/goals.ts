@@ -536,8 +536,7 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
   });
 
   try {
-    await sendWhatsAppInteractiveButtons({
-      phoneNumber: phone,
+    await sendWhatsAppInteractiveButtons(phone, {
       message: 'בחר פעולה:',
       buttons: [
         { buttonId: 'new_goal', buttonText: '➕ יעד חדש' },

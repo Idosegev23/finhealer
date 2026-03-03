@@ -15,7 +15,7 @@ export async function storeMessage(
   const waMessageData = {
     user_id: userId,
     direction: 'incoming',
-    msg_type: messageType === 'imageMessage' ? 'image' : 'text',
+    msg_type: ({ imageMessage: 'image', documentMessage: 'document', audioMessage: 'audio', videoMessage: 'video', stickerMessage: 'sticker', interactiveButtonsResponse: 'button', buttonsResponseMessage: 'button', listResponseMessage: 'list_response' } as Record<string, string>)[messageType || ''] || 'text',
     payload: payload,
     provider_msg_id: messageId,
     status: 'delivered',

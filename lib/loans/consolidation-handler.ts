@@ -6,7 +6,7 @@
  * אחרי שלב הגדרת מטרות - לא באמצע הסיווג.
  */
 
-import { createClientServerClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import type { LoanDocument } from '@/types/loans';
 
 /**
@@ -17,7 +17,7 @@ export async function handleConsolidationResponse(
   phone: string,
   response: 'yes' | 'no'
 ): Promise<string> {
-  const supabase = await createClientServerClient();
+  const supabase = createServiceClient();
 
   if (response === 'no') {
     // נקה את ה-loanConsolidation מה-context (בלי לדרוס שאר ה-context)
@@ -115,7 +115,7 @@ export async function receiveLoanDocument(
   fileUrl: string,
   fileName: string
 ): Promise<string> {
-  const supabase = await createClientServerClient();
+  const supabase = createServiceClient();
 
   // מצא את הבקשה הפעילה
   const { data: request, error } = await supabase
@@ -175,7 +175,7 @@ export async function receiveLoanDocument(
  * בדיקה אם יש בקשת איחוד פעילה
  */
 export async function checkActiveConsolidationRequest(userId: string): Promise<boolean> {
-  const supabase = await createClientServerClient();
+  const supabase = createServiceClient();
 
   const { data } = await supabase
     .from('loan_consolidation_requests')

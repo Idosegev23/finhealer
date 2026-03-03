@@ -9,4 +9,4 @@ BEGIN
   SET classification_context = COALESCE(classification_context, '{}'::jsonb) || p_update
   WHERE id = p_user_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;

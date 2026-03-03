@@ -190,8 +190,8 @@ export async function createAutoBudget(ctx: RouterContext): Promise<RouterResult
 
   // Confirmation buttons
   try {
-    await sendWhatsAppInteractiveButtons({
-      phoneNumber: ctx.phone, message: 'מאשר את התקציב?',
+    await sendWhatsAppInteractiveButtons(ctx.phone, {
+      message: 'מאשר את התקציב?',
       buttons: [{ buttonId: 'confirm_budget', buttonText: 'מאשר' }, { buttonId: 'manual_budget', buttonText: 'עריכה' }],
     });
   } catch {
@@ -271,7 +271,7 @@ export async function skipBudget(ctx: RouterContext): Promise<RouterResult> {
   const farewellMsg = `👋 *הבנתי!*\n\nנעבור ישירות לשלב המעקב.\nאבדוק בשבילך את התקציב ואתן עדכונים קבועים! 📊`;
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: farewellMsg });
 
-  return { success: true, nextPhase: 'monitoring' };
+  return { success: true, newState: 'monitoring' as any };
 }
 
 export async function finishBudget(ctx: RouterContext): Promise<RouterResult> {
@@ -312,7 +312,7 @@ export async function finishBudget(ctx: RouterContext): Promise<RouterResult> {
   const completionMsg = `🎉 *התקציב שלך הוגדר בהצלחה!*\n\n📊 סה"כ ${categoryCount} קטגוריות\n\nעכשיו נעבור למעקב על התקציב שלך.\nאני אשלח לך עדכונים שבועיים ויומיים! 🚀`;
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: completionMsg });
 
-  return { success: true, nextPhase: 'monitoring' };
+  return { success: true, newState: 'monitoring' as any };
 }
 
 export async function transitionToBudget(ctx: RouterContext): Promise<RouterResult> {
@@ -335,8 +335,7 @@ export async function transitionToBudget(ctx: RouterContext): Promise<RouterResu
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: introMsg });
 
   try {
-    await sendWhatsAppInteractiveButtons({
-      phoneNumber: ctx.phone,
+    await sendWhatsAppInteractiveButtons(ctx.phone, {
       message: 'איך תרצה להתחיל?',
       buttons: [
         { buttonId: 'auto_budget', buttonText: '🤖 אוטומטי' },

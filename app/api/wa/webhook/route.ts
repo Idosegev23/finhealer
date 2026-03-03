@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Build context object for handlers
-    const ctx = { userData, phoneNumber: phoneNumber!, payload: payload!, supabase };
+    const ctx = { userData, phoneNumber: phoneNumber!, payload: payload!, messageId: messageId!, supabase, greenAPI: getGreenAPIClient() };
 
     // 6. Dispatch by message type
     if (messageType === 'interactiveButtonsResponse' || messageType === 'buttonsResponseMessage') {

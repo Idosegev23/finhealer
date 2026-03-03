@@ -64,13 +64,20 @@ export async function handleButton(ctx: WebhookContext): Promise<NextResponse> {
   }
 
   // All other buttons → route through φRouter
-  const { routeMessage } = await import('@/lib/conversation/phi-router');
-  const result = await routeMessage(userData.id, phoneNumber, messageToRoute);
+  try {
+    const { routeMessage } = await import('@/lib/conversation/phi-router');
+    const result = await routeMessage(userData.id, phoneNumber, messageToRoute);
 
-  console.log('[φ Router] Button result: success=' + result.success);
+    console.log('[φ Router] Button result: success=' + result.success);
 
-  return NextResponse.json({
-    status: 'button_response',
-    success: result.success,
-  });
+    return NextResponse.json({
+      status: 'button_response',
+      success: result.success,
+    });
+  } catch (err) {
+    console.error('[Webhook] Button router error:', err);
+    const greenAPI = getGreenAPIClient();
+    await greenAPI.sendMessage({ phoneNumber, message: 'סליחה, משהו השתבש 😅 נסה שוב בבקשה' });
+    return NextResponse.json({ status: 'error' });
+  }
 }

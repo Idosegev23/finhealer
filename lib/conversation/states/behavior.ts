@@ -83,8 +83,8 @@ export async function startBehaviorAnalysis(ctx: RouterContext): Promise<RouterR
   });
 
   try {
-    const { runFullAnalysis } = await import('@/lib/analysis/behavior-analyzer');
-    const analysis = await runFullAnalysis(ctx.userId, 3);
+    const { analyzeBehavior } = await import('@/lib/analysis/behavior-analyzer');
+    const analysis = await analyzeBehavior(ctx.userId, 3);
     return await sendBehaviorSummary(ctx, analysis);
   } catch (error) {
     console.error('[Behavior] Analysis failed:', error);
@@ -98,8 +98,8 @@ export async function startBehaviorAnalysis(ctx: RouterContext): Promise<RouterR
 
 export async function showBehaviorSummary(ctx: RouterContext): Promise<RouterResult> {
   try {
-    const { runFullAnalysis } = await import('@/lib/analysis/behavior-analyzer');
-    const analysis = await runFullAnalysis(ctx.userId, 3);
+    const { analyzeBehavior } = await import('@/lib/analysis/behavior-analyzer');
+    const analysis = await analyzeBehavior(ctx.userId, 3);
     return await sendBehaviorSummary(ctx, analysis);
   } catch (error) {
     const greenAPI = getGreenAPIClient();

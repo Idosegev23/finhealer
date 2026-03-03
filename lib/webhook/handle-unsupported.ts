@@ -25,13 +25,19 @@ export async function handleUnsupported(ctx: WebhookContext, messageType: string
     console.log('[Webhook] LIST_RESPONSE: rowId=' + selectedRowId);
 
     if (selectedRowId) {
-      const { routeMessage } = await import('@/lib/conversation/phi-router');
-      const routerResult = await routeMessage(userData.id, phoneNumber, selectedRowId);
+      try {
+        const { routeMessage } = await import('@/lib/conversation/phi-router');
+        const routerResult = await routeMessage(userData.id, phoneNumber, selectedRowId);
 
-      return NextResponse.json({
-        status: 'list_response',
-        success: routerResult.success,
-      });
+        return NextResponse.json({
+          status: 'list_response',
+          success: routerResult.success,
+        });
+      } catch (err) {
+        console.error('[Webhook] List response router error:', err);
+        await greenAPI.sendMessage({ phoneNumber, message: 'סליחה, משהו השתבש 😅 נסה שוב בבקשה' });
+        return NextResponse.json({ status: 'error' });
+      }
     }
   } else if (messageType === 'stickerMessage' || messageType === 'contactMessage' ||
              messageType === 'locationMessage' || messageType === 'pollMessage') {

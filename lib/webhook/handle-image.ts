@@ -245,6 +245,14 @@ export async function handleImage(ctx: WebhookContext): Promise<NextResponse> {
           message: `✅ קבלה נקלטה במערכת!\n\n💰 ${tx.amount} ₪\n🏪 ${tx.vendor}\n📂 ${displayCategory}\n📅 ${displayDate}\n\n👉 אשר את ההוצאה כאן:\n${siteUrl}/dashboard/expenses/pending`,
         });
       }
+
+      // Trigger state machine for simple receipts too
+      try {
+        const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
+        await onDocumentProcessed(userData.id, phoneNumber);
+      } catch (routerErr) {
+        console.error('Router notification failed for simple receipt:', routerErr);
+      }
     } else {
       // Bank/credit statement image with many transactions
       for (const tx of transactions) {

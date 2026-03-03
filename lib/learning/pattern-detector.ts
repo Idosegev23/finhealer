@@ -75,9 +75,9 @@ async function detectMerchantPatterns(
   const merchantMap = new Map<string, { categories: string[]; count: number }>();
 
   for (const tx of transactions) {
-    if (!tx.merchant_name || !tx.category) continue;
+    if (!tx.vendor || !tx.category) continue;
 
-    const merchant = tx.merchant_name.trim().toLowerCase();
+    const merchant = tx.vendor.trim().toLowerCase();
     
     if (!merchantMap.has(merchant)) {
       merchantMap.set(merchant, { categories: [], count: 0 });
@@ -201,7 +201,7 @@ async function detectDayOfWeekPatterns(
 
   for (let day = 0; day < 7; day++) {
     const txOnDay = transactions.filter((tx) => {
-      const txDate = new Date(tx.date);
+      const txDate = new Date(tx.tx_date);
       return txDate.getDay() === day;
     });
 
@@ -258,9 +258,9 @@ async function detectSubscriptionPatterns(
   const groupMap = new Map<string, any[]>();
   
   for (const tx of transactions) {
-    if (!tx.merchant_name || !tx.amount) continue;
+    if (!tx.vendor || !tx.amount) continue;
     
-    const key = `${tx.merchant_name}-${Math.round(tx.amount)}`;
+    const key = `${tx.vendor}-${Math.round(tx.amount)}`;
     if (!groupMap.has(key)) {
       groupMap.set(key, []);
     }
