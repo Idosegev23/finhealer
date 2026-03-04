@@ -532,25 +532,26 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
   // --- Default: show action buttons ---
   await greenAPI.sendMessage({
     phoneNumber: phone,
-    message: `🎯 *ניהול יעדים*\n\nמה תרצה לעשות?`,
+    message: `🎯 *יעדי חיסכון*\n\nמה תרצה לעשות?`,
   });
 
   try {
     await sendWhatsAppInteractiveButtons(phone, {
-      message: 'בחר פעולה:',
+      message: 'בחר מה לעשות:',
       buttons: [
-        { buttonId: 'new_goal', buttonText: '➕ יעד חדש' },
-        { buttonId: 'show_goals', buttonText: '📊 הצג יעדים' },
-        { buttonId: 'finish_goals', buttonText: '✅ סיימתי' },
+        { buttonId: 'new_goal', buttonText: 'להוסיף יעד ➕' },
+        { buttonId: 'show_goals', buttonText: 'לראות יעדים 📊' },
+        { buttonId: 'finish_goals', buttonText: 'לשלב הבא ✅' },
       ],
     });
   } catch {
     await greenAPI.sendMessage({
       phoneNumber: phone,
       message:
-        `• *"יעד חדש"* - הוסף יעד\n` +
-        `• *"יעדים"* - ראה יעדים\n` +
-        `• *"סיימתי"* - המשך לתקציב`,
+        `כתוב:\n` +
+        `• *"יעד חדש"* — להוסיף יעד חיסכון\n` +
+        `• *"יעדים"* — לראות את היעדים שהגדרת\n` +
+        `• *"סיימתי"* — לעבור לשלב הבא`,
     });
   }
 

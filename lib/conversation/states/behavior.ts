@@ -146,16 +146,16 @@ export async function sendBehaviorSummary(ctx: RouterContext, analysis: any): Pr
   // Offer next step
   try {
     await sendWhatsAppInteractiveButtons(ctx.phone, {
-      message: 'מה עכשיו?',
+      message: 'מה תרצה לעשות עכשיו?',
       buttons: [
-        { buttonId: 'to_goals', buttonText: 'המשך ליעדים' },
-        { buttonId: 'add_more', buttonText: 'עוד מסמכים' },
+        { buttonId: 'to_goals', buttonText: 'להגדיר מטרות 🎯' },
+        { buttonId: 'add_more', buttonText: 'לשלוח עוד דוח 📄' },
       ],
     });
   } catch {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `*מה עכשיו?*\nכתוב *"המשך"* ליעדים\nאו שלח עוד מסמכים`,
+      message: `*מה עכשיו?*\nכתוב *"המשך"* כדי להגדיר מטרות חיסכון 🎯\nאו שלח עוד דוח מהבנק 📄`,
     });
   }
 
@@ -206,14 +206,14 @@ export async function transitionToGoals(ctx: RouterContext): Promise<RouterResul
     try {
       await greenAPI.sendInteractiveButtons({
         phoneNumber: ctx.phone,
-        message: `✨ *כלים נוספים:*\n\n` +
-          `• *יעדים* - ראה יעדים והקצאות חודשיות\n` +
-          `• *סימולציה* - בדוק "מה יקרה אם..."\n` +
-          `• *אופטימיזציה* - קבל המלצות חכמות מ-φ`,
+        message: `✨ *עוד דברים שאני יכול לעשות:*\n\n` +
+          `• *המטרות שלי* — לראות את היעדים שהגדרת\n` +
+          `• *מה יקרה אם...* — לבדוק תרחישים שונים\n` +
+          `• *טיפים לחיסכון* — המלצות מותאמות לך`,
         buttons: [
-          { buttonId: 'show_goals', buttonText: 'יעדים' },
-          { buttonId: 'simulate', buttonText: 'סימולציה' },
-          { buttonId: 'optimize', buttonText: 'אופטימיזציה' },
+          { buttonId: 'show_goals', buttonText: 'המטרות שלי 🎯' },
+          { buttonId: 'simulate', buttonText: 'מה יקרה אם... 🔮' },
+          { buttonId: 'optimize', buttonText: 'טיפים לחיסכון 💡' },
         ],
       });
     } catch {

@@ -1004,18 +1004,19 @@ export async function showNextTransaction(
   const isLearnedSuggestion = !!userRule;
   console.log(`[Classification] NEXT_TX: suggestion="${suggestion || 'none'}", source=${nextTx.income_category ? 'existing_category' : userRule ? 'user_rule' : systemSuggestion ? 'system_match' : 'none'}, isLearned=${isLearnedSuggestion}`);
 
-  let message = `💚 *${nextTx.vendor}*\n`;
-  message += `${Math.abs(nextTx.amount).toLocaleString('he-IL')} ₪ | ${nextTx.tx_date}\n\n`;
+  const txDate = nextTx.tx_date ? new Date(nextTx.tx_date).toLocaleDateString('he-IL') : nextTx.tx_date;
+  let message = `💚 *הכנסה: ${nextTx.vendor}*\n`;
+  message += `סכום: ${Math.abs(nextTx.amount).toLocaleString('he-IL')} ₪ | תאריך: ${txDate}\n\n`;
 
   if (suggestion) {
     const learnedEmoji = isLearnedSuggestion ? '🧠' : '💡';
-    message += `${learnedEmoji} נראה כמו: *${suggestion}*\n`;
-    message += `כתוב "כן" לאשר, או כתוב קטגוריה אחרת.`;
+    message += `${learnedEmoji} נראה לי שזה: *${suggestion}*\n\n`;
+    message += `לחץ *"נכון ✅"* אם זה מתאים.\nאו כתוב שם אחר (למשל: משכורת, שכירות, פנסיה).`;
   } else {
-    message += `מה הקטגוריה?`;
+    message += `לאיזה נושא ההכנסה הזו שייכת?\nלמשל: *משכורת*, *שכירות*, *החזר*.\n\nאו לחץ *"אפשרויות 📋"* לראות רשימה.`;
   }
 
-  message += `\n\n(נשארו ${remaining})`;
+  message += `\n\n(נשארו עוד ${remaining})`;
 
   // Save suggestion to cache for quick confirmation
   if (suggestion) {
@@ -1029,15 +1030,15 @@ export async function showNextTransaction(
         phoneNumber: ctx.phone,
         message,
         buttons: [
-          { buttonId: 'confirm', buttonText: 'כן' },
-          { buttonId: 'skip', buttonText: 'דלג' },
-          { buttonId: 'list', buttonText: 'רשימה' },
+          { buttonId: 'confirm', buttonText: 'נכון ✅' },
+          { buttonId: 'skip', buttonText: 'עבור הלאה ⏭️' },
+          { buttonId: 'list', buttonText: 'אפשרויות 📋' },
         ],
       });
     } catch {
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: message + `\n\n💡 *"רשימה"* לראות קטגוריות`,
+        message: message + `\n\n💡 כתוב *"רשימה"* לראות את כל האפשרויות`,
       });
     }
   } else {
@@ -1046,14 +1047,14 @@ export async function showNextTransaction(
         phoneNumber: ctx.phone,
         message,
         buttons: [
-          { buttonId: 'skip', buttonText: 'דלג' },
-          { buttonId: 'list', buttonText: 'רשימה' },
+          { buttonId: 'skip', buttonText: 'עבור הלאה ⏭️' },
+          { buttonId: 'list', buttonText: 'אפשרויות 📋' },
         ],
       });
     } catch {
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: message + `\n\n💡 *"רשימה"* לראות קטגוריות`,
+        message: message + `\n\n💡 כתוב *"רשימה"* לראות את כל האפשרויות`,
       });
     }
   }
@@ -1150,16 +1151,18 @@ export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterRe
 
   let message = '';
 
+  const expDate = firstTx.tx_date ? new Date(firstTx.tx_date).toLocaleDateString('he-IL') : firstTx.tx_date;
   if (vendorTxs.length === 1) {
-    message = `💸 *${vendor}*\n`;
-    message += `${totalAmount.toLocaleString('he-IL')} ₪ | ${firstTx.tx_date}\n\n`;
+    message = `💸 *הוצאה: ${vendor}*\n`;
+    message += `סכום: ${totalAmount.toLocaleString('he-IL')} ₪ | תאריך: ${expDate}\n\n`;
   } else {
-    message = `💸 *${vendor}* (${vendorTxs.length} תנועות)\n`;
+    message = `💸 *הוצאה: ${vendor}* (${vendorTxs.length} פעמים)\n`;
     message += `סה"כ: ${totalAmount.toLocaleString('he-IL')} ₪\n\n`;
 
     // Show up to 3 transactions
     vendorTxs.slice(0, 3).forEach(t => {
-      message += `   • ${Math.abs(t.amount).toLocaleString('he-IL')} ₪ (${t.tx_date.slice(5)})\n`;
+      const d = t.tx_date ? new Date(t.tx_date).toLocaleDateString('he-IL') : t.tx_date?.slice(5);
+      message += `   • ${Math.abs(t.amount).toLocaleString('he-IL')} ₪ (${d})\n`;
     });
     if (vendorTxs.length > 3) {
       message += `   ...ועוד ${vendorTxs.length - 3}\n`;
@@ -1169,13 +1172,13 @@ export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterRe
 
   if (suggestion) {
     const learnedEmoji = isLearnedSuggestion ? '🧠' : '💡';
-    message += `${learnedEmoji} נראה כמו: *${suggestion}*\n`;
-    message += `כתוב "כן" לאשר${vendorTxs.length > 1 ? ' את כולן' : ''}, או כתוב קטגוריה אחרת.`;
+    message += `${learnedEmoji} נראה לי שזה: *${suggestion}*\n\n`;
+    message += `לחץ *"נכון ✅"* אם זה מתאים${vendorTxs.length > 1 ? ' לכולן' : ''}.\nאו כתוב שם אחר (למשל: מכולת, דלק, חשמל).`;
   } else {
-    message += `מה הקטגוריה?`;
+    message += `לאיזה נושא ההוצאה הזו שייכת?\nלמשל: *מכולת*, *דלק*, *חשבונות*.\n\nאו לחץ *"אפשרויות 📋"* לראות רשימה.`;
   }
 
-  message += `\n\n(${groupsRemaining} קבוצות נשארו)`;
+  message += `\n\n(נשארו עוד ${groupsRemaining} קבוצות)`;
 
   // Save current group to cache for batch classification
   await saveCurrentGroupToCache(ctx.userId, vendorTxs.map(t => t.id));
@@ -1191,9 +1194,9 @@ export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterRe
         phoneNumber: ctx.phone,
         message,
         buttons: [
-          { buttonId: 'confirm', buttonText: 'כן' },
-          { buttonId: 'skip', buttonText: 'דלג' },
-          { buttonId: 'list', buttonText: 'רשימה' },
+          { buttonId: 'confirm', buttonText: 'נכון ✅' },
+          { buttonId: 'skip', buttonText: 'עבור הלאה ⏭️' },
+          { buttonId: 'list', buttonText: 'אפשרויות 📋' },
         ],
       });
     } catch {
@@ -1205,8 +1208,8 @@ export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterRe
         phoneNumber: ctx.phone,
         message,
         buttons: [
-          { buttonId: 'skip', buttonText: 'דלג' },
-          { buttonId: 'list', buttonText: 'רשימה' },
+          { buttonId: 'skip', buttonText: 'עבור הלאה ⏭️' },
+          { buttonId: 'list', buttonText: 'אפשרויות 📋' },
         ],
       });
     } catch {

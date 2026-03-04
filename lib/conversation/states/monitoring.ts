@@ -1437,8 +1437,8 @@ export async function showFinalSummary(ctx: RouterContext): Promise<RouterResult
       message,
       header: 'מה עכשיו?',
       buttons: [
-        { buttonId: 'analyze', buttonText: 'ניתוח' },
-        { buttonId: 'add_more', buttonText: 'עוד דוח' },
+        { buttonId: 'analyze', buttonText: 'בדוק הוצאות 🔍' },
+        { buttonId: 'add_more', buttonText: 'שלח עוד דוח 📄' },
       ],
     });
   } catch {

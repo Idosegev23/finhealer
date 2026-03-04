@@ -63,7 +63,7 @@ export async function handleBudgetPhase(ctx: RouterContext, msg: string): Promis
   }
 
   if (resolvedIntent === 'manual_budget') {
-    const manualMsg = `📝 *הגדרת תקציב ידנית*\n\nשלח לי את התקציב בפורמט:\n*שם קטגוריה: סכום*\n\nדוגמה:\n• מזון: 2000\n• תחזוקה: 1500\n• בידור: 800\n\nכתוב משהו כמו:\n"מזון: 2000"`;
+    const manualMsg = `📝 *בוא נגדיר תקציב בעצמך*\n\nשלח לי כמה כסף מותר להוציא על כל נושא.\n\nכתוב ככה:\n*שם הנושא: סכום*\n\nלדוגמה:\n• מזון: 2000\n• חשבונות: 1500\n• בילויים: 800\n\nפשוט כתוב נושא ומספר, למשל:\n*"מזון: 2000"*`;
     await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: manualMsg });
     return { success: true };
   }
@@ -80,17 +80,17 @@ export async function handleBudgetPhase(ctx: RouterContext, msg: string): Promis
   try {
     await greenAPI.sendInteractiveButtons({
       phoneNumber: ctx.phone,
-      message: `💰 *בוא נבנה תקציב!*\n\nתקציב הוא התוכנית הפיננסית שלך.\nאני יכול לבנות אחד אוטומטית מהנתונים שלך.`,
+      message: `💰 *בוא נבנה תקציב!*\n\nתקציב = כמה כסף מותר להוציא כל חודש על כל נושא (אוכל, חשבונות וכו').\n\nאני יכול לבנות לך תקציב אוטומטי לפי הנתונים שכבר שלחת.`,
       buttons: [
-        { buttonId: 'auto_budget', buttonText: '🚀 אוטומטי' },
-        { buttonId: 'manual_budget', buttonText: '✏️ ידני' },
-        { buttonId: 'skip_budget', buttonText: '⏭️ דלג' },
+        { buttonId: 'auto_budget', buttonText: 'בנה לי תקציב 🚀' },
+        { buttonId: 'manual_budget', buttonText: 'אגדיר בעצמי ✏️' },
+        { buttonId: 'skip_budget', buttonText: 'דלג לשלב הבא ⏭️' },
       ],
     });
   } catch {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `💰 *בוא נבנה תקציב!*\n\nכתוב:\n• *"אוטומטי"* - אני אבנה לך תקציב\n• *"ידני"* - תגדיר בעצמך\n• *"דלג"* - לשלב הבא`,
+      message: `💰 *בוא נבנה תקציב!*\n\nתקציב = כמה כסף מותר להוציא כל חודש.\n\nכתוב:\n• *"אוטומטי"* — אני אבנה לך תקציב לפי הנתונים שלך\n• *"בעצמי"* — תגדיר בעצמך כמה לכל נושא\n• *"דלג"* — לעבור לשלב הבא`,
     });
   }
 
@@ -191,11 +191,14 @@ export async function createAutoBudget(ctx: RouterContext): Promise<RouterResult
   // Confirmation buttons
   try {
     await sendWhatsAppInteractiveButtons(ctx.phone, {
-      message: 'מאשר את התקציב?',
-      buttons: [{ buttonId: 'confirm_budget', buttonText: 'מאשר' }, { buttonId: 'manual_budget', buttonText: 'עריכה' }],
+      message: 'מה דעתך על התקציב?',
+      buttons: [{ buttonId: 'confirm_budget', buttonText: 'מתאים לי ✅' }, { buttonId: 'manual_budget', buttonText: 'אשנה בעצמי ✏️' }],
     });
   } catch {
-    // Ignore button errors
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `כתוב *"מאשר"* אם התקציב מתאים, או *"בעצמי"* אם תרצה לשנות.`,
+    });
   }
 
   return { success: true };
@@ -246,7 +249,7 @@ export async function setBudgetCategory(ctx: RouterContext, category: string, am
     { onConflict: 'budget_id,category_name' }
   );
 
-  const confirmMsg = `✅ קטגוריה עדכנה: *${category}* - ₪${amount.toLocaleString('he-IL')}\n\nשלח עוד קטגוריה או כתוב *סיימתי*`;
+  const confirmMsg = `✅ נשמר: *${category}* — ₪${amount.toLocaleString('he-IL')} לחודש\n\nרוצה להוסיף עוד נושא? כתוב אותו באותו פורמט.\nסיימת? כתוב *"סיימתי"*.`;
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: confirmMsg });
 
   return { success: true };
@@ -268,7 +271,7 @@ export async function skipBudget(ctx: RouterContext): Promise<RouterResult> {
     })
     .eq('id', ctx.userId);
 
-  const farewellMsg = `👋 *הבנתי!*\n\nנעבור ישירות לשלב המעקב.\nאבדוק בשבילך את התקציב ואתן עדכונים קבועים! 📊`;
+  const farewellMsg = `👋 *בסדר, דילגנו על התקציב!*\n\nעוברים לשלב המעקב — אני אשלח לך עדכונים על ההוצאות שלך באופן קבוע 📊`;
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: farewellMsg });
 
   return { success: true, newState: 'monitoring' as any };
@@ -309,7 +312,7 @@ export async function finishBudget(ctx: RouterContext): Promise<RouterResult> {
     })
     .eq('id', ctx.userId);
 
-  const completionMsg = `🎉 *התקציב שלך הוגדר בהצלחה!*\n\n📊 סה"כ ${categoryCount} קטגוריות\n\nעכשיו נעבור למעקב על התקציב שלך.\nאני אשלח לך עדכונים שבועיים ויומיים! 🚀`;
+  const completionMsg = `🎉 *מעולה, התקציב מוכן!*\n\n📊 הגדרת ${categoryCount} נושאים בתקציב.\n\nמעכשיו אני עוקב בשבילך — אשלח לך עדכונים כשצריך לשים לב למשהו 🚀`;
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: completionMsg });
 
   return { success: true, newState: 'monitoring' as any };
@@ -331,22 +334,23 @@ export async function transitionToBudget(ctx: RouterContext): Promise<RouterResu
     })
     .eq('id', ctx.userId);
 
-  const introMsg = `🎯 *בואו נבנה תקציב!*\n\nתקציב הוא התוכנית המימונית שלך.\nאני אעזור לך להגדיר מטרות חסכון ועדכן אותך בהתקדמות.\n\nבחר אופציה:`;
+  const introMsg = `💰 *בוא נבנה תקציב חודשי!*\n\nתקציב = כמה כסף מותר להוציא כל חודש על כל נושא.\nאני אעזור לך לדעת בדיוק לאן הולך הכסף.`;
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: introMsg });
 
   try {
     await sendWhatsAppInteractiveButtons(ctx.phone, {
       message: 'איך תרצה להתחיל?',
       buttons: [
-        { buttonId: 'auto_budget', buttonText: '🤖 אוטומטי' },
-        { buttonId: 'manual_budget', buttonText: '✏️ ידנית' },
-        { buttonId: 'skip_budget', buttonText: '⏭️ דלג' }
+        { buttonId: 'auto_budget', buttonText: 'בנה לי תקציב 🚀' },
+        { buttonId: 'manual_budget', buttonText: 'אגדיר בעצמי ✏️' },
+        { buttonId: 'skip_budget', buttonText: 'דלג לשלב הבא ⏭️' }
       ]
     });
   } catch {
-    // Fallback if buttons fail
-    const fallbackMsg = `שלח אחת מהאפשרויות:\n• auto_budget\n• manual_budget\n• skip_budget`;
-    await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: fallbackMsg });
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `כתוב:\n• *"אוטומטי"* — אני אבנה לך תקציב\n• *"בעצמי"* — תגדיר בעצמך\n• *"דלג"* — לעבור לשלב הבא`,
+    });
   }
 
   return { success: true };
