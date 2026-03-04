@@ -77,6 +77,52 @@ export async function POST(request: Request) {
       );
     }
 
+    // ── Sync onboarding_state: if no more pending → advance state ──
+    try {
+      const { count: remainingPending } = await (supabase as any)
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'pending');
+
+      if (!remainingPending || remainingPending === 0) {
+        const { data: userData } = await (supabase as any)
+          .from('users')
+          .select('onboarding_state, phase')
+          .eq('id', user.id)
+          .single();
+
+        const classificationStates = ['classification', 'classification_income', 'classification_expense'];
+        if (userData && classificationStates.includes(userData.onboarding_state)) {
+          // All classified — calculate next phase and advance
+          const { calculatePhase } = await import('@/lib/services/PhaseService');
+          const nextPhase = await calculatePhase(user.id);
+
+          const phaseToState: Record<string, string> = {
+            data_collection: 'waiting_for_document',
+            behavior: 'behavior',
+            budget: 'budget',
+            goals: 'goals_setup',
+            monitoring: 'monitoring',
+          };
+          const nextState = phaseToState[nextPhase] || 'behavior';
+
+          await (supabase as any)
+            .from('users')
+            .update({
+              onboarding_state: nextState,
+              phase: nextPhase,
+              phase_updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+
+          console.log(`[Approve] State synced: ${userData.onboarding_state} → ${nextState} (phase: ${nextPhase})`);
+        }
+      }
+    } catch (syncErr) {
+      console.warn('[Approve] State sync failed (non-fatal):', syncErr);
+    }
+
     return NextResponse.json({
       success: true,
       expenses,

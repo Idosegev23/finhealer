@@ -288,6 +288,19 @@ export async function handleClassificationResponse(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
+  // ── Safety: if no pending transactions left (e.g. classified on web), auto-advance ──
+  const { count: pendingOfType } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId)
+    .eq('status', 'pending')
+    .eq('type', type);
+
+  if (!pendingOfType || pendingOfType === 0) {
+    console.log(`[Classification] AUTO_ADVANCE: 0 pending ${type} transactions, moving to next phase`);
+    return await moveToNextPhase(ctx, type);
+  }
+
   // ── Rule-based intent detection (instant, no API call) ──
   const trimmed = msg.trim();
   const lowerMsg = trimmed.toLowerCase();
