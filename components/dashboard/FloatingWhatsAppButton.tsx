@@ -23,7 +23,7 @@ export default function FloatingWhatsAppButton({
       initial={{ scale: 0, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ delay: 0.5, type: 'spring', stiffness: 200 }}
-      className="fixed bottom-6 left-6 z-50"
+      className="fixed bottom-6 right-6 z-50"
     >
       <Link
         href={whatsappUrl}

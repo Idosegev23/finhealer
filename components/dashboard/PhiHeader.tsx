@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Search,
   Bell,
   Settings,
   User,
@@ -20,7 +19,6 @@ export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [userName, setUserName] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchUserData();
@@ -66,21 +64,8 @@ export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
           <Menu className="w-6 h-6 text-white" />
         </button>
 
-        {/* Search Input */}
-        <div className="flex justify-center flex-1 mr-4 ml-4">
-          <div className="relative flex w-full max-w-xl items-stretch">
-            <input
-              type="search"
-              placeholder="חיפוש..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="form-input px-4 py-2 placeholder-gray-400 text-white bg-phi-slate/50 border border-phi-slate/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-phi-gold focus:border-transparent w-full pr-10 transition-all"
-            />
-            <span className="absolute right-0 top-0 h-full flex items-center pr-3 pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
-            </span>
-          </div>
-        </div>
+        {/* Spacer to push controls to the left */}
+        <div className="flex-1" />
 
         {/* Right side controls */}
         <ul className="flex items-center flex-shrink-0 space-x-2 space-x-reverse">
@@ -97,11 +82,6 @@ export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
               aria-haspopup="true"
             >
               <Bell className="w-5 h-5 text-white" />
-              {/* Notification badge */}
-              <span
-                aria-hidden="true"
-                className="absolute top-0 right-0 inline-block w-3 h-3 transform translate-x-1 -translate-y-1 bg-red-600 border-2 border-phi-dark rounded-full"
-              ></span>
             </button>
 
             {notificationsOpen && (
@@ -114,12 +94,9 @@ export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
                 </div>
                 <Link
                   href="/dashboard/expenses/pending"
-                  className="flex items-center justify-between w-full px-4 py-3 text-sm font-semibold transition-colors duration-150 rounded-md hover:bg-phi-gold/20"
+                  className="flex items-center w-full px-4 py-3 text-sm font-semibold transition-colors duration-150 rounded-md hover:bg-phi-gold/20"
                 >
                   <span>הוצאות ממתינות</span>
-                  <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
-                    3
-                  </span>
                 </Link>
                 <Link
                   href="/dashboard/goals"

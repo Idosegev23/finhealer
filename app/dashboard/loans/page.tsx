@@ -99,7 +99,7 @@ export default function LoansPage() {
             <p className="text-gray-600 mt-2">מעקב והיסטוריה של כל ההלוואות שלך</p>
             </div>
               <Button 
-            onClick={() => window.location.href = '/dashboard/loans/add'}
+            onClick={() => window.location.href = '/dashboard/data/loans'}
             className="bg-blue-600 hover:bg-blue-700 text-white"
               >
             <Plus className="w-5 h-5 ml-2" />
@@ -116,7 +116,7 @@ export default function LoansPage() {
                 העלה דוח בנק או הוסף הלוואה ידנית כדי להתחיל לעקוב אחרי ההלוואות שלך
               </p>
               <Button 
-                onClick={() => window.location.href = '/dashboard/scan'}
+                onClick={() => window.location.href = '/dashboard/scan-center'}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 העלה דוח בנק

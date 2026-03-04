@@ -243,11 +243,6 @@ export default function InsurancePage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <Button variant="outline" size="sm" className="w-full">
-                      ערוך פרטים
-                    </Button>
-                  </div>
                 </div>
               );
             })}

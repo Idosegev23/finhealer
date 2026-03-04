@@ -194,13 +194,6 @@ export default function LoansDataPage() {
               </Button>
             </Link>
 
-            <div className="text-center text-sm text-gray-500">
-              או
-            </div>
-
-            <Button variant="outline" className="w-full" disabled>
-              העלה דוח הלוואה (בקרוב)
-            </Button>
           </CardContent>
         </Card>
       </div>

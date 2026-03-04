@@ -19,6 +19,15 @@ interface SavingsAccount {
   target_date: string;
 }
 
+const COLOR_CLASSES: Record<string, { bg: string; text: string }> = {
+  blue: { bg: "bg-blue-100", text: "text-blue-600" },
+  green: { bg: "bg-green-100", text: "text-green-600" },
+  purple: { bg: "bg-purple-100", text: "text-purple-600" },
+  red: { bg: "bg-red-100", text: "text-red-600" },
+  orange: { bg: "bg-orange-100", text: "text-orange-600" },
+  gray: { bg: "bg-gray-100", text: "text-gray-600" },
+};
+
 const ACCOUNT_TYPE_LABELS: Record<string, { label: string; icon: any; color: string }> = {
   savings: { label: "חיסכון", icon: PiggyBank, color: "blue" },
   deposit: { label: "פיקדון", icon: TrendingUp, color: "green" },
@@ -163,6 +172,7 @@ export default function SavingsPage() {
             {savings.map((account) => {
               const typeInfo = ACCOUNT_TYPE_LABELS[account.account_type];
               const Icon = typeInfo?.icon || PiggyBank;
+              const colorClass = COLOR_CLASSES[typeInfo?.color || "gray"] || COLOR_CLASSES.gray;
               const progress = account.target_amount
                 ? (account.current_balance / account.target_amount) * 100
                 : 0;
@@ -174,8 +184,8 @@ export default function SavingsPage() {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`p-3 rounded-lg bg-${typeInfo?.color}-100`}>
-                        <Icon className={`w-6 h-6 text-${typeInfo?.color}-600`} />
+                      <div className={`p-3 rounded-lg ${colorClass.bg}`}>
+                        <Icon className={`w-6 h-6 ${colorClass.text}`} />
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
@@ -273,11 +283,6 @@ export default function SavingsPage() {
                     )}
                   </div>
 
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <Button variant="outline" size="sm" className="w-full">
-                      ערוך פרטים
-                    </Button>
-                  </div>
                 </div>
               );
             })}
