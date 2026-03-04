@@ -40,21 +40,32 @@ export async function handleClassificationState(ctx: RouterContext, msg: string)
     return { success: true };
   }
 
-  // ── Layer 1: AI Intent ──
+  // ── Rule-based intent detection (instant, no API call) ──
+  const startPatterns = /^(נתחיל|נמשיך|התחל|סווג|start|classify|קבל הכל|סווג הכל|סווג את הכל)$/i;
+  const docPatterns = /^(עוד דוח|דוח נוסף|מסמך|add doc)$/i;
+
   let intent = { intent: 'unknown', confidence: 0, params: {} };
-  try {
-    intent = await parseStateIntent(msg, 'classification_start');
-  } catch (intentErr) {
-    console.warn(`[Classification] parseStateIntent failed:`, intentErr);
+  if (startPatterns.test(msg.trim())) {
+    intent = { intent: 'start', confidence: 0.99, params: {} };
+    console.log(`[Classification] RULE_BASED: start matched "${msg.trim()}"`);
+  } else if (docPatterns.test(msg.trim())) {
+    intent = { intent: 'add_document', confidence: 0.99, params: {} };
+    console.log(`[Classification] RULE_BASED: add_document matched "${msg.trim()}"`);
+  } else {
+    try {
+      intent = await parseStateIntent(msg, 'classification_start');
+    } catch (intentErr) {
+      console.warn(`[Classification] parseStateIntent failed:`, intentErr);
+    }
   }
-  console.log(`[Classification] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
+  console.log(`[Classification] INTENT: intent="${intent.intent}", confidence=${intent.confidence}`);
 
   if (intent.intent === 'start' && intent.confidence >= 0.6) {
-    console.log(`[Classification] handleClassificationState: AI detected START intent`);
+    console.log(`[Classification] handleClassificationState: START intent`);
     return await startClassification(ctx);
   }
   if (intent.intent === 'add_document' && intent.confidence >= 0.6) {
-    console.log(`[Classification] handleClassificationState: AI detected ADD_DOCUMENT intent`);
+    console.log(`[Classification] handleClassificationState: ADD_DOCUMENT intent`);
     await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: `📄 מעולה! שלח לי את המסמך.` });
     return { success: true };
   }
@@ -277,14 +288,38 @@ export async function handleClassificationResponse(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
-  // ── AI Intent Detection ──
+  // ── Rule-based intent detection (instant, no API call) ──
+  const trimmed = msg.trim();
+  const lowerMsg = trimmed.toLowerCase();
   let intent = { intent: 'unknown', confidence: 0, params: {} };
-  try {
-    intent = await parseStateIntent(msg, `classification_${type}`);
-  } catch (intentErr) {
-    console.warn(`[Classification] parseStateIntent failed:`, intentErr);
+
+  // Critical intents: rule-based first, AI fallback
+  const acceptAllPatterns = /^(קבל הכל|סווג הכל|סווג את הכל|אשר הכל|accept all|אוטומטי|קבל את הכל|סווג אוטומטי)$/i;
+  const finishPatterns = /^(סיימתי|מספיק|נגמר|done|finish|סיום|תסיים|סיים)$/i;
+  const skipPatterns = /^(דלג|הבא|תעבור|skip|next|לא יודע)$/i;
+  const approvePatterns = /^(כן|נכון|אישור|ok|אוקיי|מסכים|yes|בסדר)$/i;
+
+  if (acceptAllPatterns.test(trimmed)) {
+    intent = { intent: 'accept_all', confidence: 0.99, params: {} };
+    console.log(`[Classification] RULE_BASED: accept_all matched "${trimmed}"`);
+  } else if (finishPatterns.test(trimmed)) {
+    intent = { intent: 'finish', confidence: 0.99, params: {} };
+    console.log(`[Classification] RULE_BASED: finish matched "${trimmed}"`);
+  } else if (skipPatterns.test(trimmed)) {
+    intent = { intent: 'skip', confidence: 0.95, params: {} };
+    console.log(`[Classification] RULE_BASED: skip matched "${trimmed}"`);
+  } else if (approvePatterns.test(trimmed)) {
+    intent = { intent: 'approve', confidence: 0.95, params: {} };
+    console.log(`[Classification] RULE_BASED: approve matched "${trimmed}"`);
+  } else {
+    // Fallback to AI intent detection
+    try {
+      intent = await parseStateIntent(msg, `classification_${type}`);
+    } catch (intentErr) {
+      console.warn(`[Classification] parseStateIntent failed:`, intentErr);
+    }
   }
-  console.log(`[Classification] AI_INTENT: intent="${intent.intent}", confidence=${intent.confidence}, params=${JSON.stringify(intent.params || {})}`);
+  console.log(`[Classification] INTENT: intent="${intent.intent}", confidence=${intent.confidence}, params=${JSON.stringify(intent.params || {})}`);
 
   // ---- ACCEPT ALL: auto-classify everything with AI suggestions ----
   if (intent.intent === 'accept_all' && intent.confidence >= 0.6) {
