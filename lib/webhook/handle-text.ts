@@ -15,7 +15,7 @@ export async function handleText(ctx: WebhookContext): Promise<NextResponse> {
   const text = messageType === 'extendedTextMessage'
     ? (payload.messageData?.extendedTextMessageData?.text || payload.messageData?.textMessageData?.textMessage || '')
     : messageType === 'quotedMessage'
-    ? (payload.messageData?.extendedTextMessageData?.text || payload.messageData?.textMessageData?.textMessage || payload.messageData?.quotedMessage?.caption || '')
+    ? (payload.messageData?.quotedMessage?.caption || payload.messageData?.extendedTextMessageData?.text || payload.messageData?.textMessageData?.textMessage || '')
     : (payload.messageData?.textMessageData?.textMessage || '');
 
   console.log('📝 Text message received, type:', messageType, 'length:', text.length);

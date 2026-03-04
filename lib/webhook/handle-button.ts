@@ -14,15 +14,17 @@ export async function handleButton(ctx: WebhookContext): Promise<NextResponse> {
   const interactiveData = payload.messageData?.interactiveButtonsResponse;
   const oldButtonData = payload.messageData?.buttonsResponseMessage;
 
-  const buttonId = interactiveData?.selectedButtonId || oldButtonData?.selectedButtonId || oldButtonData?.buttonId || '';
-  const buttonText = interactiveData?.selectedButtonText || oldButtonData?.selectedButtonText || oldButtonData?.buttonText || '';
+  const buttonId = interactiveData?.selectedButtonId || interactiveData?.selectedId || oldButtonData?.selectedButtonId || oldButtonData?.buttonId || '';
+  const buttonText = interactiveData?.selectedButtonText || interactiveData?.selectedDisplayText || oldButtonData?.selectedButtonText || oldButtonData?.buttonText || '';
 
   console.log('🔘 Button pressed - selectedButtonId:', buttonId, 'selectedButtonText:', buttonText);
 
+  // For receipt buttons use ID (contains tx UUID), for phi-router use display text (Hebrew)
   const messageToRoute = buttonId || buttonText;
-  console.log('🎯 Routing:', messageToRoute);
+  const routerMessage = buttonText || buttonId;
+  console.log('🎯 Routing:', messageToRoute, '| Router text:', routerMessage);
 
-  // Handle receipt confirm/edit buttons directly
+  // Handle receipt confirm/edit buttons directly (ID format: confirm_<uuid> / edit_<uuid>)
   if (messageToRoute.startsWith('confirm_') || messageToRoute.startsWith('edit_')) {
     const greenAPI = getGreenAPIClient();
     const txId = messageToRoute.replace(/^(confirm_|edit_)/, '');
@@ -66,7 +68,7 @@ export async function handleButton(ctx: WebhookContext): Promise<NextResponse> {
   // All other buttons → route through φRouter
   try {
     const { routeMessage } = await import('@/lib/conversation/phi-router');
-    const result = await routeMessage(userData.id, phoneNumber, messageToRoute);
+    const result = await routeMessage(userData.id, phoneNumber, routerMessage);
 
     console.log('[φ Router] Button result: success=' + result.success);
 

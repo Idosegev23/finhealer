@@ -21,7 +21,7 @@ export interface GreenAPIWebhookPayload {
     textMessageData?: { textMessage: string };
     extendedTextMessageData?: { text: string };
     buttonsResponseMessage?: { buttonId: string; buttonText: string; selectedButtonId?: string; selectedButtonText?: string };
-    interactiveButtonsResponse?: { selectedButtonId: string; selectedButtonText: string };
+    interactiveButtonsResponse?: { selectedButtonId?: string; selectedButtonText?: string; selectedId?: string; selectedDisplayText?: string; selectedIndex?: number };
     listResponseMessage?: { selectedRowId: string };
     quotedMessage?: { caption: string };
     fileMessageData?: { downloadUrl: string; fileName: string; caption: string; mimeType: string };

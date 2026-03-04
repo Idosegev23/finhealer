@@ -153,14 +153,16 @@ export async function buildUserSnapshot(userId: string): Promise<UserSnapshot> {
       .from('transactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('status', 'duplicate_suspect'),
+      .eq('status', 'pending')
+      .ilike('notes', '%חשד לכפל%'),
 
     // 11. Needs credit detail
     supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('status', 'needs_credit_detail'),
+      .eq('status', 'confirmed')
+      .ilike('notes', '%ממתין לדוח פירוט%'),
 
     // 12. Unseen insights
     supabase

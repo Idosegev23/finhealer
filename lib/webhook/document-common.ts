@@ -334,7 +334,8 @@ export async function postDocumentProcessing(
           .from('transactions')
           .select('id, vendor, amount')
           .eq('user_id', userId)
-          .eq('status', 'needs_credit_detail')
+          .eq('status', 'confirmed')
+          .ilike('notes', '%ממתין לדוח פירוט%')
           .or(`vendor.ilike.%${cardLast4}%,vendor.ilike.%ויזה ${cardLast4}%,vendor.ilike.%visa ${cardLast4}%`);
 
         if (skippedTx && skippedTx.length > 0) {
@@ -342,9 +343,10 @@ export async function postDocumentProcessing(
 
           await supabase
             .from('transactions')
-            .update({ status: 'confirmed', notes: `קושר לדוח אשראי ${cardLast4}` })
+            .update({ notes: `קושר לדוח אשראי ${cardLast4}` })
             .eq('user_id', userId)
-            .eq('status', 'needs_credit_detail')
+            .eq('status', 'confirmed')
+            .ilike('notes', '%ממתין לדוח פירוט%')
             .or(`vendor.ilike.%${cardLast4}%,vendor.ilike.%ויזה ${cardLast4}%,vendor.ilike.%visa ${cardLast4}%`);
 
           console.log(`✅ Linked ${skippedTx.length} transactions to credit statement`);

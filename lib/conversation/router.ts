@@ -81,6 +81,16 @@ export async function routeMessage(
   console.log(`[Router] ═══════════════════════════════════════`);
   console.log(`[Router] INCOMING: userId=${userId.substring(0,8)}..., phone=${phone.substring(0,6)}..., msg="${msg.substring(0, 80)}"`);
 
+  // Guard: empty message (e.g. from failed button extraction)
+  if (!msg) {
+    console.log(`[Router] EMPTY_MSG: ignoring empty message`);
+    await greenAPI.sendMessage({
+      phoneNumber: phone,
+      message: `לא קיבלתי הודעה 🤔\nכתוב *"עזרה"* לראות מה אפשר לעשות.`,
+    });
+    return { success: true };
+  }
+
   // Load conversation context for continuity
   const conversationCtx = await getOrCreateContext(userId);
 

@@ -155,13 +155,14 @@ export async function handleMonitoring(
       .from('transactions')
       .select('id, vendor, amount')
       .eq('user_id', userId)
-      .eq('status', 'needs_credit_detail')
+      .eq('status', 'confirmed')
+      .ilike('notes', '%ממתין לדוח פירוט%')
       .order('tx_date', { ascending: false });
 
     if (pendingTx && pendingTx[idx]) {
       await supabase
         .from('transactions')
-        .update({ status: 'confirmed', notes: 'סומן ידנית - ללא פירוט אשראי' })
+        .update({ notes: 'סומן ידנית - ללא פירוט אשראי' })
         .eq('id', pendingTx[idx].id);
       await greenAPI.sendMessage({
         phoneNumber: phone,
@@ -183,7 +184,8 @@ export async function handleMonitoring(
       .from('transactions')
       .select('id, vendor, amount')
       .eq('user_id', userId)
-      .eq('status', 'duplicate_suspect')
+      .eq('status', 'pending')
+      .ilike('notes', '%חשד לכפל%')
       .order('tx_date', { ascending: false });
 
     if (dupTx && dupTx[idx]) {
@@ -208,13 +210,14 @@ export async function handleMonitoring(
       .from('transactions')
       .select('id, vendor, amount')
       .eq('user_id', userId)
-      .eq('status', 'duplicate_suspect')
+      .eq('status', 'pending')
+      .ilike('notes', '%חשד לכפל%')
       .order('tx_date', { ascending: false });
 
     if (dupTx && dupTx[idx]) {
       await supabase
         .from('transactions')
-        .update({ status: 'pending', notes: 'אושר כתנועה נפרדת' })
+        .update({ notes: 'אושר כתנועה נפרדת' })
         .eq('id', dupTx[idx].id);
       await greenAPI.sendMessage({
         phoneNumber: phone,
@@ -811,7 +814,8 @@ export async function showDuplicateSuspects(ctx: RouterContext): Promise<RouterR
     .from('transactions')
     .select('id, vendor, amount, tx_date, notes')
     .eq('user_id', ctx.userId)
-    .eq('status', 'duplicate_suspect')
+    .eq('status', 'pending')
+    .ilike('notes', '%חשד לכפל%')
     .order('tx_date', { ascending: false });
 
   if (!dupTx || dupTx.length === 0) {
@@ -900,8 +904,7 @@ export async function showUnclassifiedTransactions(ctx: RouterContext): Promise<
 // ============================================================================
 
 /**
- * showNeedsCreditDetail - Shows transactions with status 'needs_credit_detail'.
- * These are credit card charges waiting for an itemized statement.
+ * showNeedsCreditDetail - Shows credit card charges waiting for an itemized statement.
  */
 export async function showNeedsCreditDetail(ctx: RouterContext): Promise<RouterResult> {
   const supabase = createServiceClient();
@@ -911,7 +914,8 @@ export async function showNeedsCreditDetail(ctx: RouterContext): Promise<RouterR
     .from('transactions')
     .select('id, vendor, amount, tx_date')
     .eq('user_id', ctx.userId)
-    .eq('status', 'needs_credit_detail')
+    .eq('status', 'confirmed')
+    .ilike('notes', '%ממתין לדוח פירוט%')
     .order('tx_date', { ascending: false });
 
   if (!pendingTx || pendingTx.length === 0) {

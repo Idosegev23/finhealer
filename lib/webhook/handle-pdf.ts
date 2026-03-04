@@ -226,7 +226,7 @@ export async function handlePdf(
           .lte('tx_date', dayAfter)
           .gte('amount', tx.amount - tolerance)
           .lte('amount', tx.amount + tolerance)
-          .neq('status', 'duplicate_suspect')
+          .not('notes', 'ilike', '%חשד לכפל%')
           .limit(1);
 
         if (existingTx && existingTx.length > 0) {
@@ -238,14 +238,14 @@ export async function handlePdf(
               type: txType,
               amount: tx.amount,
               vendor: tx.vendor,
-              date: txDate,
               tx_date: txDate,
               category,
               expense_category: tx.expense_category || tx.income_category || null,
               expense_type: tx.expense_type || (txType === 'income' ? null : 'variable'),
               payment_method: tx.payment_method || (documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
               source: 'ocr',
-              status: 'duplicate_suspect',
+              status: 'pending',
+              notes: `חשד לכפל: קיימת תנועה דומה`,
               notes: `חשד לכפל: קיימת תנועה דומה (${existingTx[0].id})`,
               original_description: tx.description || '',
               auto_categorized: !!tx.expense_category,
@@ -266,7 +266,6 @@ export async function handlePdf(
           type: txType,
           amount: tx.amount,
           vendor: tx.vendor,
-          date: txDate,
           tx_date: txDate,
           category,
           expense_category: tx.expense_category || tx.income_category || null,

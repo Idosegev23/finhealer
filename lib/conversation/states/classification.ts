@@ -1101,24 +1101,16 @@ export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterRe
     );
 
     const creditIds = creditTxs.map(t => t.id);
-    console.log(`[Classification] showNextExpenseGroup: CREDIT_SKIP: ${creditTxs.length} credit tx(s) detected, vendor="${firstTx.vendor}", marking as needs_credit_detail`);
+    console.log(`[Classification] showNextExpenseGroup: CREDIT_SKIP: ${creditTxs.length} credit tx(s) detected, vendor="${firstTx.vendor}", confirming as credit charges`);
 
-    const { error: updateError } = await supabase
+    await supabase
       .from('transactions')
       .update({
-        status: 'needs_credit_detail',
-        notes: 'ממתין לדוח פירוט אשראי',
+        status: 'confirmed',
+        expense_category: 'חיוב אשראי',
+        notes: 'חיוב אשראי כולל - דילג אוטומטית, ממתין לדוח פירוט',
       })
       .in('id', creditIds);
-
-    if (updateError) {
-      console.error('[Classification] Failed to mark credit transactions:', updateError);
-      // Fallback: mark as confirmed to avoid infinite loop
-      await supabase
-        .from('transactions')
-        .update({ status: 'confirmed', notes: 'חיוב אשראי - דילג אוטומטית' })
-        .in('id', creditIds);
-    }
 
     if (creditTxs.length > 1) {
       await greenAPI.sendMessage({
@@ -1271,9 +1263,13 @@ export async function moveToNextPhase(
   console.log(`[Classification] moveToNextPhase: hasMoreDocs=${hasMoreDocs}`);
 
   if (hasMoreDocs) {
-    // Still waiting for missing documents
-    console.log(`[Classification] moveToNextPhase: waiting for missing documents, staying in current state`);
-    return { success: true };
+    // Missing docs requested — transition to waiting_for_document so user can upload
+    console.log(`[Classification] moveToNextPhase: waiting for missing documents, transitioning to waiting_for_document`);
+    await supabase
+      .from('users')
+      .update({ onboarding_state: 'waiting_for_document' })
+      .eq('id', ctx.userId);
+    return { success: true, newState: 'waiting_for_document' as any };
   }
 
   // No missing documents - check for pending credit transactions
@@ -1281,7 +1277,8 @@ export async function moveToNextPhase(
     .from('transactions')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', ctx.userId)
-    .eq('status', 'needs_credit_detail');
+    .eq('status', 'confirmed')
+    .ilike('notes', '%ממתין לדוח פירוט%');
 
   console.log(`[Classification] moveToNextPhase: pendingCreditCount=${pendingCreditCount || 0}`);
   if (pendingCreditCount && pendingCreditCount > 0) {
@@ -1317,7 +1314,7 @@ export async function moveToNextPhase(
       })
       .eq('id', ctx.userId);
 
-    return { success: true };
+    return { success: true, newState: 'waiting_for_document' as any };
   }
 
   // All done - move to goals setup
