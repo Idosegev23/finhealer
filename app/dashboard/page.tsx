@@ -10,6 +10,7 @@ import { PhaseJourney } from '@/components/dashboard/PhaseJourney'
 import { GoalsProgress } from '@/components/dashboard/GoalsProgress'
 import { PendingTransactionsBanner } from '@/components/dashboard/PendingTransactionsBanner'
 import { LoansStatusCard } from '@/components/dashboard/LoansStatusCard'
+import { RealtimeRefresh } from '@/components/dashboard/RealtimeRefresh'
 
 export const revalidate = 30
 
@@ -127,6 +128,12 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
       <div className="container mx-auto px-4 py-6 max-w-5xl space-y-5">
+
+        {/* Real-time: auto-refresh when WhatsApp bot processes documents */}
+        <RealtimeRefresh
+          userId={user.id}
+          tables={['behavior_insights', 'budgets', 'goals', 'uploaded_statements']}
+        />
 
         {/* Pending banner */}
         <PendingTransactionsBanner />

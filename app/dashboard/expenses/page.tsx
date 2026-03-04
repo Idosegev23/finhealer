@@ -115,7 +115,7 @@ export default function ExpensesPage() {
                 <XAxis dataKey="monthName" />
                 <YAxis />
                 <Tooltip
-                  formatter={(value: number) => `₪${value.toLocaleString()}`}
+                  formatter={(value: number) => `₪${value.toLocaleString('he-IL')}`}
                   labelStyle={{ textAlign: 'right' }}
                 />
                 <Legend />
@@ -201,7 +201,7 @@ function MonthCard({ month, data, isExpanded, onToggle }: MonthCardProps) {
 
         <div className="flex items-center gap-6">
           <div className="text-left">
-            <p className="text-2xl font-bold text-gray-900">₪{data.total.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-gray-900">₪{data.total.toLocaleString('he-IL')}</p>
             <p className="text-sm text-gray-500">סה&quot;כ הוצאות</p>
           </div>
           {isExpanded ? (
@@ -295,7 +295,7 @@ function ExpenseTypeCard({ title, amount, percent, color }: ExpenseTypeCardProps
   return (
     <div className={`p-4 rounded-lg border ${colorClasses[color]}`}>
       <p className="text-sm font-medium mb-2">{title}</p>
-      <p className="text-2xl font-bold">₪{amount.toLocaleString()}</p>
+      <p className="text-2xl font-bold">₪{amount.toLocaleString('he-IL')}</p>
       <p className="text-sm mt-1">{percent.toFixed(1)}% מהסה&quot;כ</p>
     </div>
   );
@@ -382,7 +382,7 @@ function CategoryGroup({ title, categories, transactions, type }: CategoryGroupP
                 <p className="text-sm text-gray-500">{items.length} תנועות</p>
                   </div>
               </div>
-              <p className="font-semibold text-gray-900">₪{total.toLocaleString()}</p>
+              <p className="font-semibold text-gray-900">₪{total.toLocaleString('he-IL')}</p>
               </button>
 
               {isExpanded && (
@@ -393,11 +393,11 @@ function CategoryGroup({ title, categories, transactions, type }: CategoryGroupP
                         <div>
                           <p className="font-medium text-gray-900">{tx.vendor || 'לא צוין'}</p>
                           <p className="text-sm text-gray-500">
-                            {new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL')}
+                            {new Date(tx.tx_date).toLocaleDateString('he-IL')}
                             {tx.payment_method && ` • ${tx.payment_method}`}
                           </p>
                         </div>
-                        <p className="text-lg font-semibold text-gray-900">₪{parseFloat(tx.amount).toLocaleString()}</p>
+                        <p className="text-lg font-semibold text-gray-900">₪{parseFloat(tx.amount).toLocaleString('he-IL')}</p>
                       </div>
                       
                       {/* Show Details if transaction has details */}

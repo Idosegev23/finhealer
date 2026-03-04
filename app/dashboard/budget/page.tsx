@@ -397,7 +397,7 @@ export default function BudgetPage() {
                 <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
               </div>
               <p className="text-green-100 text-sm mb-1">הכנסות</p>
-              <p className="text-3xl font-bold">₪{(summary?.avgMonthlyIncome || 0).toLocaleString()}</p>
+              <p className="text-3xl font-bold">₪{(summary?.avgMonthlyIncome || 0).toLocaleString('he-IL')}</p>
             </CardContent>
           </Card>
 
@@ -408,7 +408,7 @@ export default function BudgetPage() {
                 <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
               </div>
               <p className="text-red-100 text-sm mb-1">הוצאות</p>
-              <p className="text-3xl font-bold">₪{(summary?.avgMonthlyExpenses || 0).toLocaleString()}</p>
+              <p className="text-3xl font-bold">₪{(summary?.avgMonthlyExpenses || 0).toLocaleString('he-IL')}</p>
             </CardContent>
           </Card>
 
@@ -421,7 +421,7 @@ export default function BudgetPage() {
                 <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
                 </div>
               <p className="text-white/80 text-sm mb-1">יתרה</p>
-              <p className="text-3xl font-bold">₪{(summary?.avgMonthlySavings || 0).toLocaleString()}</p>
+              <p className="text-3xl font-bold">₪{(summary?.avgMonthlySavings || 0).toLocaleString('he-IL')}</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -473,7 +473,7 @@ export default function BudgetPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-phi-dark mb-4">
-                    ₪{(expenseTypes?.fixed?.avgMonthly || 0).toLocaleString()}
+                    ₪{(expenseTypes?.fixed?.avgMonthly || 0).toLocaleString('he-IL')}
                     <span className="text-sm font-normal text-phi-slate">/חודש</span>
                   </p>
                   <div className="space-y-2">
@@ -502,7 +502,7 @@ export default function BudgetPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-phi-dark mb-4">
-                    ₪{(expenseTypes?.variable?.avgMonthly || 0).toLocaleString()}
+                    ₪{(expenseTypes?.variable?.avgMonthly || 0).toLocaleString('he-IL')}
                     <span className="text-sm font-normal text-phi-slate">/חודש</span>
                   </p>
                   <div className="space-y-2">
@@ -531,7 +531,7 @@ export default function BudgetPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-phi-dark mb-4">
-                    ₪{(expenseTypes?.special?.avgMonthly || 0).toLocaleString()}
+                    ₪{(expenseTypes?.special?.avgMonthly || 0).toLocaleString('he-IL')}
                     <span className="text-sm font-normal text-phi-slate">/חודש</span>
                   </p>
                   <div className="space-y-2">
@@ -573,9 +573,9 @@ export default function BudgetPage() {
                               <span className="font-medium text-phi-dark">{cat.category_name}</span>
                               <div className="text-left">
                                 <span className={`font-bold ${isOver ? 'text-red-600' : 'text-phi-dark'}`}>
-                                  ₪{(cat.spent_amount || 0).toLocaleString()}
+                                  ₪{(cat.spent_amount || 0).toLocaleString('he-IL')}
                                 </span>
-                                <span className="text-phi-slate"> / ₪{(cat.allocated_amount || 0).toLocaleString()}</span>
+                                <span className="text-phi-slate"> / ₪{(cat.allocated_amount || 0).toLocaleString('he-IL')}</span>
                               </div>
                             </div>
                             <Progress 
@@ -586,8 +586,8 @@ export default function BudgetPage() {
                               <span>{Math.round(percentage)}% נוצל</span>
                               <span className={isOver ? 'text-red-600' : 'text-green-600'}>
                                 {isOver 
-                                  ? `חריגה של ₪${((cat.spent_amount || 0) - (cat.allocated_amount || 0)).toLocaleString()}`
-                                  : `נותרו ₪${((cat.allocated_amount || 0) - (cat.spent_amount || 0)).toLocaleString()}`
+                                  ? `חריגה של ₪${((cat.spent_amount || 0) - (cat.allocated_amount || 0)).toLocaleString('he-IL')}`
+                                  : `נותרו ₪${((cat.allocated_amount || 0) - (cat.spent_amount || 0)).toLocaleString('he-IL')}`
                                 }
                               </span>
                             </div>
@@ -643,7 +643,7 @@ export default function BudgetPage() {
                                   {vendor.vendor}
                                 </span>
                                 <span className="font-bold text-phi-dark">
-                                  ₪{vendor.avgMonthly.toLocaleString()}
+                                  ₪{vendor.avgMonthly.toLocaleString('he-IL')}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">

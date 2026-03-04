@@ -143,7 +143,7 @@ export default function LoansPage() {
                     <TrendingDown className="w-8 h-8 opacity-80" />
                     <span className="text-sm opacity-80">תשלום חודשי</span>
                   </div>
-                  <div className="text-3xl font-bold">₪{totalMonthlyPayments.toLocaleString()}</div>
+                  <div className="text-3xl font-bold">₪{totalMonthlyPayments.toLocaleString('he-IL')}</div>
                 </CardContent>
               </Card>
 
@@ -154,7 +154,7 @@ export default function LoansPage() {
                     <span className="text-sm opacity-80">סה״כ חוב</span>
                   </div>
                   <div className="text-3xl font-bold">
-                    {totalDebt > 0 ? `₪${totalDebt.toLocaleString()}` : 'לא ידוע'}
+                    {totalDebt > 0 ? `₪${totalDebt.toLocaleString('he-IL')}` : 'לא ידוע'}
                             </div>
                 </CardContent>
               </Card>
@@ -185,7 +185,7 @@ export default function LoansPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip formatter={(value: number) => `₪${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number) => `₪${value.toLocaleString('he-IL')}`} />
                       <Bar dataKey="payment" fill="#3A7BD5" />
                     </BarChart>
                   </ResponsiveContainer>
@@ -214,7 +214,7 @@ export default function LoansPage() {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => `₪${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number) => `₪${value.toLocaleString('he-IL')}`} />
                     </PieChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -249,9 +249,9 @@ export default function LoansPage() {
                           </span>
                         </div>
                           <div className="mt-2 flex gap-6 text-sm text-gray-600">
-                            <span>תשלום חודשי: <strong className="text-gray-900">₪{loan.monthly_payment.toLocaleString()}</strong></span>
+                            <span>תשלום חודשי: <strong className="text-gray-900">₪{loan.monthly_payment.toLocaleString('he-IL')}</strong></span>
                             {loan.current_balance && (
-                              <span>יתרת חוב: <strong className="text-gray-900">₪{loan.current_balance.toLocaleString()}</strong></span>
+                              <span>יתרת חוב: <strong className="text-gray-900">₪{loan.current_balance.toLocaleString('he-IL')}</strong></span>
                             )}
                             {loan.interest_rate && (
                               <span>ריבית: <strong className="text-gray-900">{loan.interest_rate}%</strong></span>

@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, CheckCircle, Clock } from 'lucide-react';
+import { subscribeToTransactions } from '@/lib/supabase/realtime';
+import { createClient } from '@/lib/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Transaction {
   id: string;
@@ -46,6 +49,55 @@ export default function TransactionsTable({
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'confirmed'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [updatingGoal, setUpdatingGoal] = useState<string | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Real-time: refetch transactions when changes are detected
+  const refetchTransactions = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+      const { data } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('tx_date', thirtyDaysAgoStr)
+        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true')
+        .order('tx_date', { ascending: false });
+
+      if (data) setTransactions(data as any);
+    } catch (err) {
+      console.error('Realtime refetch failed:', err);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const supabase = createClient();
+
+    // Debounced refetch to batch rapid changes
+    const triggerRefetch = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        refetchTransactions();
+      }, 1000);
+    };
+
+    channelRef.current = subscribeToTransactions(userId, {
+      onChange: triggerRefetch,
+    });
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, [userId, refetchTransactions]);
 
   // עדכון יעד של תנועה
   async function handleGoalChange(transactionId: string, goalId: string | null) {
