@@ -46,69 +46,26 @@ export async function resolveUser(
   let userData: any;
 
   if (!user) {
-    // Auto-create new user from WhatsApp
-    console.log('🆕 New user from WhatsApp:', maskPhone(phoneNumber));
+    // User not registered — direct them to the website
+    console.log('🚫 Unknown WhatsApp user:', maskPhone(phoneNumber));
 
-    const senderName = payload.senderData?.senderName || '';
-    const cleanName = senderName && senderName !== phoneNumber && !/^\d+$/.test(senderName)
-      ? senderName.trim()
-      : '';
-
-    const initialName = cleanName || 'משתמש חדש';
-    const initialState = cleanName ? 'waiting_for_document' : 'waiting_for_name';
-    console.log(`[Webhook] CREATE_USER: name="${initialName}", state=${initialState}, hasProfileName=${!!cleanName}`);
-
-    const { data: newUser, error: createError } = await supabase
-      .from('users')
-      .insert({
-        phone: phoneNumber,
-        name: initialName,
-        full_name: cleanName || null,
-        wa_opt_in: true,
-        onboarding_state: initialState,
-        phase: 'data_collection',
-        subscription_status: 'trial',
-        trial_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      })
-      .select('id, name, wa_opt_in, phone, subscription_status, trial_expires_at')
-      .single();
-
-    if (createError || !newUser) {
-      console.error('❌ Failed to create new user:', createError);
-      return {
-        earlyReturn: true,
-        statusCode: 500,
-        response: { status: 'error', message: 'Failed to create user' },
-      };
-    }
-
-    console.log('✅ New user created:', maskUserId(newUser.id));
-    userData = newUser;
-
-    // Send welcome message
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app';
     const greenAPI = getGreenAPIClient();
 
-    if (cleanName) {
-      await greenAPI.sendMessage({
-        phoneNumber,
-        message: `היי ${cleanName}! 👋\n\nאני *φ Phi* - העוזר הפיננסי שלך.\n\n📄 שלח לי דוח בנק או אשראי (PDF/Excel/תמונה) ואני אנתח את התנועות שלך.`,
-      });
-    } else {
-      await greenAPI.sendMessage({
-        phoneNumber,
-        message: `היי! 👋\n\nאני *φ Phi* - העוזר הפיננסי שלך.\n\nאיך קוראים לך? 😊`,
-      });
-    }
+    await greenAPI.sendMessage({
+      phoneNumber,
+      message:
+        `היי! 👋\n\n` +
+        `אני *φ Phi* - המאמן הפיננסי שלך.\n\n` +
+        `כדי להתחיל, צריך להירשם קודם באתר:\n` +
+        `🔗 ${siteUrl}/signup\n\n` +
+        `ההרשמה לוקחת פחות מדקה — אחרי זה נמשיך כאן! 😊`,
+    });
 
-    // If first message is a document/image, don't return early - process it
-    if (messageType === 'documentMessage' || messageType === 'imageMessage') {
-      console.log('[Webhook] FIRST_MSG_DOC: processing document from new user');
-    } else {
-      return {
-        earlyReturn: true,
-        response: { status: 'new_user_greeted', userId: newUser.id },
-      };
-    }
+    return {
+      earlyReturn: true,
+      response: { status: 'unregistered_user_redirected' },
+    };
   } else {
     console.log('✅ User found:', maskUserId((user as any).id));
     userData = user as any;
