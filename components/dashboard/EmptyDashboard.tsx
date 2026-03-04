@@ -59,7 +59,7 @@ export default function EmptyDashboard({ userName, hasProfile }: EmptyDashboardP
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
-              onClick={() => router.push('/reflection')}
+              onClick={() => router.push('/dashboard/settings')}
               className="w-full p-6 bg-white rounded-2xl text-right border-2 border-[#3A7BD5] shadow-lg hover:shadow-xl transition-all group"
             >
               <div className="flex items-center justify-between">
@@ -269,7 +269,7 @@ export default function EmptyDashboard({ userName, hasProfile }: EmptyDashboardP
             className="mt-8 text-center"
           >
             <button
-              onClick={() => router.push('/reflection')}
+              onClick={() => router.push('/dashboard/settings')}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-[#3A7BD5] to-[#7ED957] text-white rounded-xl font-bold hover:shadow-xl transition-all shadow-lg"
             >
               בואו נתחיל! 🚀

@@ -26,8 +26,8 @@ export default async function TransactionsPage() {
   }
 
   const userInfo = userData as any;
-  if (userInfo.subscription_status !== 'active') {
-    redirect('/payment');
+  if (!userInfo.subscription_status || !['active', 'trial'].includes(userInfo.subscription_status)) {
+    redirect('/onboarding');
   }
 
   // 30 days back

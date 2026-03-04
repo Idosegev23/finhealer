@@ -22,7 +22,7 @@ export function ProgressiveBanner({ type, transactionCount = 0, daysSinceStart =
       title: 'רוצה תובנות מדויקות יותר?',
       description: 'השלם את הפרופיל הפיננסי שלך ונוכל לתת לך המלצות מותאמות אישית',
       cta: 'השלם פרופיל',
-      link: '/reflection',
+      link: '/dashboard/settings',
     },
     add_transactions: {
       icon: TrendingUp,

@@ -172,14 +172,6 @@ export default function BudgetPage() {
                       ))}
                     </div>
                     <div className="flex flex-wrap gap-3">
-                      {!profileContext?.hasProfile && (
-                        <Link href="/reflection">
-                          <Button className="bg-red-600 hover:bg-red-700 text-white">
-                            <FileText className="w-4 h-4 ml-2" />
-                            מלא שאלון שיקוף
-                          </Button>
-                        </Link>
-                      )}
                       {missingData?.some(m => m.field === 'documents') && (
                         <Button variant="outline" className="border-red-300 text-red-700">
                           <MessageCircle className="w-4 h-4 ml-2" />
@@ -212,7 +204,7 @@ export default function BudgetPage() {
                 </div>
                     <Progress value={profileCompleteness} className="h-2 [&>div]:bg-yellow-500" />
                   </div>
-                  <Link href="/reflection">
+                  <Link href="/dashboard/settings">
                     <Button size="sm" variant="outline" className="border-yellow-400 text-yellow-700">
                       השלם
                     </Button>

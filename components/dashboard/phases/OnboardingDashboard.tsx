@@ -59,7 +59,7 @@ export function OnboardingDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/reflection">
+            <Link href="/dashboard/settings">
               <Button className="w-full">התחל עכשיו</Button>
             </Link>
           </CardContent>

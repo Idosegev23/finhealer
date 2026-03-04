@@ -31,7 +31,7 @@ export function checkSubscription(userData: any): SubscriptionCheckResult {
       message:
         `⏰ *תקופת הנסיון הסתיימה!*\n\n` +
         `כדי להמשיך להשתמש ב-φ Phi, שדרג לתוכנית בתשלום.\n\n` +
-        `💳 שדרג עכשיו: ${SITE_URL}/payment\n\n` +
+        `💳 כתוב *"שדרג"* כאן או בקר ב: ${SITE_URL}/dashboard/settings\n\n` +
         `כתוב *"עזרה"* לשאלות.`,
     };
   }
@@ -42,7 +42,7 @@ export function checkSubscription(userData: any): SubscriptionCheckResult {
     message:
       `😔 *המנוי שלך לא פעיל.*\n\n` +
       `כדי לחזור, שדרג כאן:\n` +
-      `💳 ${SITE_URL}/payment\n\n` +
+      `💳 כתוב *"שדרג"* או בקר ב: ${SITE_URL}/dashboard/settings\n\n` +
       `הנתונים שלך שמורים ומחכים לך! 💰`,
   };
 }

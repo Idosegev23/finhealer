@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // אם המשתמש לא מחובר ומנסה לגשת לדפים מוגנים
-  const protectedPaths = ['/dashboard', '/onboarding', '/payment', '/transactions', '/goals', '/budget', '/reports', '/settings', '/loans-simulator', '/guide', '/admin']
+  const protectedPaths = ['/dashboard', '/onboarding', '/transactions', '/goals', '/budget', '/reports', '/settings', '/loans-simulator', '/guide', '/admin']
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
   
   if (!user && isProtectedPath) {
@@ -91,37 +91,33 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // תהליך: login (auth) → payment (בחירת תוכנית בתוכו) → users table נוצר → onboarding → dashboard
+    // תהליך: login/signup → onboarding (טלפון) → WhatsApp → dashboard
 
     // 1. משתמש מאומת אבל לא קיים ב-users (משתמש חדש לגמרי)
     if (!userExistsInDB) {
-      // הפנה לאונבורדינג (שם יבחר מנוי ויזין פרטים)
       if (!currentPath.startsWith('/onboarding') &&
           currentPath !== '/login' &&
           currentPath !== '/signup') {
-        console.log('🎯 Redirecting new user to onboarding from:', currentPath)
         return NextResponse.redirect(new URL('/onboarding', request.url))
       }
     }
 
-    // 2. משתמש קיים ב-DB אבל טרם השלים onboarding
+    // 2. משתמש קיים ב-DB אבל טרם השלים onboarding (אין טלפון)
     if (userExistsInDB && !hasCompletedOnboarding) {
-      if (!currentPath.startsWith('/onboarding') && 
-          currentPath !== '/payment') {
-        console.log('📝 Redirecting incomplete user to onboarding from:', currentPath)
+      if (!currentPath.startsWith('/onboarding')) {
         return NextResponse.redirect(new URL('/onboarding', request.url))
       }
     }
 
-    // 3. משתמש עם הכל - אסור לחזור ל-login/signup/payment
+    // 3. משתמש עם הכל — אסור לחזור ל-login/signup
     if (userExistsInDB && hasCompletedOnboarding && hasActiveSubscription) {
-      if (currentPath === '/login' || 
+      if (currentPath === '/login' ||
           currentPath === '/signup') {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
 
-      // מנע גישה ל-payment/onboarding אלא אם כן רוצה לעדכן
-      if ((currentPath === '/payment' || currentPath.startsWith('/onboarding')) &&
+      // מנע גישה ל-onboarding אלא אם כן רוצה לעדכן
+      if (currentPath.startsWith('/onboarding') &&
           !request.nextUrl.searchParams.has('update')) {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
