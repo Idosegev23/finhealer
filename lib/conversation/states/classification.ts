@@ -75,7 +75,7 @@ export async function handleClassificationState(ctx: RouterContext, msg: string)
   try {
     await greenAPI.sendInteractiveButtons({
       phoneNumber: ctx.phone,
-      message: `יש לי תנועות שמחכות לסיווג.\nמה תרצה לעשות?`,
+      message: `יש לי הוצאות והכנסות מהדוחות שלך שצריך לסדר.\nבוא נעבור עליהן ביחד — זה קל ומהיר! 😊`,
       header: 'מה עכשיו?',
       buttons: [
         { buttonId: 'start_classify', buttonText: 'נמשיך' },
@@ -85,7 +85,7 @@ export async function handleClassificationState(ctx: RouterContext, msg: string)
   } catch {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `*מה עכשיו?*\n\n• כתוב *"נמשיך"* להתחיל לסווג תנועות\n• או שלח עוד מסמך PDF`,
+      message: `*מה עכשיו?*\n\n• כתוב *"נמשיך"* כדי לסדר את ההוצאות וההכנסות\n• או שלח עוד דוח מהבנק`,
     });
   }
 
@@ -121,7 +121,7 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
     console.log(`[Classification] START: no uploaded docs AND no transactions, aborting classification`);
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `📄 *אין עדיין דוחות במערכת!*\n\nשלח לי דוח בנק או דוח אשראי קודם.\n\n💡 אפשר לשלוח PDF, Excel או תמונה.`,
+      message: `📄 *עוד לא קיבלתי דוחות!*\n\nכדי שאוכל לעזור לך, שלח לי דוח מהבנק או מחברת האשראי.\n\n💡 *איך?* היכנס לאפליקציה של הבנק ← דוחות ← שלח לי כקובץ PDF, תמונה או Excel.`,
     });
     return { success: true };
   }
@@ -133,7 +133,7 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
   if (autoClassified > 0) {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `🧠 סיווגתי אוטומטית ${autoClassified} תנועות לפי מה שלמדתי ממך!`,
+      message: `🧠 זיהיתי ${autoClassified} פעולות שכבר מוכרות לי וסידרתי אותן אוטומטית!`,
     });
   }
 
@@ -161,7 +161,7 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
       console.log(`[Classification] START: no transactions at all, asking for documents`);
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: `אין תנועות לסיווג! 🤷\n\nשלח לי דוח בנק או דוח אשראי קודם.`,
+        message: `אין עדיין הוצאות או הכנסות לסדר 🤷\n\nשלח לי דוח מהבנק או מחברת האשראי כדי שנתחיל.`,
       });
       return { success: true };
     }
@@ -206,18 +206,18 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
         await greenAPI.sendMessage({
           phoneNumber: ctx.phone,
           message:
-            `✅ *סיימנו את הסיווג!*\n\nכל התנועות מסווגות 🎉\n\n` +
-            `עכשיו בוא נגדיר את היעדים הפיננסיים שלך! 🎯\n` +
-            `כתוב *"יעדים"* או *"הגדר יעד"* כדי להתחיל.`,
+            `✅ *מעולה, סידרנו הכל!*\n\nכל ההוצאות וההכנסות מסודרות 🎉\n\n` +
+            `עכשיו בוא נגדיר מטרות — למשל, לחסוך לחופשה או לשלם חוב! 🎯\n` +
+            `כתוב *"יעדים"* כדי להתחיל.`,
         });
       } else {
         await greenAPI.sendMessage({
           phoneNumber: ctx.phone,
           message:
-            `✅ *סיימנו את הסיווג!*\n\nכל התנועות מסווגות 🎉\n\n` +
+            `✅ *מעולה, סידרנו הכל!*\n\nכל ההוצאות וההכנסות מסודרות 🎉\n\n` +
             (nextPhase === 'data_collection'
-              ? `📄 כדי להמשיך, שלח עוד דוחות (צריך לפחות 3 חודשים של נתונים).`
-              : `📊 עכשיו נעבור לנתח את ההתנהגות הפיננסית שלך.\n\nכתוב *"ניתוח"* כדי להתחיל.`),
+              ? `📄 כדי שאוכל לעזור לך יותר, שלח עוד דוחות מהבנק (הכי טוב 3 חודשים אחרונים).`
+              : `📊 עכשיו אבדוק איך הכסף שלך מתנהל ואתן לך טיפים.\n\nכתוב *"ניתוח"* כדי להתחיל.`),
         });
       }
     }
@@ -230,8 +230,9 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message:
-      `🎯 *בוא נעבור על התנועות ביחד!*\n\n` +
-      `יש לך ${incomeCount} הכנסות ו-${expenseCount} הוצאות.\n\n` +
+      `🎯 *בוא נסדר את הכספים שלך!*\n\n` +
+      `מצאתי ${incomeCount} הכנסות (כסף שנכנס) ו-${expenseCount} הוצאות (כסף שיצא).\n\n` +
+      `אני אראה לך כל אחת ואתה תגיד לי מה זה — פשוט מאוד! 😊\n\n` +
       (incomeCount > 0 ? `נתחיל עם ההכנסות 💚` : `נתחיל עם ההוצאות 💸`),
   });
 
@@ -239,16 +240,16 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
   try {
     await greenAPI.sendInteractiveButtons({
       phoneNumber: ctx.phone,
-      message: `רוצה שאסווג הכל אוטומטית?\nאו שנעבור אחד-אחד?`,
+      message: `אני יכול לסדר את הכל בשבילך אוטומטית, או שנעבור ביחד אחד-אחד.\n\nמה מתאים לך?`,
       buttons: [
-        { buttonId: 'accept_all', buttonText: '🚀 סווג הכל' },
+        { buttonId: 'accept_all', buttonText: '🚀 סדר הכל' },
         { buttonId: 'start_classify', buttonText: '👆 אחד-אחד' },
       ],
     });
   } catch {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `💡 *טיפ:* כתוב *"קבל הכל"* ואני אסווג את כולם אוטומטית!`,
+      message: `💡 *טיפ:* כתוב *"קבל הכל"* ואני אסדר את כולם בשבילך!`,
     });
   }
 
@@ -353,7 +354,7 @@ export async function handleClassificationResponse(
 
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `🚀 *מסווג ${pendingTx.length} תנועות אוטומטית...*`,
+      message: `🚀 *מסדר ${pendingTx.length} הוצאות והכנסות בשבילך...*\n\nזה ייקח כמה שניות ⏳`,
     });
 
     let classified = 0;
@@ -432,9 +433,9 @@ export async function handleClassificationResponse(
     }
 
     console.log(`[Classification] ACCEPT_ALL_DONE: classified=${classified}/${pendingTx.length}, fallback=${fallbackCount}`);
-    let doneMsg = `✅ *סיווגתי ${classified} תנועות!*`;
+    let doneMsg = `✅ *סידרתי ${classified} הוצאות והכנסות!*`;
     if (fallbackCount > 0) {
-      doneMsg += `\n\n⚠️ ${fallbackCount} תנועות סווגו כ-"אחר" — תוכל לתקן אותן אחר כך.`;
+      doneMsg += `\n\n⚠️ ל-${fallbackCount} פעולות לא מצאתי קטגוריה מתאימה — תוכל לתקן אותן אחר כך בלי בעיה.`;
     }
     doneMsg += `\n\nנמשיך לשלב הבא 🎯`;
     await greenAPI.sendMessage({
@@ -476,7 +477,7 @@ export async function handleClassificationResponse(
 
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: `⏭️ דילגתי על ${count} תנועות שנשארו.`,
+        message: `⏭️ דילגתי על ${count} פעולות שנשארו — אפשר לחזור אליהן אחר כך.`,
       });
     }
 
@@ -524,7 +525,7 @@ export async function handleClassificationResponse(
       if (reopened) {
         await greenAPI.sendMessage({
           phoneNumber: ctx.phone,
-          message: `↩️ פתחתי מחדש: *${reopened.vendor}* (${Math.abs(reopened.amount).toLocaleString('he-IL')} ₪)\nהיה: *${reopened.category}*\n\nכתוב קטגוריה חדשה:`,
+          message: `↩️ חזרתי לפעולה הקודמת:\n*${reopened.vendor}* — ${Math.abs(reopened.amount).toLocaleString('he-IL')} ₪\nהיה מסודר כ: *${reopened.category}*\n\nכתוב לאיזה נושא זה שייך (למשל: משכורת, מכולת, חשמל):`,
         });
         return await showNextExpenseGroup(ctx);
       }
@@ -625,7 +626,7 @@ export async function handleClassificationResponse(
         await saveSuggestionsToCache(ctx.userId, [aiCategory]);
         await greenAPI.sendMessage({
           phoneNumber: ctx.phone,
-          message: `🤖 הבנתי *"${aiCategory}"* — נכון?\n\nכתוב *"כן"* לאשר, או כתוב קטגוריה אחרת.`,
+          message: `🤖 נראה לי שזה *"${aiCategory}"* — נכון?\n\nכתוב *"כן"* אם זה מתאים, או כתוב שם אחר.`,
         });
         return { success: true };
       }
@@ -640,7 +641,7 @@ export async function handleClassificationResponse(
     console.log(`[Classification] RESPONSE: unrecognized input="${msg}" (expense), asking user to retry`);
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `❓ לא הבנתי. כתוב שם קטגוריה, או *"רשימה"* לאפשרויות.`,
+      message: `❓ לא הבנתי.\n\nכתוב לאיזה נושא ההוצאה שייכת — למשל: *מכולת*, *דלק*, *חשמל*.\n\nאו כתוב *"רשימה"* ואני אראה לך את כל האפשרויות.`,
     });
     return { success: true };
   }
@@ -696,7 +697,7 @@ export async function handleClassificationResponse(
     if (reopened) {
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: `↩️ פתחתי מחדש: *${reopened.vendor}* (${Math.abs(reopened.amount).toLocaleString('he-IL')} ₪)\nהיה: *${reopened.category}*\n\nכתוב קטגוריה חדשה:`,
+        message: `↩️ חזרתי לפעולה הקודמת:\n*${reopened.vendor}* — ${Math.abs(reopened.amount).toLocaleString('he-IL')} ₪\nהיה מסודר כ: *${reopened.category}*\n\nכתוב לאיזה נושא זה שייך (למשל: משכורת, מכולת, חשמל):`,
       });
       return await showNextTransaction(ctx, type);
     }
@@ -1115,7 +1116,7 @@ export async function showNextExpenseGroup(ctx: RouterContext): Promise<RouterRe
     if (creditTxs.length > 1) {
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: `⏭️ דילגתי על ${creditTxs.length} חיובי אשראי.\nשלח דוח פירוט אשראי אחרי שנסיים.`,
+        message: `⏭️ דילגתי על ${creditTxs.length} חיובים מכרטיס אשראי.\nאחרי שנסיים, שלח לי את דוח פירוט האשראי ואסדר גם אותם.`,
       });
     } else {
       await greenAPI.sendMessage({
@@ -1251,7 +1252,7 @@ export async function moveToNextPhase(
 
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: `✅ *סיימנו את ההכנסות!*\n\nעכשיו נעבור על ההוצאות 💸`,
+        message: `✅ *יופי, סידרנו את ההכנסות!*\n\nעכשיו נעבור על ההוצאות (הכסף שיצא) 💸`,
       });
 
       return await showNextExpenseGroup({ ...ctx, state: 'classification_expense' });
@@ -1287,10 +1288,10 @@ export async function moveToNextPhase(
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message:
-        `🎉 *סיימנו את הסיווג!*\n\n` +
-        `⚠️ *רגע!* זיהיתי ${pendingCreditCount} חיובי אשראי.\n\n` +
-        `📄 *שלח לי את דוחות האשראי* כדי שאראה לאן הכסף הלך.\n\n` +
-        `💡 יש לך מספר כרטיסים? שלח כל אחד בנפרד.`,
+        `🎉 *סידרנו הכל!*\n\n` +
+        `⚠️ *רגע* — מצאתי ${pendingCreditCount} חיובים מכרטיס אשראי שעדיין לא מפורטים.\n\n` +
+        `📄 *שלח לי את דוח פירוט האשראי* (אפשר למצוא אותו באפליקציה של חברת האשראי).\n\n` +
+        `💡 יש לך כמה כרטיסים? שלח כל דוח בנפרד.`,
     });
 
     // Merge into classification_context (do not overwrite other keys)

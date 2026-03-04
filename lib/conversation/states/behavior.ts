@@ -51,12 +51,12 @@ export async function handleBehaviorPhase(ctx: RouterContext, msg: string): Prom
   if (intent.intent === 'help') {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `📊 *שלב 2: ניתוח התנהגות*\n\n` +
-        `*מה אני יכול לעשות:*\n` +
-        `• *ניתוח* - הרץ ניתוח מלא\n` +
-        `• *סיכום* - הצג תובנות\n` +
-        `• *המשך* - עבור לשלב היעדים\n\n` +
-        `φ מזהה דפוסים בהוצאות שלך`,
+      message: `📊 *שלב 2: בדיקת ההוצאות שלך*\n\n` +
+        `*מה אפשר לעשות כאן:*\n` +
+        `• כתוב *"ניתוח"* — אני אבדוק לאן הולך הכסף שלך\n` +
+        `• כתוב *"סיכום"* — אני אראה לך תוצאות\n` +
+        `• כתוב *"המשך"* — לעבור לשלב הבא\n\n` +
+        `אני מחפש דברים שחוזרים על עצמם כדי לעזור לך לחסוך 💡`,
     });
     return { success: true };
   }
@@ -65,11 +65,11 @@ export async function handleBehaviorPhase(ctx: RouterContext, msg: string): Prom
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `🤔 לא הבנתי.\n\n` +
-      `*אפשרויות:*\n` +
-      `• *"ניתוח"* - הרץ ניתוח התנהגות\n` +
-      `• *"סיכום"* - הצג תובנות\n` +
-      `• *"המשך"* - עבור לשלב הבא\n` +
-      `• *"עזרה"* - עוד אפשרויות`,
+      `*מה אפשר לעשות:*\n` +
+      `• כתוב *"ניתוח"* — אבדוק לאן הולך הכסף\n` +
+      `• כתוב *"סיכום"* — אראה לך תוצאות\n` +
+      `• כתוב *"המשך"* — לעבור לשלב הבא\n` +
+      `• כתוב *"עזרה"* — עוד אפשרויות`,
   });
   return { success: true };
 }
@@ -79,7 +79,7 @@ export async function startBehaviorAnalysis(ctx: RouterContext): Promise<RouterR
 
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
-    message: `🔍 מנתח את ההתנהגות הפיננסית שלך...\n\nזה יכול לקחת כמה שניות.`,
+    message: `🔍 בודק את ההוצאות וההכנסות שלך...\n\nרגע, זה ייקח כמה שניות ⏳`,
   });
 
   try {

@@ -282,7 +282,7 @@ export async function handleImage(ctx: WebhookContext): Promise<NextResponse> {
 
       await greenAPI.sendMessage({
         phoneNumber,
-        message: `🎉 זיהיתי ${transactions.length} תנועות!\n\n👉 אשר את ההוצאות כאן:\n${siteUrl}/dashboard/expenses/pending`,
+        message: `🎉 זיהיתי ${transactions.length} הוצאות מהקבלה!\n\nאפשר לראות ולאשר אותן באתר:\n${siteUrl}/dashboard/expenses/pending`,
       });
 
       // Trigger state machine

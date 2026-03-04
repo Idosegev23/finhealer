@@ -36,8 +36,8 @@ export async function handleStart(
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: `היי ${ctx.userName || ''}! 👋\n\n` +
-        `יש לך הוצאות והכנסות שצריך לסדר.\n` +
-        `כתוב *"נתחיל"* ונעבור עליהן ביחד 🎯`,
+        `יש לי הוצאות והכנסות מהדוחות שלך שצריך לסדר.\n` +
+        `זה קל ומהיר — כתוב *"נתחיל"* ונעבור עליהן ביחד! 🎯`,
     });
 
     return { success: true, newState: 'classification' as any };
@@ -47,10 +47,9 @@ export async function handleStart(
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `היי ${ctx.userName || 'שם'}! 👋\n\n` +
-      `אני φ Phi, העוזר הפיננסי שלך 😊\n\n` +
-      `📄 כדי להתחיל, שלח לי דוח מהבנק או מחברת האשראי.\n` +
-      `מתאים PDF, תמונה, או קובץ Excel.\n\n` +
-      `💡 *איפה מוצאים את זה?*\nבאפליקציית הבנק → דוחות → ייצוא`,
+      `אני φ Phi, ואני כאן לעזור לך לנהל את הכסף בקלות 😊\n\n` +
+      `📄 כדי להתחיל, שלח לי דוח מהבנק או מחברת האשראי.\nמתאים: PDF, תמונה, או קובץ Excel.\n\n` +
+      `💡 *איפה מוצאים?*\nנכנסים לאפליקציה של הבנק ← דוחות ← שולחים לי את הקובץ.\n\nפשוט מאוד! 😊`,
   });
 
   return { success: true, newState: 'waiting_for_document' as any };
@@ -79,7 +78,7 @@ export async function handleWaitingForName(
     phoneNumber: ctx.phone,
     message: `נעים להכיר, ${msg}! 😊\n\n` +
       `אני φ Phi, ואני כאן לעזור לך לנהל את הכסף בקלות.\n\n` +
-      `📄 שלח לי דוח מהבנק או מחברת האשראי (PDF/תמונה/Excel) ונתחיל!`,
+      `📄 שלח לי דוח מהבנק או מחברת האשראי ונתחיל!\nמתאים: PDF, תמונה, או קובץ Excel.`,
   });
 
   return { success: true, newState: 'waiting_for_document' as any };
@@ -160,7 +159,7 @@ export async function handleWaitingForDocument(
       await supabase.from('users').update({ onboarding_state: 'classification' }).eq('id', ctx.userId);
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: `בסדר! 😊\n\nיש לך הוצאות והכנסות שצריך לסדר.\nכתוב *"נתחיל"* כשתהיה מוכן.`,
+        message: `בסדר! 😊\n\nיש לי הוצאות והכנסות מהדוחות שלך שצריך לסדר.\nכתוב *"נתחיל"* כשתהיה מוכן — זה קל ומהיר!`,
       });
       return { success: true, newState: 'classification' as any };
     } else {
@@ -171,7 +170,7 @@ export async function handleWaitingForDocument(
       await supabase.from('users').update({ onboarding_state: 'monitoring', phase: skipPhase }).eq('id', ctx.userId);
       await greenAPI.sendMessage({
         phoneNumber: ctx.phone,
-        message: `בסדר! 😊\n\nתוכל לשלוח מסמכים בכל עת.\n\nבינתיים, אפשר לשאול אותי שאלות פיננסיות או לכתוב *"עזרה"* לראות מה אפשר לעשות.`,
+        message: `בסדר! 😊\n\nתוכל לשלוח לי דוחות מהבנק מתי שתרצה.\n\nבינתיים, אפשר לשאול אותי שאלות על הכסף שלך, או לכתוב *"עזרה"* לראות מה אני יכול לעשות.`,
       });
       return { success: true, newState: 'monitoring' as any };
     }
@@ -181,12 +180,12 @@ export async function handleWaitingForDocument(
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `📄 אני מחכה לדוח מהבנק או מחברת האשראי.\n\n` +
-      `*מה מתאים:*\n` +
+      `*מה אפשר לשלוח:*\n` +
       `• קובץ PDF\n` +
       `• תמונה (צילום מסך)\n` +
       `• קובץ Excel\n\n` +
-      `💡 אפשר למצוא את זה באפליקציית הבנק בחלק של "דוחות".\n\n` +
-      `אין לך עכשיו? כתוב *"דלג"* ונמשיך.`,
+      `💡 *איפה מוצאים?*\nנכנסים לאפליקציה של הבנק ← דוחות ← שולחים לי.\n\n` +
+      `אין לך עכשיו? כתוב *"דלג"* ונמשיך בלי זה.`,
   });
 
   return { success: true };
