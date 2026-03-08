@@ -35,7 +35,7 @@ export function PhaseProgressCard({ userName, currentPhase, sections }: PhasePro
     { id: 'expenses', label: 'הוצאות', href: '/dashboard/expenses', completed: sections.expenses },
     { id: 'loans', label: 'הלוואות', href: '/dashboard/loans', completed: sections.loans },
     { id: 'savings', label: 'חיסכון', href: '/dashboard/savings', completed: sections.savings },
-    { id: 'cash_flow', label: 'תזרים מזומנים', href: '/dashboard/cash-flow', completed: sections.cash_flow },
+    { id: 'cash_flow', label: 'תזרים מזומנים', href: '/dashboard/reports/cash-flow', completed: sections.cash_flow },
     { id: 'investments', label: 'השקעות', href: '/dashboard/investments', completed: sections.investments },
     { id: 'insurance', label: 'ביטוחים', href: '/dashboard/insurance', completed: sections.insurance },
   ];

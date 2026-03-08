@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { BarChart3, TrendingDown, TrendingUp, Activity } from 'lucide-react';
+import { TrendingDown, TrendingUp, Activity, Wallet } from 'lucide-react';
 
 const reportPages = [
-  { href: '/dashboard/reports/overview', label: 'תמונת מצב כללית', icon: BarChart3, description: 'סקירה מלאה של המצב הפיננסי' },
-  { href: '/dashboard/reports/expenses', label: 'דוח הוצאות', icon: TrendingDown, description: 'ניתוח הוצאות לפי קטגוריות' },
-  { href: '/dashboard/reports/income', label: 'דוח הכנסות', icon: TrendingUp, description: 'סיכום מקורות הכנסה' },
+  { href: '/dashboard/budget', label: 'תקציב', icon: Wallet, description: 'תקציב חודשי — בפועל מול תכנון' },
+  { href: '/dashboard/expenses', label: 'הוצאות', icon: TrendingDown, description: 'ניתוח הוצאות לפי קטגוריות' },
+  { href: '/dashboard/income', label: 'הכנסות', icon: TrendingUp, description: 'סיכום מקורות הכנסה' },
   { href: '/dashboard/reports/cash-flow', label: 'תזרים מזומנים', icon: Activity, description: 'תחזית תזרים חודשית' },
 ];
 

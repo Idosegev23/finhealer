@@ -144,7 +144,7 @@ export function SunburstChart({
             // אם זה פריט אחרון (ללא children) - נבדוק אם יש transactionId
             if (p.data.transactionId && showTransactionLink) {
               // נפתח את הקישור להוצאה בדף ההוצאות
-              window.location.href = `/dashboard/expenses-overview?transaction=${p.data.transactionId}`
+              window.location.href = `/dashboard/expenses?transaction=${p.data.transactionId}`
               return
             }
             

@@ -11,7 +11,10 @@ import {
   FileText,
   Settings,
   BarChart3,
-  ClipboardList,
+  TrendingDown,
+  TrendingUp,
+  Landmark,
+  PiggyBank,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -19,19 +22,32 @@ import { createClient } from "@/lib/supabase/client";
 // ϕ = U+03D5 (mathematical phi)
 const PHI = 'ϕ';
 
+interface NavItem {
+  href: string;
+  label: string;
+  icon: any;
+  separator?: boolean;
+}
+
 interface PhiSidebarProps {
   isMobileMenuOpen: boolean;
   closeMobileMenu: () => void;
 }
 
-const navItems = [
+const navItems: NavItem[] = [
   { href: "/dashboard", label: "ראשי", icon: Home },
-  { href: "/dashboard/overview", label: "גרפים", icon: BarChart3 },
-  { href: "/dashboard/goals", label: "יעדים", icon: Target },
-  { href: "/dashboard/budget", label: "תקציב", icon: Wallet },
+  { href: "/dashboard/overview", label: "סקירה כללית", icon: BarChart3 },
+
+  { href: "/dashboard/budget", label: "תקציב", icon: Wallet, separator: true },
+  { href: "/dashboard/expenses", label: "הוצאות", icon: TrendingDown },
+  { href: "/dashboard/income", label: "הכנסות", icon: TrendingUp },
   { href: "/dashboard/transactions", label: "תנועות", icon: Receipt },
-  { href: "/dashboard/reports", label: "דוחות", icon: ClipboardList },
-  { href: "/dashboard/missing-documents", label: "מסמכים", icon: FileText },
+
+  { href: "/dashboard/goals", label: "יעדים", icon: Target, separator: true },
+  { href: "/dashboard/loans", label: "הלוואות", icon: Landmark },
+  { href: "/dashboard/savings", label: "חסכונות", icon: PiggyBank },
+
+  { href: "/dashboard/missing-documents", label: "מסמכים", icon: FileText, separator: true },
   { href: "/dashboard/settings", label: "הגדרות", icon: Settings },
 ];
 
@@ -72,26 +88,30 @@ export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProp
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || 
+          const isActive = pathname === item.href ||
             (item.href !== "/dashboard" && pathname.startsWith(item.href));
-          
+
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onLinkClick}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group ${
-                isActive
-                  ? "bg-phi-gold/20 text-phi-gold"
-                  : "text-gray-400 hover:bg-phi-slate/30 hover:text-white"
-              }`}
-            >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-phi-gold' : ''}`} />
-              <span className="text-sm font-medium">{item.label}</span>
-            </Link>
+            <div key={item.href}>
+              {item.separator && (
+                <div className="border-t border-phi-slate/15 my-2" />
+              )}
+              <Link
+                href={item.href}
+                onClick={onLinkClick}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all group ${
+                  isActive
+                    ? "bg-phi-gold/20 text-phi-gold"
+                    : "text-gray-400 hover:bg-phi-slate/30 hover:text-white"
+                }`}
+              >
+                <Icon className={`w-4.5 h-4.5 ${isActive ? 'text-phi-gold' : ''}`} />
+                <span className="text-sm font-medium">{item.label}</span>
+              </Link>
+            </div>
           );
         })}
       </nav>
