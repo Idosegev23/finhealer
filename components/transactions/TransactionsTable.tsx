@@ -141,7 +141,7 @@ export default function TransactionsTable({
     
     const matchesType = filterType === 'all' || tx.type === filterType;
     const matchesStatus = filterStatus === 'all' || tx.status === filterStatus;
-    const matchesCategory = filterCategory === 'all' || tx.budget_categories?.id === filterCategory;
+    const matchesCategory = filterCategory === 'all' || tx.category === filterCategory;
 
     return matchesSearch && matchesType && matchesStatus && matchesCategory;
   });
@@ -228,7 +228,7 @@ export default function TransactionsTable({
           >
             <option value="all">כל הקטגוריות</option>
             {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
+              <option key={cat.id} value={cat.name}>{cat.name}</option>
             ))}
           </select>
         </div>

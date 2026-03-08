@@ -38,7 +38,6 @@ export default async function TransactionsPage() {
   // Parallel fetches
   const [
     { data: transactions },
-    { data: categories },
     { data: goals },
   ] = await Promise.all([
     supabase
@@ -49,18 +48,21 @@ export default async function TransactionsPage() {
       .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true')
       .order('tx_date', { ascending: false }),
     supabase
-      .from('budget_categories')
-      .select('id, name')
-      .eq('user_id', user.id)
-      .eq('active', true)
-      .order('name'),
-    supabase
       .from('goals')
       .select('id, name')
       .eq('user_id', user.id)
       .eq('status', 'active')
       .order('name'),
   ]);
+
+  // Extract distinct categories from user's transactions
+  const categorySet = new Set<string>();
+  (transactions || []).forEach((tx: any) => {
+    if (tx.category) categorySet.add(tx.category);
+  });
+  const categories = Array.from(categorySet)
+    .sort()
+    .map((name, i) => ({ id: `cat-${i}`, name }));
 
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
