@@ -9,13 +9,14 @@ import {
   CreditCard, ShoppingBag, Lock, Zap, Star,
   PieChart, BarChart3, ArrowRight, AlertTriangle,
   CheckCircle, FileText, MessageCircle, XCircle,
-  Pencil, Save, X
+  Pencil, Save, X, Plus, Trash2, ListPlus
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import SmartCategoryPicker from '@/components/transactions/SmartCategoryPicker';
 
 interface MissingDataItem {
   field: string;
@@ -75,6 +76,16 @@ export default function BudgetPage() {
   const [editMode, setEditMode] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  // Manual budget creation
+  const [showManualCreate, setShowManualCreate] = useState(false);
+  const [manualCategories, setManualCategories] = useState<Array<{ name: string; amount: number; type: string }>>([]);
+  const [manualTotalBudget, setManualTotalBudget] = useState(0);
+  // Add category to existing budget
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatAmount, setNewCatAmount] = useState(0);
+  const [newCatType, setNewCatType] = useState('variable');
+  const [addingCategory, setAddingCategory] = useState(false);
 
   useEffect(() => {
     loadBudget();
@@ -185,6 +196,87 @@ export default function BudgetPage() {
       console.error('Error saving categories:', err);
     } finally {
       setSaving(null);
+    }
+  };
+
+  // --- Manual budget creation ---
+  const addManualCategory = (categoryName: string, expenseType?: string) => {
+    if (manualCategories.some(c => c.name === categoryName)) return;
+    setManualCategories(prev => [
+      ...prev,
+      { name: categoryName, amount: 0, type: expenseType || 'variable' },
+    ]);
+  };
+
+  const removeManualCategory = (name: string) => {
+    setManualCategories(prev => prev.filter(c => c.name !== name));
+  };
+
+  const updateManualCategoryAmount = (name: string, amount: number) => {
+    setManualCategories(prev =>
+      prev.map(c => c.name === name ? { ...c, amount } : c)
+    );
+  };
+
+  const createManualBudget = async () => {
+    if (manualCategories.length === 0) return;
+    setCreating(true);
+    try {
+      const total = manualTotalBudget || manualCategories.reduce((s, c) => s + c.amount, 0);
+      const res = await fetch('/api/budget/create-manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          month: currentMonth,
+          totalBudget: total,
+          categories: manualCategories,
+        }),
+      });
+      if (res.ok) {
+        setShowManualCreate(false);
+        setManualCategories([]);
+        setManualTotalBudget(0);
+        loadBudget();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'שגיאה ביצירת תקציב');
+      }
+    } catch (err) {
+      console.error('Manual budget error:', err);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // --- Add category to existing budget ---
+  const addCategoryToExisting = async () => {
+    if (!newCatName || !data?.budget?.id) return;
+    setAddingCategory(true);
+    try {
+      const res = await fetch('/api/budget/add-category', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          budgetId: data.budget.id,
+          categoryName: newCatName,
+          amount: newCatAmount,
+          type: newCatType,
+        }),
+      });
+      if (res.ok) {
+        setShowAddCategory(false);
+        setNewCatName('');
+        setNewCatAmount(0);
+        setNewCatType('variable');
+        loadBudget();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'שגיאה בהוספת קטגוריה');
+      }
+    } catch (err) {
+      console.error('Add category error:', err);
+    } finally {
+      setAddingCategory(false);
     }
   };
 
@@ -343,17 +435,26 @@ export default function BudgetPage() {
               </select>
               
               {!hasBudget && (
-                <Button
-                  onClick={createSmartBudget}
-                  disabled={creating}
-                  className="bg-phi-gold hover:bg-phi-coral text-white"
-                >
-                  {creating ? (
-                    <><RefreshCw className="w-4 h-4 ml-2 animate-spin" /> יוצר...</>
-                  ) : (
-                    <><Sparkles className="w-4 h-4 ml-2" /> צור תקציב חכם</>
-                  )}
-                </Button>
+                <>
+                  <Button
+                    onClick={createSmartBudget}
+                    disabled={creating}
+                    className="bg-phi-gold hover:bg-phi-coral text-white"
+                  >
+                    {creating ? (
+                      <><RefreshCw className="w-4 h-4 ml-2 animate-spin" /> יוצר...</>
+                    ) : (
+                      <><Sparkles className="w-4 h-4 ml-2" /> צור תקציב חכם</>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => setShowManualCreate(true)}
+                    variant="outline"
+                    className="border-phi-gold text-phi-gold hover:bg-phi-gold/10"
+                  >
+                    <ListPlus className="w-4 h-4 ml-2" /> צור תקציב ידני
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -454,6 +555,166 @@ export default function BudgetPage() {
               </CardContent>
             </Card>
           </motion.div>
+
+        {/* Manual Budget Creation Panel */}
+        {showManualCreate && !hasBudget && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <Card className="bg-white border-phi-gold border-2">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-phi-dark flex items-center gap-2">
+                    <ListPlus className="w-5 h-5 text-phi-gold" />
+                    יצירת תקציב ידני
+                  </CardTitle>
+                  <Button size="sm" variant="ghost" onClick={() => { setShowManualCreate(false); setManualCategories([]); }}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-sm text-phi-slate">בחר קטגוריות וקבע סכום לכל אחת</p>
+              </CardHeader>
+              <CardContent>
+                {/* Add category with SmartCategoryPicker */}
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-phi-dark mb-1 block">הוסף קטגוריה:</label>
+                  <div className="w-64">
+                    <SmartCategoryPicker
+                      value=""
+                      onChange={(name, type) => addManualCategory(name, type)}
+                    />
+                  </div>
+                </div>
+
+                {/* Category list */}
+                {manualCategories.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    <div className="grid grid-cols-12 gap-2 px-3 py-1 text-xs font-medium text-phi-slate border-b border-phi-frost">
+                      <div className="col-span-5">קטגוריה</div>
+                      <div className="col-span-2 text-center">סוג</div>
+                      <div className="col-span-3 text-center">סכום חודשי</div>
+                      <div className="col-span-2"></div>
+                    </div>
+                    {manualCategories.map((cat) => (
+                      <div key={cat.name} className="grid grid-cols-12 gap-2 items-center px-3 py-2 bg-phi-bg rounded-lg">
+                        <div className="col-span-5 text-sm font-medium text-phi-dark truncate">{cat.name}</div>
+                        <div className="col-span-2 text-center">
+                          <Badge variant="outline" className="text-[10px]">
+                            {cat.type === 'fixed' ? 'קבוע' : cat.type === 'variable' ? 'משתנה' : 'מיוחד'}
+                          </Badge>
+                        </div>
+                        <div className="col-span-3">
+                          <input
+                            type="number"
+                            value={cat.amount || ''}
+                            onChange={(e) => updateManualCategoryAmount(cat.name, Number(e.target.value))}
+                            placeholder="0"
+                            className="w-full px-2 py-1 text-sm border rounded text-center bg-white"
+                            min={0}
+                            dir="ltr"
+                          />
+                        </div>
+                        <div className="col-span-2 text-center">
+                          <button onClick={() => removeManualCategory(cat.name)} className="text-red-400 hover:text-red-600">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Total */}
+                    <div className="flex items-center justify-between px-3 py-3 bg-phi-dark text-white rounded-lg mt-3">
+                      <span className="font-medium">סה&quot;כ תקציב:</span>
+                      <span className="text-xl font-bold">
+                        ₪{manualCategories.reduce((s, c) => s + c.amount, 0).toLocaleString('he-IL')}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Create button */}
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => { setShowManualCreate(false); setManualCategories([]); }}
+                  >
+                    ביטול
+                  </Button>
+                  <Button
+                    onClick={createManualBudget}
+                    disabled={creating || manualCategories.length === 0 || manualCategories.every(c => c.amount === 0)}
+                    className="bg-phi-gold hover:bg-phi-coral text-white"
+                  >
+                    {creating ? (
+                      <><RefreshCw className="w-4 h-4 ml-2 animate-spin" /> יוצר...</>
+                    ) : (
+                      <><CheckCircle className="w-4 h-4 ml-2" /> צור תקציב ({manualCategories.length} קטגוריות)</>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Add Category to Existing Budget Modal */}
+        {showAddCategory && hasBudget && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Card className="bg-white border-phi-gold border-2">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-phi-dark text-base flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-phi-gold" />
+                    הוספת קטגוריה לתקציב
+                  </CardTitle>
+                  <Button size="sm" variant="ghost" onClick={() => setShowAddCategory(false)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="w-64">
+                    <label className="text-xs font-medium text-phi-slate mb-1 block">קטגוריה:</label>
+                    <SmartCategoryPicker
+                      value={newCatName}
+                      onChange={(name, type) => { setNewCatName(name); if (type) setNewCatType(type); }}
+                    />
+                  </div>
+                  <div className="w-32">
+                    <label className="text-xs font-medium text-phi-slate mb-1 block">סכום חודשי:</label>
+                    <input
+                      type="number"
+                      value={newCatAmount || ''}
+                      onChange={(e) => setNewCatAmount(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full px-3 py-2 text-sm border rounded bg-white"
+                      min={0}
+                      dir="ltr"
+                    />
+                  </div>
+                  <Button
+                    onClick={addCategoryToExisting}
+                    disabled={addingCategory || !newCatName || newCatAmount <= 0}
+                    className="bg-phi-gold hover:bg-phi-coral text-white"
+                  >
+                    {addingCategory ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <><Plus className="w-4 h-4 ml-1" /> הוסף</>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Summary Cards */}
           <motion.div
@@ -630,43 +891,56 @@ export default function BudgetPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-phi-dark">תקציב לפי קטגוריות</CardTitle>
-                    {categories && categories.length > 0 && hasBudget && (
+                    {hasBudget && (
                       <div className="flex gap-2">
-                        {editMode ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowAddCategory(!showAddCategory)}
+                          className="border-green-400 text-green-600 hover:bg-green-50"
+                        >
+                          <Plus className="w-4 h-4 ml-1" />
+                          הוסף קטגוריה
+                        </Button>
+                        {categories && categories.length > 0 && (
                           <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={cancelEditing}
-                              className="border-red-300 text-red-600"
-                            >
-                              <X className="w-4 h-4 ml-1" />
-                              ביטול
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={saveAllCategories}
-                              disabled={saving === 'all'}
-                              className="bg-phi-gold hover:bg-phi-coral text-white"
-                            >
-                              {saving === 'all' ? (
-                                <RefreshCw className="w-4 h-4 ml-1 animate-spin" />
-                              ) : (
-                                <Save className="w-4 h-4 ml-1" />
-                              )}
-                              שמור הכל
-                            </Button>
+                            {editMode ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={cancelEditing}
+                                  className="border-red-300 text-red-600"
+                                >
+                                  <X className="w-4 h-4 ml-1" />
+                                  ביטול
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={saveAllCategories}
+                                  disabled={saving === 'all'}
+                                  className="bg-phi-gold hover:bg-phi-coral text-white"
+                                >
+                                  {saving === 'all' ? (
+                                    <RefreshCw className="w-4 h-4 ml-1 animate-spin" />
+                                  ) : (
+                                    <Save className="w-4 h-4 ml-1" />
+                                  )}
+                                  שמור הכל
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={startEditing}
+                                className="border-phi-gold text-phi-gold hover:bg-phi-gold/10"
+                              >
+                                <Pencil className="w-4 h-4 ml-1" />
+                                עריכת תקציב
+                              </Button>
+                            )}
                           </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={startEditing}
-                            className="border-phi-gold text-phi-gold hover:bg-phi-gold/10"
-                          >
-                            <Pencil className="w-4 h-4 ml-1" />
-                            עריכת תקציב
-                          </Button>
                         )}
                       </div>
                     )}
@@ -837,10 +1111,20 @@ export default function BudgetPage() {
                     <div className="text-center py-12">
                       <BarChart3 className="w-16 h-16 text-phi-frost mx-auto mb-4" />
                       <p className="text-phi-slate mb-4">אין קטגוריות תקציב עדיין</p>
-                      <Button onClick={createSmartBudget} disabled={creating} className="bg-phi-gold text-white">
-                        <Sparkles className="w-4 h-4 ml-2" />
-                        צור תקציב חכם
-                      </Button>
+                      <div className="flex gap-3 justify-center">
+                        <Button onClick={createSmartBudget} disabled={creating} className="bg-phi-gold text-white">
+                          <Sparkles className="w-4 h-4 ml-2" />
+                          צור תקציב חכם
+                        </Button>
+                        <Button
+                          onClick={() => setShowManualCreate(true)}
+                          variant="outline"
+                          className="border-phi-gold text-phi-gold"
+                        >
+                          <ListPlus className="w-4 h-4 ml-2" />
+                          צור תקציב ידני
+                        </Button>
+                      </div>
                     </div>
                   )}
               </CardContent>
