@@ -1,342 +1,340 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { FileSpreadsheet, Download } from 'lucide-react'
+import {
+  TrendingUp, TrendingDown, Wallet, BarChart3,
+  Target, PiggyBank, Landmark, Briefcase,
+  ChevronLeft, MessageCircle,
+} from 'lucide-react'
 import Link from 'next/link'
 import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner'
-import OverviewTransactionsSection from '@/components/reports/OverviewTransactionsSection'
+import { ExpensesPieBudget } from '@/components/dashboard/ExpensesPieBudget'
 
-// ✨ רענון הדף כל 30 שניות כדי להציג נתונים עדכניים
 export const revalidate = 30;
 
 export default async function OverviewPage() {
   const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: userData } = await supabase
     .from('users')
-    .select('*')
+    .select('id, name, phase')
     .eq('id', user.id)
     .single()
+  if (!userData) redirect('/login')
 
-  if (!userData) {
-    redirect('/login')
-  }
+  // Current month
+  const now = new Date()
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  const today = now.toISOString().split('T')[0]
 
-  const userDataInfo = userData as any
+  // Previous month
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
+  const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
 
-  // קבלת כל הנתונים במקביל
-  const now = new Date();
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const today = now.toISOString().split('T')[0];
-
+  // Parallel fetches — only what matters
   const [
-    { data: profile },
+    { data: currentTx },
+    { data: prevTx },
+    { data: goals },
     { data: loans },
     { data: savings },
-    { data: insurance },
-    { data: pensions },
     { data: income },
-    { data: monthlyTransactions },
+    { data: recentTx },
+    { data: topCategories },
   ] = await Promise.all([
-    supabase.from('user_financial_profile').select('*').eq('user_id', user.id).single(),
-    supabase.from('loans').select('*').eq('user_id', user.id).eq('active', true),
-    supabase.from('savings_accounts').select('*').eq('user_id', user.id).eq('active', true),
-    supabase.from('insurance').select('*').eq('user_id', user.id).eq('active', true),
-    supabase.from('pension_insurance').select('*').eq('user_id', user.id).eq('active', true),
-    supabase.from('income_sources').select('*').eq('user_id', user.id).eq('active', true),
     supabase
       .from('transactions')
-      .select('*')
+      .select('type, amount, expense_category')
       .eq('user_id', user.id)
-      .in('status', ['confirmed', 'pending'])
+      .eq('status', 'confirmed')
       .gte('tx_date', firstOfMonth)
       .lte('tx_date', today)
       .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'),
-  ]);
+    supabase
+      .from('transactions')
+      .select('type, amount')
+      .eq('user_id', user.id)
+      .eq('status', 'confirmed')
+      .gte('tx_date', prevMonthStart)
+      .lte('tx_date', prevMonthEnd)
+      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'),
+    supabase
+      .from('goals')
+      .select('id, name, target_amount, current_amount, status')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('priority', { ascending: true })
+      .limit(5),
+    supabase
+      .from('loans')
+      .select('id, monthly_payment, current_balance')
+      .eq('user_id', user.id)
+      .eq('active', true),
+    supabase
+      .from('savings_accounts')
+      .select('id, current_balance')
+      .eq('user_id', user.id)
+      .eq('active', true),
+    supabase
+      .from('income_sources')
+      .select('id, source_name, actual_bank_amount')
+      .eq('user_id', user.id)
+      .eq('active', true),
+    supabase
+      .from('transactions')
+      .select('id, type, amount, category, vendor, tx_date, expense_category')
+      .eq('user_id', user.id)
+      .eq('status', 'confirmed')
+      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true')
+      .order('tx_date', { ascending: false })
+      .limit(10),
+    supabase
+      .from('transactions')
+      .select('expense_category, amount')
+      .eq('user_id', user.id)
+      .eq('type', 'expense')
+      .eq('status', 'confirmed')
+      .gte('tx_date', firstOfMonth)
+      .lte('tx_date', today)
+      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'),
+  ])
 
-  const transactionIncome = (monthlyTransactions || [])
-    .filter((tx: any) => tx.type === 'income')
-    .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+  // Monthly KPIs
+  const curList = (currentTx || []) as any[]
+  const curIncome = curList.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0)
+  const curExpenses = curList.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0)
+  const curBalance = curIncome - curExpenses
 
-  const transactionExpenses = (monthlyTransactions || [])
-    .filter((tx: any) => tx.type === 'expense')
-    .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+  const prevList = (prevTx || []) as any[]
+  const prevExpenses = prevList.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0)
+  const expenseChange = prevExpenses > 0
+    ? Math.round(((curExpenses - prevExpenses) / prevExpenses) * 100)
+    : 0
 
-  const profileData: any = profile || {}
+  // Top categories
+  const catMap: Record<string, number> = {}
+  ;(topCategories || []).forEach((tx: any) => {
+    const cat = tx.expense_category || 'לא מסווג'
+    catMap[cat] = (catMap[cat] || 0) + Math.round(Number(tx.amount) || 0)
+  })
+  const topCats = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5)
+
+  // Summaries
+  const totalLoansPayment = (loans || []).reduce((s: number, l: any) => s + Number(l.monthly_payment || 0), 0)
+  const totalLoansBalance = (loans || []).reduce((s: number, l: any) => s + Number(l.current_balance || 0), 0)
+  const totalSavings = (savings || []).reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0)
+  const totalIncomeFixed = (income || []).reduce((s: number, i: any) => s + Number(i.actual_bank_amount || 0), 0)
+
+  const monthName = now.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })
 
   return (
-    <div className="min-h-screen bg-dashboard">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50" dir="rtl">
+      <div className="container mx-auto px-4 py-6 max-w-5xl space-y-5">
         <WhatsAppBanner message="רוצה לעדכן נתונים? לשאול שאלה? כל זה דרך WhatsApp! 💬" />
-        
+
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-theme-primary mb-2">
-              תמונת מצב מלאה 📊
-            </h1>
-            <p className="text-theme-secondary">
-              סיכום מפורט של כל הנתונים הפיננסיים שלך
-            </p>
-          </div>
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
-            <Download className="w-4 h-4" />
-            ייצוא לExcel
-          </button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">סקירה כללית</h1>
+          <p className="text-sm text-gray-500">{monthName} — תמונת מצב פיננסית</p>
         </div>
 
-        {/* מידע אישי */}
-        <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-lg mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <FileSpreadsheet className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h2 className="text-xl font-bold text-theme-primary">מידע אישי</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-theme-tertiary">שם מלא</p>
-              <p className="font-bold text-theme-primary">{userDataInfo.name}</p>
-            </div>
-            <div>
-              <p className="text-sm text-theme-tertiary">גיל</p>
-              <p className="font-bold text-theme-primary">{profileData.age || '-'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-theme-tertiary">מצב משפחתי</p>
-              <p className="font-bold text-theme-primary">{profileData.marital_status || '-'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-theme-tertiary">עיר מגורים</p>
-              <p className="font-bold text-theme-primary">{profileData.city || '-'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-theme-tertiary">סטטוס תעסוקה</p>
-              <p className="font-bold text-theme-primary">{profileData.employment_status || '-'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-theme-tertiary">מספר ילדים</p>
-              <p className="font-bold text-theme-primary">{profileData.dependents || 0}</p>
-            </div>
-          </div>
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCard label="הכנסות" value={curIncome} color="green"
+            icon={<TrendingUp className="w-4 h-4 text-green-600" />} />
+          <KpiCard label="הוצאות" value={curExpenses} color="red"
+            icon={<TrendingDown className="w-4 h-4 text-red-600" />}
+            badge={expenseChange !== 0 ? `${expenseChange > 0 ? '+' : ''}${expenseChange}%` : undefined}
+            badgeColor={expenseChange > 0 ? 'red' : 'green'} />
+          <KpiCard label="מאזן" value={curBalance} color={curBalance >= 0 ? 'blue' : 'red'} signed
+            icon={<Wallet className="w-4 h-4 text-blue-600" />} />
+          <KpiCard label="חיסכון" value={totalSavings} color="purple"
+            icon={<PiggyBank className="w-4 h-4 text-purple-600" />} />
         </div>
 
-        {/* סיכום הכנסות והוצאות מתנועות */}
-        {(transactionIncome > 0 || transactionExpenses > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-xl p-6 shadow-lg">
-              <h3 className="text-sm text-green-600 dark:text-green-400 font-semibold mb-2">💰 הכנסות החודש (מתנועות)</h3>
-              <p className="text-3xl font-black text-green-700 dark:text-green-300">₪{transactionIncome.toLocaleString('he-IL')}</p>
+        {/* Pie chart + budget recommendations */}
+        <ExpensesPieBudget />
+
+        {/* Top spending categories this month */}
+        {topCats.length > 0 && (
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-amber-500" />
+                הוצאות מובילות — {monthName}
+              </h3>
+              <Link href="/dashboard/expenses" className="text-xs text-amber-600 hover:underline flex items-center gap-0.5">
+                הכל <ChevronLeft className="w-3 h-3" />
+              </Link>
             </div>
-            <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-xl p-6 shadow-lg">
-              <h3 className="text-sm text-red-600 dark:text-red-400 font-semibold mb-2">💳 הוצאות החודש (מתנועות)</h3>
-              <p className="text-3xl font-black text-red-700 dark:text-red-300">₪{transactionExpenses.toLocaleString('he-IL')}</p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 shadow-lg">
-              <h3 className="text-sm text-blue-600 dark:text-blue-400 font-semibold mb-2">📊 מאזן חודשי</h3>
-              <p className={`text-3xl font-black ${transactionIncome - transactionExpenses >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-                {transactionIncome - transactionExpenses >= 0 ? '+' : ''}₪{(transactionIncome - transactionExpenses).toLocaleString('he-IL')}
-              </p>
+            <div className="space-y-2">
+              {topCats.map(([cat, amount]) => {
+                const pct = curExpenses > 0 ? Math.round((amount / curExpenses) * 100) : 0
+                return (
+                  <div key={cat}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-700">{cat}</span>
+                      <span className="text-gray-500">₪{amount.toLocaleString('he-IL')} ({pct}%)</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-l from-amber-400 to-amber-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
 
-        {/* טבלה - הכנסות קבועות */}
-        <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-lg mb-6">
-          <h2 className="text-xl font-bold text-theme-primary mb-4">💰 מקורות הכנסה קבועים</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-theme">
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">מקור</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">סכום ברוטו</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">סכום נטו</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">תדירות</th>
-                </tr>
-              </thead>
-              <tbody>
-                {income && income.length > 0 ? (
-                  income.map((item: any, index: number) => (
-                    <tr key={index} className="border-b border-theme hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="py-3 px-4 text-theme-primary">{item.source_name}</td>
-                      <td className="py-3 px-4 text-theme-primary">₪{Number(item.gross_amount || 0).toLocaleString('he-IL')}</td>
-                      <td className="py-3 px-4 font-bold text-green-600 dark:text-green-400">₪{Number(item.net_amount || 0).toLocaleString('he-IL')}</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{item.frequency || 'חודשי'}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="py-4 text-center text-theme-tertiary">אין נתונים</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* טבלה - הלוואות */}
-        <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-lg mb-6">
-          <h2 className="text-xl font-bold text-theme-primary mb-4">🏦 הלוואות</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-theme">
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">שם הלוואה</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">יתרה נוכחית</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">תשלום חודשי</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">ריבית</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">תאריך סיום</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loans && loans.length > 0 ? (
-                  loans.map((loan: any, index: number) => (
-                    <tr key={index} className="border-b border-theme hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="py-3 px-4 text-theme-primary">{loan.loan_name}</td>
-                      <td className="py-3 px-4 font-bold text-red-600 dark:text-red-400">₪{Number(loan.current_balance || 0).toLocaleString('he-IL')}</td>
-                      <td className="py-3 px-4 text-theme-primary">₪{Number(loan.monthly_payment || 0).toLocaleString('he-IL')}</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{loan.interest_rate}%</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{loan.end_date || '-'}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-4 text-center text-theme-tertiary">אין נתונים</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* טבלאות מתנועות - גרסה מתקדמת */}
-        {monthlyTransactions && monthlyTransactions.length > 0 && (
-          <div className="mb-6">
-            <OverviewTransactionsSection transactions={monthlyTransactions} />
+        {/* Goals */}
+        {goals && goals.length > 0 && (
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                <Target className="w-4 h-4 text-purple-500" />
+                יעדים פעילים
+              </h3>
+              <Link href="/dashboard/goals" className="text-xs text-purple-600 hover:underline flex items-center gap-0.5">
+                הכל <ChevronLeft className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {(goals as any[]).map((goal) => {
+                const pct = goal.target_amount > 0
+                  ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100))
+                  : 0
+                return (
+                  <div key={goal.id}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-800 font-medium">{goal.name}</span>
+                      <span className="text-gray-500 text-xs">
+                        ₪{Number(goal.current_amount || 0).toLocaleString('he-IL')} / ₪{Number(goal.target_amount).toLocaleString('he-IL')}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-l from-purple-400 to-purple-600"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 
-        {/* טבלה - חיסכון */}
-        <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-lg mb-6">
-          <h2 className="text-xl font-bold text-theme-primary mb-4">💵 חיסכון</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-theme">
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">שם חשבון</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">סוג</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">יתרה נוכחית</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">תשואה שנתית</th>
-                </tr>
-              </thead>
-              <tbody>
-                {savings && savings.length > 0 ? (
-                  savings.map((account: any, index: number) => (
-                    <tr key={index} className="border-b border-theme hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="py-3 px-4 text-theme-primary">{account.account_name}</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{account.account_type}</td>
-                      <td className="py-3 px-4 font-bold text-green-600 dark:text-green-400">₪{Number(account.current_balance || 0).toLocaleString('he-IL')}</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{account.annual_yield || 0}%</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="py-4 text-center text-theme-tertiary">אין נתונים</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        {/* Financial modules summary */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <ModuleCard title="הלוואות" icon={<Landmark className="w-4 h-4" />}
+            count={(loans || []).length}
+            detail={totalLoansPayment > 0 ? `₪${totalLoansPayment.toLocaleString('he-IL')}/חודש` : undefined}
+            subDetail={totalLoansBalance > 0 ? `יתרה: ₪${totalLoansBalance.toLocaleString('he-IL')}` : undefined}
+            href="/dashboard/loans" color="red" />
+          <ModuleCard title="חסכונות" icon={<PiggyBank className="w-4 h-4" />}
+            count={(savings || []).length}
+            detail={totalSavings > 0 ? `₪${totalSavings.toLocaleString('he-IL')}` : undefined}
+            href="/dashboard/savings" color="green" />
+          <ModuleCard title="הכנסות קבועות" icon={<Briefcase className="w-4 h-4" />}
+            count={(income || []).length}
+            detail={totalIncomeFixed > 0 ? `₪${totalIncomeFixed.toLocaleString('he-IL')}/חודש` : undefined}
+            href="/dashboard/income" color="blue" />
+          <ModuleCard title="יעדים" icon={<Target className="w-4 h-4" />}
+            count={(goals || []).length}
+            href="/dashboard/goals" color="purple" />
         </div>
 
-        {/* טבלה - ביטוחים */}
-        <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-lg mb-6">
-          <h2 className="text-xl font-bold text-theme-primary mb-4">🛡️ ביטוחים</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-theme">
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">סוג ביטוח</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">חברה</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">מספר פוליסה</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">פרמיה חודשית</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">סכום כיסוי</th>
-                </tr>
-              </thead>
-              <tbody>
-                {insurance && insurance.length > 0 ? (
-                  insurance.map((policy: any, index: number) => (
-                    <tr key={index} className="border-b border-theme hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="py-3 px-4 text-theme-primary">{policy.insurance_type}</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{policy.company_name}</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{policy.policy_number}</td>
-                      <td className="py-3 px-4 text-theme-primary">₪{Number(policy.monthly_premium || 0).toLocaleString('he-IL')}</td>
-                      <td className="py-3 px-4 font-bold text-green-600 dark:text-green-400">₪{Number(policy.coverage_amount || 0).toLocaleString('he-IL')}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-4 text-center text-theme-tertiary">אין נתונים</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        {/* Recent transactions */}
+        {recentTx && recentTx.length > 0 && (
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 text-sm">תנועות אחרונות</h3>
+              <Link href="/dashboard/transactions" className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
+                הכל <ChevronLeft className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {(recentTx as any[]).map((tx) => (
+                <div key={tx.id} className="flex items-center justify-between py-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      tx.type === 'income' ? 'bg-green-50' : 'bg-red-50'
+                    }`}>
+                      {tx.type === 'income'
+                        ? <TrendingUp className="w-3.5 h-3.5 text-green-600" />
+                        : <TrendingDown className="w-3.5 h-3.5 text-red-600" />}
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-900 leading-tight">{tx.vendor || tx.expense_category || tx.category || 'תנועה'}</p>
+                      <p className="text-xs text-gray-400">{tx.tx_date}</p>
+                    </div>
+                  </div>
+                  <p className={`font-semibold text-sm ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                    {tx.type === 'income' ? '+' : '-'}₪{Number(tx.amount).toLocaleString('he-IL')}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-
-        {/* טבלה - פנסיה */}
-        <div className="bg-card-dark border border-theme rounded-xl p-6 shadow-lg mb-6">
-          <h2 className="text-xl font-bold text-theme-primary mb-4">💼 פנסיה וקופות גמל</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-theme">
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">קרן</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">סוג</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">יתרה</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">תשואה שנתית</th>
-                  <th className="text-right py-3 px-4 text-theme-secondary font-semibold">דמי ניהול</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pensions && pensions.length > 0 ? (
-                  pensions.map((pension: any, index: number) => (
-                    <tr key={index} className="border-b border-theme hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="py-3 px-4 text-theme-primary">{pension.fund_name}</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{pension.fund_type}</td>
-                      <td className="py-3 px-4 font-bold text-green-600 dark:text-green-400">₪{Number(pension.current_balance || 0).toLocaleString('he-IL')}</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{pension.annual_yield || 0}%</td>
-                      <td className="py-3 px-4 text-theme-tertiary">{pension.management_fees || 0}%</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-4 text-center text-theme-tertiary">אין נתונים</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Back to Dashboard */}
-        <div className="mt-8 text-center">
-          <Link 
-            href="/dashboard"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
-          >
-            ← חזרה לדשבורד
-          </Link>
-        </div>
+        )}
       </div>
     </div>
-  );
+  )
 }
 
+// ─── Helper Components ─────────────────────────────
+
+function KpiCard({ label, value, icon, color, signed, badge, badgeColor }: {
+  label: string; value: number; icon: React.ReactNode; color: string;
+  signed?: boolean; badge?: string; badgeColor?: string;
+}) {
+  const cm: Record<string, string> = {
+    green: 'text-green-600', red: 'text-red-600', blue: 'text-blue-600', purple: 'text-purple-600',
+  }
+  return (
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+      <div className="flex items-center justify-between mb-2">
+        <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center">{icon}</div>
+        {badge && (
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+            badgeColor === 'red' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+          }`}>{badge}</span>
+        )}
+      </div>
+      <span className="text-xs text-gray-400">{label}</span>
+      <p className={`text-xl font-bold ${cm[color] || 'text-gray-900'}`}>
+        {signed && value >= 0 ? '+' : ''}₪{value.toLocaleString('he-IL')}
+      </p>
+    </div>
+  )
+}
+
+function ModuleCard({ title, icon, count, detail, subDetail, href, color }: {
+  title: string; icon: React.ReactNode; count: number;
+  detail?: string; subDetail?: string; href: string; color: string;
+}) {
+  const bg: Record<string, string> = { red: 'bg-red-50', green: 'bg-green-50', blue: 'bg-blue-50', purple: 'bg-purple-50' }
+  const tx: Record<string, string> = { red: 'text-red-600', green: 'text-green-600', blue: 'text-blue-600', purple: 'text-purple-600' }
+  return (
+    <Link href={href} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-gray-200 transition-colors block">
+      <div className={`w-8 h-8 rounded-lg ${bg[color]} flex items-center justify-center mb-2 ${tx[color]}`}>{icon}</div>
+      <p className="text-sm font-medium text-gray-900">{title}</p>
+      {count > 0 ? (
+        <>
+          {detail && <p className={`text-sm font-bold mt-1 ${tx[color]}`}>{detail}</p>}
+          {subDetail && <p className="text-xs text-gray-400 mt-0.5">{subDetail}</p>}
+          <p className="text-xs text-gray-400 mt-1">{count} רשומות</p>
+        </>
+      ) : (
+        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+          <MessageCircle className="w-3 h-3" />
+          עדכן דרך WhatsApp
+        </p>
+      )}
+    </Link>
+  )
+}
