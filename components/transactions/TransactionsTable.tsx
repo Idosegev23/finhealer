@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, CheckCircle, Clock } from 'lucide-react';
+import { Search, CheckCircle, Clock, Pencil, Trash2, Save, X, Sparkles, Loader2 } from 'lucide-react';
 import { subscribeToTransactions } from '@/lib/supabase/realtime';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import SmartCategoryPicker from './SmartCategoryPicker';
 
 interface Transaction {
   id: string;
@@ -15,7 +16,7 @@ interface Transaction {
   source: string;
   tx_date: string;
   date: string;
-  status: 'pending' | 'confirmed' | 'pending';
+  status: 'pending' | 'confirmed';
   category: string | null;
   expense_category: string | null;
   income_category: string | null;
@@ -30,6 +31,15 @@ interface Transaction {
   } | null;
 }
 
+interface EditingState {
+  vendor: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  tx_date: string;
+  status: 'pending' | 'confirmed';
+}
+
 interface TransactionsTableProps {
   initialTransactions: Transaction[];
   categories: Array<{ id: string; name: string }>;
@@ -37,11 +47,11 @@ interface TransactionsTableProps {
   userId: string;
 }
 
-export default function TransactionsTable({ 
-  initialTransactions, 
+export default function TransactionsTable({
+  initialTransactions,
   categories,
   goals = [],
-  userId 
+  userId
 }: TransactionsTableProps) {
   const [transactions, setTransactions] = useState(initialTransactions);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,6 +59,12 @@ export default function TransactionsTable({
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'confirmed'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [updatingGoal, setUpdatingGoal] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<EditingState | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reclassifying, setReclassifying] = useState(false);
+  const [reclassifyResult, setReclassifyResult] = useState<string | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -102,29 +118,28 @@ export default function TransactionsTable({
   // עדכון יעד של תנועה
   async function handleGoalChange(transactionId: string, goalId: string | null) {
     setUpdatingGoal(transactionId);
-    
+
     try {
       const { createClientComponentClient } = await import('@/lib/supabase/client');
       const supabase = createClientComponentClient();
-      
+
       const { error } = await supabase
         .from('transactions')
         .update({ goal_id: goalId })
         .eq('id', transactionId);
-      
+
       if (error) {
         console.error('Failed to update goal:', error);
         alert('שגיאה בעדכון היעד');
         return;
       }
-      
-      // עדכן state מקומי
-      setTransactions(prev => prev.map(tx => 
-        tx.id === transactionId 
+
+      setTransactions(prev => prev.map(tx =>
+        tx.id === transactionId
           ? { ...tx, goal_id: goalId }
           : tx
       ));
-      
+
     } catch (error) {
       console.error('Error updating goal:', error);
       alert('שגיאה בעדכון היעד');
@@ -133,12 +148,121 @@ export default function TransactionsTable({
     }
   }
 
+  // ── עריכה ──
+  function startEdit(tx: Transaction) {
+    setEditingId(tx.id);
+    setEditData({
+      vendor: tx.vendor || '',
+      amount: tx.amount,
+      type: tx.type,
+      category: tx.expense_category || tx.income_category || tx.category || '',
+      tx_date: tx.tx_date || tx.date,
+      status: tx.status,
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditData(null);
+  }
+
+  async function saveEdit() {
+    if (!editingId || !editData) return;
+    setSaving(true);
+
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingId,
+          vendor: editData.vendor,
+          amount: editData.amount,
+          type: editData.type,
+          category: editData.category,
+          tx_date: editData.tx_date,
+          status: editData.status,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'שגיאה בשמירה');
+        return;
+      }
+
+      const { transaction: updated } = await res.json();
+
+      setTransactions(prev =>
+        prev.map(tx =>
+          tx.id === editingId
+            ? {
+                ...tx,
+                ...updated,
+                category: updated.category,
+                expense_category: updated.type === 'expense' ? updated.category : tx.expense_category,
+                income_category: updated.type === 'income' ? updated.category : tx.income_category,
+              }
+            : tx
+        )
+      );
+      setEditingId(null);
+      setEditData(null);
+    } catch {
+      alert('שגיאה בשמירה');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ── מחיקה ──
+  async function handleDelete(txId: string) {
+    if (!confirm('למחוק את התנועה?')) return;
+    setDeletingId(txId);
+
+    try {
+      const res = await fetch(`/api/transactions?id=${txId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        alert('שגיאה במחיקה');
+        return;
+      }
+      setTransactions(prev => prev.filter(tx => tx.id !== txId));
+    } catch {
+      alert('שגיאה במחיקה');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // ── סיווג מחדש ──
+  async function handleReclassify() {
+    setReclassifying(true);
+    setReclassifyResult(null);
+
+    try {
+      const res = await fetch('/api/transactions/reclassify', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'שגיאה בסיווג מחדש');
+        return;
+      }
+      const data = await res.json();
+      setReclassifyResult(`סווגו ${data.updated} תנועות מתוך ${data.total}`);
+      // Refetch to show updated categories
+      await refetchTransactions();
+    } catch {
+      alert('שגיאה בסיווג מחדש');
+    } finally {
+      setReclassifying(false);
+    }
+  }
+
   // סינון
   const filteredTransactions = transactions.filter(tx => {
-    const matchesSearch = 
+    const matchesSearch =
       (tx.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
       (tx.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
-    
+
     const matchesType = filterType === 'all' || tx.type === filterType;
     const matchesStatus = filterStatus === 'all' || tx.status === filterStatus;
     const matchesCategory = filterCategory === 'all' || tx.category === filterCategory;
@@ -167,14 +291,14 @@ export default function TransactionsTable({
             {stats.totalIncome.toLocaleString('he-IL')} ₪
           </p>
         </div>
-        
+
         <div className="bg-white rounded-xl p-6 border border-gray-100">
           <p className="text-sm text-[#555555] mb-1">הוצאות החודש</p>
           <p className="text-3xl font-bold text-[#D64541]">
             {stats.totalExpenses.toLocaleString('he-IL')} ₪
           </p>
         </div>
-        
+
         <div className="bg-white rounded-xl p-6 border border-gray-100">
           <p className="text-sm text-[#555555] mb-1">ממתינות לאישור</p>
           <p className="text-3xl font-bold text-[#F6A623]">
@@ -231,6 +355,24 @@ export default function TransactionsTable({
               <option key={cat.id} value={cat.name}>{cat.name}</option>
             ))}
           </select>
+          {/* Re-classify button */}
+          <div className="flex items-center gap-3 md:col-span-4">
+            <button
+              onClick={handleReclassify}
+              disabled={reclassifying}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium transition-colors"
+            >
+              {reclassifying ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              {reclassifying ? 'מסווג...' : 'סווג מחדש (AI)'}
+            </button>
+            {reclassifyResult && (
+              <span className="text-sm text-green-600 font-medium">{reclassifyResult}</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -240,19 +382,20 @@ export default function TransactionsTable({
           <table className="w-full">
             <thead className="bg-[#F5F6F8]">
               <tr>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">תאריך</th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">תיאור</th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">קטגוריה</th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">יעד</th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">סכום</th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">מקור</th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-[#1E2A3B]">סטטוס</th>
+                <th className="text-right px-4 py-4 text-sm font-semibold text-[#1E2A3B]">תאריך</th>
+                <th className="text-right px-4 py-4 text-sm font-semibold text-[#1E2A3B]">תיאור</th>
+                <th className="text-right px-4 py-4 text-sm font-semibold text-[#1E2A3B]">קטגוריה</th>
+                <th className="text-right px-4 py-4 text-sm font-semibold text-[#1E2A3B]">סוג</th>
+                <th className="text-right px-4 py-4 text-sm font-semibold text-[#1E2A3B]">יעד</th>
+                <th className="text-right px-4 py-4 text-sm font-semibold text-[#1E2A3B]">סכום</th>
+                <th className="text-right px-4 py-4 text-sm font-semibold text-[#1E2A3B]">סטטוס</th>
+                <th className="text-center px-4 py-4 text-sm font-semibold text-[#1E2A3B]">פעולות</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="text-[#555555]">
                       <p className="text-lg mb-2">אין תנועות להצגה</p>
                       <p className="text-sm">נסה לשנות את המסננים או הוסף תנועה חדשה</p>
@@ -260,72 +403,193 @@ export default function TransactionsTable({
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-[#F5F6F8] transition-colors">
-                    <td className="px-6 py-4 text-sm text-[#333333]">
-                      {new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL')}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        {tx.vendor && (
-                          <p className="text-sm font-medium text-[#1E2A3B]">{tx.vendor}</p>
+                filteredTransactions.map((tx) => {
+                  const isEditing = editingId === tx.id;
+                  const isDeleting = deletingId === tx.id;
+
+                  if (isEditing && editData) {
+                    return (
+                      <tr key={tx.id} className="bg-blue-50">
+                        {/* תאריך */}
+                        <td className="px-4 py-2">
+                          <input
+                            type="date"
+                            value={editData.tx_date}
+                            onChange={(e) => setEditData({ ...editData, tx_date: e.target.value })}
+                            className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-[#3A7BD5] focus:outline-none"
+                          />
+                        </td>
+                        {/* תיאור */}
+                        <td className="px-4 py-2">
+                          <input
+                            type="text"
+                            value={editData.vendor}
+                            onChange={(e) => setEditData({ ...editData, vendor: e.target.value })}
+                            className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-[#3A7BD5] focus:outline-none"
+                            placeholder="שם ספק / תיאור"
+                          />
+                        </td>
+                        {/* קטגוריה */}
+                        <td className="px-4 py-2">
+                          <SmartCategoryPicker
+                            value={editData.category}
+                            vendor={editData.vendor}
+                            onChange={(category, expenseType) => setEditData({
+                              ...editData,
+                              category,
+                            })}
+                          />
+                        </td>
+                        {/* סוג */}
+                        <td className="px-4 py-2">
+                          <select
+                            value={editData.type}
+                            onChange={(e) => setEditData({ ...editData, type: e.target.value as 'income' | 'expense' })}
+                            className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-[#3A7BD5] focus:outline-none"
+                          >
+                            <option value="expense">הוצאה</option>
+                            <option value="income">הכנסה</option>
+                          </select>
+                        </td>
+                        {/* יעד */}
+                        <td className="px-4 py-2">
+                          <span className="text-xs text-gray-400">-</span>
+                        </td>
+                        {/* סכום */}
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            value={editData.amount}
+                            onChange={(e) => setEditData({ ...editData, amount: Number(e.target.value) })}
+                            className="w-24 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-[#3A7BD5] focus:outline-none text-left"
+                            min={0}
+                            step={1}
+                          />
+                        </td>
+                        {/* סטטוס */}
+                        <td className="px-4 py-2">
+                          <select
+                            value={editData.status}
+                            onChange={(e) => setEditData({ ...editData, status: e.target.value as 'pending' | 'confirmed' })}
+                            className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-[#3A7BD5] focus:outline-none"
+                          >
+                            <option value="confirmed">מאושר</option>
+                            <option value="pending">בהמתנה</option>
+                          </select>
+                        </td>
+                        {/* פעולות */}
+                        <td className="px-4 py-2">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={saveEdit}
+                              disabled={saving}
+                              className="p-1.5 rounded-lg bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
+                              title="שמור"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              className="p-1.5 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400"
+                              title="ביטול"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  // שורה רגילה
+                  return (
+                    <tr key={tx.id} className={`hover:bg-[#F5F6F8] transition-colors ${isDeleting ? 'opacity-50' : ''}`}>
+                      <td className="px-4 py-4 text-sm text-[#333333]">
+                        {new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL')}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div>
+                          {tx.vendor && (
+                            <p className="text-sm font-medium text-[#1E2A3B]">{tx.vendor}</p>
+                          )}
+                          {tx.description && (
+                            <p className="text-xs text-[#555555]">{tx.description}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {(tx.category || tx.expense_category || tx.income_category) ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-[#3A7BD5]">
+                            {tx.category || tx.expense_category || tx.income_category}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-[#555555]">ללא קטגוריה</span>
                         )}
-                        {tx.description && (
-                          <p className="text-xs text-[#555555]">{tx.description}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          tx.type === 'income'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {tx.type === 'income' ? 'הכנסה' : 'הוצאה'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        {tx.type === 'income' && tx.status === 'confirmed' ? (
+                          <select
+                            value={tx.goal_id || ''}
+                            onChange={(e) => handleGoalChange(tx.id, e.target.value || null)}
+                            disabled={updatingGoal === tx.id}
+                            className="text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-phi-gold"
+                          >
+                            <option value="">ללא יעד</option>
+                            {goals.map(goal => (
+                              <option key={goal.id} value={goal.id}>
+                                {goal.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : tx.goal?.name ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-phi-gold text-white">
+                            {tx.goal.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {(tx.category || tx.expense_category || tx.income_category) ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-[#3A7BD5]">
-                          {tx.category || tx.expense_category || tx.income_category}
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`text-sm font-semibold ${
+                          tx.type === 'income' ? 'text-[#7ED957]' : 'text-[#D64541]'
+                        }`}>
+                          {tx.type === 'income' ? '+' : '-'}{tx.amount.toLocaleString('he-IL')} ₪
                         </span>
-                      ) : tx.budget_categories?.name ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-[#3A7BD5]">
-                          {tx.budget_categories.name}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-[#555555]">ללא קטגוריה</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {tx.type === 'income' && tx.status === 'confirmed' ? (
-                        <select
-                          value={tx.goal_id || ''}
-                          onChange={(e) => handleGoalChange(tx.id, e.target.value || null)}
-                          disabled={updatingGoal === tx.id}
-                          className="text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-phi-gold"
-                        >
-                          <option value="">ללא יעד</option>
-                          {goals.map(goal => (
-                            <option key={goal.id} value={goal.id}>
-                              {goal.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : tx.goal?.name ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-phi-gold text-white">
-                          {tx.goal.name}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`text-sm font-semibold ${
-                        tx.type === 'income' ? 'text-[#7ED957]' : 'text-[#D64541]'
-                      }`}>
-                        {tx.type === 'income' ? '+' : '-'}{tx.amount.toLocaleString('he-IL')} ₪
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <SourceBadge source={tx.source} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={tx.status} />
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-4 py-4">
+                        <StatusBadge status={tx.status} />
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => startEdit(tx)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="עריכה"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(tx.id)}
+                            disabled={isDeleting}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            title="מחיקה"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -342,26 +606,7 @@ export default function TransactionsTable({
   );
 }
 
-function SourceBadge({ source }: { source: string }) {
-  const labels: Record<string, { text: string; color: string }> = {
-    manual: { text: 'ידני', color: 'bg-gray-100 text-gray-700' },
-    wa_text: { text: 'WhatsApp', color: 'bg-green-100 text-green-700' },
-    wa_image: { text: 'קבלה', color: 'bg-blue-100 text-blue-700' },
-    ocr: { text: 'סריקה', color: 'bg-purple-100 text-purple-700' },
-    bank_statement: { text: 'דוח בנק', color: 'bg-indigo-100 text-indigo-700' },
-    credit_statement: { text: 'כ. אשראי', color: 'bg-cyan-100 text-cyan-700' },
-  };
-
-  const { text, color } = labels[source] || labels.manual;
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color}`}>
-      {text}
-    </span>
-  );
-}
-
-function StatusBadge({ status }: { status: 'pending' | 'confirmed' | 'pending' }) {
+function StatusBadge({ status }: { status: 'pending' | 'confirmed' }) {
   if (status === 'confirmed') {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E8F5E9] text-[#7ED957]">
@@ -371,20 +616,10 @@ function StatusBadge({ status }: { status: 'pending' | 'confirmed' | 'pending' }
     );
   }
 
-  if (status === 'pending') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-[#2196F3]">
-        <Clock className="w-3 h-3" />
-        בהמתנה
-      </span>
-    );
-  }
-
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#FFF3E0] text-[#F6A623]">
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-[#2196F3]">
       <Clock className="w-3 h-3" />
-      מוצע
+      בהמתנה
     </span>
   );
 }
-

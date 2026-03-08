@@ -92,10 +92,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
     }
 
-    // Aggregate by category
+    // Meta-categories to exclude: banking operations, not real expense categories
+    const metaCategories = new Set([
+      'חיוב כרטיס אשראי',
+      'חיוב אשראי',
+      'חיוב כרטיס',
+      'העברה יוצאת',
+      'העברה נכנסת',
+      'משיכת מזומן',
+      'עמלות בנק',
+      'עמלות כרטיס אשראי',
+      'הכנסה אחרת',
+      'השקעות',
+      'גמלאות/ביטוח לאומי',
+    ]);
+
+    // Aggregate by category (skip meta-categories)
     const catMap: Record<string, { value: number; count: number; expense_type: string }> = {};
     (expenses || []).forEach((tx: any) => {
       const cat = tx.expense_category || 'לא מסווג';
+      if (metaCategories.has(cat)) return; // skip banking operations
       if (!catMap[cat]) catMap[cat] = { value: 0, count: 0, expense_type: tx.expense_type || 'variable' };
       catMap[cat].value += Math.round(Number(tx.amount) || 0);
       catMap[cat].count += 1;

@@ -111,11 +111,25 @@ export async function GET(request: Request) {
       });
     }
 
+    // Meta-categories to exclude from budget analysis
+    const metaCategories = new Set([
+      'חיוב כרטיס אשראי', 'חיוב אשראי', 'חיוב כרטיס',
+      'העברה יוצאת', 'העברה נכנסת', 'משיכת מזומן',
+      'עמלות בנק', 'עמלות כרטיס אשראי',
+      'הכנסה אחרת', 'השקעות', 'גמלאות/ביטוח לאומי',
+    ]);
+
     // 8. ממוצע שורת הוצאה (vendor breakdown)
     const vendorMap: Record<string, { total: number; count: number; category: string }> = {};
-    const monthsWithData = new Set(transactions?.map(t => t.date?.substring(0, 7))).size || 1;
-    
-    transactions?.forEach(t => {
+    const monthsWithData = new Set(transactions?.map(t => t.tx_date?.substring(0, 7))).size || 1;
+
+    // Filter out meta-category transactions from analysis
+    const realExpenses = transactions?.filter(t => {
+      const cat = t.category || t.expense_category || '';
+      return !metaCategories.has(cat);
+    }) || [];
+
+    realExpenses.forEach(t => {
       const vendor = t.vendor || t.original_description || 'לא ידוע';
       if (!vendorMap[vendor]) {
         vendorMap[vendor] = { total: 0, count: 0, category: t.category || t.expense_category || 'אחר' };
@@ -142,7 +156,7 @@ export async function GET(request: Request) {
       special: { total: 0, count: 0, categories: [] as string[] }
     };
 
-    transactions?.forEach(t => {
+    realExpenses.forEach(t => {
       const expType = t.expense_frequency || t.expense_type || 'variable';
       const cat = t.category || t.expense_category || 'אחר';
       
