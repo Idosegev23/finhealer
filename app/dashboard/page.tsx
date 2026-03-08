@@ -11,6 +11,7 @@ import { GoalsProgress } from '@/components/dashboard/GoalsProgress'
 import { PendingTransactionsBanner } from '@/components/dashboard/PendingTransactionsBanner'
 import { LoansStatusCard } from '@/components/dashboard/LoansStatusCard'
 import { RealtimeRefresh } from '@/components/dashboard/RealtimeRefresh'
+import { ExpensesPieBudget } from '@/components/dashboard/ExpensesPieBudget'
 
 export const revalidate = 30
 
@@ -203,6 +204,9 @@ export default async function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Expenses pie chart + budget recommendations */}
+        <ExpensesPieBudget />
 
         {/* Budget tracking */}
         {budgetTracking && budgetTracking.length > 0 && (
