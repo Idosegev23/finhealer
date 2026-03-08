@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Wallet, TrendingUp, Calendar, AlertCircle, 
+import {
+  Wallet, TrendingUp, Calendar, AlertCircle,
   RefreshCw, Sparkles, DollarSign, Clock,
   ChevronDown, ChevronUp, Target, Users, Home,
   CreditCard, ShoppingBag, Lock, Zap, Star,
   PieChart, BarChart3, ArrowRight, AlertTriangle,
-  CheckCircle, FileText, MessageCircle, XCircle
+  CheckCircle, FileText, MessageCircle, XCircle,
+  Pencil, Save, X
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,9 @@ export default function BudgetPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'vendors'>('overview');
+  const [editMode, setEditMode] = useState(false);
+  const [editValues, setEditValues] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
     loadBudget();
@@ -113,6 +117,74 @@ export default function BudgetPage() {
       console.error('Error creating budget:', error);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startEditing = () => {
+    const values: Record<string, number> = {};
+    categories?.forEach(cat => {
+      values[cat.category_name] = cat.allocated_amount || 0;
+    });
+    setEditValues(values);
+    setEditMode(true);
+  };
+
+  const cancelEditing = () => {
+    setEditMode(false);
+    setEditValues({});
+  };
+
+  const saveCategory = async (categoryName: string) => {
+    if (!data?.budget?.id) return;
+    const newAmount = editValues[categoryName];
+    if (newAmount === undefined) return;
+
+    setSaving(categoryName);
+    try {
+      const res = await fetch('/api/budget/update-category', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          budgetId: data.budget.id,
+          categoryName,
+          newAmount,
+        }),
+      });
+      if (res.ok) {
+        await loadBudget();
+      }
+    } catch (err) {
+      console.error('Error saving category:', err);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const saveAllCategories = async () => {
+    if (!data?.budget?.id) return;
+    setSaving('all');
+    try {
+      for (const [categoryName, newAmount] of Object.entries(editValues)) {
+        const existing = categories?.find(c => c.category_name === categoryName);
+        if (existing && existing.allocated_amount !== newAmount) {
+          await fetch('/api/budget/update-category', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              budgetId: data.budget.id,
+              categoryName,
+              newAmount,
+            }),
+          });
+        }
+      }
+      await loadBudget();
+      setEditMode(false);
+      setEditValues({});
+    } catch (err) {
+      console.error('Error saving categories:', err);
+    } finally {
+      setSaving(null);
     }
   };
 
@@ -556,45 +628,211 @@ export default function BudgetPage() {
             >
               <Card className="bg-white border-phi-frost">
                 <CardHeader>
-                  <CardTitle className="text-phi-dark">תקציב לפי קטגוריות</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-phi-dark">תקציב לפי קטגוריות</CardTitle>
+                    {categories && categories.length > 0 && hasBudget && (
+                      <div className="flex gap-2">
+                        {editMode ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={cancelEditing}
+                              className="border-red-300 text-red-600"
+                            >
+                              <X className="w-4 h-4 ml-1" />
+                              ביטול
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={saveAllCategories}
+                              disabled={saving === 'all'}
+                              className="bg-phi-gold hover:bg-phi-coral text-white"
+                            >
+                              {saving === 'all' ? (
+                                <RefreshCw className="w-4 h-4 ml-1 animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4 ml-1" />
+                              )}
+                              שמור הכל
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={startEditing}
+                            className="border-phi-gold text-phi-gold hover:bg-phi-gold/10"
+                          >
+                            <Pencil className="w-4 h-4 ml-1" />
+                            עריכת תקציב
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {editMode && (
+                    <p className="text-sm text-phi-slate mt-2">
+                      שנה את הסכומים לפי מה שצריך להיות, ולחץ &quot;שמור הכל&quot;
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent>
                   {categories && categories.length > 0 ? (
-                    <div className="space-y-4">
-                      {categories.map((cat, i) => {
-                        const percentage = cat.allocated_amount > 0 
-                          ? Math.min(100, (cat.spent_amount / cat.allocated_amount) * 100) 
-                          : 0;
-                        const isOver = percentage > 100;
-                        
-                        return (
-                          <div key={i} className="p-4 rounded-lg bg-phi-bg">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="font-medium text-phi-dark">{cat.category_name}</span>
-                              <div className="text-left">
-                                <span className={`font-bold ${isOver ? 'text-red-600' : 'text-phi-dark'}`}>
-                                  ₪{(cat.spent_amount || 0).toLocaleString('he-IL')}
-                                </span>
-                                <span className="text-phi-slate"> / ₪{(cat.allocated_amount || 0).toLocaleString('he-IL')}</span>
+                    <>
+                      {/* Table header */}
+                      <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2 text-sm font-medium text-phi-slate border-b border-phi-frost mb-2">
+                        <div className="col-span-3">קטגוריה</div>
+                        <div className="col-span-2 text-center">בפועל</div>
+                        <div className="col-span-2 text-center">תקציב</div>
+                        <div className="col-span-2 text-center">הפרש</div>
+                        <div className="col-span-3 text-center">ניצול</div>
+                      </div>
+                      <div className="space-y-3">
+                        {categories.map((cat, i) => {
+                          const allocatedAmount = editMode
+                            ? (editValues[cat.category_name] ?? cat.allocated_amount ?? 0)
+                            : (cat.allocated_amount || 0);
+                          const spentAmount = cat.spent_amount || 0;
+                          const diff = allocatedAmount - spentAmount;
+                          const percentage = allocatedAmount > 0
+                            ? (spentAmount / allocatedAmount) * 100
+                            : 0;
+                          const isOver = percentage > 100;
+                          const isWarning = percentage >= 80 && percentage <= 100;
+
+                          return (
+                            <div key={i} className={`p-4 rounded-lg ${isOver ? 'bg-red-50 border border-red-200' : isWarning ? 'bg-yellow-50 border border-yellow-200' : 'bg-phi-bg'}`}>
+                              {/* Desktop: table row */}
+                              <div className="hidden md:grid grid-cols-12 gap-2 items-center">
+                                <div className="col-span-3 font-medium text-phi-dark">{cat.category_name}</div>
+                                <div className="col-span-2 text-center font-bold text-phi-dark">
+                                  ₪{spentAmount.toLocaleString('he-IL')}
+                                </div>
+                                <div className="col-span-2 text-center">
+                                  {editMode ? (
+                                    <input
+                                      type="number"
+                                      value={editValues[cat.category_name] ?? cat.allocated_amount ?? 0}
+                                      onChange={(e) => setEditValues(prev => ({
+                                        ...prev,
+                                        [cat.category_name]: Number(e.target.value)
+                                      }))}
+                                      className="w-24 px-2 py-1 border border-phi-gold rounded text-center font-bold text-phi-dark bg-white"
+                                      min={0}
+                                      dir="ltr"
+                                    />
+                                  ) : (
+                                    <span className="font-bold text-phi-slate">
+                                      ₪{allocatedAmount.toLocaleString('he-IL')}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className={`col-span-2 text-center font-bold ${diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  {diff < 0 ? '-' : '+'}₪{Math.abs(diff).toLocaleString('he-IL')}
+                                </div>
+                                <div className="col-span-3">
+                                  <div className="flex items-center gap-2">
+                                    <Progress
+                                      value={Math.min(percentage, 100)}
+                                      className={`h-3 flex-1 ${isOver ? '[&>div]:bg-red-500' : isWarning ? '[&>div]:bg-yellow-500' : '[&>div]:bg-phi-mint'}`}
+                                    />
+                                    <span className={`text-sm font-bold w-12 text-left ${isOver ? 'text-red-600' : isWarning ? 'text-yellow-600' : 'text-green-600'}`}>
+                                      {Math.round(percentage)}%
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Mobile: stacked */}
+                              <div className="md:hidden">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium text-phi-dark">{cat.category_name}</span>
+                                  <span className={`text-sm font-bold ${isOver ? 'text-red-600' : 'text-green-600'}`}>
+                                    {Math.round(percentage)}%
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm mb-2">
+                                  <span className="text-phi-slate">
+                                    בפועל: <span className="font-bold text-phi-dark">₪{spentAmount.toLocaleString('he-IL')}</span>
+                                  </span>
+                                  {editMode ? (
+                                    <span className="text-phi-slate">
+                                      תקציב: <input
+                                        type="number"
+                                        value={editValues[cat.category_name] ?? cat.allocated_amount ?? 0}
+                                        onChange={(e) => setEditValues(prev => ({
+                                          ...prev,
+                                          [cat.category_name]: Number(e.target.value)
+                                        }))}
+                                        className="w-20 px-1 py-0.5 border border-phi-gold rounded text-center font-bold text-phi-dark bg-white"
+                                        min={0}
+                                        dir="ltr"
+                                      />
+                                    </span>
+                                  ) : (
+                                    <span className="text-phi-slate">
+                                      תקציב: <span className="font-bold">₪{allocatedAmount.toLocaleString('he-IL')}</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <Progress
+                                  value={Math.min(percentage, 100)}
+                                  className={`h-2 ${isOver ? '[&>div]:bg-red-500' : isWarning ? '[&>div]:bg-yellow-500' : '[&>div]:bg-phi-mint'}`}
+                                />
+                                <div className={`text-xs mt-1 text-left font-bold ${diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  {diff < 0 ? `חריגה: ₪${Math.abs(diff).toLocaleString('he-IL')}` : `נותר: ₪${diff.toLocaleString('he-IL')}`}
+                                </div>
                               </div>
                             </div>
-                            <Progress 
-                              value={Math.min(percentage, 100)} 
-                              className={`h-2 ${isOver ? '[&>div]:bg-red-500' : '[&>div]:bg-phi-mint'}`}
-                            />
-                            <div className="flex justify-between mt-1 text-xs text-phi-slate">
-                              <span>{Math.round(percentage)}% נוצל</span>
-                              <span className={isOver ? 'text-red-600' : 'text-green-600'}>
-                                {isOver 
-                                  ? `חריגה של ₪${((cat.spent_amount || 0) - (cat.allocated_amount || 0)).toLocaleString('he-IL')}`
-                                  : `נותרו ₪${((cat.allocated_amount || 0) - (cat.spent_amount || 0)).toLocaleString('he-IL')}`
-                                }
-                              </span>
+                          );
+                        })}
+                      </div>
+
+                      {/* Summary row */}
+                      {categories.length > 0 && (
+                        <div className="mt-4 p-4 rounded-lg bg-phi-dark text-white">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div>
+                              <p className="text-white/60 text-xs">סה&quot;כ בפועל</p>
+                              <p className="text-lg font-bold">
+                                ₪{categories.reduce((sum: number, c: any) => sum + (c.spent_amount || 0), 0).toLocaleString('he-IL')}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-white/60 text-xs">סה&quot;כ תקציב</p>
+                              <p className="text-lg font-bold">
+                                ₪{(editMode
+                                  ? Object.values(editValues).reduce((sum, v) => sum + v, 0)
+                                  : categories.reduce((sum: number, c: any) => sum + (c.allocated_amount || 0), 0)
+                                ).toLocaleString('he-IL')}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-white/60 text-xs">הפרש</p>
+                              {(() => {
+                                const totalSpent = categories.reduce((sum: number, c: any) => sum + (c.spent_amount || 0), 0);
+                                const totalAlloc = editMode
+                                  ? Object.values(editValues).reduce((sum, v) => sum + v, 0)
+                                  : categories.reduce((sum: number, c: any) => sum + (c.allocated_amount || 0), 0);
+                                const totalDiff = totalAlloc - totalSpent;
+                                return (
+                                  <p className={`text-lg font-bold ${totalDiff < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                    {totalDiff < 0 ? '-' : '+'}₪{Math.abs(totalDiff).toLocaleString('he-IL')}
+                                  </p>
+                                );
+                              })()}
+                            </div>
+                            <div>
+                              <p className="text-white/60 text-xs">חריגות</p>
+                              <p className="text-lg font-bold text-red-400">
+                                {categories.filter((c: any) => (c.spent_amount || 0) > (c.allocated_amount || 0)).length}
+                              </p>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="text-center py-12">
                       <BarChart3 className="w-16 h-16 text-phi-frost mx-auto mb-4" />

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { checkNegativeCashFlow } from '@/lib/finance/cash-flow-alerts';
+import { isQuietTime } from '@/lib/utils/quiet-hours';
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +19,13 @@ export async function GET(req: NextRequest) {
         { status: 401 }
       );
     }
-    
+
+    const quietCheck = isQuietTime();
+    if (quietCheck.isQuiet) {
+      console.log(`[Cron] Skipped — ${quietCheck.description}`);
+      return NextResponse.json({ skipped: true, reason: quietCheck.description });
+    }
+
     console.log('[Cron] Starting cash flow alerts check...');
     
     await checkNegativeCashFlow();

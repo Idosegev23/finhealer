@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { monitorAllUsersGoals } from '@/lib/goals/goals-monitor';
+import { isQuietTime } from '@/lib/utils/quiet-hours';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,13 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
-    
+
+    const quietCheck = isQuietTime();
+    if (quietCheck.isQuiet) {
+      console.log(`[Cron] Skipped — ${quietCheck.description}`);
+      return NextResponse.json({ skipped: true, reason: quietCheck.description });
+    }
+
     console.log('[Goals Check] Starting daily goals monitoring...');
     const startTime = Date.now();
     

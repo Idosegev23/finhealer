@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processDueReminders } from "@/lib/proactive/reminder-system";
 import { generateInsights, sendInsightAsReminder } from "@/lib/proactive/insights-generator";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isQuietTime } from '@/lib/utils/quiet-hours';
 
 /**
  * Cron Job: Process Due Reminders
@@ -30,6 +31,12 @@ export async function GET(request: NextRequest) {
         { error: "Unauthorized" },
         { status: 401 }
       );
+    }
+
+    const quietCheck = isQuietTime();
+    if (quietCheck.isQuiet) {
+      console.log(`[Cron] Skipped — ${quietCheck.description}`);
+      return NextResponse.json({ skipped: true, reason: quietCheck.description });
     }
 
     console.log("🕐 Cron: Processing due reminders...");

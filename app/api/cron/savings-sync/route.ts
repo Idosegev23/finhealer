@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { syncSavingsToGoals } from '@/lib/goals/savings-sync';
+import { isQuietTime } from '@/lib/utils/quiet-hours';
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +19,13 @@ export async function GET(req: NextRequest) {
         { status: 401 }
       );
     }
-    
+
+    const quietCheck = isQuietTime();
+    if (quietCheck.isQuiet) {
+      console.log(`[Cron] Skipped — ${quietCheck.description}`);
+      return NextResponse.json({ skipped: true, reason: quietCheck.description });
+    }
+
     console.log('[Cron] Starting savings sync...');
     
     await syncSavingsToGoals();

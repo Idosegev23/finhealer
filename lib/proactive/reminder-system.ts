@@ -236,7 +236,7 @@ async function getReminderConfig(userId: string): Promise<ReminderConfig> {
     enabled: true,
     frequency: data?.reminder_frequency || "normal",
     preferredTime: data?.preferred_reminder_time || "09:00",
-    quietHoursStart: "22:00",
+    quietHoursStart: "20:00",
     quietHoursEnd: "08:00",
   };
 }

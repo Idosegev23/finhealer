@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendWhatsAppMessage, sendWhatsAppImage } from "@/lib/greenapi/client";
 import { generateChartForUser } from "@/lib/ai/chart-generator";
+import { isQuietTime } from '@/lib/utils/quiet-hours';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,6 +22,12 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const quietCheck = isQuietTime();
+  if (quietCheck.isQuiet) {
+    console.log(`[Cron] Skipped — ${quietCheck.description}`);
+    return NextResponse.json({ skipped: true, reason: quietCheck.description });
   }
 
   console.log("[Cron] Starting monthly summary...");

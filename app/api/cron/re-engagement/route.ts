@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
+import { isQuietTime } from '@/lib/utils/quiet-hours';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -18,6 +19,12 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const quietCheck = isQuietTime();
+    if (quietCheck.isQuiet) {
+      console.log(`[Cron] Skipped — ${quietCheck.description}`);
+      return NextResponse.json({ skipped: true, reason: quietCheck.description });
     }
 
     console.log('[Cron] Starting re-engagement...');
