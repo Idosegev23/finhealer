@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { plan, onboardingType, phone, waOptIn } = body;
+    const { plan, onboardingType, phone, waOptIn, referralCode } = body;
 
     if (!plan || !['basic', 'premium'].includes(plan)) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
@@ -176,6 +176,25 @@ export async function POST(request: NextRequest) {
     if (subscriptionError) {
       console.error('Error creating subscription:', subscriptionError);
       // Non-fatal — user was created successfully
+    }
+
+    // Apply referral code if provided
+    if (referralCode) {
+      const normalizedRef = referralCode.trim().toUpperCase();
+      const { data: referrer } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('referral_code', normalizedRef)
+        .neq('id', user.id)
+        .maybeSingle();
+
+      if (referrer) {
+        await supabaseAdmin
+          .from('users')
+          .update({ referred_by: normalizedRef })
+          .eq('id', user.id);
+        console.log(`🎁 Referral code ${normalizedRef} applied for user ${user.id}`);
+      }
     }
 
     console.log(`✅ User ${user.id} created (trial). Phone: ${phone === '0000000000' ? 'temporary' : cleanPhone}`);

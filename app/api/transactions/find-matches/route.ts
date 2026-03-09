@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     // שלוף תנועות קיימות שעשויות להתאים
     // חיפוש תנועות מאותו חודש בלבד (אופטימיזציה)
-    const dates = newTransactions.map((t: any) => new Date(t.date));
+    const dates = newTransactions.map((t: any) => new Date(t.tx_date || t.date));
     const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
     const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
     
@@ -107,11 +107,11 @@ export async function POST(request: NextRequest) {
 function findPotentialMatches(newTransaction: any, existingTransactions: any[]): any[] {
   const matches: any[] = [];
   const newAmount = parseFloat(newTransaction.amount);
-  const newDate = new Date(newTransaction.date);
+  const newDate = new Date(newTransaction.tx_date || newTransaction.date);
 
   for (const existing of existingTransactions) {
     const existingAmount = parseFloat(existing.amount);
-    const existingDate = new Date(existing.date);
+    const existingDate = new Date(existing.tx_date || existing.date);
     
     // חישוב ציון התאמה
     const score = calculateMatchScore(

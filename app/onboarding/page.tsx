@@ -59,6 +59,7 @@ export default function OnboardingPage() {
       setFormattedPhone(phoneFormatted)
 
       // Create/update user with phone
+      const referralCode = localStorage.getItem('phi-referral-code')
       const response = await fetch('/api/subscription/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,8 +68,10 @@ export default function OnboardingPage() {
           onboardingType: 'quick',
           phone: phoneFormatted,
           waOptIn: true,
+          referralCode: referralCode || undefined,
         }),
       })
+      if (referralCode) localStorage.removeItem('phi-referral-code')
 
       if (!response.ok) {
         const data = await response.json()

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Loader2, CheckCircle2 } from 'lucide-react'
@@ -17,6 +18,15 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const supabase = createClient()
+  const searchParams = useSearchParams()
+
+  // Capture referral code from URL
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) {
+      localStorage.setItem('phi-referral-code', ref)
+    }
+  }, [searchParams])
 
   const handleGoogleSignup = async () => {
     try {
