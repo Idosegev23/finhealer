@@ -12,6 +12,9 @@ import { PendingTransactionsBanner } from '@/components/dashboard/PendingTransac
 import { LoansStatusCard } from '@/components/dashboard/LoansStatusCard'
 import { RealtimeRefresh } from '@/components/dashboard/RealtimeRefresh'
 import { ExpensesPieBudget } from '@/components/dashboard/ExpensesPieBudget'
+import BenchmarkWidget from '@/components/dashboard/BenchmarkWidget'
+import ReferralCard from '@/components/dashboard/ReferralCard'
+import InstallPWA from '@/components/dashboard/InstallPWA'
 
 export const revalidate = 30
 
@@ -313,6 +316,12 @@ export default async function DashboardPage() {
           </div>
         )}
 
+        {/* Benchmark + Referral */}
+        <div className="grid lg:grid-cols-2 gap-4">
+          <BenchmarkWidget />
+          <ReferralCard />
+        </div>
+
         {/* Quick Actions */}
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <h3 className="font-semibold text-gray-900 text-sm mb-3">פעולות מהירות</h3>
@@ -354,6 +363,8 @@ export default async function DashboardPage() {
           שלב: <span className="font-medium text-gray-500">{phaseLabel[currentPhase] || currentPhase}</span>
         </p>
 
+        {/* PWA Install Prompt */}
+        <InstallPWA />
       </div>
     </div>
   )

@@ -107,6 +107,53 @@ export async function GET(request: NextRequest) {
         } else {
           results.push({ user_id: budget.user_id, alerted: false, reason: 'no threshold reached' });
         }
+
+        // --- Per-category alerts (80%+) ---
+        const { data: budgetCats } = await supabase
+          .from('budget_categories')
+          .select('category_name, allocated_amount, spent_amount, status')
+          .eq('budget_id', budget.id);
+
+        for (const cat of budgetCats || []) {
+          if (!cat.allocated_amount || cat.allocated_amount <= 0) continue;
+          const catPercent = ((cat.spent_amount || 0) / cat.allocated_amount) * 100;
+          if (catPercent < 80) continue;
+          if (cat.status === 'warning' || cat.status === 'exceeded') continue;
+
+          // Dedup: check last 24h
+          const { data: recentCatAlert } = await supabase
+            .from('alerts')
+            .select('id')
+            .eq('user_id', budget.user_id)
+            .eq('type', 'category_warning')
+            .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+            .limit(1);
+
+          if (recentCatAlert && recentCatAlert.length > 0) continue;
+
+          const isExceeded = catPercent >= 100;
+          const catMsg = isExceeded
+            ? `🚨 ${user.name || 'היי'}, חרגת בקטגוריה *${cat.category_name}*!\n\n💸 תקציב: ₪${cat.allocated_amount.toLocaleString()}\n💰 הוצאת: ₪${(cat.spent_amount || 0).toLocaleString()}\n📊 חריגה: ₪${((cat.spent_amount || 0) - cat.allocated_amount).toLocaleString()}`
+            : `⚠️ ${user.name || 'היי'}, ${Math.round(catPercent)}% בקטגוריה *${cat.category_name}*\n\n💸 תקציב: ₪${cat.allocated_amount.toLocaleString()}\n💰 הוצאת: ₪${(cat.spent_amount || 0).toLocaleString()}\n📊 נותר: ₪${(cat.allocated_amount - (cat.spent_amount || 0)).toLocaleString()}`;
+
+          await greenAPI.sendMessage({ phoneNumber: user.phone, message: catMsg });
+
+          await (supabase as any).from('alerts').insert({
+            user_id: budget.user_id,
+            type: 'category_warning',
+            message: catMsg,
+            status: 'sent',
+            params: { budget_id: budget.id, category: cat.category_name, percent: catPercent },
+          });
+
+          await supabase
+            .from('budget_categories')
+            .update({ status: isExceeded ? 'exceeded' : 'warning' })
+            .eq('budget_id', budget.id)
+            .eq('category_name', cat.category_name);
+
+          results.push({ user_id: budget.user_id, category: cat.category_name, alerted: true });
+        }
       } catch (userError) {
         console.error(`Error processing budget ${budget.id}:`, userError);
         results.push({ budget_id: budget.id, success: false, error: String(userError) });

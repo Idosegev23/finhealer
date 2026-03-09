@@ -27,18 +27,29 @@ export async function verifyAndParse(request: NextRequest): Promise<GuardResult>
   const rawBody = await request.text();
   const payload: GreenAPIWebhookPayload = JSON.parse(rawBody);
 
-  // Signature verification
+  // Token verification (URL-based: /api/wa/webhook?token=xxx)
+  const webhookToken = process.env.WEBHOOK_TOKEN;
+  if (webhookToken) {
+    const url = new URL(request.url);
+    const token = url.searchParams.get('token');
+    if (token !== webhookToken) {
+      console.warn('⚠️ Webhook token mismatch - rejecting');
+      return { ignored: true, statusCode: 401, response: { status: 'unauthorized' } };
+    }
+  }
+
+  // HMAC signature verification (if provider supports it)
   const webhookSecret = process.env.GREEN_API_WEBHOOK_SECRET;
   if (webhookSecret) {
     const signature = request.headers.get('x-webhook-signature') || '';
     const { createHmac } = await import('crypto');
     const expected = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
     if (signature !== expected && signature !== `sha256=${expected}`) {
-      console.warn('⚠️ Webhook signature mismatch - rejecting request');
+      console.warn('⚠️ Webhook signature mismatch - rejecting');
       return { ignored: true, statusCode: 401, response: { status: 'unauthorized' } };
     }
-  } else if (process.env.NODE_ENV === 'production') {
-    console.warn('⚠️ GREEN_API_WEBHOOK_SECRET not set - webhook signature verification disabled');
+  } else if (process.env.NODE_ENV === 'production' && !webhookToken) {
+    console.warn('⚠️ No webhook auth configured — set WEBHOOK_TOKEN or GREEN_API_WEBHOOK_SECRET');
   }
 
   console.log(`[Webhook] ═══════════════════════════════════════`);

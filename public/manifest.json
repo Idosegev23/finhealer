@@ -1,0 +1,20 @@
+{
+  "name": "Phi - היחס הזהב של הכסף שלך",
+  "short_name": "Phi",
+  "description": "פלטפורמה חכמה לבריאות פיננסית עם ליווי אישי",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#2E3440",
+  "theme_color": "#2E3440",
+  "dir": "rtl",
+  "lang": "he",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

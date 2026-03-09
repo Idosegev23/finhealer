@@ -21,12 +21,18 @@ export const metadata: Metadata = {
   description: 'פלטפורמה חכמה לבריאות פיננסית עם ליווי אישי. מעקב אוטומטי, תובנות מבוססות AI, ובוט WhatsApp חכם. גלה את ה-ϕ שלך - האיזון המושלם בין הכנסות להוצאות.',
   keywords: ['phi', 'בריאות פיננסית', 'ניהול תקציב', 'חיסכון', 'מעקב הוצאות', 'יעדים פיננסיים', 'ליווי פיננסי'],
   authors: [{ name: 'Phi - גדי' }],
+  manifest: '/manifest.json',
   viewport: {
     width: 'device-width',
     initialScale: 1,
     maximumScale: 1,
   },
   themeColor: '#2E3440',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Phi',
+  },
   openGraph: {
     title: 'Phi (ϕ) - היחס הזהב של הכסף שלך',
     description: 'פלטפורמה חכמה לבריאות פיננסית עם ליווי אישי, מעקב אוטומטי ובוט WhatsApp חכם.',

@@ -15,6 +15,8 @@ import {
   TrendingUp,
   Landmark,
   PiggyBank,
+  Repeat,
+  Gift,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -42,6 +44,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard/expenses", label: "הוצאות", icon: TrendingDown },
   { href: "/dashboard/income", label: "הכנסות", icon: TrendingUp },
   { href: "/dashboard/transactions", label: "תנועות", icon: Receipt },
+  { href: "/dashboard/recurring", label: "מנויים וחוזרות", icon: Repeat },
 
   { href: "/dashboard/goals", label: "יעדים", icon: Target, separator: true },
   { href: "/dashboard/loans", label: "הלוואות", icon: Landmark },
