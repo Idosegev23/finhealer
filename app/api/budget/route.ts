@@ -187,6 +187,43 @@ export async function GET(request: Request) {
       (expenseTypes[k] as any).avgMonthly = Math.round(expenseTypes[k].total / monthsWithData);
     });
 
+    // Category breakdown: group actual expenses by category with line-level detail
+    const categoryMap: Record<string, { total: number; count: number; type: string; vendors: Record<string, { total: number; count: number }> }> = {};
+    realExpenses.forEach(t => {
+      const cat = t.category || t.expense_category || 'אחר';
+      const vendor = t.vendor || t.original_description || 'לא ידוע';
+      const expType = t.expense_frequency || t.expense_type || 'variable';
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = { total: 0, count: 0, type: expType, vendors: {} };
+      }
+      categoryMap[cat].total += Math.abs(t.amount || 0);
+      categoryMap[cat].count++;
+      if (!categoryMap[cat].vendors[vendor]) {
+        categoryMap[cat].vendors[vendor] = { total: 0, count: 0 };
+      }
+      categoryMap[cat].vendors[vendor].total += Math.abs(t.amount || 0);
+      categoryMap[cat].vendors[vendor].count++;
+    });
+
+    const categoryBreakdown = Object.entries(categoryMap)
+      .map(([category, data]) => ({
+        category,
+        totalSpent: Math.round(data.total),
+        avgMonthly: Math.round(data.total / monthsWithData),
+        count: data.count,
+        type: data.type,
+        vendors: Object.entries(data.vendors)
+          .map(([vendor, vd]) => ({
+            vendor,
+            total: Math.round(vd.total),
+            avgMonthly: Math.round(vd.total / monthsWithData),
+            count: vd.count,
+          }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 10),
+      }))
+      .sort((a, b) => b.avgMonthly - a.avgMonthly);
+
     // 10. קבלת ילדים (מטבלה נפרדת אם קיימת)
     const { count: childrenCount } = await supabase
       .from('children')
@@ -262,6 +299,7 @@ export async function GET(request: Request) {
       categories,
       frequencies,
       vendorBreakdown,
+      categoryBreakdown,
       expenseTypes,
       summary: {
         avgMonthlyIncome: effectiveIncome,

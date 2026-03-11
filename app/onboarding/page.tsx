@@ -298,10 +298,10 @@ export default function OnboardingPage() {
               </a>
 
               <Link
-                href="/dashboard"
+                href="/payment"
                 className="w-full border-2 border-phi-frost text-phi-dark py-4 rounded-lg font-medium hover:bg-phi-frost/50 transition flex items-center justify-center gap-2"
               >
-                <span>לדשבורד</span>
+                <span>המשך לבחירת תוכנית</span>
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </motion.div>

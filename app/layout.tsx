@@ -22,6 +22,10 @@ export const metadata: Metadata = {
   keywords: ['phi', 'בריאות פיננסית', 'ניהול תקציב', 'חיסכון', 'מעקב הוצאות', 'יעדים פיננסיים', 'ליווי פיננסי'],
   authors: [{ name: 'Phi - גדי' }],
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/logo.png',
+  },
   viewport: {
     width: 'device-width',
     initialScale: 1,
@@ -32,6 +36,9 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Phi',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
   openGraph: {
     title: 'Phi (ϕ) - היחס הזהב של הכסף שלך',

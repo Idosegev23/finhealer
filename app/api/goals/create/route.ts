@@ -1,0 +1,64 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { name, goal_type, target_amount, monthly_allocation, deadline, funding_notes } = body;
+
+    if (!name || !target_amount) {
+      return NextResponse.json({ error: 'name and target_amount are required' }, { status: 400 });
+    }
+
+    // Get next priority
+    const { data: existingGoals } = await supabase
+      .from('goals')
+      .select('priority')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('priority', { ascending: false })
+      .limit(1);
+
+    const nextPriority = (existingGoals?.[0]?.priority || 0) + 1;
+
+    const goalData: Record<string, any> = {
+      user_id: user.id,
+      name,
+      goal_type: goal_type || 'savings_goal',
+      target_amount,
+      current_amount: 0,
+      status: 'active',
+      priority: Math.min(nextPriority, 10),
+      is_flexible: true,
+      auto_adjust: true,
+      min_allocation: 0,
+      monthly_allocation: monthly_allocation || 0,
+    };
+
+    if (deadline) goalData.deadline = deadline;
+    if (funding_notes) goalData.funding_notes = funding_notes;
+
+    const { data: goal, error } = await supabase
+      .from('goals')
+      .insert(goalData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating goal:', error);
+      return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, goal });
+  } catch (error: any) {
+    console.error('Create goal error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

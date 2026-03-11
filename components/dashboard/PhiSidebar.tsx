@@ -17,6 +17,7 @@ import {
   PiggyBank,
   Repeat,
   Gift,
+  Calculator,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -49,6 +50,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard/goals", label: "יעדים", icon: Target, separator: true },
   { href: "/dashboard/loans", label: "הלוואות", icon: Landmark },
   { href: "/dashboard/savings", label: "חסכונות", icon: PiggyBank },
+  { href: "/dashboard/simulator", label: "סימולטור", icon: Calculator },
 
   { href: "/dashboard/missing-documents", label: "מסמכים", icon: FileText, separator: true },
   { href: "/dashboard/settings", label: "הגדרות", icon: Settings },

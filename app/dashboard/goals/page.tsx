@@ -29,8 +29,8 @@ import { GoalsListCard } from '@/components/goals/GoalsListCard';
 import { GoalsDragList } from '@/components/goals/GoalsDragList';
 import { GoalsTimeline } from '@/components/goals/GoalsTimeline';
 import GoalDepositModal from '@/components/goals/GoalDepositModal';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { createClientComponentClient } from '@/lib/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -613,8 +613,9 @@ export default function GoalsPage() {
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
-              🎯 סדר עדיפויות יעדים
+              סדר עדיפויות יעדים
             </DialogTitle>
+            <DialogDescription>גרור את היעדים כדי לשנות את סדר העדיפויות</DialogDescription>
           </DialogHeader>
           <GoalsDragList
             goals={goals}

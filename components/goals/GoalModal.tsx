@@ -92,11 +92,8 @@ export function GoalModal({ isOpen, onClose, onSave, goal, userId }: GoalModalPr
         name: formData.name,
         goal_type: formData.goal_type,
         target_amount: parseFloat(formData.target_amount) || 0,
-        deadline: formData.deadline ? new Date(formData.deadline) : undefined,
         priority: parseInt(formData.priority) || 5,
         budget_source: formData.budget_source,
-        funding_notes: formData.funding_notes || undefined,
-        goal_group: formData.goal_group || undefined,
         user_id: userId,
         status: 'active',
         is_flexible: true,
@@ -104,6 +101,10 @@ export function GoalModal({ isOpen, onClose, onSave, goal, userId }: GoalModalPr
         monthly_allocation: 0,
         auto_adjust: true,
       };
+      // Only send optional fields if they have values
+      if (formData.deadline) goalData.deadline = formData.deadline as any;
+      if (formData.funding_notes) goalData.funding_notes = formData.funding_notes;
+      if (formData.goal_group) goalData.goal_group = formData.goal_group;
 
       if (goal) {
         goalData.id = goal.id;
