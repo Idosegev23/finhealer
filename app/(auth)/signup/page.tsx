@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -10,6 +10,17 @@ import { motion } from 'framer-motion'
 // ϕ = U+03D5 (mathematical phi)
 const PHI = 'ϕ'
 
+function ReferralCapture() {
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) {
+      localStorage.setItem('phi-referral-code', ref)
+    }
+  }, [searchParams])
+  return null
+}
+
 export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -18,15 +29,6 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const supabase = createClient()
-  const searchParams = useSearchParams()
-
-  // Capture referral code from URL
-  useEffect(() => {
-    const ref = searchParams.get('ref')
-    if (ref) {
-      localStorage.setItem('phi-referral-code', ref)
-    }
-  }, [searchParams])
 
   const handleGoogleSignup = async () => {
     try {
@@ -120,6 +122,7 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex" dir="rtl">
+      <Suspense><ReferralCapture /></Suspense>
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-phi-dark via-phi-slate to-phi-dark relative overflow-hidden">
         <div className="relative z-10 flex flex-col items-center justify-center w-full p-12 text-white">
