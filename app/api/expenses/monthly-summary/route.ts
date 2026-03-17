@@ -30,8 +30,8 @@ export async function GET(request: Request) {
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'expense')
-      .eq('status', 'confirmed') // ⭐ רק תנועות מאושרות - לא ממתינות!
-      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
+      .eq('status', 'confirmed')
+      .or('is_summary.is.null,is_summary.eq.false')
       .gte('tx_date', startDateStr)
       .order('tx_date', { ascending: false });
 

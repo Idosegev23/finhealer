@@ -59,9 +59,9 @@ export async function GET(request: Request) {
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'expense')
+      .or('is_summary.is.null,is_summary.eq.false')
       .gte('tx_date', fromDate)
       .lte('tx_date', toDate)
-      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
       .order('tx_date', { ascending: true });
 
     if (error) {

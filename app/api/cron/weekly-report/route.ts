@@ -50,18 +50,18 @@ export async function GET(request: NextRequest) {
           .from('transactions')
           .select('amount, type, category')
           .eq('user_id', user.id)
+          .or('is_summary.is.null,is_summary.eq.false')
           .gte('tx_date', sevenDaysAgo.toISOString().split('T')[0])
-          .lte('tx_date', today.toISOString().split('T')[0])
-          .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
+          .lte('tx_date', today.toISOString().split('T')[0]);
 
-        // השבוע שעבר (14-7 ימים אחרונים) - parent transactions + cash expenses
+        // השבוע שעבר (14-7 ימים אחרונים)
         const { data: lastWeek } = await supabase
           .from('transactions')
           .select('amount, type')
           .eq('user_id', user.id)
+          .or('is_summary.is.null,is_summary.eq.false')
           .gte('tx_date', fourteenDaysAgo.toISOString().split('T')[0])
-          .lt('tx_date', sevenDaysAgo.toISOString().split('T')[0])
-          .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
+          .lt('tx_date', sevenDaysAgo.toISOString().split('T')[0]);
 
         const thisWeekExpenses = thisWeek
           ?.filter((tx) => tx.type === 'expense')

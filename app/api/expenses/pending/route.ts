@@ -22,6 +22,7 @@ export async function GET() {
       .select('*')
       .eq('user_id', user.id)
       .eq('status', 'pending')
+      .or('is_summary.is.null,is_summary.eq.false')
       .order('created_at', { ascending: false });
 
     // ⭐ שליפת receipt_number מ-receipts table עבור תנועות עם receipt_id

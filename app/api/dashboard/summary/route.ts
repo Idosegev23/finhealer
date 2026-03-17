@@ -33,9 +33,9 @@ export async function GET() {
       .select('type, amount, status')
       .eq('user_id', user.id)
       .in('status', ['confirmed', 'pending'])
+      .or('is_summary.is.null,is_summary.eq.false')
       .gte('tx_date', firstDayOfMonth)
-      .lte('tx_date', today)
-      .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true');
+      .lte('tx_date', today);
 
     const txData = (transactions || []) as any[];
     const confirmedTx = txData.filter(t => t.status === 'confirmed');

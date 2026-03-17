@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
       .from("transactions")
       .select("user_id, amount, type, expense_category, tx_date")
       .eq("status", "confirmed")
+      .or('is_summary.is.null,is_summary.eq.false')
       .gte("tx_date", twoWeeksAgoStr)
       .lte("tx_date", todayStr)
       .in("user_id", userIds);

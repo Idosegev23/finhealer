@@ -23,6 +23,7 @@ export async function GET() {
       `)
       .eq("user_id", user.id)
       .eq("type", "expense")
+      .or('is_summary.is.null,is_summary.eq.false')
       .not("category_group", "is", null);
 
     if (error) {

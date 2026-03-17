@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
-import { matchCreditTransactions } from '@/lib/reconciliation/credit-matcher';
+import { matchCreditTransactions, isCreditCardCompany } from '@/lib/reconciliation/credit-matcher';
 import { parseDate, parseDateWithFallback } from '@/lib/utils/date-parser';
 import * as XLSX from 'xlsx';
 
@@ -1097,7 +1097,9 @@ async function saveBankTransactions(supabase: any, result: any, userId: string, 
       }
 
       // Mark if needs details (credit card payments need credit statement details)
-      const needsDetails = paymentMethod === 'credit_card';
+      // Also detect CC company aggregate charges (e.g., "מקס", "ישראכרט", "כאל")
+      const vendorIsCCCompany = isCreditCardCompany(tx.vendor || tx.description);
+      const needsDetails = paymentMethod === 'credit_card' || vendorIsCCCompany;
 
       return {
         user_id: userId,

@@ -121,6 +121,7 @@ async function collectFinancialData(userId: string): Promise<UserFinancialData> 
     .select('expense_category, amount, tx_date')
     .eq('user_id', userId)
     .eq('type', 'expense')
+    .or('is_summary.is.null,is_summary.eq.false')
     .gte('tx_date', threeMonthsAgo.toISOString().split('T')[0]);
   
   // Group by category and month for trend calculation

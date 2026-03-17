@@ -68,10 +68,10 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'income')
-      .eq('status', 'confirmed') // רק תנועות מאושרות
+      .eq('status', 'confirmed')
+      .or('is_summary.is.null,is_summary.eq.false')
       .gte('tx_date', `${currentMonth}-01`)
-      .lte('tx_date', `${currentMonth}-31`)
-      .or('has_details.is.null,has_details.eq.false'); // רק parent transactions
+      .lte('tx_date', `${currentMonth}-31`);
 
     const monthlyIncomeFromTransactions = (transactionIncome || [])
       .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);

@@ -63,8 +63,8 @@ async function processUser(supabase: any, userId: string) {
     .select('type, amount, vendor, expense_category, expense_type, tx_date, payment_method')
     .eq('user_id', userId)
     .eq('status', 'confirmed')
+    .or('is_summary.is.null,is_summary.eq.false')
     .gte('tx_date', startDate)
-    .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true')
     .order('tx_date', { ascending: true });
 
   if (!transactions || transactions.length < 10) {

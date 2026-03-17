@@ -106,9 +106,9 @@ export async function GET(request: NextRequest) {
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')
+        .or('is_summary.is.null,is_summary.eq.false')
         .gte('tx_date', startDate)
-        .lte('tx_date', endDate)
-        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
+        .lte('tx_date', endDate);
 
       if (queryError) {
         console.error('❌ Error fetching transactions:', queryError);
@@ -153,9 +153,9 @@ export async function GET(request: NextRequest) {
         .eq('type', 'expense')
         .eq('status', 'confirmed')
         .eq('expense_type', expenseType)
+        .or('is_summary.is.null,is_summary.eq.false')
         .gte('tx_date', startDate)
-        .lte('tx_date', endDate)
-        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'); // כולל תנועות parent + מזומן
+        .lte('tx_date', endDate);
 
       if (queryError) {
         console.error('❌ Error fetching transactions:', queryError);
@@ -204,9 +204,9 @@ export async function GET(request: NextRequest) {
         .eq('status', 'confirmed')
         .eq('expense_type', expenseType)
         .eq('expense_category', expenseCategory)
+        .or('is_summary.is.null,is_summary.eq.false')
         .gte('tx_date', startDate)
         .lte('tx_date', endDate)
-        .or('has_details.is.null,has_details.eq.false')
         .order('tx_date', { ascending: false });
 
       if (queryError) {

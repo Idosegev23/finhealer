@@ -22,6 +22,7 @@ export async function GET() {
       .select("amount, tx_date, type")
       .eq("user_id", user.id)
       .eq("type", "expense")
+      .or('is_summary.is.null,is_summary.eq.false')
       .gte("tx_date", sixMonthsAgo.toISOString())
       .order("tx_date", { ascending: true });
 

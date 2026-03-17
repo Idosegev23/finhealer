@@ -100,6 +100,7 @@ export async function GET(request: Request) {
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'expense')
+      .or('is_summary.is.null,is_summary.eq.false')
       .gte('tx_date', startDate);
 
     // בדיקה אם אין מספיק תנועות
@@ -236,6 +237,7 @@ export async function GET(request: Request) {
       .select('amount')
       .eq('user_id', user.id)
       .eq('type', 'income')
+      .or('is_summary.is.null,is_summary.eq.false')
       .gte('tx_date', startDate);
 
     const totalIncome = incomeTransactions.data?.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0) || 0;

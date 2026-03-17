@@ -38,9 +38,9 @@ export async function GET(request: NextRequest) {
         .eq('type', 'expense')
         .eq('status', 'confirmed')
         .eq('expense_category', drilldown)
+        .or('is_summary.is.null,is_summary.eq.false')
         .gte('tx_date', startDate)
-        .lte('tx_date', endDate)
-        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true');
+        .lte('tx_date', endDate);
 
       if (error) {
         console.error('Drilldown error:', error);
@@ -73,18 +73,18 @@ export async function GET(request: NextRequest) {
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')
+        .or('is_summary.is.null,is_summary.eq.false')
         .gte('tx_date', startDate)
-        .lte('tx_date', endDate)
-        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true'),
+        .lte('tx_date', endDate),
       supabase
         .from('transactions')
         .select('amount')
         .eq('user_id', user.id)
         .eq('type', 'income')
         .eq('status', 'confirmed')
+        .or('is_summary.is.null,is_summary.eq.false')
         .gte('tx_date', startDate)
-        .lte('tx_date', endDate)
-        .or('has_details.is.null,has_details.eq.false'),
+        .lte('tx_date', endDate),
     ]);
 
     if (expErr) {

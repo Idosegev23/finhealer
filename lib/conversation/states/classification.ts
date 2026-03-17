@@ -295,7 +295,8 @@ export async function handleClassificationResponse(
     .select('id', { count: 'exact', head: true })
     .eq('user_id', ctx.userId)
     .eq('status', 'pending')
-    .eq('type', type);
+    .eq('type', type)
+    .or('is_summary.is.null,is_summary.eq.false');
 
   if (!pendingOfType || pendingOfType === 0) {
     console.log(`[Classification] AUTO_ADVANCE: 0 pending ${type} transactions, moving to next phase`);
@@ -345,7 +346,8 @@ export async function handleClassificationResponse(
       .select('id, vendor, amount, expense_category, income_category, category')
       .eq('user_id', ctx.userId)
       .eq('status', 'pending')
-      .eq('type', type);
+      .eq('type', type)
+      .or('is_summary.is.null,is_summary.eq.false');
 
     if (!pendingTx || pendingTx.length === 0) {
       await moveToNextPhase(ctx, type);

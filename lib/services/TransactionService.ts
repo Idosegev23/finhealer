@@ -60,6 +60,7 @@ export async function getPending(
     .select('*')
     .eq('user_id', userId)
     .eq('status', 'pending')
+    .or('is_summary.is.null,is_summary.eq.false')
     .order('tx_date', { ascending: true });
 
   if (type) {
@@ -88,6 +89,7 @@ export async function getConfirmed(
     .select('*')
     .eq('user_id', userId)
     .eq('status', 'confirmed')
+    .or('is_summary.is.null,is_summary.eq.false')
     .order('tx_date', { ascending: false });
 
   if (options?.type) query = query.eq('type', options.type);
@@ -111,7 +113,8 @@ export async function countByStatus(
     .from('transactions')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('status', status);
+    .eq('status', status)
+    .or('is_summary.is.null,is_summary.eq.false');
 
   return count || 0;
 }
@@ -214,7 +217,8 @@ export async function getSummaryWithPending(
     .from('transactions')
     .select('type, amount, status')
     .eq('user_id', userId)
-    .in('status', ['confirmed', 'pending']);
+    .in('status', ['confirmed', 'pending'])
+    .or('is_summary.is.null,is_summary.eq.false');
 
   if (fromDate) query = query.gte('tx_date', fromDate);
   if (toDate) query = query.lte('tx_date', toDate);
@@ -325,6 +329,7 @@ export async function getDateRange(
     .select('tx_date')
     .eq('user_id', userId)
     .eq('status', 'confirmed')
+    .or('is_summary.is.null,is_summary.eq.false')
     .order('tx_date', { ascending: true })
     .limit(1)
     .single();
@@ -334,6 +339,7 @@ export async function getDateRange(
     .select('tx_date')
     .eq('user_id', userId)
     .eq('status', 'confirmed')
+    .or('is_summary.is.null,is_summary.eq.false')
     .order('tx_date', { ascending: false })
     .limit(1)
     .single();

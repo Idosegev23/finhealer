@@ -77,6 +77,7 @@ export async function analyzeBehavior(userId: string): Promise<BehaviorAnalysisR
     .select('id, tx_date, amount, type, category, expense_category, vendor, is_recurring')
     .eq('user_id', userId)
     .eq('status', 'confirmed')
+    .or('is_summary.is.null,is_summary.eq.false')
     .gte('tx_date', thirtyDaysAgo.toISOString().split('T')[0])
     .order('tx_date', { ascending: false });
   
@@ -501,8 +502,9 @@ export async function getQuickAITip(userId: string): Promise<string | null> {
     .select('amount, expense_category, tx_date')
     .eq('user_id', userId)
     .eq('type', 'expense')
+    .or('is_summary.is.null,is_summary.eq.false')
     .gte('tx_date', thirtyDaysAgo.toISOString().split('T')[0]);
-  
+
   if (!transactions || transactions.length < 5) {
     return 'עדיין אין מספיק נתונים לטיפ אישי - המשך לעדכן הוצאות! 📊';
   }
@@ -581,7 +583,8 @@ export async function checkReadyForBudget(userId: string): Promise<{
     .from('transactions')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('status', 'confirmed');
+    .eq('status', 'confirmed')
+    .or('is_summary.is.null,is_summary.eq.false');
   
   // 3. קריטריונים למעבר
   const MIN_DAYS = 30;

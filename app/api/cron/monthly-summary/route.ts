@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         .select("user_id, amount, type, vendor, budget_categories (name)")
         .in("user_id", userIds)
         .eq("status", "confirmed")
+        .or('is_summary.is.null,is_summary.eq.false')
         .gte("tx_date", lastMonth.toISOString().split("T")[0])
         .lte("tx_date", lastMonthEnd.toISOString().split("T")[0]),
       supabaseAdmin
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
         .select("user_id, amount, type")
         .in("user_id", userIds)
         .eq("status", "confirmed")
+        .or('is_summary.is.null,is_summary.eq.false')
         .gte("tx_date", prevMonth.toISOString().split("T")[0])
         .lte("tx_date", prevMonthEnd.toISOString().split("T")[0]),
     ]);
