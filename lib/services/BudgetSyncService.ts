@@ -10,6 +10,9 @@
 
 import { createServiceClient } from '@/lib/supabase/server';
 
+// Simple per-user lock to prevent concurrent sync
+const syncLocks = new Map<string, Promise<any>>();
+
 // ============================================================================
 // Main Sync Function
 // ============================================================================
@@ -22,6 +25,26 @@ import { createServiceClient } from '@/lib/supabase/server';
  * @returns       - Summary of what was updated
  */
 export async function syncBudgetSpending(
+  userId: string,
+  month?: string
+): Promise<{ synced: boolean; totalSpent: number; categoriesUpdated: number }> {
+  const lockKey = `${userId}:${month || 'current'}`;
+
+  // If there's already a sync running for this user+month, wait for it
+  const existing = syncLocks.get(lockKey);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = _syncBudgetSpendingImpl(userId, month).finally(() => {
+    syncLocks.delete(lockKey);
+  });
+
+  syncLocks.set(lockKey, promise);
+  return promise;
+}
+
+async function _syncBudgetSpendingImpl(
   userId: string,
   month?: string
 ): Promise<{ synced: boolean; totalSpent: number; categoriesUpdated: number }> {

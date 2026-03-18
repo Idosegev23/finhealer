@@ -70,6 +70,16 @@ const userRateLimit = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 10_000; // 10 seconds
 
+// Cleanup stale rate limit entries every 5 minutes
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, val] of userRateLimit.entries()) {
+      if (val.resetAt < now) userRateLimit.delete(key);
+    }
+  }, 5 * 60 * 1000);
+}
+
 export function checkRateLimit(userId: string): boolean {
   const now = Date.now();
   const entry = userRateLimit.get(userId);
@@ -99,6 +109,18 @@ export function checkRateLimit(userId: string): boolean {
 
 const processingLocks = new Map<string, number>();
 const LOCK_TIMEOUT_MS = 30_000; // 30 seconds max lock time
+
+// Cleanup stale locks every 5 minutes
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamp] of processingLocks.entries()) {
+      if (now - timestamp > LOCK_TIMEOUT_MS * 2) {
+        processingLocks.delete(key);
+      }
+    }
+  }, 5 * 60 * 1000);
+}
 
 /**
  * Acquire a processing lock for a user.

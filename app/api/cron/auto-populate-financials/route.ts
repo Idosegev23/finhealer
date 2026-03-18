@@ -37,13 +37,25 @@ export async function GET(request: Request) {
 
     const results: any[] = [];
 
-    for (const user of users) {
-      try {
-        const result = await processUser(supabase, user.id);
-        results.push({ userId: user.id, name: user.name, ...result });
-      } catch (err: any) {
-        console.error(`[auto-populate] Error for user ${user.id}:`, err.message);
-        results.push({ userId: user.id, error: err.message });
+    // Process users in parallel batches of 10
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < users.length; i += BATCH_SIZE) {
+      const batch = users.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (user) => {
+          const result = await processUser(supabase, user.id);
+          return { userId: user.id, name: user.name, ...result };
+        })
+      );
+
+      for (let j = 0; j < batchResults.length; j++) {
+        const r = batchResults[j];
+        if (r.status === 'fulfilled') {
+          results.push(r.value);
+        } else {
+          console.error(`[auto-populate] Error for user ${batch[j].id}:`, r.reason?.message || r.reason);
+          results.push({ userId: batch[j].id, error: r.reason?.message || 'Unknown error' });
+        }
       }
     }
 
