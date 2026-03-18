@@ -25,6 +25,7 @@ export type MonitoringIntentType =
   | 'advisor'
   | 'goals'
   | 'goal_deposit'
+  | 'add_expense'
   | 'unclassified'
   | 'credit_pending'
   | 'duplicates'
@@ -45,6 +46,7 @@ export interface MonitoringIntent {
     category?: string;
     goal_name?: string;
     amount?: number;
+    vendor?: string;
   };
 }
 
@@ -68,6 +70,7 @@ phi_score - ציון/דירוג/בריאות פיננסית
 advisor - ייעוץ/יועץ/גדי/רוצה להתייעץ
 goals - יעדים/חיסכון/הגדר יעד/רוצה לחסוך
 goal_deposit - הפקדה ליעד. params:{goal_name:"...",amount:N}
+add_expense - הוצאתי/שילמתי/קניתי/הוצאה/רכשתי + סכום. params:{amount:N,category:"...",vendor:"..."}
 unclassified - לא מסווגות/ממתינות/תנועות שצריך לסווג
 credit_pending - ממתין לאשראי/פירוט אשראי
 duplicates - כפל תשלום/כפילויות/חשד לכפל

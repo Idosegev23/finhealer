@@ -11,7 +11,8 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
  * Runs daily. For each user with confirmed transactions:
  * 1. Detects recurring income → upserts income_sources
  * 2. Detects recurring loan-like payments → upserts loans
- * 3. Builds user_financial_profile from aggregated transaction data
+ * 3. Detects recurring expenses → upserts recurring_patterns
+ * 4. Builds user_financial_profile from aggregated transaction data
  */
 export async function GET(request: Request) {
   try {
@@ -73,11 +74,13 @@ async function processUser(supabase: any, userId: string) {
 
   const incomeResult = await detectAndUpsertIncomeSources(supabase, userId, transactions);
   const loanResult = await detectAndUpsertLoans(supabase, userId, transactions);
+  const recurringResult = await detectAndUpsertRecurringExpenses(supabase, userId, transactions);
   const profileResult = await buildFinancialProfile(supabase, userId, transactions);
 
   return {
     incomeSources: incomeResult,
     loans: loanResult,
+    recurringExpenses: recurringResult,
     profile: profileResult,
   };
 }
@@ -228,6 +231,105 @@ function guessloanType(vendor: string, category: string): string {
   if (v.includes('ליסינג') || v.includes('leasing') || v.includes('רכב')) return 'car';
   if (v.includes('סטודנט') || v.includes('לימוד')) return 'student';
   return 'personal';
+}
+
+// ─── RECURRING EXPENSE DETECTION ─────────────────────
+async function detectAndUpsertRecurringExpenses(supabase: any, userId: string, transactions: any[]) {
+  const expenses = transactions.filter((t: any) => t.type === 'expense');
+  if (expenses.length < 5) return { detected: 0 };
+
+  // Group by normalized vendor
+  const vendorMap: Record<string, { amounts: number[]; dates: string[]; category: string; expenseType: string }> = {};
+  expenses.forEach((tx: any) => {
+    const vendor = (tx.vendor || '').trim();
+    if (!vendor || vendor.length < 2) return;
+    const key = vendor.toLowerCase().replace(/[0-9\-]/g, '').trim();
+    if (!key) return;
+    if (!vendorMap[key]) vendorMap[key] = { amounts: [], dates: [], category: tx.expense_category || '', expenseType: tx.expense_type || 'variable' };
+    vendorMap[key].amounts.push(Math.abs(Number(tx.amount) || 0));
+    vendorMap[key].dates.push(tx.tx_date);
+  });
+
+  const detected: any[] = [];
+
+  for (const [normalizedVendor, data] of Object.entries(vendorMap)) {
+    if (data.amounts.length < 2) continue;
+
+    // Check amount consistency (within 10%)
+    const avg = data.amounts.reduce((s, a) => s + a, 0) / data.amounts.length;
+    if (avg < 20) continue; // Too small
+    const isConsistent = data.amounts.every(a => Math.abs(a - avg) / avg < 0.10);
+    if (!isConsistent) continue;
+
+    // Check it spans at least 2 different months
+    const months = new Set(data.dates.map(d => d.substring(0, 7)));
+    if (months.size < 2) continue;
+
+    // Calculate frequency
+    const sortedMonths = Array.from(months).sort();
+    const gaps: number[] = [];
+    for (let i = 1; i < sortedMonths.length; i++) {
+      const [y1, m1] = sortedMonths[i - 1].split('-').map(Number);
+      const [y2, m2] = sortedMonths[i].split('-').map(Number);
+      gaps.push((y2 - y1) * 12 + (m2 - m1));
+    }
+    const avgGap = gaps.length > 0 ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 1;
+    const frequency = avgGap <= 1.5 ? 'monthly' : avgGap <= 2.5 ? 'bi-monthly' : avgGap <= 4 ? 'quarterly' : 'yearly';
+
+    // Calculate expected day of month
+    const days = data.dates.map(d => new Date(d).getDate());
+    const avgDay = Math.round(days.reduce((a, b) => a + b, 0) / days.length);
+
+    // Calculate next expected date
+    const lastDate = new Date(data.dates.sort().pop()!);
+    const nextExpected = new Date(lastDate);
+    switch (frequency) {
+      case 'monthly': nextExpected.setMonth(nextExpected.getMonth() + 1); break;
+      case 'bi-monthly': nextExpected.setMonth(nextExpected.getMonth() + 2); break;
+      case 'quarterly': nextExpected.setMonth(nextExpected.getMonth() + 3); break;
+      case 'yearly': nextExpected.setFullYear(nextExpected.getFullYear() + 1); break;
+    }
+    nextExpected.setDate(avgDay);
+
+    // Get original vendor name (not normalized)
+    const originalVendor = expenses.find((tx: any) =>
+      (tx.vendor || '').toLowerCase().replace(/[0-9\-]/g, '').trim() === normalizedVendor
+    )?.vendor || normalizedVendor;
+
+    // Upsert into recurring_patterns
+    const { error } = await supabase
+      .from('recurring_patterns')
+      .upsert({
+        user_id: userId,
+        vendor: originalVendor,
+        amount: Math.round(avg),
+        expected_amount: Math.round(avg),
+        frequency,
+        expected_day: avgDay,
+        day_tolerance: 3,
+        next_expected: nextExpected.toISOString().split('T')[0],
+        last_occurrence: data.dates.sort().pop(),
+        occurrence_count: data.amounts.length,
+        missed_count: 0,
+        status: 'active',
+        is_auto_detected: true,
+        pattern_type: 'expense',
+        category: data.category || null,
+        expense_type: data.expenseType || 'variable',
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,vendor',
+        ignoreDuplicates: false,
+      });
+
+    if (!error) {
+      detected.push({ vendor: originalVendor, amount: Math.round(avg), frequency, months: months.size });
+    } else {
+      console.warn(`[auto-populate] recurring upsert error for ${originalVendor}:`, error.message);
+    }
+  }
+
+  return { detected: detected.length, patterns: detected };
 }
 
 // ─── FINANCIAL PROFILE FROM TRANSACTIONS ───────────

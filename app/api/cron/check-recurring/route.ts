@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isQuietTime } from '@/lib/utils/quiet-hours';
+import { getGreenAPIClient } from '@/lib/greenapi/client';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     // Get all active recurring patterns
     const { data: patterns } = await supabase
       .from('recurring_patterns')
-      .select('id, user_id, vendor, amount, frequency, next_expected, day_tolerance, status, occurrence_count, missed_count')
+      .select('id, user_id, vendor, amount, expected_amount, frequency, next_expected, day_tolerance, status, occurrence_count, missed_count')
       .eq('status', 'active');
 
     if (!patterns || patterns.length === 0) {
@@ -103,26 +104,60 @@ export async function GET(request: NextRequest) {
         );
 
         if (matchingTransactions.length > 0) {
+          // Update expected_amount with exponential moving average (α=0.3)
+          const actualAmount = Math.abs(parseFloat(matchingTransactions[0].amount));
+          const currentExpected = pattern.amount || actualAmount;
+          const alpha = 0.3;
+          const newExpectedAmount = Math.round(alpha * actualAmount + (1 - alpha) * currentExpected);
+
           await supabase
             .from('recurring_patterns')
             .update({
               last_occurrence: today.toISOString().split('T')[0],
               next_expected: newNextExpected.toISOString().split('T')[0],
-              occurrence_count: pattern.occurrence_count + 1,
+              occurrence_count: (pattern.occurrence_count || 0) + 1,
+              amount: newExpectedAmount,
+              expected_amount: newExpectedAmount,
+              missed_count: 0, // Reset missed count on successful match
               updated_at: new Date().toISOString(),
             })
             .eq('id', pattern.id);
 
           updated++;
         } else {
+          const newMissedCount = (pattern.missed_count || 0) + 1;
+
           await supabase
             .from('recurring_patterns')
             .update({
               next_expected: newNextExpected.toISOString().split('T')[0],
-              missed_count: pattern.missed_count + 1,
+              missed_count: newMissedCount,
               updated_at: new Date().toISOString(),
             })
             .eq('id', pattern.id);
+
+          // Send WhatsApp alert on first miss only
+          if (newMissedCount === 1) {
+            try {
+              // Get user's phone number
+              const { data: userData } = await supabase
+                .from('users')
+                .select('phone')
+                .eq('id', pattern.user_id)
+                .single();
+
+              if (userData?.phone) {
+                const greenAPI = getGreenAPIClient();
+                const amountStr = (pattern.amount || 0).toLocaleString('he-IL');
+                await greenAPI.sendMessage({
+                  phoneNumber: userData.phone,
+                  message: `⚠️ שים לב — *${pattern.vendor}* (${amountStr} ₪) לא זוהה החודש.\n\nהכל בסדר? אם שילמת במקום אחר, אפשר להתעלם 😊`,
+                });
+              }
+            } catch (alertErr) {
+              console.warn(`[Cron] Failed to send missed alert for pattern ${pattern.id}:`, alertErr);
+            }
+          }
 
           updated++;
         }

@@ -389,6 +389,9 @@ async function dispatchMonitoringIntent(
     case 'goal_deposit':
       return await handleGoalDeposit(ctx, msg);
 
+    case 'add_expense':
+      return await handleAddExpense(ctx, intent);
+
     case 'unclassified':
       return await showUnclassifiedTransactions(ctx);
 
@@ -485,6 +488,92 @@ async function dispatchMonitoringIntent(
     default:
       return null; // Fall through to AI chat (Layer 3)
   }
+}
+
+// ============================================================================
+// Quick Expense from WhatsApp
+// ============================================================================
+
+/**
+ * handleAddExpense - Creates a confirmed expense from free-text WhatsApp message.
+ * User says "הוצאתי 150 בסופר" → creates transaction + confirms via WhatsApp.
+ */
+async function handleAddExpense(
+  ctx: RouterContext,
+  intent: MonitoringIntent
+): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+  const amount = intent.params?.amount;
+
+  if (!amount || amount <= 0) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `לא הצלחתי לזהות סכום 🤔\nנסה שוב, למשל: "הוצאתי 50 על קפה"`,
+    });
+    return { success: true };
+  }
+
+  // Try to match category from AI-extracted category or vendor
+  const categoryName = intent.params?.category || null;
+  const vendorName = intent.params?.vendor || null;
+
+  let expenseCategory = 'כללי';
+  let expenseType: 'fixed' | 'variable' | 'special' = 'variable';
+  let categoryGroup: string | null = null;
+
+  if (categoryName) {
+    const match = findBestMatch(categoryName);
+    if (match) {
+      expenseCategory = match.name;
+      expenseType = (match as any).expense_type || 'variable';
+      categoryGroup = (match as any).category_group || null;
+    } else {
+      expenseCategory = categoryName;
+    }
+  }
+
+  // Create the transaction
+  const today = new Date().toISOString().split('T')[0];
+  const { error } = await supabase
+    .from('transactions')
+    .insert({
+      user_id: ctx.userId,
+      type: 'expense',
+      amount: amount,
+      category: expenseCategory,
+      expense_category: expenseCategory,
+      expense_type: expenseType,
+      category_group: categoryGroup,
+      vendor: vendorName,
+      tx_date: today,
+      source: 'whatsapp',
+      status: 'confirmed',
+      auto_categorized: !!categoryName,
+    });
+
+  if (error) {
+    console.error('[Monitoring] add_expense error:', error);
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `❌ שגיאה בשמירת ההוצאה. נסה שוב.`,
+    });
+    return { success: true };
+  }
+
+  // Build confirmation message
+  const amountStr = amount.toLocaleString('he-IL');
+  const parts = [`✅ *${amountStr} ₪*`];
+  if (vendorName) parts.push(`ב${vendorName}`);
+  parts.push(`(${expenseCategory})`);
+  parts.push(`נרשם!`);
+
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: parts.join(' '),
+  });
+
+  return { success: true };
 }
 
 // ============================================================================
