@@ -325,6 +325,11 @@ export async function POST(request: NextRequest) {
     // 7. Send WhatsApp notification
     await sendWhatsAppNotification(stmt.user_id, itemsProcessed, docType, statementId);
 
+    // 8. Sync budget spending (fire-and-forget)
+    import('@/lib/services/BudgetSyncService')
+      .then(({ syncBudgetSpending }) => syncBudgetSpending(stmt.user_id))
+      .catch(err => console.warn('[BudgetSync] post-document error:', err));
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`✅ [BG] Completed in ${duration}s`);
 

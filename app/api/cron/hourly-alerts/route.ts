@@ -30,6 +30,10 @@ export async function GET(request: NextRequest) {
 
     const currentMonth = new Date().toISOString().substring(0, 7);
 
+    // Recalculate all budget spending before checking thresholds
+    const { syncAllBudgets } = await import('@/lib/services/BudgetSyncService');
+    await syncAllBudgets();
+
     // מצא משתמשים עם תקציב פעיל
     const { data: budgets } = await supabase
       .from('budgets')

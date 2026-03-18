@@ -152,6 +152,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to update transaction' }, { status: 500 });
       }
 
+      // Sync budget spending
+      if (type === 'expense') {
+        const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
+        syncBudgetSpending(user.id).catch(err => console.error('[BudgetSync] post-update error:', err));
+      }
+
       return NextResponse.json({ transaction: data });
     } else {
       // Insert
@@ -182,6 +188,12 @@ export async function POST(request: Request) {
       if (error) {
         console.error('Error creating transaction:', error);
         return NextResponse.json({ error: 'Failed to create transaction' }, { status: 500 });
+      }
+
+      // Sync budget spending
+      if (data?.type === 'expense' && data?.status === 'confirmed') {
+        const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
+        syncBudgetSpending(user.id).catch(err => console.error('[BudgetSync] post-insert error:', err));
       }
 
       return NextResponse.json({ transaction: data }, { status: 201 });
@@ -224,6 +236,10 @@ export async function DELETE(request: Request) {
       console.error('Error deleting transaction:', error);
       return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
     }
+
+    // Sync budget spending
+    const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
+    syncBudgetSpending(user.id).catch(err => console.error('[BudgetSync] post-delete error:', err));
 
     return NextResponse.json({ success: true });
   } catch (error) {

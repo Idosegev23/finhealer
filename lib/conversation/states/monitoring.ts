@@ -563,6 +563,10 @@ async function handleAddExpense(
     return { success: true };
   }
 
+  // Sync budget spending after adding expense
+  const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
+  syncBudgetSpending(ctx.userId).catch(err => console.error('[BudgetSync] whatsapp-expense error:', err));
+
   // Fetch weekly spending context for immediate feedback
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
@@ -1103,6 +1107,22 @@ export async function showBudgetStatus(ctx: RouterContext): Promise<RouterResult
         `כתוב *"תקציב אוטומטי"* ליצירת תקציב.`,
     });
     return { success: true };
+  }
+
+  // Ensure budget spending is up-to-date
+  const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
+  await syncBudgetSpending(ctx.userId, currentMonth);
+
+  // Re-fetch budget with updated totals
+  const { data: freshBudget } = await supabase
+    .from('budgets')
+    .select('id, total_budget, savings_goal, total_spent')
+    .eq('user_id', ctx.userId)
+    .eq('month', currentMonth)
+    .single();
+
+  if (freshBudget) {
+    Object.assign(budget, freshBudget);
   }
 
   const { data: categories } = await supabase
