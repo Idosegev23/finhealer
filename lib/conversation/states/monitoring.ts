@@ -509,7 +509,7 @@ async function handleAddExpense(
   if (!amount || amount <= 0) {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
-      message: `לא הצלחתי לזהות סכום 🤔\nנסה שוב, למשל: "הוצאתי 50 על קפה"`,
+      message: `לא הצלחתי לזהות סכום 🤔\nנסה שוב, למשל: *"סופר 450"* או *"קפה 15"*`,
     });
     return { success: true };
   }
@@ -522,13 +522,15 @@ async function handleAddExpense(
   let expenseType: 'fixed' | 'variable' | 'special' = 'variable';
   let categoryGroup: string | null = null;
 
-  if (categoryName) {
-    const match = findBestMatch(categoryName);
+  // Try vendor as category hint if no explicit category
+  const categoryHint = categoryName || vendorName;
+  if (categoryHint) {
+    const match = findBestMatch(categoryHint);
     if (match) {
       expenseCategory = match.name;
       expenseType = (match as any).expense_type || 'variable';
       categoryGroup = (match as any).category_group || null;
-    } else {
+    } else if (categoryName) {
       expenseCategory = categoryName;
     }
   }
@@ -549,7 +551,7 @@ async function handleAddExpense(
       tx_date: today,
       source: 'whatsapp',
       status: 'confirmed',
-      auto_categorized: !!categoryName,
+      auto_categorized: !!categoryHint,
     });
 
   if (error) {
@@ -561,16 +563,51 @@ async function handleAddExpense(
     return { success: true };
   }
 
-  // Build confirmation message
+  // Fetch weekly spending context for immediate feedback
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  const { data: weekTxs } = await supabase
+    .from('transactions')
+    .select('amount')
+    .eq('user_id', ctx.userId)
+    .eq('type', 'expense')
+    .eq('status', 'confirmed')
+    .or('is_summary.is.null,is_summary.eq.false')
+    .gte('tx_date', weekStartStr);
+
+  const weekTotal = (weekTxs || []).reduce((sum: number, tx: any) => sum + Math.abs(Number(tx.amount) || 0), 0);
+
+  // Build confirmation with context
   const amountStr = amount.toLocaleString('he-IL');
-  const parts = [`✅ *${amountStr} ₪*`];
-  if (vendorName) parts.push(`ב${vendorName}`);
-  parts.push(`(${expenseCategory})`);
-  parts.push(`נרשם!`);
+  let msg_out = `✅ *${amountStr} ₪*`;
+  if (vendorName) msg_out += ` ב${vendorName}`;
+  msg_out += ` (${expenseCategory}) נרשם!`;
+  msg_out += `\n📊 השבוע: ${weekTotal.toLocaleString('he-IL')} ₪`;
+
+  // Check budget if available
+  const { data: activeBudget } = await supabase
+    .from('budgets')
+    .select('total_budget')
+    .eq('user_id', ctx.userId)
+    .eq('is_active', true)
+    .single();
+
+  if (activeBudget?.total_budget) {
+    // Monthly budget → approximate weekly = monthly / 4.3
+    const weeklyBudget = Math.round(activeBudget.total_budget / 4.3);
+    const remaining = weeklyBudget - weekTotal;
+    if (remaining > 0) {
+      msg_out += ` מתוך ~${weeklyBudget.toLocaleString('he-IL')} ₪`;
+    } else {
+      msg_out += `\n⚠️ חרגת מהתקציב השבועי!`;
+    }
+  }
 
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
-    message: parts.join(' '),
+    message: msg_out,
   });
 
   return { success: true };
