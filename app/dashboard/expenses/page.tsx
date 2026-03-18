@@ -202,7 +202,7 @@ function MonthCard({ month, data, isExpanded, onToggle, onRefresh }: MonthCardPr
         </div>
 
         <div className="flex items-center gap-6">
-          <div className="text-left">
+          <div className="text-end">
             <p className="text-2xl font-bold text-gray-900">₪{data.total.toLocaleString('he-IL')}</p>
             <p className="text-sm text-gray-500">סה&quot;כ הוצאות</p>
           </div>

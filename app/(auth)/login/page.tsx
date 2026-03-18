@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [resetSent, setResetSent] = useState(false)
   const supabase = createClient()
 
   const handleGoogleLogin = async () => {
@@ -127,6 +128,12 @@ export default function LoginPage() {
               </div>
             )}
 
+            {resetSent && (
+              <div className="bg-green-50 border border-green-200 text-green-600 rounded-lg p-4 mb-6 text-sm">
+                נשלח מייל לאיפוס סיסמה! בדוק את תיבת הדואר שלך.
+              </div>
+            )}
+
             {/* Google Sign In Button */}
             <button
               onClick={handleGoogleLogin}
@@ -193,6 +200,37 @@ export default function LoginPage() {
                   placeholder="הסיסמה שלך"
                   disabled={isLoading}
                 />
+              </div>
+
+              <div className="flex justify-start">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!email) {
+                      setError('הכנס כתובת מייל קודם')
+                      return
+                    }
+                    try {
+                      setIsLoading(true)
+                      setError(null)
+                      setResetSent(false)
+                      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: `${window.location.origin}/auth/reset-password`,
+                      })
+                      if (error) throw error
+                      setError(null)
+                      setResetSent(true)
+                    } catch (err: any) {
+                      setError(err.message || 'שגיאה בשליחת מייל איפוס')
+                    } finally {
+                      setIsLoading(false)
+                    }
+                  }}
+                  className="text-sm text-phi-gold hover:underline"
+                  disabled={isLoading}
+                >
+                  שכחת סיסמה?
+                </button>
               </div>
 
               <button

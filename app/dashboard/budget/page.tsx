@@ -1013,7 +1013,7 @@ export default function BudgetPage() {
                                       value={Math.min(percentage, 100)}
                                       className={`h-3 flex-1 ${isOver ? '[&>div]:bg-red-500' : isWarning ? '[&>div]:bg-yellow-500' : '[&>div]:bg-phi-mint'}`}
                                     />
-                                    <span className={`text-sm font-bold w-12 text-left ${isOver ? 'text-red-600' : isWarning ? 'text-yellow-600' : 'text-green-600'}`}>
+                                    <span className={`text-sm font-bold w-12 text-end ${isOver ? 'text-red-600' : isWarning ? 'text-yellow-600' : 'text-green-600'}`}>
                                       {Math.round(percentage)}%
                                     </span>
                                   </div>
@@ -1056,7 +1056,7 @@ export default function BudgetPage() {
                                   value={Math.min(percentage, 100)}
                                   className={`h-2 ${isOver ? '[&>div]:bg-red-500' : isWarning ? '[&>div]:bg-yellow-500' : '[&>div]:bg-phi-mint'}`}
                                 />
-                                <div className={`text-xs mt-1 text-left font-bold ${diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                <div className={`text-xs mt-1 text-end font-bold ${diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
                                   {diff < 0 ? `חריגה: ₪${Math.abs(diff).toLocaleString('he-IL')}` : `נותר: ₪${diff.toLocaleString('he-IL')}`}
                                 </div>
                               </div>

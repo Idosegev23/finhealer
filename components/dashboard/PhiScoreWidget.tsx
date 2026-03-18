@@ -25,13 +25,14 @@ const getScoreGradient = (score: number): string => {
 }
 
 export function PhiScoreWidget({ score, className = '' }: PhiScoreWidgetProps) {
-  const displayScore = score ?? 0
-  const { message, color } = getScoreMessage(displayScore)
-  const gradient = getScoreGradient(displayScore)
-  
+  const hasScore = score !== null && score !== undefined
+  const displayScore = hasScore ? score : 0
+  const { message, color } = hasScore ? getScoreMessage(displayScore) : { message: 'ממתין לנתונים', color: 'text-phi-slate' }
+  const gradient = hasScore ? getScoreGradient(displayScore) : 'from-gray-300 to-gray-200'
+
   // Calculate percentage for the circular progress
   const circumference = 2 * Math.PI * 45 // radius = 45
-  const strokeDashoffset = circumference - (displayScore / 100) * circumference
+  const strokeDashoffset = hasScore ? circumference - (displayScore / 100) * circumference : circumference
 
   return (
     <div className={`bg-white rounded-2xl p-6 shadow-sm border border-phi-frost ${className}`}>
@@ -71,15 +72,24 @@ export function PhiScoreWidget({ score, className = '' }: PhiScoreWidgetProps) {
           
           {/* Score number */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <motion.span 
-              className="text-4xl font-bold text-phi-dark"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              {displayScore}
-            </motion.span>
-            <span className="text-xs text-phi-slate">ציון {PHI}</span>
+            {hasScore ? (
+              <>
+                <motion.span
+                  className="text-4xl font-bold text-phi-dark"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  {displayScore}
+                </motion.span>
+                <span className="text-xs text-phi-slate">ציון {PHI}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-lg font-medium text-phi-slate">?</span>
+                <span className="text-xs text-phi-slate">ציון {PHI}</span>
+              </>
+            )}
           </div>
         </div>
 

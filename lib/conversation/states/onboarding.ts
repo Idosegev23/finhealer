@@ -65,17 +65,27 @@ export async function handleWaitingForName(
   supabase: any,
   greenAPI: any
 ): Promise<RouterResult> {
+  // Validate name
+  const cleanName = msg.trim().replace(/[^\p{L}\p{N}\s'-]/gu, '').substring(0, 50);
+  if (!cleanName || cleanName.length < 2) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: 'לא הצלחתי לזהות שם תקין. נסה שוב - מה השם שלך? 😊',
+    });
+    return { success: true };
+  }
+
   await supabase
     .from('users')
     .update({
-      name: msg,
+      name: cleanName,
       onboarding_state: 'waiting_for_document'
     })
     .eq('id', ctx.userId);
 
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
-    message: `נעים להכיר, ${msg}! 😊\n\n` +
+    message: `נעים להכיר, ${cleanName}! 😊\n\n` +
       `אני φ Phi, ואני כאן לעזור לך לנהל את הכסף בקלות.\n\n` +
       `📄 שלח לי דוח מהבנק או מחברת האשראי ונתחיל!\nמתאים: PDF, תמונה, או קובץ Excel.`,
   });

@@ -30,9 +30,16 @@ export async function POST(request: Request) {
     } = body;
 
     // ולידציה
-    if (!amount || !date) {
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       return NextResponse.json(
-        { error: 'Missing required fields: amount, date' },
+        { error: 'סכום חייב להיות מספר חיובי' },
+        { status: 400 }
+      );
+    }
+
+    if (!date) {
+      return NextResponse.json(
+        { error: 'Missing required field: date' },
         { status: 400 }
       );
     }

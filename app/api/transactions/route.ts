@@ -113,9 +113,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (amount <= 0) {
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       return NextResponse.json(
-        { error: 'Amount must be positive' },
+        { error: 'סכום חייב להיות מספר חיובי' },
         { status: 400 }
       );
     }

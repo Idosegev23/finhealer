@@ -824,7 +824,7 @@ export default function PendingExpensesPage() {
                         </div>
                       )}
                     </div>
-                    <div className="text-left">
+                    <div className="text-end">
                       <div className={`text-6xl font-extrabold ${isIncome ? 'text-green-700' : 'text-blue-700'} drop-shadow-lg`}>
                         {isIncome ? '+' : ''}{formatCurrency(expense.amount)}
                       </div>

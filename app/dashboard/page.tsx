@@ -16,6 +16,7 @@ import BenchmarkWidget from '@/components/dashboard/BenchmarkWidget'
 import ReferralCard from '@/components/dashboard/ReferralCard'
 import InstallPWA from '@/components/dashboard/InstallPWA'
 import { DedupAlert } from '@/components/dashboard/DedupAlert'
+import { QuickAddFAB } from '@/components/dashboard/QuickAddFAB'
 
 export const revalidate = 30
 
@@ -327,7 +328,7 @@ export default async function DashboardPage() {
                       <p className="text-xs text-gray-400">{tx.tx_date || ''}</p>
                     </div>
                   </div>
-                  <div className="text-left flex items-center gap-2">
+                  <div className="text-end flex items-center gap-2">
                     {tx.status === 'pending' && (
                       <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">ממתין</span>
                     )}
@@ -390,6 +391,9 @@ export default async function DashboardPage() {
 
         {/* PWA Install Prompt */}
         <InstallPWA />
+
+        {/* Floating Quick Add Expense */}
+        <QuickAddFAB />
       </div>
     </div>
   )
