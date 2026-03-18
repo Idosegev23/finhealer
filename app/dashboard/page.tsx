@@ -17,6 +17,7 @@ import ReferralCard from '@/components/dashboard/ReferralCard'
 import InstallPWA from '@/components/dashboard/InstallPWA'
 import { DedupAlert } from '@/components/dashboard/DedupAlert'
 import { QuickAddFAB } from '@/components/dashboard/QuickAddFAB'
+import { OnboardingWizard } from '@/components/dashboard/OnboardingWizard'
 
 export const revalidate = 30
 
@@ -155,6 +156,13 @@ export default async function DashboardPage() {
             {now.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
+
+        {/* Onboarding Wizard for new users */}
+        <OnboardingWizard
+          userName={u.name || ''}
+          hasTransactions={(recentTx?.length || 0) > 0}
+          phase={currentPhase}
+        />
 
         {/* Score + Phase */}
         <div className="grid lg:grid-cols-2 gap-4">

@@ -392,6 +392,9 @@ async function dispatchMonitoringIntent(
     case 'add_expense':
       return await handleAddExpense(ctx, intent);
 
+    case 'undo_expense':
+      return await handleUndoExpense(ctx);
+
     case 'unclassified':
       return await showUnclassifiedTransactions(ctx);
 
@@ -609,9 +612,65 @@ async function handleAddExpense(
     }
   }
 
+  msg_out += `\n\n_טעות? כתוב *"בטל"*_`;
+
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: msg_out,
+  });
+
+  return { success: true };
+}
+
+// ============================================================================
+// Undo Last WhatsApp Expense
+// ============================================================================
+
+async function handleUndoExpense(ctx: RouterContext): Promise<RouterResult> {
+  const supabase = createServiceClient();
+  const greenAPI = getGreenAPIClient();
+
+  // Find the last WhatsApp-added expense (within last 24 hours)
+  const oneDayAgo = new Date();
+  oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
+  const { data: lastExpense } = await supabase
+    .from('transactions')
+    .select('id, amount, vendor, expense_category, tx_date, created_at')
+    .eq('user_id', ctx.userId)
+    .eq('source', 'whatsapp')
+    .eq('type', 'expense')
+    .eq('status', 'confirmed')
+    .gte('created_at', oneDayAgo.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!lastExpense) {
+    await greenAPI.sendMessage({
+      phoneNumber: ctx.phone,
+      message: `לא מצאתי הוצאה שנרשמה ב-24 השעות האחרונות מוואטסאפ 🤔`,
+    });
+    return { success: true };
+  }
+
+  // Delete it
+  await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', lastExpense.id)
+    .eq('user_id', ctx.userId);
+
+  // Sync budget
+  const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
+  syncBudgetSpending(ctx.userId).catch(err => console.error('[BudgetSync] undo error:', err));
+
+  const amountStr = Math.abs(Number(lastExpense.amount)).toLocaleString('he-IL');
+  const vendor = lastExpense.vendor || lastExpense.expense_category || '';
+
+  await greenAPI.sendMessage({
+    phoneNumber: ctx.phone,
+    message: `🗑️ בוטל: *${amountStr} ₪*${vendor ? ` ב${vendor}` : ''}\n\nההוצאה נמחקה והתקציב עודכן.`,
   });
 
   return { success: true };

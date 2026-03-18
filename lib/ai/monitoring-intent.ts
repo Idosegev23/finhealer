@@ -26,6 +26,7 @@ export type MonitoringIntentType =
   | 'goals'
   | 'goal_deposit'
   | 'add_expense'
+  | 'undo_expense'
   | 'unclassified'
   | 'credit_pending'
   | 'duplicates'
@@ -71,6 +72,7 @@ advisor - ייעוץ/יועץ/גדי/רוצה להתייעץ
 goals - יעדים/חיסכון/הגדר יעד/רוצה לחסוך
 goal_deposit - הפקדה ליעד. params:{goal_name:"...",amount:N}
 add_expense - רישום הוצאה: כל הודעה שמכילה מקום/חנות + סכום, גם בלי פועל. דוגמאות: "סופר 450", "דלק 300", "קפה 15", "200 נעליים", "הוצאתי 50 על אוכל", "שילמתי 120 מסעדה", "מקדונלדס 89". params:{amount:N,category:"...",vendor:"..."}
+undo_expense - בטל/תקן/טעות/מחק הוצאה אחרונה/ביטול. ללא params.
 unclassified - לא מסווגות/ממתינות/תנועות שצריך לסווג
 credit_pending - ממתין לאשראי/פירוט אשראי
 duplicates - כפל תשלום/כפילויות/חשד לכפל
