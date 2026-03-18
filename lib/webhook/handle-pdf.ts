@@ -197,6 +197,18 @@ export async function handlePdf(
       partialOverlapWarning = `\n\n⚠️ *שים לב:* ${duplicateCheck.overlapPercent}% מהתנועות כבר קיימות במערכת.\nייתכן שחלק מהמסמך כבר הועלה קודם.`;
     }
 
+    // Auto-detect financial account from extracted data
+    let financialAccountId: string | null = null;
+    try {
+      const { detectAccountFromDocument } = await import('@/lib/services/AccountService');
+      financialAccountId = await detectAccountFromDocument(supabase, userData.id, documentType, ocrData);
+      if (financialAccountId) {
+        console.log(`🏦 WA: Linked to account: ${financialAccountId}`);
+      }
+    } catch (accErr) {
+      console.warn('⚠️ WA account detection failed (non-fatal):', accErr);
+    }
+
     // Save transactions one-by-one with per-row dedup
     const pendingBatchId = `batch_${Date.now()}_${userData.id.substring(0, 8)}`;
     const insertedIds: string[] = [];
@@ -251,6 +263,7 @@ export async function handlePdf(
               auto_categorized: !!tx.expense_category,
               confidence_score: tx.confidence || 0.5,
               batch_id: pendingBatchId,
+              financial_account_id: financialAccountId,
             })
             .select('id')
             .single();
@@ -278,6 +291,7 @@ export async function handlePdf(
           auto_categorized: !!tx.expense_category,
           confidence_score: tx.confidence || 0.5,
           batch_id: pendingBatchId,
+          financial_account_id: financialAccountId,
         })
         .select('id')
         .single();

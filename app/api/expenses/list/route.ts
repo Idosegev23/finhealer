@@ -17,6 +17,7 @@ export async function GET(request: Request) {
     const paymentMethod = searchParams.get('payment_method')
     const expenseFrequency = searchParams.get('expense_frequency')
     const status = searchParams.get('status')
+    const accountId = searchParams.get('account_id')
     const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500)
     const offset = parseInt(searchParams.get('offset') || '0')
 
@@ -64,6 +65,10 @@ export async function GET(request: Request) {
 
     if (status) {
       query = query.eq('status', status)
+    }
+
+    if (accountId) {
+      query = query.eq('financial_account_id', accountId)
     }
 
     // Pagination

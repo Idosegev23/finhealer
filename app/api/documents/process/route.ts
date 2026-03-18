@@ -4,6 +4,7 @@ import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { matchCreditTransactions, isCreditCardCompany } from '@/lib/reconciliation/credit-matcher';
 import { parseDate, parseDateWithFallback } from '@/lib/utils/date-parser';
+import { detectAccountFromDocument } from '@/lib/services/AccountService';
 import * as XLSX from 'xlsx';
 
 /**
@@ -176,24 +177,40 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', statementId);
 
+    // 4.5 Auto-detect financial account from extracted data
+    let financialAccountId: string | null = null;
+    try {
+      financialAccountId = await detectAccountFromDocument(supabase, stmt.user_id, stmt.file_type || '', result);
+      if (financialAccountId) {
+        // Link statement to account
+        await supabase
+          .from('uploaded_statements')
+          .update({ financial_account_id: financialAccountId })
+          .eq('id', statementId);
+        console.log(`🏦 Linked statement to account: ${financialAccountId}`);
+      }
+    } catch (accErr) {
+      console.warn('⚠️ Account detection failed (non-fatal):', accErr);
+    }
+
     // 5. Save data to appropriate table(s) based on document type
     const docType = stmt.file_type?.toLowerCase() || '';
 
     if (docType.includes('credit')) {
       // Credit statements → transaction_details (לא תנועות חדשות!)
       // דוח אשראי של חודש X-1 מתחבר לתנועות תשלום אשראי בחודש X
-      itemsProcessed = await saveCreditDetails(supabase, result, stmt.user_id, statementId as string, stmt.statement_month);
+      itemsProcessed = await saveCreditDetails(supabase, result, stmt.user_id, statementId as string, stmt.statement_month, financialAccountId);
 
       // 🔥 Auto-dedup: mark bank CC aggregate charges as is_summary when detailed CC statement exists
       try {
-        const dedupResult = await matchCreditTransactions(supabase, stmt.user_id, statementId as string);
+        const dedupResult = await matchCreditTransactions(supabase, stmt.user_id, statementId as string, undefined, financialAccountId);
         console.log(`🔄 Auto-dedup after credit upload: ${dedupResult.matched} matches`);
       } catch (dedupError) {
         console.warn('⚠️ Auto-dedup failed (non-fatal):', dedupError);
       }
     } else if (docType.includes('bank')) {
       // Bank statements → transactions עם is_source_transaction = true
-      const txCount = await saveBankTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
+      const txCount = await saveBankTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month, financialAccountId);
       const accountCount = await saveBankAccounts(supabase, result, stmt.user_id, statementId as string);
       const loanCount = await saveLoanPaymentsAsLoans(supabase, result, stmt.user_id);
       
@@ -995,7 +1012,7 @@ async function analyzeExcelWithAI(buffer: Buffer, documentType: string, fileName
 /**
  * Save bank transactions - source transactions (is_source_transaction = true)
  */
-async function saveBankTransactions(supabase: any, result: any, userId: string, documentId: string, documentType: string, statementMonth?: string): Promise<number> {
+async function saveBankTransactions(supabase: any, result: any, userId: string, documentId: string, documentType: string, statementMonth?: string, financialAccountId?: string | null): Promise<number> {
   try {
     console.log(`💾 Saving bank transactions (source) for statement month: ${statementMonth || 'not provided'}`);
     
@@ -1146,6 +1163,7 @@ async function saveBankTransactions(supabase: any, result: any, userId: string, 
         is_immediate_charge: false, // Will be determined later
         linked_loan_id: linkedLoanId,
         matching_status: 'not_matched',
+        financial_account_id: financialAccountId || null,
       };
     });
 
@@ -1506,7 +1524,7 @@ async function saveAccountSnapshot(
  * Save credit statement details - creates transaction_details and matches to bank transactions
  * דוח אשראי של חודש X-1 מתחבר לתנועות תשלום אשראי בחודש X
  */
-async function saveCreditDetails(supabase: any, result: any, userId: string, documentId: string, statementMonth?: string): Promise<number> {
+async function saveCreditDetails(supabase: any, result: any, userId: string, documentId: string, statementMonth?: string, financialAccountId?: string | null): Promise<number> {
   try {
     console.log(`💾 Saving credit details for statement month: ${statementMonth || 'not provided'}`);
     
@@ -1749,6 +1767,7 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
         statement_month: detail.detail_period_month, // Month they belong to
         card_number_last4: detail.card_number_last4,
         matching_status: 'pending_matching', // Waiting for bank statement
+        financial_account_id: financialAccountId || null,
       }));
 
       const { error: insertError } = await supabase

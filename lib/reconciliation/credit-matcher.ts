@@ -69,23 +69,27 @@ export function isExternalCreditCardCompany(vendor: string | null | undefined): 
 /**
  * Main entry: match credit card statement against bank transactions
  * Returns { matched: number } indicating how many bank charges were marked as summary
+ *
+ * When financialAccountId is provided, matching is scoped to that account
+ * for more precise results in multi-account scenarios.
  */
 export async function matchCreditTransactions(
   supabase: any,
   userId: string,
   documentId: string,
-  documentType?: string
+  documentType?: string,
+  financialAccountId?: string | null
 ): Promise<{ matched: number }> {
   if (documentType && !documentType.includes('credit')) return { matched: 0 };
 
   console.log('🔗 Starting credit card reconciliation...');
 
   // Strategy 1: Use billing_info if available (most accurate)
-  const matched = await matchViaBillingInfo(supabase, userId, documentId);
+  const matched = await matchViaBillingInfo(supabase, userId, documentId, financialAccountId);
 
   if (!matched) {
     // Strategy 2: Sum credit transactions and match against bank CC charges
-    const sumMatched = await matchViaSumComparison(supabase, userId, documentId);
+    const sumMatched = await matchViaSumComparison(supabase, userId, documentId, financialAccountId);
     return { matched: sumMatched ? 1 : 0 };
   }
 
@@ -98,7 +102,8 @@ export async function matchCreditTransactions(
 async function matchViaBillingInfo(
   supabase: any,
   userId: string,
-  creditDocId: string
+  creditDocId: string,
+  financialAccountId?: string | null
 ): Promise<boolean> {
   const { data: creditDoc } = await supabase
     .from('uploaded_statements')
@@ -132,9 +137,9 @@ async function matchViaBillingInfo(
     return false;
   }
 
-  console.log(`💳 Billing info: Date=${billingDateISO}, Amount=${next_billing_amount}, Card=${card_last_digits || 'N/A'}`);
+  console.log(`💳 Billing info: Date=${billingDateISO}, Amount=${next_billing_amount}, Card=${card_last_digits || 'N/A'}, Account=${financialAccountId || 'any'}`);
 
-  const match = await findBankCCCharge(supabase, userId, next_billing_amount, billingDateISO, card_last_digits, 3);
+  const match = await findBankCCCharge(supabase, userId, next_billing_amount, billingDateISO, card_last_digits, 3, financialAccountId);
 
   if (match) {
     await markAsSummary(supabase, match.id, creditDocId);
@@ -150,7 +155,8 @@ async function matchViaBillingInfo(
 async function matchViaSumComparison(
   supabase: any,
   userId: string,
-  creditDocId: string
+  creditDocId: string,
+  financialAccountId?: string | null
 ): Promise<boolean> {
   // Get all transactions from this credit statement
   const { data: creditTxs } = await supabase
@@ -247,7 +253,8 @@ async function findBankCCCharge(
   amount: number,
   dateISO: string,
   cardLast4: string | undefined,
-  dayRange: number
+  dayRange: number,
+  financialAccountId?: string | null
 ): Promise<any | null> {
   const tolerance = amount * 0.02;
   const minAmount = amount - tolerance;
@@ -259,7 +266,19 @@ async function findBankCCCharge(
   const maxDate = new Date(d);
   maxDate.setDate(maxDate.getDate() + dayRange);
 
-  const { data: candidates } = await supabase
+  // If we have a CC financial_account_id, try to find its parent bank account
+  // to scope the search to that bank's transactions
+  let bankAccountId: string | null = null;
+  if (financialAccountId) {
+    const { data: ccAccount } = await supabase
+      .from('financial_accounts')
+      .select('parent_bank_account_id')
+      .eq('id', financialAccountId)
+      .single();
+    bankAccountId = ccAccount?.parent_bank_account_id || null;
+  }
+
+  let query = supabase
     .from('transactions')
     .select('*')
     .eq('user_id', userId)
@@ -270,6 +289,13 @@ async function findBankCCCharge(
     .lte('amount', maxAmount)
     .gte('tx_date', minDate.toISOString().split('T')[0])
     .lte('tx_date', maxDate.toISOString().split('T')[0]);
+
+  // Scope to parent bank account if known
+  if (bankAccountId) {
+    query = query.eq('financial_account_id', bankAccountId);
+  }
+
+  const { data: candidates } = await query;
 
   if (!candidates || candidates.length === 0) return null;
 

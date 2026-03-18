@@ -6,6 +6,7 @@ import { subscribeToTransactions } from '@/lib/supabase/realtime';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import SmartCategoryPicker from './SmartCategoryPicker';
+import { AccountFilter } from '@/components/dashboard/AccountFilter';
 
 interface Transaction {
   id: string;
@@ -21,6 +22,7 @@ interface Transaction {
   expense_category: string | null;
   income_category: string | null;
   goal_id?: string | null;
+  financial_account_id?: string | null;
   goal?: {
     id: string;
     name: string;
@@ -58,6 +60,7 @@ export default function TransactionsTable({
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'confirmed'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterAccount, setFilterAccount] = useState<string | null>(null);
   const [updatingGoal, setUpdatingGoal] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<EditingState | null>(null);
@@ -266,8 +269,9 @@ export default function TransactionsTable({
     const matchesType = filterType === 'all' || tx.type === filterType;
     const matchesStatus = filterStatus === 'all' || tx.status === filterStatus;
     const matchesCategory = filterCategory === 'all' || tx.category === filterCategory;
+    const matchesAccount = !filterAccount || tx.financial_account_id === filterAccount;
 
-    return matchesSearch && matchesType && matchesStatus && matchesCategory;
+    return matchesSearch && matchesType && matchesStatus && matchesCategory && matchesAccount;
   });
 
   // חישוב סטטיסטיקות
@@ -306,6 +310,9 @@ export default function TransactionsTable({
           </p>
         </div>
       </div>
+
+      {/* Account Filter (only shows if 2+ accounts) */}
+      <AccountFilter value={filterAccount} onChange={setFilterAccount} />
 
       {/* Filters */}
       <div className="bg-white rounded-xl p-6 border border-gray-100">
