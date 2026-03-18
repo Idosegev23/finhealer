@@ -56,6 +56,7 @@ async function getTransactionsForExport(
       budget_categories (name)
     `)
     .eq('user_id', userId)
+    .or('is_summary.is.null,is_summary.eq.false')
     .order('tx_date', { ascending: false });
   
   if (dateRange) {

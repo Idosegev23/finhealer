@@ -4,13 +4,13 @@
  */
 
 import { NextRequest } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { exportTransactionsToExcel, createExcelResponse } from '@/lib/export/excel-exporter';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServiceClient();
-    
+    const supabase = await createClient();
+
     // בדוק אימות
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     

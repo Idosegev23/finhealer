@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       { data: bankAccounts },
     ] = await Promise.all([
       supabase.from('users').select('*').eq('id', user.id).single(),
-      supabase.from('transactions').select('*').eq('user_id', user.id),
+      supabase.from('transactions').select('*').eq('user_id', user.id).or('is_summary.is.null,is_summary.eq.false'),
       supabase.from('loans').select('*').eq('user_id', user.id),
       supabase.from('goals').select('*').eq('user_id', user.id),
       supabase.from('budget_categories').select('*').eq('user_id', user.id),

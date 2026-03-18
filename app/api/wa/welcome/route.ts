@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +20,10 @@ export async function GET(request: NextRequest) {
     
     // אם יש טלפון, נבדוק את ה-state של המשתמש
     if (phone) {
-      const supabase = createServiceClient();
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
       
       // נרמול מספר טלפון
       let cleanPhone = phone.replace(/\D/g, '');

@@ -69,7 +69,6 @@ export async function handleWaitingForName(
     .from('users')
     .update({
       name: msg,
-      full_name: msg,
       onboarding_state: 'waiting_for_document'
     })
     .eq('id', ctx.userId);

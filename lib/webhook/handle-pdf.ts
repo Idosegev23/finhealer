@@ -257,7 +257,6 @@ export async function handlePdf(
               payment_method: tx.payment_method || (documentType === 'credit' ? 'credit_card' : 'bank_transfer'),
               source: 'ocr',
               status: 'pending',
-              notes: `חשד לכפל: קיימת תנועה דומה`,
               notes: `חשד לכפל: קיימת תנועה דומה (${existingTx[0].id})`,
               original_description: tx.description || '',
               auto_categorized: !!tx.expense_category,

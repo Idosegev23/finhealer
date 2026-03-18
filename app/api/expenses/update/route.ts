@@ -44,7 +44,6 @@ export async function PUT(request: Request) {
     if (amount !== undefined) updateData.amount = parseFloat(amount);
     if (vendor !== undefined) updateData.vendor = vendor;
     if (date !== undefined) {
-      updateData.date = date;
       updateData.tx_date = date;
     }
     if (expense_category !== undefined) updateData.expense_category = expense_category;
