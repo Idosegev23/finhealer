@@ -4,7 +4,7 @@ import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { verifyAndParse } from '@/lib/webhook/guards';
 import { resolveUser } from '@/lib/webhook/user-resolver';
 import { storeMessage } from '@/lib/webhook/message-store';
-import { checkRateLimit, maskUserId } from '@/lib/webhook/utils';
+import { checkRateLimit, maskUserId, acquireProcessingLock, releaseProcessingLock } from '@/lib/webhook/utils';
 import { handleButton } from '@/lib/webhook/handle-button';
 import { handleText } from '@/lib/webhook/handle-text';
 import { handleImage } from '@/lib/webhook/handle-image';
@@ -57,6 +57,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'rate_limited' });
     }
 
+    // 3.5 Processing lock — prevent state transition race conditions
+    if (!acquireProcessingLock(userData.id)) {
+      console.warn(`🔒 User ${maskUserId(userData.id)} already being processed, queuing response`);
+      const greenAPI = getGreenAPIClient();
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `⏳ רגע, אני עדיין מטפל בהודעה הקודמת...`,
+      });
+      return NextResponse.json({ status: 'processing_locked' });
+    }
+
     // 4. Save incoming message
     const messageType = payload!.messageData?.typeMessage;
     console.log('📨 MESSAGE TYPE:', messageType);
@@ -73,24 +84,28 @@ export async function POST(request: NextRequest) {
     const ctx = { userData, phoneNumber: phoneNumber!, payload: payload!, messageId: messageId!, supabase, greenAPI: getGreenAPIClient() };
 
     // 6. Dispatch by message type
-    if (messageType === 'interactiveButtonsResponse' || messageType === 'buttonsResponseMessage') {
-      return handleButton(ctx);
-    }
+    try {
+      if (messageType === 'interactiveButtonsResponse' || messageType === 'buttonsResponseMessage') {
+        return await handleButton(ctx);
+      }
 
-    if (messageType === 'textMessage' || messageType === 'extendedTextMessage' || messageType === 'quotedMessage') {
-      return handleText(ctx);
-    }
+      if (messageType === 'textMessage' || messageType === 'extendedTextMessage' || messageType === 'quotedMessage') {
+        return await handleText(ctx);
+      }
 
-    if (messageType === 'imageMessage') {
-      return handleImage(ctx);
-    }
+      if (messageType === 'imageMessage') {
+        return await handleImage(ctx);
+      }
 
-    if (messageType === 'documentMessage') {
-      return handleDocument(ctx);
-    }
+      if (messageType === 'documentMessage') {
+        return await handleDocument(ctx);
+      }
 
-    // All other message types (audio, video, sticker, list response, etc.)
-    return handleUnsupported(ctx, messageType);
+      // All other message types (audio, video, sticker, list response, etc.)
+      return await handleUnsupported(ctx, messageType);
+    } finally {
+      releaseProcessingLock(userData.id);
+    }
 
   } catch (error: any) {
     console.error('❌ Webhook error:', error);

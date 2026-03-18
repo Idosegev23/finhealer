@@ -183,6 +183,14 @@ export async function POST(request: NextRequest) {
       // Credit statements → transaction_details (לא תנועות חדשות!)
       // דוח אשראי של חודש X-1 מתחבר לתנועות תשלום אשראי בחודש X
       itemsProcessed = await saveCreditDetails(supabase, result, stmt.user_id, statementId as string, stmt.statement_month);
+
+      // 🔥 Auto-dedup: mark bank CC aggregate charges as is_summary when detailed CC statement exists
+      try {
+        const dedupResult = await matchCreditTransactions(supabase, stmt.user_id, statementId as string);
+        console.log(`🔄 Auto-dedup after credit upload: ${dedupResult.matched} matches`);
+      } catch (dedupError) {
+        console.warn('⚠️ Auto-dedup failed (non-fatal):', dedupError);
+      }
     } else if (docType.includes('bank')) {
       // Bank statements → transactions עם is_source_transaction = true
       const txCount = await saveBankTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
@@ -214,6 +222,15 @@ export async function POST(request: NextRequest) {
         insertedTxs || []
       );
       
+      // 🔥 Auto-dedup: if CC statements already exist, mark bank CC aggregates as is_summary
+      try {
+        const { retroactiveDedup } = await import('@/lib/reconciliation/credit-matcher');
+        const dedupResult = await retroactiveDedup(supabase, stmt.user_id);
+        console.log(`🔄 Auto-dedup after bank upload: ${dedupResult.matched} matches`);
+      } catch (dedupError) {
+        console.warn('⚠️ Auto-dedup failed (non-fatal):', dedupError);
+      }
+
       itemsProcessed = txCount + accountCount + loanCount + missingDocsCount + creditCardMissingDocs;
     } else if (docType.includes('payslip') || docType.includes('salary') || docType.includes('תלוש')) {
       // Payslips → payslips table + link to income transaction

@@ -94,6 +94,36 @@ export function checkRateLimit(userId: string): boolean {
 }
 
 // ============================================================================
+// Per-user processing lock (prevents state transition race conditions)
+// ============================================================================
+
+const processingLocks = new Map<string, number>();
+const LOCK_TIMEOUT_MS = 30_000; // 30 seconds max lock time
+
+/**
+ * Acquire a processing lock for a user.
+ * Returns true if lock acquired, false if user is already being processed.
+ * Locks auto-expire after 30s to prevent deadlocks.
+ */
+export function acquireProcessingLock(userId: string): boolean {
+  const now = Date.now();
+  const existingLock = processingLocks.get(userId);
+
+  // Lock exists and hasn't expired
+  if (existingLock && (now - existingLock) < LOCK_TIMEOUT_MS) {
+    return false;
+  }
+
+  processingLocks.set(userId, now);
+  return true;
+}
+
+/** Release the processing lock for a user. */
+export function releaseProcessingLock(userId: string): void {
+  processingLocks.delete(userId);
+}
+
+// ============================================================================
 // Processing tips & progress updates (shown during document analysis)
 // ============================================================================
 

@@ -149,8 +149,8 @@ export async function createAutoBudget(ctx: RouterContext): Promise<RouterResult
     await supabase.from('budget_categories').delete().eq('budget_id', budgetId);
     const budgetCategories = categories.map(cat => ({
       budget_id: budgetId, category_name: cat.name, detailed_category: cat.name,
-      allocated_amount: Math.round(cat.amount * 0.95), spent_amount: cat.amount,
-      remaining_amount: Math.round(cat.amount * 0.95) - cat.amount, percentage_used: cat.percentage
+      allocated_amount: Math.round(cat.amount * 0.95), spent_amount: 0,
+      remaining_amount: Math.round(cat.amount * 0.95), percentage_used: 0
     }));
     if (budgetCategories.length > 0) {
       await supabase.from('budget_categories').insert(budgetCategories);

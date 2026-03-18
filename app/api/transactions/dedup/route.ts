@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { retroactiveDedup } from '@/lib/reconciliation/credit-matcher';
+import { retroactiveDedup, isExternalCreditCardCompany } from '@/lib/reconciliation/credit-matcher';
 
 /**
  * POST /api/transactions/dedup
@@ -70,13 +70,10 @@ export async function GET() {
       .eq('is_source_transaction', true)
       .or('is_summary.is.null,is_summary.eq.false');
 
-    // Filter for CC company vendors
-    const CC_PATTERNS = ['מקס', 'max', 'ישראכרט', 'isracard', 'כאל', 'cal', 'אמריקן', 'amex', 'ויזה', 'ויזא', 'visa', 'כרטיס אשראי', 'דיינרס', 'מסטרקארד'];
-    const potentialDupes = (ccCharges || []).filter((tx: any) => {
-      if (!tx.vendor) return false;
-      const v = tx.vendor.toLowerCase();
-      return CC_PATTERNS.some(p => v.includes(p.toLowerCase()));
-    });
+    // Filter for external CC company vendors (not bank-issued Visa/Mastercard)
+    const potentialDupes = (ccCharges || []).filter((tx: any) =>
+      isExternalCreditCardCompany(tx.vendor)
+    );
 
     return NextResponse.json({
       alreadyMarked: summaryCount || 0,

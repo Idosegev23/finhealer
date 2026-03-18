@@ -484,6 +484,13 @@ export async function onClassificationComplete(userId: string, phone: string): P
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
+  // Clean up classification_context (no longer needed, prevents JSONB bloat)
+  await supabase
+    .from('users')
+    .update({ classification_context: null })
+    .eq('id', userId);
+  console.log(`[Router] Cleaned classification_context for user ${userId.substring(0,8)}`);
+
   // Check if user already has goals - if so, go to behavior; otherwise goals_setup
   const { data: existingGoals } = await supabase
     .from('goals')

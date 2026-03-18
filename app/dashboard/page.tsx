@@ -15,6 +15,7 @@ import { ExpensesPieBudget } from '@/components/dashboard/ExpensesPieBudget'
 import BenchmarkWidget from '@/components/dashboard/BenchmarkWidget'
 import ReferralCard from '@/components/dashboard/ReferralCard'
 import InstallPWA from '@/components/dashboard/InstallPWA'
+import { DedupAlert } from '@/components/dashboard/DedupAlert'
 
 export const revalidate = 30
 
@@ -138,6 +139,9 @@ export default async function DashboardPage() {
           userId={user.id}
           tables={['behavior_insights', 'budgets', 'goals', 'uploaded_statements']}
         />
+
+        {/* Dedup alert — CC double-counting detection */}
+        <DedupAlert />
 
         {/* Pending banner */}
         <PendingTransactionsBanner />

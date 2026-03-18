@@ -1628,11 +1628,11 @@ async function calculateLocalPhiScore(userId: string, supabase: any): Promise<nu
   const income = (txs || []).filter((t: any) => t.type === 'income').reduce((s: number, t: any) => s + Math.abs(t.amount), 0);
   const expenses = (txs || []).filter((t: any) => t.type === 'expense').reduce((s: number, t: any) => s + Math.abs(t.amount), 0);
 
-  // 1. Savings rate (0-30 points)
+  // 1. Savings rate (0-25 points)
   const savingsRate = income > 0 ? (income - expenses) / income : 0;
-  const savingsScore = Math.min(30, Math.max(0, savingsRate * 100));
+  const savingsScore = Math.min(25, Math.max(0, Math.round(savingsRate * 83))); // 30% savings = 25 points
 
-  // 2. Budget adherence (0-25 points)
+  // 2. Budget adherence (0-20 points)
   const currentMonth = now.toISOString().substring(0, 7);
   const { data: budget } = await supabase
     .from('budgets')
@@ -1641,30 +1641,30 @@ async function calculateLocalPhiScore(userId: string, supabase: any): Promise<nu
     .eq('month', currentMonth)
     .single();
 
-  let budgetScore = 15; // neutral if no budget
-  if (budget) {
+  let budgetScore = 12; // neutral if no budget
+  if (budget && Number(budget.total_budget) > 0) {
     const budgetUsed = Number(budget.total_spent) / Number(budget.total_budget);
-    if (budgetUsed <= 0.8) budgetScore = 25;
-    else if (budgetUsed <= 1.0) budgetScore = 18;
-    else if (budgetUsed <= 1.2) budgetScore = 10;
-    else budgetScore = 5;
+    if (budgetUsed <= 0.8) budgetScore = 20;
+    else if (budgetUsed <= 1.0) budgetScore = 15;
+    else if (budgetUsed <= 1.2) budgetScore = 8;
+    else budgetScore = 3;
   }
 
-  // 3. Goal progress (0-25 points)
+  // 3. Goal progress (0-20 points)
   const { data: goals } = await supabase
     .from('goals')
     .select('target_amount, current_amount')
     .eq('user_id', userId)
     .eq('status', 'active');
 
-  let goalScore = 10; // neutral if no goals
+  let goalScore = 8; // neutral if no goals
   if (goals && goals.length > 0) {
     const avgProgress = goals.reduce((s: number, g: any) =>
       s + Math.min(1, g.current_amount / g.target_amount), 0) / goals.length;
-    goalScore = Math.round(avgProgress * 25);
+    goalScore = Math.round(avgProgress * 20);
   }
 
-  // 4. Consistency - classified transactions ratio (0-20 points)
+  // 4. Consistency - classified transactions ratio (0-15 points)
   const { data: allTx } = await supabase
     .from('transactions')
     .select('status')
@@ -1674,9 +1674,29 @@ async function calculateLocalPhiScore(userId: string, supabase: any): Promise<nu
   const totalTx = allTx?.length || 1;
   const confirmedTx = (allTx || []).filter((t: any) => t.status === 'confirmed').length;
   const classifiedRatio = confirmedTx / totalTx;
-  const consistencyScore = Math.round(classifiedRatio * 20);
+  const consistencyScore = Math.round(classifiedRatio * 15);
 
-  return savingsScore + budgetScore + goalScore + consistencyScore;
+  // 5. Debt health (0-20 points) — lower debt-to-income = higher score
+  const { data: loans } = await supabase
+    .from('loans')
+    .select('monthly_payment')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  const monthlyIncome = income / 3; // 3-month total → monthly
+  let debtScore = 20; // full score if no debt
+  if (loans && loans.length > 0 && monthlyIncome > 0) {
+    const totalMonthlyDebt = loans.reduce((s: number, l: any) => s + (parseFloat(l.monthly_payment) || 0), 0);
+    const debtToIncome = totalMonthlyDebt / monthlyIncome;
+    // DTI ≤ 20% = 20 pts, 30% = 15, 40% = 10, 50% = 5, >50% = 2
+    if (debtToIncome <= 0.2) debtScore = 20;
+    else if (debtToIncome <= 0.3) debtScore = 15;
+    else if (debtToIncome <= 0.4) debtScore = 10;
+    else if (debtToIncome <= 0.5) debtScore = 5;
+    else debtScore = 2;
+  }
+
+  return savingsScore + budgetScore + goalScore + consistencyScore + debtScore;
 }
 
 // ============================================================================

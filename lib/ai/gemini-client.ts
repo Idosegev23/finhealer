@@ -80,53 +80,55 @@ export async function chatWithGeminiFlash(
   conversationHistory?: ConversationMessage[]
 ): Promise<string> {
   try {
-    const client = getClient();
+    return await retryWithBackoff(async () => {
+      const client = getClient();
 
-    // Build contents array with history
-    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+      // Build contents array with history
+      const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
 
-    // System context as first user message (Gemini uses systemInstruction or first message)
-    const contextMessage = userContext
-      ? `${systemPrompt}\n\n${userContext}`
-      : systemPrompt;
+      // System context as first user message (Gemini uses systemInstruction or first message)
+      const contextMessage = userContext
+        ? `${systemPrompt}\n\n${userContext}`
+        : systemPrompt;
 
-    contents.push({
-      role: 'user',
-      parts: [{ text: contextMessage }],
-    });
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'הבנתי, אני מוכן לעזור.' }],
-    });
+      contents.push({
+        role: 'user',
+        parts: [{ text: contextMessage }],
+      });
+      contents.push({
+        role: 'model',
+        parts: [{ text: 'הבנתי, אני מוכן לעזור.' }],
+      });
 
-    // Add conversation history
-    if (conversationHistory && conversationHistory.length > 0) {
-      for (const msg of conversationHistory) {
-        contents.push({
-          role: msg.role,
-          parts: [{ text: msg.content }],
-        });
+      // Add conversation history
+      if (conversationHistory && conversationHistory.length > 0) {
+        for (const msg of conversationHistory) {
+          contents.push({
+            role: msg.role,
+            parts: [{ text: msg.content }],
+          });
+        }
       }
-    }
 
-    // Add current message
-    contents.push({
-      role: 'user',
-      parts: [{ text: message }],
-    });
+      // Add current message
+      contents.push({
+        role: 'user',
+        parts: [{ text: message }],
+      });
 
-    const response = await client.models.generateContent({
-      model: FLASH_MODEL,
-      contents,
-      config: {
-        thinkingConfig: { thinkingLevel: 'low' as any },
-        maxOutputTokens: 300,
-      },
-    });
+      const response = await client.models.generateContent({
+        model: FLASH_MODEL,
+        contents,
+        config: {
+          thinkingConfig: { thinkingLevel: 'low' as any },
+          maxOutputTokens: 300,
+        },
+      });
 
-    const text = response.text || '';
-    console.log(`[Gemini Flash] Response: ${text.substring(0, 100)}...`);
-    return text;
+      const text = response.text || '';
+      console.log(`[Gemini Flash] Response: ${text.substring(0, 100)}...`);
+      return text;
+    }, 'Gemini Flash');
   } catch (error) {
     console.error('[Gemini Flash] Error:', error);
     throw new Error('AI service temporarily unavailable');
@@ -142,23 +144,25 @@ export async function chatWithGeminiFlashMinimal(
   systemPrompt: string
 ): Promise<string> {
   try {
-    const client = getClient();
+    return await retryWithBackoff(async () => {
+      const client = getClient();
 
-    const response = await client.models.generateContent({
-      model: FLASH_MODEL,
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${systemPrompt}\n\n${message}` }],
+      const response = await client.models.generateContent({
+        model: FLASH_MODEL,
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `${systemPrompt}\n\n${message}` }],
+          },
+        ],
+        config: {
+          thinkingConfig: { thinkingLevel: 'minimal' as any },
+          maxOutputTokens: 500,
         },
-      ],
-      config: {
-        thinkingConfig: { thinkingLevel: 'minimal' as any },
-        maxOutputTokens: 500,
-      },
-    });
+      });
 
-    return response.text || '';
+      return response.text || '';
+    }, 'Gemini Flash Minimal');
   } catch (error) {
     console.error('[Gemini Flash Minimal] Error:', error);
     throw error;
@@ -180,49 +184,51 @@ export async function chatWithGeminiPro(
   conversationHistory?: ConversationMessage[]
 ): Promise<string> {
   try {
-    const client = getClient();
+    return await retryWithBackoff(async () => {
+      const client = getClient();
 
-    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+      const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
 
-    // System + context
-    const contextMessage = userContext
-      ? `${systemPrompt}\n\n${userContext}`
-      : systemPrompt;
+      // System + context
+      const contextMessage = userContext
+        ? `${systemPrompt}\n\n${userContext}`
+        : systemPrompt;
 
-    contents.push({
-      role: 'user',
-      parts: [{ text: contextMessage }],
-    });
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'הבנתי, אני מנתח את המידע.' }],
-    });
+      contents.push({
+        role: 'user',
+        parts: [{ text: contextMessage }],
+      });
+      contents.push({
+        role: 'model',
+        parts: [{ text: 'הבנתי, אני מנתח את המידע.' }],
+      });
 
-    // History
-    if (conversationHistory && conversationHistory.length > 0) {
-      for (const msg of conversationHistory) {
-        contents.push({
-          role: msg.role,
-          parts: [{ text: msg.content }],
-        });
+      // History
+      if (conversationHistory && conversationHistory.length > 0) {
+        for (const msg of conversationHistory) {
+          contents.push({
+            role: msg.role,
+            parts: [{ text: msg.content }],
+          });
+        }
       }
-    }
 
-    // Current message
-    contents.push({
-      role: 'user',
-      parts: [{ text: message }],
-    });
+      // Current message
+      contents.push({
+        role: 'user',
+        parts: [{ text: message }],
+      });
 
-    const response = await client.models.generateContent({
-      model: FLASH_MODEL,
-      contents,
-      config: {
-        maxOutputTokens: 2000,
-      },
-    });
+      const response = await client.models.generateContent({
+        model: FLASH_MODEL,
+        contents,
+        config: {
+          maxOutputTokens: 2000,
+        },
+      });
 
-    return response.text || '';
+      return response.text || '';
+    }, 'Gemini Flash Deep Chat');
   } catch (error) {
     console.error('[Gemini Flash Deep Chat] Error:', error);
     throw new Error('AI analysis service temporarily unavailable');

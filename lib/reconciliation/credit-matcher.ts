@@ -42,15 +42,41 @@ export function isCreditCardCompany(vendor: string | null | undefined): boolean 
 }
 
 /**
+ * External CC companies that issue separate statements (not bank-issued cards).
+ * Bank-issued Visa/Mastercard show individual transactions in the bank statement,
+ * NOT as a monthly aggregate — so they should NOT be flagged for dedup.
+ */
+const EXTERNAL_CC_PATTERNS = [
+  'מקס', 'max', 'מקס איט',
+  'ישראכרט', 'isracard',
+  'כאל', 'cal',
+  'אמריקן אקספרס', 'אמריקן', 'amex', 'american express',
+  'דיינרס', 'diners',
+  'לאומי קארד', 'leumi card',
+  'פועלים אשראי', 'ישראכארט',
+];
+
+/**
+ * Check if vendor is an external CC company (issues separate statements with monthly aggregate billing).
+ * Excludes bank-issued Visa/Mastercard which show individual transactions in bank statement.
+ */
+export function isExternalCreditCardCompany(vendor: string | null | undefined): boolean {
+  if (!vendor) return false;
+  const v = vendor.toLowerCase().trim();
+  return EXTERNAL_CC_PATTERNS.some(pattern => v.includes(pattern.toLowerCase()));
+}
+
+/**
  * Main entry: match credit card statement against bank transactions
+ * Returns { matched: number } indicating how many bank charges were marked as summary
  */
 export async function matchCreditTransactions(
   supabase: any,
   userId: string,
   documentId: string,
-  documentType: string
-) {
-  if (!documentType.includes('credit')) return;
+  documentType?: string
+): Promise<{ matched: number }> {
+  if (documentType && !documentType.includes('credit')) return { matched: 0 };
 
   console.log('🔗 Starting credit card reconciliation...');
 
@@ -59,8 +85,11 @@ export async function matchCreditTransactions(
 
   if (!matched) {
     // Strategy 2: Sum credit transactions and match against bank CC charges
-    await matchViaSumComparison(supabase, userId, documentId);
+    const sumMatched = await matchViaSumComparison(supabase, userId, documentId);
+    return { matched: sumMatched ? 1 : 0 };
   }
+
+  return { matched: 1 };
 }
 
 /**
@@ -122,7 +151,7 @@ async function matchViaSumComparison(
   supabase: any,
   userId: string,
   creditDocId: string
-) {
+): Promise<boolean> {
   // Get all transactions from this credit statement
   const { data: creditTxs } = await supabase
     .from('transactions')
@@ -133,7 +162,7 @@ async function matchViaSumComparison(
 
   if (!creditTxs || creditTxs.length === 0) {
     console.log('⚠️ No credit transactions found for document');
-    return;
+    return false;
   }
 
   // Sum all expenses from this CC statement
@@ -146,7 +175,7 @@ async function matchViaSumComparison(
 
   if (!firstDate || totalAmount <= 0) {
     console.log('⚠️ Cannot determine credit statement period or amount');
-    return;
+    return false;
   }
 
   // The bank charge typically appears at the end of the billing cycle or start of next month
@@ -177,10 +206,10 @@ async function matchViaSumComparison(
 
   if (!bankCharges || bankCharges.length === 0) {
     console.log('⚠️ No matching bank charge found for sum comparison');
-    return;
+    return false;
   }
 
-  // Filter for known CC company vendors
+  // Filter for known CC company vendors (excluding bank-issued cards — small individual charges)
   const ccCharges = bankCharges.filter((tx: any) => isCreditCardCompany(tx.vendor));
 
   if (ccCharges.length === 0) {
@@ -194,18 +223,19 @@ async function matchViaSumComparison(
 
     if (fallbackCharges.length === 0) {
       console.log('⚠️ Found amount matches but no CC company vendors');
-      return;
+      return false;
     }
 
     // Use closest amount match
     const best = findClosestMatch(fallbackCharges, totalAmount);
     await markAsSummary(supabase, best.id, creditDocId);
-    return;
+    return true;
   }
 
   // Use closest amount match among CC charges
   const best = findClosestMatch(ccCharges, totalAmount);
   await markAsSummary(supabase, best.id, creditDocId);
+  return true;
 }
 
 /**
@@ -446,7 +476,8 @@ export async function retroactiveDedup(
 
   if (unmatchedCCCharges) {
     for (const charge of unmatchedCCCharges) {
-      if (!isCreditCardCompany(charge.vendor)) continue;
+      // Only consider external CC companies (not bank-issued Visa/Mastercard)
+      if (!isExternalCreditCardCompany(charge.vendor)) continue;
 
       // Check if there are detailed CC transactions in the same month with similar total
       const chargeDate = new Date(charge.tx_date);
