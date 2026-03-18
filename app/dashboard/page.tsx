@@ -216,6 +216,18 @@ export default async function DashboardPage() {
         <ExpensesPieBudget />
 
         {/* Budget tracking */}
+        {(!budgetTracking || budgetTracking.length === 0) && (
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2 mb-2">
+              <Target className="w-4 h-4 text-amber-500" />
+              מעקב תקציב
+            </h3>
+            <p className="text-xs text-gray-400">עדיין לא הוגדר תקציב.</p>
+            <Link href="/dashboard/budget" className="inline-block mt-2 text-xs text-amber-600 font-medium hover:underline">
+              צור תקציב חכם
+            </Link>
+          </div>
+        )}
         {budgetTracking && budgetTracking.length > 0 && (
           <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-3">
@@ -282,6 +294,15 @@ export default async function DashboardPage() {
         )}
 
         {/* Recent Transactions */}
+        {(!recentTx || recentTx.length === 0) && (
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-semibold text-gray-900 text-sm mb-2">תנועות אחרונות</h3>
+            <p className="text-xs text-gray-400">אין עדיין תנועות. שלח דוח בנק בוואטסאפ או העלה מהדשבורד.</p>
+            <Link href="/dashboard/scan-center" className="inline-block mt-2 text-xs text-amber-600 font-medium hover:underline">
+              העלה דוח ראשון
+            </Link>
+          </div>
+        )}
         {recentTx && recentTx.length > 0 && (
           <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-3">

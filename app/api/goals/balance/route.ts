@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import {
   calculateOptimalAllocations,
   saveAllocationHistory,
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
     
     // בדוק הרשאות
-    const supabase = createServiceClient();
+    const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
     }
     
     // בדוק הרשאות
-    const supabase = createServiceClient();
+    const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user || user.id !== userId) {

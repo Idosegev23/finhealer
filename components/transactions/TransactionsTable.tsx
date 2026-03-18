@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, CheckCircle, Clock, Pencil, Trash2, Save, X, Sparkles, Loader2 } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 import { subscribeToTransactions } from '@/lib/supabase/realtime';
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -55,6 +56,7 @@ export default function TransactionsTable({
   goals = [],
   userId
 }: TransactionsTableProps) {
+  const { addToast } = useToast();
   const [transactions, setTransactions] = useState(initialTransactions);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
@@ -133,7 +135,7 @@ export default function TransactionsTable({
 
       if (error) {
         console.error('Failed to update goal:', error);
-        alert('שגיאה בעדכון היעד');
+        addToast({ type: 'error', title: 'שגיאה בעדכון היעד', duration: 4000 });
         return;
       }
 
@@ -145,7 +147,7 @@ export default function TransactionsTable({
 
     } catch (error) {
       console.error('Error updating goal:', error);
-      alert('שגיאה בעדכון היעד');
+      addToast({ type: 'error', title: 'שגיאה בעדכון היעד', duration: 4000 });
     } finally {
       setUpdatingGoal(null);
     }
@@ -190,7 +192,7 @@ export default function TransactionsTable({
 
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || 'שגיאה בשמירה');
+        addToast({ type: 'error', title: err.error || 'שגיאה בשמירה', duration: 4000 });
         return;
       }
 
@@ -212,7 +214,7 @@ export default function TransactionsTable({
       setEditingId(null);
       setEditData(null);
     } catch {
-      alert('שגיאה בשמירה');
+      addToast({ type: 'error', title: 'שגיאה בשמירה', duration: 4000 });
     } finally {
       setSaving(false);
     }
@@ -226,12 +228,12 @@ export default function TransactionsTable({
     try {
       const res = await fetch(`/api/transactions?id=${txId}`, { method: 'DELETE' });
       if (!res.ok) {
-        alert('שגיאה במחיקה');
+        addToast({ type: 'error', title: 'שגיאה במחיקה', duration: 4000 });
         return;
       }
       setTransactions(prev => prev.filter(tx => tx.id !== txId));
     } catch {
-      alert('שגיאה במחיקה');
+      addToast({ type: 'error', title: 'שגיאה במחיקה', duration: 4000 });
     } finally {
       setDeletingId(null);
     }
@@ -246,7 +248,7 @@ export default function TransactionsTable({
       const res = await fetch('/api/transactions/reclassify', { method: 'POST' });
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || 'שגיאה בסיווג מחדש');
+        addToast({ type: 'error', title: err.error || 'שגיאה בסיווג מחדש', duration: 4000 });
         return;
       }
       const data = await res.json();
@@ -254,28 +256,31 @@ export default function TransactionsTable({
       // Refetch to show updated categories
       await refetchTransactions();
     } catch {
-      alert('שגיאה בסיווג מחדש');
+      addToast({ type: 'error', title: 'שגיאה בסיווג מחדש', duration: 4000 });
     } finally {
       setReclassifying(false);
     }
   }
 
-  // סינון
-  const filteredTransactions = transactions.filter(tx => {
-    const matchesSearch =
-      (tx.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (tx.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
+  // סינון (memoized)
+  const filteredTransactions = useMemo(() => {
+    const search = searchTerm.toLowerCase();
+    return transactions.filter(tx => {
+      const matchesSearch = !search ||
+        (tx.vendor?.toLowerCase().includes(search) || false) ||
+        (tx.description?.toLowerCase().includes(search) || false);
 
-    const matchesType = filterType === 'all' || tx.type === filterType;
-    const matchesStatus = filterStatus === 'all' || tx.status === filterStatus;
-    const matchesCategory = filterCategory === 'all' || tx.category === filterCategory;
-    const matchesAccount = !filterAccount || tx.financial_account_id === filterAccount;
+      const matchesType = filterType === 'all' || tx.type === filterType;
+      const matchesStatus = filterStatus === 'all' || tx.status === filterStatus;
+      const matchesCategory = filterCategory === 'all' || tx.category === filterCategory;
+      const matchesAccount = !filterAccount || tx.financial_account_id === filterAccount;
 
-    return matchesSearch && matchesType && matchesStatus && matchesCategory && matchesAccount;
-  });
+      return matchesSearch && matchesType && matchesStatus && matchesCategory && matchesAccount;
+    });
+  }, [transactions, searchTerm, filterType, filterStatus, filterCategory, filterAccount]);
 
-  // חישוב סטטיסטיקות
-  const stats = {
+  // חישוב סטטיסטיקות (memoized)
+  const stats = useMemo(() => ({
     totalIncome: transactions
       .filter(tx => tx.type === 'income' && tx.status === 'confirmed')
       .reduce((sum, tx) => sum + tx.amount, 0),
@@ -283,7 +288,7 @@ export default function TransactionsTable({
       .filter(tx => tx.type === 'expense' && tx.status === 'confirmed')
       .reduce((sum, tx) => sum + tx.amount, 0),
     proposedCount: transactions.filter(tx => tx.status === 'pending').length,
-  };
+  }), [transactions]);
 
   return (
     <div className="space-y-6">

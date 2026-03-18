@@ -5,6 +5,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useToast } from '@/components/ui/toaster';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -44,7 +45,8 @@ export default function GoalsPage() {
   const [userId, setUserId] = useState<string>('');
   const [isDragMode, setIsDragMode] = useState(false);
   const [depositingGoal, setDepositingGoal] = useState<Goal | null>(null);
-  
+  const { addToast } = useToast();
+
   const supabase = createClientComponentClient();
   
   useEffect(() => {
@@ -464,7 +466,7 @@ export default function GoalsPage() {
             onClose={() => setDepositingGoal(null)}
             onSuccess={() => {
               loadGoalsAndAllocations();
-              alert('ההפקדה נוספה בהצלחה!');
+              addToast({ type: 'success', title: 'ההפקדה נוספה בהצלחה!', duration: 4000 });
             }}
           />
         )}

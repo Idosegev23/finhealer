@@ -56,6 +56,8 @@ export function ToastComponent({ toast, onDismiss }: ToastProps) {
         toastStyles[toast.type]
       )}
       dir="rtl"
+      role="alert"
+      aria-live="assertive"
     >
       <div className="flex-shrink-0 text-2xl">{toastIcons[toast.type]}</div>
       
@@ -77,6 +79,7 @@ export function ToastComponent({ toast, onDismiss }: ToastProps) {
       <button
         onClick={() => onDismiss(toast.id)}
         className="flex-shrink-0 rounded-md p-1 hover:bg-black/5 transition-colors"
+        aria-label="סגור התראה"
       >
         <X className="h-4 w-4" />
       </button>

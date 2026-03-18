@@ -25,6 +25,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { SmartIncomeCalculator } from './SmartIncomeCalculator';
+import { useToast } from '@/components/ui/toaster';
 
 // ============================================================================
 // טיפוסים
@@ -104,6 +105,7 @@ export default function ConversationalIncomeWizard({
   editMode = false,
   incomeId,
 }: ConversationalIncomeWizardProps) {
+  const { addToast } = useToast();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [calculatedData, setCalculatedData] = useState<any>(null);
@@ -205,7 +207,7 @@ export default function ConversationalIncomeWizard({
 
       onSuccess?.(result.income);
     } catch (error: any) {
-      alert(`❌ ${error.message}`);
+      addToast({ type: 'error', title: 'שגיאה', description: error.message || String(error), duration: 4000 });
     } finally {
       setLoading(false);
     }
@@ -268,10 +270,10 @@ export default function ConversationalIncomeWizard({
               try {
                 // TODO: Implement OCR
                 // For now, just show a message
-                alert('🚀 תכונת OCR תתווסף בקרוב! נוכל לקרוא את התלוש אוטומטית');
+                addToast({ type: 'info', title: 'תכונת OCR תתווסף בקרוב! נוכל לקרוא את התלוש אוטומטית', duration: 4000 });
                 setUploadingPayslip(false);
               } catch (error) {
-                alert('❌ שגיאה בקריאת התלוש');
+                addToast({ type: 'error', title: 'שגיאה בקריאת התלוש', duration: 4000 });
                 setUploadingPayslip(false);
               }
             }}

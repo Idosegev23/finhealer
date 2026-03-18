@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { SmartIncomeCalculator } from './SmartIncomeCalculator';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toaster';
 
 // ============================================================================
 // טיפוסים
@@ -123,6 +124,7 @@ export default function IncomeTable({
   onTogglePrimary,
   onRefresh,
 }: IncomeTableProps) {
+  const { addToast } = useToast();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -162,7 +164,7 @@ export default function IncomeTable({
       onDelete?.(id);
       onRefresh?.();
     } catch (error) {
-      alert('❌ שגיאה במחיקת מקור ההכנסה');
+      addToast({ type: 'error', title: 'שגיאה במחיקת מקור ההכנסה', duration: 4000 });
     } finally {
       setDeletingId(null);
     }
@@ -183,7 +185,7 @@ export default function IncomeTable({
       onTogglePrimary?.(id, !currentValue);
       onRefresh?.();
     } catch (error) {
-      alert('❌ שגיאה בעדכון');
+      addToast({ type: 'error', title: 'שגיאה בעדכון', duration: 4000 });
     }
   };
 
@@ -215,7 +217,7 @@ export default function IncomeTable({
               variant="outline"
               onClick={() => {
                 // TODO: bulk delete
-                alert('מחיקה קבוצתית תתווסף בקרוב');
+                addToast({ type: 'info', title: 'מחיקה קבוצתית תתווסף בקרוב', duration: 4000 });
               }}
               className="text-red-600 hover:text-red-700"
             >

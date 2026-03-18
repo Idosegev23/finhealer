@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { Goal, GoalType, BudgetSource } from '@/types/goals';
+import { useToast } from '@/components/ui/toaster';
 
 interface GoalModalProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ const BUDGET_SOURCES: { value: BudgetSource; label: string }[] = [
 ];
 
 export function GoalModal({ isOpen, onClose, onSave, goal, userId }: GoalModalProps) {
+  const { addToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -114,7 +116,7 @@ export function GoalModal({ isOpen, onClose, onSave, goal, userId }: GoalModalPr
       onClose();
     } catch (error) {
       console.error('Error saving goal:', error);
-      alert('שגיאה בשמירת היעד');
+      addToast({ type: 'error', title: 'שגיאה בשמירת היעד', duration: 4000 });
     } finally {
       setIsLoading(false);
     }

@@ -24,6 +24,7 @@ export async function GET(request: Request) {
       .from('transactions')
       .select('id, tx_date, amount, type, status, vendor, category, expense_category, income_category, notes, is_recurring, payment_method, expense_frequency, has_details, is_cash_expense', { count: 'exact' })
       .eq('user_id', user.id)
+      .or('is_summary.is.null,is_summary.eq.false') // 🔥 Exclude CC aggregates to prevent double-counting
       .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true') // כולל תנועות parent + מזומן
       .order('tx_date', { ascending: false });
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, DollarSign } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function QuickExpenseForm({ onClose, employmentStatus }: Props) {
+  const { addToast } = useToast();
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [expenseType, setExpenseType] = useState<'fixed' | 'variable' | 'special' | null>(null);
@@ -50,14 +52,11 @@ export function QuickExpenseForm({ onClose, employmentStatus }: Props) {
       if (!response.ok) throw new Error('Failed to save transaction');
 
       // Success!
-      alert('✅ ההוצאה נשמרה בהצלחה!');
+      addToast({ type: 'success', title: 'ההוצאה נשמרה בהצלחה', duration: 3000 });
       onClose();
-      
-      // Refresh the page to show new transaction
-      window.location.reload();
     } catch (error) {
       console.error('Error saving expense:', error);
-      alert('❌ שגיאה בשמירת ההוצאה. נסה שוב.');
+      addToast({ type: 'error', title: 'שגיאה בשמירת ההוצאה', description: 'נסה שוב', duration: 4000 });
     } finally {
       setLoading(false);
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/toaster';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { PlusCircle, Trash2, DollarSign, FileText, CreditCard, Loader2 } from 'lucide-react';
@@ -32,6 +33,7 @@ interface Loan {
 
 export default function ManualInputPage() {
   const router = useRouter();
+  const { addToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -137,7 +139,7 @@ export default function ManualInputPage() {
     // Validate at least one income source
     const validIncome = incomeSources.filter(i => i.source_name && i.net_amount > 0);
     if (validIncome.length === 0) {
-      alert('אנא הזן לפחות מקור הכנסה אחד');
+      addToast({ type: 'error', title: 'אנא הזן לפחות מקור הכנסה אחד', duration: 4000 });
       return;
     }
 
@@ -162,13 +164,13 @@ export default function ManualInputPage() {
       }
 
       // Show success message
-      alert('הנתונים נשמרו בהצלחה! 🎉');
+      addToast({ type: 'success', title: 'הנתונים נשמרו בהצלחה!', duration: 4000 });
       
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (error) {
       console.error('Save error:', error);
-      alert('אירעה שגיאה. נסה שוב.');
+      addToast({ type: 'error', title: 'אירעה שגיאה. נסה שוב.', duration: 4000 });
     } finally {
       setIsLoading(false);
     }

@@ -147,6 +147,7 @@ export default function ExpensesPage() {
                   data={data}
                   isExpanded={isExpanded}
                   onToggle={() => toggleMonth(month)}
+                  onRefresh={fetchExpenses}
                 />
               );
             })
@@ -175,9 +176,10 @@ interface MonthCardProps {
   data: MonthData;
   isExpanded: boolean;
   onToggle: () => void;
+  onRefresh: () => void;
 }
 
-function MonthCard({ month, data, isExpanded, onToggle }: MonthCardProps) {
+function MonthCard({ month, data, isExpanded, onToggle, onRefresh }: MonthCardProps) {
   const monthName = formatMonthName(month);
 
   // חישוב אחוזים
@@ -248,6 +250,7 @@ function MonthCard({ month, data, isExpanded, onToggle }: MonthCardProps) {
                 categories={data.byCategory}
                 transactions={data.transactions}
                 type="fixed"
+                onRefresh={onRefresh}
               />
             )}
 
@@ -258,6 +261,7 @@ function MonthCard({ month, data, isExpanded, onToggle }: MonthCardProps) {
                 categories={data.byCategory}
                 transactions={data.transactions}
                 type="variable"
+                onRefresh={onRefresh}
               />
             )}
 
@@ -268,6 +272,7 @@ function MonthCard({ month, data, isExpanded, onToggle }: MonthCardProps) {
                 categories={data.byCategory}
                 transactions={data.transactions}
                 type="special"
+                onRefresh={onRefresh}
               />
             )}
           </div>
@@ -307,9 +312,10 @@ interface CategoryGroupProps {
   categories: Record<string, any>;
   transactions: any[];
   type: 'fixed' | 'variable' | 'special';
+  onRefresh: () => void;
 }
 
-function CategoryGroup({ title, categories, transactions, type }: CategoryGroupProps) {
+function CategoryGroup({ title, categories, transactions, type, onRefresh }: CategoryGroupProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   // סינון טרנזקציות לפי סוג
@@ -349,8 +355,8 @@ function CategoryGroup({ title, categories, transactions, type }: CategoryGroupP
       });
 
       if (response.ok) {
-        // Refresh page to show updated data
-        window.location.reload();
+        // Re-fetch data instead of hard reload
+        onRefresh();
       }
     } catch (error) {
       console.error('Failed to unlink transaction:', error);
