@@ -27,6 +27,19 @@ function cleanJsonString(jsonStr: string): string {
     .replace(/:\s*(\d+)\.\s*([,}\]])/g, ': $1$2');
 }
 
+/**
+ * Detect if a category represents a credit card aggregate charge from bank statement.
+ * These should be marked is_summary=true to prevent double-counting with CC details.
+ */
+function isCreditCardAggregate(category: string | null | undefined): boolean {
+  if (!category) return false;
+  const lower = category.toLowerCase();
+  return lower.includes('חיוב אשראי') || lower.includes('חיוב כרטיס') ||
+         lower.includes('חיוב ויזה') || lower.includes('חיוב מסטרקארד') ||
+         lower.includes('חיוב ישראכרט') || lower.includes('חיוב לאומי קארד') ||
+         lower.includes('חיוב כאל') || lower.includes('חיוב max');
+}
+
 // ⚡️ Vercel Background Function Configuration
 export const runtime = 'nodejs'; // Force Node.js runtime
 export const maxDuration = 600; // 10 minutes for large documents with GPT-5-nano
@@ -1160,6 +1173,8 @@ async function saveBankTransactions(supabase: any, result: any, userId: string, 
         auto_categorized: true,
         is_recurring: tx.type === 'הוראת קבע',
         currency: 'ILS',
+        // Auto-mark CC aggregate charges from bank statements to prevent double-counting
+        is_summary: isCreditCardAggregate(tx.expense_category || tx.category),
         // ⭐ New hierarchy fields
         is_source_transaction: true, // Bank statements are source of truth
         statement_month: statementMonthDate, // Month of the statement
