@@ -62,7 +62,8 @@ export async function GET(request: NextRequest) {
     const incomeSources = data || [];
 
     // ✨ שליפת הכנסות מתנועות (דוחות סרוקים)
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const monthParam = searchParams.get('month');
+    const targetMonth = monthParam || new Date().toISOString().slice(0, 7); // YYYY-MM
     const { data: transactionIncome, error: txError } = await (supabase as any)
       .from('transactions')
       .select('*')
@@ -70,8 +71,8 @@ export async function GET(request: NextRequest) {
       .eq('type', 'income')
       .eq('status', 'confirmed')
       .or('is_summary.is.null,is_summary.eq.false')
-      .gte('tx_date', `${currentMonth}-01`)
-      .lte('tx_date', `${currentMonth}-31`);
+      .gte('tx_date', `${targetMonth}-01`)
+      .lte('tx_date', `${targetMonth}-31`);
 
     const monthlyIncomeFromTransactions = (transactionIncome || [])
       .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);

@@ -261,6 +261,9 @@ export default function IncomeTable({
                 <th className="text-right px-4 py-3 text-sm font-semibold text-gray-700">
                   תדירות
                 </th>
+                <th className="text-right px-4 py-3 text-sm font-semibold text-gray-700">
+                  מאז
+                </th>
                 <th className="text-center px-4 py-3 text-sm font-semibold text-gray-700">
                   סטטוס
                 </th>
@@ -377,6 +380,14 @@ function IncomeRow({
       <td className="px-4 py-4">
         <span className="text-sm text-gray-600">
           {FREQUENCY_LABELS[income.payment_frequency] || income.payment_frequency}
+        </span>
+      </td>
+
+      <td className="px-4 py-4">
+        <span className="text-sm text-gray-500">
+          {income.created_at
+            ? new Date(income.created_at).toLocaleDateString('he-IL', { month: 'short', year: 'numeric' })
+            : '—'}
         </span>
       </td>
 
