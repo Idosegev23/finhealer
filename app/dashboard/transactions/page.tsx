@@ -25,10 +25,7 @@ export default async function TransactionsPage() {
     redirect('/login');
   }
 
-  const userInfo = userData as any;
-  if (!userInfo.subscription_status || !['active', 'trial'].includes(userInfo.subscription_status)) {
-    redirect('/onboarding');
-  }
+  // Free access — no subscription check needed
 
   // 30 days back
   const thirtyDaysAgo = new Date();
