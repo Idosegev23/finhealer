@@ -37,7 +37,6 @@ export default async function DashboardPage() {
   if (!userData) redirect('/login')
 
   const u = userData as any
-  if (!u.subscription_status || !['active', 'trial'].includes(u.subscription_status)) redirect('/onboarding')
 
   // Current month range
   const now = new Date()

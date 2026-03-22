@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     const nameFromOAuth = user.user_metadata?.name || user.user_metadata?.full_name || '';
     const hasNameFromOAuth = nameFromOAuth && nameFromOAuth.trim().length > 0;
 
-    // Create/update user — trial status (not active)
+    // Create/update user — free access (no trial gating)
     const { error: upsertUserError } = await supabaseAdmin
       .from('users')
       .upsert({
@@ -132,8 +132,7 @@ export async function POST(request: NextRequest) {
         full_name: hasNameFromOAuth ? nameFromOAuth : null,
         phone: phone === '0000000000' ? null : cleanPhone,
         wa_opt_in: waOptIn !== undefined ? waOptIn : true,
-        subscription_status: 'trial',
-        trial_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        subscription_status: 'active',
         phase: 'data_collection',
         onboarding_state: hasNameFromOAuth ? 'waiting_for_document' : 'waiting_for_name',
         created_at: existingUser ? undefined : new Date().toISOString(),
@@ -157,8 +156,8 @@ export async function POST(request: NextRequest) {
         {
           user_id: user.id,
           plan,
-          status: 'trial',
-          provider: 'manual',
+          status: 'active',
+          provider: 'free',
           started_at: new Date().toISOString(),
           amount,
           currency: 'ILS',

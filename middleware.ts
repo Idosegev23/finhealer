@@ -78,9 +78,10 @@ export async function middleware(request: NextRequest) {
       .maybeSingle()
 
     const userExistsInDB = !!userData && !userError
-    const hasActiveSubscription = userData?.subscription_status === 'active' || userData?.subscription_status === 'trial'
-    // השלים אונבורדינג = יש מנוי פעיל/trial + יש טלפון (name מגיע אוטומטית מGoogle)
-    const hasCompletedOnboarding = hasActiveSubscription && !!userData?.phone
+    // Free access — no subscription check needed
+    const hasActiveSubscription = userExistsInDB
+    // השלים אונבורדינג = קיים ב-DB + יש טלפון
+    const hasCompletedOnboarding = userExistsInDB && !!userData?.phone
 
     // Admin access — check email allowlist
     if (currentPath.startsWith('/admin')) {

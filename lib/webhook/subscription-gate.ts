@@ -1,54 +1,21 @@
 // @ts-nocheck
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://finhealer.vercel.app';
-
 export interface SubscriptionCheckResult {
   allowed: boolean;
   message?: string;
 }
 
 /**
- * Check if user has an active subscription or valid trial.
- * Returns allowed=true if they can use the bot, or a message to send if blocked.
+ * Check if user can use the bot.
+ * Currently: free access for everyone — no subscription gating.
  */
-export function checkSubscription(userData: any): SubscriptionCheckResult {
-  const status = userData.subscription_status;
-
-  // Active subscription — always allowed
-  if (status === 'active') {
-    return { allowed: true };
-  }
-
-  // Trial — check expiration
-  if (status === 'trial') {
-    const expires = userData.trial_expires_at ? new Date(userData.trial_expires_at) : null;
-    if (expires && expires > new Date()) {
-      return { allowed: true };
-    }
-    // Trial expired
-    return {
-      allowed: false,
-      message:
-        `⏰ *תקופת הנסיון הסתיימה!*\n\n` +
-        `כדי להמשיך להשתמש ב-φ Phi, שדרג לתוכנית בתשלום.\n\n` +
-        `💳 כתוב *"שדרג"* כאן או בקר ב: ${SITE_URL}/dashboard/settings\n\n` +
-        `כתוב *"עזרה"* לשאלות.`,
-    };
-  }
-
-  // Cancelled / inactive / unknown
-  return {
-    allowed: false,
-    message:
-      `😔 *המנוי שלך לא פעיל.*\n\n` +
-      `כדי לחזור, שדרג כאן:\n` +
-      `💳 כתוב *"שדרג"* או בקר ב: ${SITE_URL}/dashboard/settings\n\n` +
-      `הנתונים שלך שמורים ומחכים לך! 💰`,
-  };
+export function checkSubscription(_userData: any): SubscriptionCheckResult {
+  return { allowed: true };
 }
 
 /**
  * Check if a message text is an allowed command even when subscription is blocked.
+ * With free access this is unused, but kept for future payment integration.
  */
 export function isAllowedWhenBlocked(text: string): boolean {
   if (!text) return false;
