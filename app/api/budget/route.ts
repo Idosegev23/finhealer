@@ -158,7 +158,7 @@ export async function GET(request: Request) {
     };
 
     realExpenses.forEach(t => {
-      const expType = t.expense_frequency || t.expense_type || 'variable';
+      const expType = t.expense_type || t.expense_frequency || 'variable';
       const cat = t.category || t.expense_category || 'אחר';
       
       if (expType === 'fixed') {
@@ -193,7 +193,7 @@ export async function GET(request: Request) {
     realExpenses.forEach(t => {
       const cat = t.category || t.expense_category || 'אחר';
       const vendor = t.vendor || t.original_description || 'לא ידוע';
-      const expType = t.expense_frequency || t.expense_type || 'variable';
+      const expType = t.expense_type || t.expense_frequency || 'variable';
       if (!categoryMap[cat]) {
         categoryMap[cat] = { total: 0, count: 0, type: expType, vendors: {} };
       }

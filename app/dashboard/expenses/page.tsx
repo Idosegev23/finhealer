@@ -440,10 +440,25 @@ function formatMonthName(monthKey: string): string {
 }
 
 function getExpenseTypeFromTransaction(tx: any): 'fixed' | 'variable' | 'special' {
+  // Check expense_type first (set by OCR/AI classification)
+  if (tx.expense_type === 'fixed') return 'fixed';
+  if (tx.expense_type === 'variable') return 'variable';
+  if (tx.expense_type === 'special') return 'special';
+
+  // Fallback to expense_frequency (set by manual entry)
   if (tx.expense_frequency === 'fixed') return 'fixed';
   if (tx.expense_frequency === 'special') return 'special';
   if (tx.expense_frequency === 'temporary' || tx.expense_frequency === 'one_time') return 'variable';
-  
-  // ברירת מחדל
+
+  // Last resort: try to infer from expense_category via known fixed categories
+  const fixedCategories = new Set([
+    'שכירות', 'משכנתא', 'ביטוח בריאות', 'ביטוח רכב', 'ביטוח דירה', 'ביטוח חיים',
+    'חשמל', 'מים', 'גז', 'ארנונה', 'ועד בית', 'אינטרנט', 'סלולר', 'טלפון',
+    'גן ילדים', 'צהרון', 'שכר לימוד', 'חוגים', 'הלוואה', 'החזר הלוואה',
+    'ביטוח לאומי', 'מס הכנסה', 'קופת גמל', 'קרן פנסיה', 'קרן השתלמות',
+  ]);
+  const cat = tx.expense_category || tx.category || '';
+  if (fixedCategories.has(cat)) return 'fixed';
+
   return 'variable';
 }

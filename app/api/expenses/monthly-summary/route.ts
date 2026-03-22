@@ -122,31 +122,37 @@ function groupByMonth(transactions: any[]) {
 /**
  * זיהוי סוג הוצאה מהטרנזקציה
  */
-function getExpenseType(tx: any): 'fixed' | 'variable' | 'special' | null {
-  // אם יש expense_frequency
+function getExpenseType(tx: any): 'fixed' | 'variable' | 'special' {
+  // Check expense_type first (set by OCR/AI classification)
+  if (tx.expense_type === 'fixed') return 'fixed';
+  if (tx.expense_type === 'variable') return 'variable';
+  if (tx.expense_type === 'special') return 'special';
+
+  // Fallback to expense_frequency (set by manual entry)
   if (tx.expense_frequency === 'fixed') return 'fixed';
   if (tx.expense_frequency === 'temporary') return 'variable';
   if (tx.expense_frequency === 'special') return 'special';
   if (tx.expense_frequency === 'one_time') return 'variable';
 
-  // אם אין - ניחוש לפי detailed_category או category
+  // Last resort: infer from category name
   const category = (tx.expense_category || tx.category || '').toLowerCase();
-  
+
   // קבועות
-  if (category.includes('ארנונה') || category.includes('ביטוח') || 
+  if (category.includes('ארנונה') || category.includes('ביטוח') ||
       category.includes('משכנתא') || category.includes('שכירות') ||
-      category.includes('אינטרנט') || category.includes('טלפון') ||
-      category.includes('חשמל') || category.includes('מים') || category.includes('גז')) {
+      category.includes('אינטרנט') || category.includes('טלפון') || category.includes('סלולר') ||
+      category.includes('חשמל') || category.includes('מים') || category.includes('גז') ||
+      category.includes('ועד בית') || category.includes('גן ילדים') || category.includes('צהרון') ||
+      category.includes('הלוואה') || category.includes('פנסיה') || category.includes('קופת גמל')) {
     return 'fixed';
   }
 
   // מיוחדות
-  if (category.includes('חופש') || category.includes('מחשב') || 
+  if (category.includes('חופש') || category.includes('מחשב') ||
       category.includes('רהיט') || category.includes('אירוע')) {
     return 'special';
   }
 
-  // ברירת מחדל - משתנה
   return 'variable';
 }
 
