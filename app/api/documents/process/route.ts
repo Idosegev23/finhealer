@@ -1150,7 +1150,7 @@ async function saveBankTransactions(supabase: any, result: any, userId: string, 
         date: parsedDate,
         tx_date: parsedDate,
         source: 'ocr',
-        status: 'pending',
+        status: (tx.expense_category || tx.category) ? 'confirmed' : 'pending',
         notes: tx.notes || tx.description || null,
         payment_method: paymentMethod,
         expense_type: tx.expense_type || 'variable',
@@ -1765,7 +1765,7 @@ async function saveCreditDetails(supabase: any, result: any, userId: string, doc
         expense_type: detail.expense_type,
         payment_method: 'credit_card',
         source: 'ocr',
-        status: 'pending', // ✅ תמיד proposed כדי להופיע ברשימה לאישור
+        status: (detail.expense_category || detail.category) ? 'confirmed' : 'pending',
         document_id: documentId,
         // Hierarchy fields
         is_source_transaction: false, // Credit details are NOT source
@@ -1937,8 +1937,8 @@ async function saveTransactions(supabase: any, result: any, userId: string, docu
         date: parsedDate,
         tx_date: parsedDate,
         source: 'ocr',
-        status: 'pending', // 🔥 תמיד proposed - המשתמש חייב לאשר ידנית!
-        needs_review: true,
+        status: expenseCategory ? 'confirmed' : 'pending',
+        needs_review: !expenseCategory,
         notes: tx.installment 
           ? `${tx.notes || tx.description || ''} ${tx.installment}`.trim() 
           : (tx.notes || tx.description || null),
