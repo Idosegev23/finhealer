@@ -26,7 +26,8 @@ import type { RouterContext, RouterResult, UserState } from './shared';
 
 // State handlers
 import { handleStart, handleWaitingForName, handleWaitingForDocument } from './states/onboarding';
-import { handleClassificationState, handleClassificationResponse, startClassification } from './states/classification';
+// Old classification engine kept as import for legacy fallback ONLY
+// import { handleClassificationState, handleClassificationResponse, startClassification } from './states/classification';
 import { handleSmartClassification } from './states/smart-classification';
 import { phiBrain } from '@/lib/ai/phi-brain';
 import { handleBehaviorPhase } from './states/behavior';
@@ -36,6 +37,12 @@ import { handleMonitoring, handleLoanConsolidationOffer, handleWaitingForLoanDoc
 
 // Re-export types for consumers
 export type { RouterContext, RouterResult, UserState };
+
+// startClassification wrapper — uses new smart-classification engine
+// Replaces the old classification.ts callback
+async function startClassification(ctx: RouterContext): Promise<RouterResult> {
+  return handleSmartClassification(ctx, 'נמשיך');
+}
 
 // ============================================================================
 // State guidance messages (what to do next in each state)
@@ -550,21 +557,17 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
   if (wasWaitingForDocument && (incomeCount > 0 || expenseCount > 0)) {
     console.log(`[Router] DOC_ACTION: starting interactive classification for ${incomeCount + expenseCount} pending transactions`);
 
-    await greenAPI.sendMessage({
-      phoneNumber: phone,
-      message: `✅ *קיבלתי את הדוח!*\n\n` +
-        `📝 ${incomeCount + expenseCount} פעולות נמצאו\n` +
-        `💚 ${incomeCount} הכנסות (${totalIncome.toLocaleString('he-IL')} ₪)\n` +
-        `💸 ${expenseCount} הוצאות (${totalExpenses.toLocaleString('he-IL')} ₪)\n\n` +
-        `🎯 *בוא נעבור עליהן ביחד!*`,
-    });
-
+    // AI already classified at import time (documents/process/route.ts)
+    // Just trigger smart-classification to show summary
     await supabase
       .from('users')
-      .update({ onboarding_state: 'classification' })
+      .update({ onboarding_state: 'smart_classification' })
       .eq('id', userId);
 
-    await startClassification({ userId, phone, state: 'classification' as any, userName: null });
+    await handleSmartClassification(
+      { userId, phone, state: 'smart_classification' as any, userName: null },
+      'נמשיך'
+    );
     return;
   }
 

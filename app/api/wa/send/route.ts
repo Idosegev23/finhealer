@@ -40,6 +40,11 @@ export async function POST(request: NextRequest) {
     const body: SendMessageBody = await request.json();
     const { userId, phone, message, buttons, isOnboarding } = body;
 
+    // RLS: users can only send messages as themselves
+    if (userId && authUser.id !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     if (!message) {
       return NextResponse.json(
         { error: 'message is required' },
