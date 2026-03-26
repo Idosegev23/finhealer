@@ -15,6 +15,7 @@ export type UserState =
   | 'classification'
   | 'classification_income'
   | 'classification_expense'
+  | 'smart_classification'
   | 'behavior'
   | 'goals'
   | 'goals_setup'

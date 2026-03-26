@@ -335,10 +335,34 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', statementId);
 
-    // 7. Send WhatsApp notification
+    // 7. AI-first classification: classify ALL pending transactions immediately
+    try {
+      const { classifyAllTransactions, applyClassifications, learnFromClassifications } = await import('@/lib/classification/ai-classifier');
+      const classifyResult = await classifyAllTransactions(stmt.user_id);
+      if (classifyResult.classified.length > 0) {
+        await applyClassifications(stmt.user_id, classifyResult.classified);
+        await learnFromClassifications(stmt.user_id, classifyResult.classified);
+        console.log(`🧠 [AI-Classify] Auto-classified ${classifyResult.stats.total} transactions: rules=${classifyResult.stats.hardRules}, AI=${classifyResult.stats.ai}, credit=${classifyResult.stats.creditCharges}`);
+      }
+    } catch (classifyErr) {
+      console.warn('⚠️ AI classification failed (non-fatal, transactions remain pending):', classifyErr);
+    }
+
+    // 7.5. Reconcile credit charges (mark bank CC aggregates as is_summary)
+    try {
+      const { reconcileCreditCharges } = await import('@/lib/classification/reconciliation');
+      const reconResult = await reconcileCreditCharges(stmt.user_id);
+      if (reconResult.reconciled > 0) {
+        console.log(`🔄 [Reconciliation] Reconciled ${reconResult.reconciled} CC charges, ${reconResult.needsDetail.length} need detail`);
+      }
+    } catch (reconErr) {
+      console.warn('⚠️ Reconciliation failed (non-fatal):', reconErr);
+    }
+
+    // 8. Send WhatsApp notification
     await sendWhatsAppNotification(stmt.user_id, itemsProcessed, docType, statementId);
 
-    // 8. Sync budget spending (fire-and-forget)
+    // 9. Sync budget spending (fire-and-forget)
     import('@/lib/services/BudgetSyncService')
       .then(({ syncBudgetSpending }) => syncBudgetSpending(stmt.user_id))
       .catch(err => console.warn('[BudgetSync] post-document error:', err));

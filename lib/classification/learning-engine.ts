@@ -1,13 +1,17 @@
 /**
- * Learning Engine - מנוע למידה אוטומטית לסיווג תנועות
- * 
+ * Learning Engine v3.1 — מנוע למידה אוטומטית לסיווג תנועות
+ *
  * לוגיקה:
- * - confidence >= 90% → סיווג אוטומטי (לא שואלים)
- * - confidence 70-89% → מציעים + שואלים
- * - confidence < 70% → שואלים בלי הצעה
- * 
+ * - confidence >= 70% → סיווג אוטומטי (לא שואלים)
+ * - confidence 50-69% → מציעים + שואלים
+ * - confidence < 50% → שואלים בלי הצעה
+ *
  * כל אישור מעלה את ה-confidence ב-10%
- * כל תיקון מוריד ל-50%
+ * תיקון ידני = confidence 85% (המשתמש אמר מפורש מה זה)
+ * AI classification ראשוני = 75%
+ *
+ * Financial Signature: vendor + amount range כמפתח
+ * "מגדל|small" (189₪) ≠ "מגדל|xlarge" (1,200₪)
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
@@ -59,11 +63,12 @@ export interface Transaction {
 // Constants
 // ============================================================================
 
-const AUTO_CLASSIFY_THRESHOLD = 0.90;  // 90% - סיווג אוטומטי
-const SUGGEST_THRESHOLD = 0.70;         // 70% - הצעה
+const AUTO_CLASSIFY_THRESHOLD = 0.70;  // 70% - סיווג אוטומטי (was 90%)
+const SUGGEST_THRESHOLD = 0.50;         // 50% - הצעה (was 70%)
 const CONFIDENCE_INCREMENT = 0.10;      // +10% לכל אישור
-const CONFIDENCE_ON_CORRECTION = 0.50;  // 50% אחרי תיקון
-const MIN_COUNT_FOR_AUTO = 3;           // מינימום 3 אישורים לסיווג אוטומטי
+const CONFIDENCE_ON_CORRECTION = 0.85;  // 85% אחרי תיקון ידני (was 50% — user explicitly said what it is!)
+const CONFIDENCE_ON_FIRST_CLASSIFY = 0.75; // 75% כשAI סיווג בפעם הראשונה
+const MIN_COUNT_FOR_AUTO = 1;           // מינימום 1 אישור לסיווג אוטומטי (was 3)
 
 // ============================================================================
 // Vendor Normalization
@@ -192,7 +197,7 @@ export async function learnFromConfirmation(
     
     const newConfidence = isSameCategory
       ? Math.min(1.0, existingPattern.confidence_score + CONFIDENCE_INCREMENT)
-      : CONFIDENCE_ON_CORRECTION;  // תיקון - הורדה ל-50%
+      : CONFIDENCE_ON_CORRECTION;  // תיקון ידני = 85% (המשתמש אמר מפורש)
     
     const newCount = isSameCategory
       ? existingPattern.learned_from_count + 1
@@ -229,7 +234,7 @@ export async function learnFromConfirmation(
           category_id: categoryId,
           category_name: categoryName,
         },
-        confidence_score: 0.60,  // מתחילים ב-60%
+        confidence_score: CONFIDENCE_ON_FIRST_CLASSIFY,  // 75% — AI classified
         learned_from_count: 1,
         auto_apply: false,  // עדיין לא אוטומטי
         last_seen: new Date().toISOString(),
@@ -504,7 +509,335 @@ export function formatAutoClassificationMessage(
   }
   
   lines.push('\nרוצה לשנות משהו? כתוב "תקן [שם ספק]"');
-  
+
   return lines.join('\n');
+}
+
+// ============================================================================
+// v3.1: Financial Signature
+// ============================================================================
+
+/**
+ * Creates a financial signature: vendor + amount range.
+ * "מגדל|small" (189₪ = ביטוח בריאות) ≠ "מגדל|xlarge" (1,200₪ = פנסיה)
+ */
+export function getAmountRange(amount: number): string {
+  const abs = Math.abs(amount);
+  if (abs <= 50) return 'micro';
+  if (abs <= 200) return 'small';
+  if (abs <= 500) return 'medium';
+  if (abs <= 1000) return 'large';
+  if (abs <= 3000) return 'xlarge';
+  return 'jumbo';
+}
+
+export function getFinancialSignature(vendor: string, amount: number): string {
+  return `${normalizeVendorName(vendor)}|${getAmountRange(amount)}`;
+}
+
+// ============================================================================
+// v3.1: Financial DNA
+// ============================================================================
+
+export interface FinancialDNAEntry {
+  category: string;
+  vendor: string | string[];
+  amount: number;       // average
+  amount_min: number;
+  amount_max: number;
+  day: number | number[]; // typical day(s) of month
+  frequency: 'monthly' | 'weekly' | 'quarterly' | 'irregular';
+  occurrences: number;
+}
+
+export type FinancialDNA = Record<string, FinancialDNAEntry>;
+
+/**
+ * Build Financial DNA from 3+ months of confirmed transactions.
+ * Returns a template of recurring financial patterns.
+ */
+export async function buildFinancialDNA(userId: string): Promise<FinancialDNA> {
+  const supabase = createServiceClient();
+
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('vendor, amount, tx_date, expense_category, income_category, category, type')
+    .eq('user_id', userId)
+    .eq('status', 'confirmed')
+    .or('is_summary.is.null,is_summary.eq.false')
+    .gte('tx_date', threeMonthsAgo.toISOString().split('T')[0])
+    .order('tx_date', { ascending: false });
+
+  if (!transactions || transactions.length < 10) return {};
+
+  // Group by vendor (normalized)
+  const groups = new Map<string, Array<{ amount: number; day: number; month: string; category: string }>>();
+
+  for (const tx of transactions) {
+    if (!tx.vendor) continue;
+    const key = normalizeVendorName(tx.vendor);
+    if (!key) continue;
+
+    const date = new Date(tx.tx_date);
+    const entry = {
+      amount: Math.abs(Number(tx.amount)),
+      day: date.getDate(),
+      month: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+      category: tx.expense_category || tx.income_category || tx.category || '',
+    };
+
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(entry);
+  }
+
+  const dna: FinancialDNA = {};
+
+  for (const [vendorKey, entries] of Array.from(groups.entries())) {
+    // Need at least 2 occurrences across different months
+    const uniqueMonths = new Set(entries.map(e => e.month));
+    if (uniqueMonths.size < 2) continue;
+
+    // Check amount consistency (within 20%)
+    const amounts = entries.map(e => e.amount);
+    const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    const allSimilar = amounts.every(a => Math.abs(a - avgAmount) / avgAmount <= 0.20);
+
+    if (!allSimilar && amounts.length < 3) continue; // inconsistent and not enough data
+
+    const days = entries.map(e => e.day);
+    const category = entries[0].category;
+    const originalVendor = transactions.find(t => normalizeVendorName(t.vendor || '') === vendorKey)?.vendor || vendorKey;
+
+    // Determine frequency
+    let frequency: 'monthly' | 'weekly' | 'quarterly' | 'irregular' = 'irregular';
+    if (uniqueMonths.size >= 2 && uniqueMonths.size >= entries.length * 0.7) {
+      frequency = 'monthly';
+    }
+
+    const dnaKey = category || vendorKey;
+    dna[dnaKey] = {
+      category,
+      vendor: originalVendor,
+      amount: Math.round(avgAmount),
+      amount_min: Math.round(Math.min(...amounts)),
+      amount_max: Math.round(Math.max(...amounts)),
+      day: days.length <= 3 ? days : [Math.round(days.reduce((a, b) => a + b, 0) / days.length)],
+      frequency,
+      occurrences: entries.length,
+    };
+  }
+
+  // Save to user profile
+  const { data: user } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+
+  const ctx = user?.classification_context || {};
+  await supabase
+    .from('users')
+    .update({ classification_context: { ...ctx, financial_dna: dna } })
+    .eq('id', userId);
+
+  return dna;
+}
+
+/**
+ * Match a transaction against Financial DNA.
+ * Returns category + high confidence if match found.
+ */
+export function matchAgainstDNA(
+  tx: { vendor?: string; amount?: number },
+  dna: FinancialDNA
+): { matched: boolean; category?: string; confidence?: number } {
+  if (!tx.vendor || !tx.amount || Object.keys(dna).length === 0) {
+    return { matched: false };
+  }
+
+  const vendorNorm = normalizeVendorName(tx.vendor);
+  const amount = Math.abs(Number(tx.amount));
+
+  for (const [, entry] of Object.entries(dna)) {
+    // Match vendor (fuzzy)
+    const dnaVendors = Array.isArray(entry.vendor) ? entry.vendor : [entry.vendor];
+    const vendorMatch = dnaVendors.some(v => {
+      const vNorm = normalizeVendorName(v);
+      return vNorm === vendorNorm || vNorm.includes(vendorNorm) || vendorNorm.includes(vNorm);
+    });
+
+    if (!vendorMatch) continue;
+
+    // Match amount (within ±20%)
+    const tolerance = entry.amount * 0.20;
+    if (amount >= entry.amount_min - tolerance && amount <= entry.amount_max + tolerance) {
+      return {
+        matched: true,
+        category: entry.category,
+        confidence: 0.95,
+      };
+    }
+  }
+
+  return { matched: false };
+}
+
+// ============================================================================
+// v3.1: Batch Learning
+// ============================================================================
+
+/**
+ * Learn from a batch of AI classifications.
+ * Uses financial signature as pattern key.
+ */
+export async function learnFromBatchClassification(
+  userId: string,
+  classifications: Array<{
+    vendor: string;
+    amount: number;
+    category_name: string;
+    source: 'dna' | 'rules' | 'hard_rule' | 'personal' | 'ai';
+  }>
+): Promise<void> {
+  const supabase = createServiceClient();
+
+  for (const c of classifications) {
+    if (!c.vendor || c.category_name === 'אחר') continue;
+
+    const signature = getFinancialSignature(c.vendor, c.amount);
+    const confidence = c.source === 'ai' ? CONFIDENCE_ON_FIRST_CLASSIFY : 0.95;
+
+    // Upsert using financial signature
+    await supabase
+      .from('user_category_rules')
+      .upsert(
+        {
+          user_id: userId,
+          vendor_pattern: signature,
+          category: c.category_name,
+          confidence,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,vendor_pattern' }
+      )
+      .select();
+
+    // Also upsert plain vendor name (for backward compat)
+    const vendorKey = normalizeVendorName(c.vendor);
+    if (vendorKey && vendorKey !== signature) {
+      await supabase
+        .from('user_category_rules')
+        .upsert(
+          {
+            user_id: userId,
+            vendor_pattern: vendorKey,
+            category: c.category_name,
+            confidence: Math.max(confidence - 0.05, 0.5),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,vendor_pattern' }
+        )
+        .select();
+    }
+
+    // Bug fix #3: Sync to user_patterns for backward compatibility (old flow fallback)
+    if (vendorKey) {
+      await supabase
+        .from('user_patterns')
+        .upsert(
+          {
+            user_id: userId,
+            pattern_type: 'vendor_category',
+            pattern_key: vendorKey,
+            pattern_value: { category_name: c.category_name },
+            confidence_score: confidence,
+            learned_from_count: 1,
+            auto_apply: confidence >= AUTO_CLASSIFY_THRESHOLD,
+            last_seen: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,pattern_type,pattern_key' }
+        )
+        .select();
+    }
+  }
+}
+
+/**
+ * Learn from user correction — high confidence.
+ */
+export async function learnFromCorrectionV2(
+  userId: string,
+  vendor: string,
+  amount: number,
+  oldCategory: string,
+  newCategory: string
+): Promise<void> {
+  const supabase = createServiceClient();
+  const signature = getFinancialSignature(vendor, amount);
+  const vendorKey = normalizeVendorName(vendor);
+
+  // Old rule: lower confidence
+  if (oldCategory && oldCategory !== newCategory) {
+    await supabase
+      .from('user_category_rules')
+      .update({ confidence: 0.50, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('vendor_pattern', signature);
+  }
+
+  // New rule: high confidence (user explicitly said)
+  await supabase
+    .from('user_category_rules')
+    .upsert(
+      {
+        user_id: userId,
+        vendor_pattern: signature,
+        category: newCategory,
+        confidence: CONFIDENCE_ON_CORRECTION,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,vendor_pattern' }
+    )
+    .select();
+
+  // Also update plain vendor key
+  if (vendorKey && vendorKey !== signature) {
+    await supabase
+      .from('user_category_rules')
+      .upsert(
+        {
+          user_id: userId,
+          vendor_pattern: vendorKey,
+          category: newCategory,
+          confidence: CONFIDENCE_ON_CORRECTION - 0.05,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,vendor_pattern' }
+      )
+      .select();
+  }
+
+  // Bug fix #3: Sync to user_patterns for backward compatibility
+  if (vendorKey) {
+    await supabase
+      .from('user_patterns')
+      .upsert(
+        {
+          user_id: userId,
+          pattern_type: 'vendor_category',
+          pattern_key: vendorKey,
+          pattern_value: { category_name: newCategory },
+          confidence_score: CONFIDENCE_ON_CORRECTION,
+          learned_from_count: 1,
+          auto_apply: true,
+          last_seen: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,pattern_type,pattern_key' }
+      )
+      .select();
+  }
 }
 

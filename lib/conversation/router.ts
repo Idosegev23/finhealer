@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * φ Router - AI-powered conversation router
  *
@@ -28,6 +27,8 @@ import type { RouterContext, RouterResult, UserState } from './shared';
 // State handlers
 import { handleStart, handleWaitingForName, handleWaitingForDocument } from './states/onboarding';
 import { handleClassificationState, handleClassificationResponse, startClassification } from './states/classification';
+import { handleSmartClassification } from './states/smart-classification';
+import { phiBrain } from '@/lib/ai/phi-brain';
 import { handleBehaviorPhase } from './states/behavior';
 import { handleGoalsSetup, handleGoalsPhase } from './states/goals';
 import { handleBudgetPhase } from './states/budget';
@@ -50,7 +51,8 @@ function getStateGuidance(state: UserState, userName: string | null): string {
     case 'classification':
     case 'classification_income':
     case 'classification_expense':
-      return `אנחנו מסדרים את ההוצאות וההכנסות שלך 📊\n\nאני מראה לך כל פעולה ואתה אומר לי מה זה.\nכתוב *"כן"* לאשר, שם אחר לשנות, או *"דלג"* לעבור הלאה.\n\nרוצה שאסדר הכל בשבילך? כתוב *"קבל הכל"*.`;
+    case 'smart_classification':
+      return `📊 מסדרים את ההוצאות וההכנסות.\n\nכתבו *"נמשיך"* ואני אסווג הכל אוטומטית — אפשר לתקן אחר כך.`;
     case 'goals_setup':
     case 'goals':
       return `אנחנו מגדירים מטרות כספיות 🎯\nלמשל: לחסוך לחופשה, לסגור חוב, או לבנות קרן חירום.\n\nכתוב *"יעד חדש"* להוסיף מטרה, או *"סיימתי"* להמשיך.`;
@@ -127,10 +129,18 @@ export async function routeMessage(
 
   // ══════════════════════════════════════════════════════════════════════════
   // UNIVERSAL INTENTS (handled in ANY state, before state dispatch)
+  // For PhiBrain states — skip universal intents, brain handles everything
   // ══════════════════════════════════════════════════════════════════════════
 
+  const brainManagedStates = [
+    'classification', 'classification_income', 'classification_expense', 'smart_classification',
+    'behavior', 'goals_setup', 'goals', 'budget',
+    'loan_consolidation_offer', 'waiting_for_loan_docs', 'monitoring',
+  ];
+  const isBrainManaged = brainManagedStates.includes(state);
+
   // Greeting - smart, context-aware response
-  if (intent?.type === 'greeting' && intent.confidence > 0.8) {
+  if (!isBrainManaged && intent?.type === 'greeting' && intent.confidence > 0.8) {
     // Don't intercept greetings during name collection (it might be a name like "שלום")
     if (state !== 'waiting_for_name') {
       console.log(`[Router] UNIVERSAL: greeting in state=${state}`);
@@ -206,7 +216,7 @@ export async function routeMessage(
   }
 
   // Thanks - respond warmly and guide
-  if (intent?.type === 'thanks' && intent.confidence > 0.8) {
+  if (!isBrainManaged && intent?.type === 'thanks' && intent.confidence > 0.8) {
     if (state !== 'waiting_for_name') {
       console.log(`[Router] UNIVERSAL: thanks in state=${state}`);
       const responses = [
@@ -219,7 +229,7 @@ export async function routeMessage(
   }
 
   // Help - context-sensitive help
-  if (intent?.type === 'help' && intent.confidence > 0.8) {
+  if (!isBrainManaged && intent?.type === 'help' && intent.confidence > 0.8) {
     console.log(`[Router] UNIVERSAL: help in state=${state}`);
     const stateLabels: Record<string, string> = {
       start: 'התחלה',
@@ -312,7 +322,7 @@ export async function routeMessage(
   }
 
   // Cancel / Back — universal escape from any non-terminal state
-  if (intent?.type === 'cancel' && intent.confidence > 0.7) {
+  if (!isBrainManaged && intent?.type === 'cancel' && intent.confidence > 0.7) {
     const cancellableStates: UserState[] = ['goals_setup', 'behavior', 'budget', 'loan_consolidation_offer', 'waiting_for_loan_docs'];
     if (cancellableStates.includes(state)) {
       console.log(`[Router] UNIVERSAL: cancel in state=${state} → monitoring`);
@@ -331,7 +341,7 @@ export async function routeMessage(
   }
 
   // Frustration / Tiredness - offer a break
-  if (mood === 'tired' && state !== 'waiting_for_name') {
+  if (!isBrainManaged && mood === 'tired' && state !== 'waiting_for_name') {
     console.log(`[Router] UNIVERSAL: user seems tired/frustrated in state=${state}`);
     await greenAPI.sendMessage({
       phoneNumber: phone,
@@ -398,74 +408,39 @@ export async function routeMessage(
     return result;
   }
 
-  if (state === 'classification') {
-    console.log(`[Router] DISPATCH: state=classification → handleClassificationState()`);
-    const result = await handleClassificationState(ctx, msg);
-    console.log(`[Router] RESULT: state=classification, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHI BRAIN — All smart states go through the AI engine
+  // Handles: classification, behavior, goals, budget, monitoring, loans
+  // ══════════════════════════════════════════════════════════════════════════
 
-  if (state === 'classification_income') {
-    console.log(`[Router] DISPATCH: state=classification_income → handleClassificationResponse(type=income)`);
-    const result = await handleClassificationResponse(ctx, msg, 'income');
-    console.log(`[Router] RESULT: state=classification_income, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
+  const brainStates = [
+    'classification', 'classification_income', 'classification_expense', 'smart_classification',
+    'behavior', 'goals_setup', 'goals', 'budget',
+    'loan_consolidation_offer', 'waiting_for_loan_docs', 'monitoring',
+  ];
 
-  if (state === 'classification_expense') {
-    console.log(`[Router] DISPATCH: state=classification_expense → handleClassificationResponse(type=expense)`);
-    const result = await handleClassificationResponse(ctx, msg, 'expense');
-    console.log(`[Router] RESULT: state=classification_expense, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
-
-  if (state === 'behavior') {
-    console.log(`[Router] DISPATCH: state=behavior → handleBehaviorPhase()`);
-    const result = await handleBehaviorPhase(ctx, msg);
-    console.log(`[Router] RESULT: state=behavior, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
-
-  if (state === 'goals_setup') {
-    console.log(`[Router] DISPATCH: state=goals_setup → handleGoalsSetup()`);
-    const result = await handleGoalsSetup(ctx, msg);
-    console.log(`[Router] RESULT: state=goals_setup, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
-
-  if (state === 'goals') {
-    console.log(`[Router] DISPATCH: state=goals → handleGoalsPhase()`);
-    const result = await handleGoalsPhase(ctx, msg);
-    console.log(`[Router] RESULT: state=goals, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
-
-  if (state === 'budget') {
-    console.log(`[Router] DISPATCH: state=budget → handleBudgetPhase()`);
-    const result = await handleBudgetPhase(ctx, msg);
-    console.log(`[Router] RESULT: state=budget, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
-
-  if (state === 'loan_consolidation_offer') {
-    console.log(`[Router] DISPATCH: state=loan_consolidation_offer → handleLoanConsolidationOffer()`);
-    const result = await handleLoanConsolidationOffer(ctx, msg);
-    console.log(`[Router] RESULT: state=loan_consolidation_offer, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
-
-  if (state === 'waiting_for_loan_docs') {
-    console.log(`[Router] DISPATCH: state=waiting_for_loan_docs → handleWaitingForLoanDocs()`);
-    const result = await handleWaitingForLoanDocs(ctx, msg);
-    console.log(`[Router] RESULT: state=waiting_for_loan_docs, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
-
-  if (state === 'monitoring') {
-    console.log(`[Router] DISPATCH: state=monitoring → handleMonitoring()`);
-    const result = await handleMonitoring(ctx, msg, userName, startClassification);
-    console.log(`[Router] RESULT: state=monitoring, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
+  if (brainStates.includes(state)) {
+    console.log(`[Router] DISPATCH: state=${state} → PhiBrain`);
+    try {
+      const action = await phiBrain(userId, { type: 'whatsapp_message', message: msg });
+      console.log(`[Router] RESULT: PhiBrain responded=${!action.silent}, state_update=${action.updateState || 'none'}`);
+      return { success: true, newState: action.updateState as any };
+    } catch (brainErr) {
+      console.error(`[Router] PhiBrain error, falling back to legacy handler:`, brainErr);
+      // Fallback: use legacy handlers if brain fails
+      if (state === 'monitoring') {
+        return await handleMonitoring(ctx, msg, userName, startClassification);
+      }
+      if (state.startsWith('classification') || state === 'smart_classification') {
+        return await handleSmartClassification(ctx, msg);
+      }
+      if (state === 'behavior') return await handleBehaviorPhase(ctx, msg);
+      if (state === 'goals_setup') return await handleGoalsSetup(ctx, msg);
+      if (state === 'goals') return await handleGoalsPhase(ctx, msg);
+      if (state === 'budget') return await handleBudgetPhase(ctx, msg);
+      if (state === 'loan_consolidation_offer') return await handleLoanConsolidationOffer(ctx, msg);
+      if (state === 'waiting_for_loan_docs') return await handleWaitingForLoanDocs(ctx, msg);
+    }
   }
 
   // Update conversation context on every message
