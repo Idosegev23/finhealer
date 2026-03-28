@@ -262,7 +262,7 @@ ${eventDescription}
 בחר פעולה אחת מהרשימה וכתוב ב-action. החזר JSON בלבד:
 {
   "should_respond": true/false,
-  "action": "log_expense|undo_expense|show_summary|show_chart|show_budget|show_goals|show_cashflow|show_phi_score|classify|coaching|greeting|help|general_chat|none",
+  "action": "log_expense|undo_expense|show_money_flow|afford_check|show_summary|show_chart|show_budget|show_goals|show_cashflow|show_phi_score|classify|coaching|greeting|help|general_chat|none",
   "action_params": {
     "vendor": "...", "amount": 0, "category": "..."
   },
@@ -276,6 +276,8 @@ actions אפשריות:
 - log_expense: המשתמש רושם הוצאה. חובה: action_params.vendor + action_params.amount. אופציונלי: action_params.category.
   דוגמאות: "סופר 450", "קפה 15", "200 נעליים", "דלק 300"
 - undo_expense: המשתמש רוצה לבטל. "בטל", "טעות", "מחק"
+- show_money_flow: "כמה יש לי", "כמה חופשי", "מצב כסף", "כמה אפשר להוציא היום", "יומי", "שבועי"
+- afford_check: "אפשר לקנות X?", "יש לי כסף ל-X?", "אני רוצה לקנות". חובה: action_params.amount + action_params.description
 - show_summary: "סיכום", "מצב", "סטטוס"
 - show_chart: "גרף", "תרשים", "תראה לי גרף"
 - show_budget: "תקציב", "כמה נשאר", "כמה אפשר להוציא"
@@ -425,6 +427,28 @@ export async function phiBrain(
           await syncBudgetSpending(userId);
         } catch {}
         action.sendMessage = `🗑️ בוטל: ${Math.abs(Number(lastTx.amount)).toLocaleString('he-IL')}₪ ${lastTx.vendor}`;
+        break;
+      }
+
+      // ── SHOW SUMMARY ──
+      // ── MONEY FLOW ──
+      case 'show_money_flow': {
+        const { calculateMoneyFlow, formatMoneyFlowForWhatsApp } = await import('@/lib/finance/money-flow');
+        const flow = await calculateMoneyFlow(userId);
+        action.sendMessage = formatMoneyFlowForWhatsApp(flow, ctx.userName);
+        break;
+      }
+
+      // ── AFFORD CHECK ──
+      case 'afford_check': {
+        const checkAmount = Number(params.amount) || 0;
+        if (checkAmount <= 0) {
+          action.sendMessage = 'כמה עולה הפריט? כתבו למשל: "אפשר לקנות טלוויזיה ב-3000?"';
+          break;
+        }
+        const { canIAfford, formatAffordabilityForWhatsApp } = await import('@/lib/finance/money-flow');
+        const affordResult = await canIAfford(userId, checkAmount, params.description || params.vendor);
+        action.sendMessage = formatAffordabilityForWhatsApp(affordResult, checkAmount, params.description || params.vendor);
         break;
       }
 
