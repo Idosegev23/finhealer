@@ -181,7 +181,28 @@ async function _calculateMoneyFlowImpl(userId: string, month?: string): Promise<
   ]);
 
   // ── Calculate income ──
-  const monthlyIncome = (incomeTx || []).reduce((s, t) => s + Math.abs(Number(t.amount || 0)), 0);
+  let monthlyIncome = (incomeTx || []).reduce((s, t) => s + Math.abs(Number(t.amount || 0)), 0);
+
+  // Fallback: if no income this month, use profile's average or last 3 months average
+  if (monthlyIncome === 0) {
+    const profileIncome = Number(userProfile?.total_monthly_income || 0);
+    if (profileIncome > 0) {
+      monthlyIncome = profileIncome;
+    } else {
+      // Calculate from last 3 months
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      const { data: recentIncome } = await supabase.from('transactions')
+        .select('amount')
+        .eq('user_id', userId).eq('type', 'income').eq('status', 'confirmed')
+        .or('is_summary.is.null,is_summary.eq.false')
+        .gte('tx_date', threeMonthsAgo.toISOString().split('T')[0]);
+      if (recentIncome && recentIncome.length > 0) {
+        const total = recentIncome.reduce((s, t) => s + Math.abs(Number(t.amount || 0)), 0);
+        monthlyIncome = Math.round(total / 3);
+      }
+    }
+  }
 
   // ── Separate locked (fixed) vs variable expenses ──
   const expenses = (expenseTx || []) as Array<{ amount: number; vendor: string; expense_category: string; expense_type: string; tx_date: string; category: string }>;

@@ -175,10 +175,21 @@ const HARD_RULES: Record<string, { category: string; expense_type?: string; is_c
 // Hard Rule Matching
 // ============================================================================
 
-function matchHardRule(vendor: string): { category: string; expense_type?: string; is_credit?: boolean } | null {
+function matchHardRule(vendor: string, originalDescription?: string): { category: string; expense_type?: string; is_credit?: boolean } | null {
   if (!vendor) return null;
   const lower = vendor.toLowerCase().trim();
+  const desc = (originalDescription || '').toLowerCase().trim();
 
+  // ── Transfer detection (before dictionary) ──
+  // "העברה ל..." = outgoing transfer, "העברה מ..." = incoming transfer
+  if (desc.startsWith('העברה ל') || desc.includes('העברה ל')) {
+    return { category: 'העברה יוצאת', expense_type: 'variable' };
+  }
+  if (desc.startsWith('העברה מ') || desc.includes('העברה מ')) {
+    return { category: 'העברה נכנסת', expense_type: 'variable' };
+  }
+
+  // ── Dictionary lookup ──
   for (const [key, rule] of Object.entries(HARD_RULES)) {
     if (lower.includes(key) || key.includes(lower)) {
       return rule;
@@ -338,8 +349,8 @@ export async function classifyAllTransactions(userId: string): Promise<ClassifyA
       }
     }
 
-    // === LAYER 1: Hard rules ===
-    const hardRule = matchHardRule(vendor);
+    // === LAYER 1: Hard rules (+ transfer detection from original_description) ===
+    const hardRule = matchHardRule(vendor, tx.original_description);
     if (hardRule) {
       if (hardRule.is_credit) {
         classified.push({ ...makeTx(tx, hardRule.category, 0.95, 'hard_rule'), is_credit_charge: true });
@@ -396,7 +407,7 @@ export async function classifyAllTransactions(userId: string): Promise<ClassifyA
         const result = resultMap.get(tx.index);
         if (result && result.category_name) {
           // Month 1 validation: if hard rule disagrees with Gemini, trust hard rule for obvious cases
-          const hardRule = matchHardRule(tx.vendor);
+          const hardRule = matchHardRule(tx.vendor, tx.original_description);
           let finalCategory = result.category_name;
           let finalConfidence = result.confidence || 0.8;
 
