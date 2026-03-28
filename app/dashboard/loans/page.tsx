@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { DashboardWrapper } from '@/components/dashboard/DashboardWrapper';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { CreditCard, TrendingDown, DollarSign, Clock, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Card as DSCard, EmptyState as DSEmptyState, PageHeader } from '@/components/ui/design-system';
 
 interface Loan {
   id: string;
@@ -91,95 +92,76 @@ export default function LoansPage() {
 
   return (
     <DashboardWrapper>
-      <div className="min-h-screen bg-gray-50 p-6" dir="rtl">
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
+        <div className="max-w-5xl mx-auto space-y-5">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-            <div>
-            <h1 className="text-3xl font-bold text-gray-900">💳 הלוואות</h1>
-            <p className="text-gray-600 mt-2">מעקב והיסטוריה של כל ההלוואות שלך</p>
-            </div>
-              <Button 
-            onClick={() => window.location.href = '/dashboard/data/loans'}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-            <Plus className="w-5 h-5 ml-2" />
-                הוסף הלוואה
-              </Button>
-        </div>
+        <PageHeader
+          title="הלוואות"
+          subtitle="מעקב והיסטוריה של כל ההלוואות שלך"
+          action={
+            <Button
+              onClick={() => window.location.href = '/dashboard/data/loans'}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="w-5 h-5 ml-2" />
+              הוסף הלוואה
+            </Button>
+          }
+        />
 
           {loans.length === 0 ? (
-          <Card className="bg-white">
-            <CardContent className="p-12 text-center">
-              <CreditCard className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">אין הלוואות עדיין</h3>
-              <p className="text-gray-600 mb-6">
-                העלה דוח בנק או הוסף הלוואה ידנית כדי להתחיל לעקוב אחרי ההלוואות שלך
-              </p>
-              <Button 
-                onClick={() => window.location.href = '/dashboard/scan-center'}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                העלה דוח בנק
-              </Button>
-            </CardContent>
-          </Card>
+          <DSEmptyState
+            icon={CreditCard}
+            title="אין הלוואות עדיין"
+            description="העלה דוח בנק או הוסף הלוואה ידנית כדי להתחיל לעקוב אחרי ההלוואות שלך"
+            action={{ label: 'העלה דוח בנק', href: '/dashboard/scan-center' }}
+          />
           ) : (
             <>
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                <CardContent className="p-6">
+              <DSCard padding="lg" className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-blue-500">
                   <div className="flex items-center justify-between mb-2">
                     <CreditCard className="w-8 h-8 opacity-80" />
                     <span className="text-sm opacity-80">הלוואות פעילות</span>
                   </div>
                   <div className="text-3xl font-bold">{loans.filter(l => l.active).length}</div>
-                </CardContent>
-              </Card>
+              </DSCard>
 
-              <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
-                <CardContent className="p-6">
+              <DSCard padding="lg" className="bg-gradient-to-br from-red-500 to-red-600 text-white border-red-500">
                   <div className="flex items-center justify-between mb-2">
                     <TrendingDown className="w-8 h-8 opacity-80" />
                     <span className="text-sm opacity-80">תשלום חודשי</span>
                   </div>
                   <div className="text-3xl font-bold">₪{totalMonthlyPayments.toLocaleString('he-IL')}</div>
-                </CardContent>
-              </Card>
+              </DSCard>
 
-              <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-                <CardContent className="p-6">
+              <DSCard padding="lg" className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-orange-500">
                   <div className="flex items-center justify-between mb-2">
                     <DollarSign className="w-8 h-8 opacity-80" />
                     <span className="text-sm opacity-80">סה״כ חוב</span>
                   </div>
                   <div className="text-3xl font-bold">
                     {totalDebt > 0 ? `₪${totalDebt.toLocaleString('he-IL')}` : 'לא ידוע'}
-                            </div>
-                </CardContent>
-              </Card>
+                  </div>
+              </DSCard>
 
-              <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-                <CardContent className="p-6">
+              <DSCard padding="lg" className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-purple-500">
                   <div className="flex items-center justify-between mb-2">
                     <Clock className="w-8 h-8 opacity-80" />
                     <span className="text-sm opacity-80">ריבית ממוצעת</span>
-                              </div>
+                  </div>
                   <div className="text-3xl font-bold">
                     {averageInterest > 0 ? `${averageInterest.toFixed(1)}%` : 'לא ידוע'}
-                              </div>
-                </CardContent>
-              </Card>
-                            </div>
+                  </div>
+              </DSCard>
+            </div>
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               {/* Monthly Payments Bar Chart */}
-              <Card className="bg-white">
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-900">תשלומים חודשיים לפי מלווה</CardTitle>
-                </CardHeader>
-                <CardContent>
+              <DSCard padding="lg">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">תשלומים חודשיים לפי מלווה</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={monthlyPaymentsData}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -189,15 +171,11 @@ export default function LoansPage() {
                       <Bar dataKey="payment" fill="#3A7BD5" />
                     </BarChart>
                   </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              </DSCard>
 
               {/* Loan Types Pie Chart */}
-              <Card className="bg-white">
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-900">פילוח לפי סוג הלוואה</CardTitle>
-                </CardHeader>
-                <CardContent>
+              <DSCard padding="lg">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">פילוח לפי סוג הלוואה</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
@@ -217,16 +195,12 @@ export default function LoansPage() {
                       <Tooltip formatter={(value: number) => `₪${value.toLocaleString('he-IL')}`} />
                     </PieChart>
                   </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              </DSCard>
               </div>
 
             {/* Loans List */}
-            <Card className="bg-white">
-              <CardHeader>
-                <CardTitle className="text-xl font-bold text-gray-900">רשימת הלוואות</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <DSCard padding="lg">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">רשימת הלוואות</h3>
                 <div className="space-y-4">
                   {loans.map((loan) => (
                     <div key={loan.id} className="border border-gray-200 rounded-lg">
@@ -272,10 +246,10 @@ export default function LoansPage() {
                     </div>
                   ))}
               </div>
-              </CardContent>
-            </Card>
+            </DSCard>
           </>
         )}
+        </div>
       </div>
     </DashboardWrapper>
   );

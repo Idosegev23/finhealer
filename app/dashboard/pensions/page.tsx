@@ -6,6 +6,7 @@ import { PlusCircle, Shield, TrendingUp, Briefcase } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { AddPensionModal } from "@/components/pensions/AddPensionModal";
 import { RequestPensionReport } from "@/components/pension/RequestPensionReport";
+import { PageWrapper, Card as DSCard } from '@/components/ui/design-system';
 
 interface PensionFund {
   id: string;
@@ -62,8 +63,7 @@ export default function PensionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
-        <div className="max-w-7xl mx-auto px-4">
+    <PageWrapper>
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -76,7 +76,7 @@ export default function PensionsPage() {
                   type="info"
                 />
               </h1>
-              <p className="text-gray-600 mt-2">
+              <p className="text-phi-slate mt-2">
                 ניהול מרכזי של כל החיסכון הפנסיוני שלך
               </p>
             </div>
@@ -93,45 +93,45 @@ export default function PensionsPage() {
         {/* Summary Cards */}
         {summary && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <Briefcase className="w-5 h-5 text-blue-500" />
-                <span className="text-sm text-gray-600">סה&quot;כ קרנות</span>
+                <span className="text-sm text-phi-slate">סה&quot;כ קרנות</span>
               </div>
               <div className="text-2xl font-bold text-gray-900">
                 {summary.total_funds}
               </div>
-            </div>
+            </DSCard>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <TrendingUp className="w-5 h-5 text-green-500" />
-                <span className="text-sm text-gray-600">יתרה כוללת</span>
+                <span className="text-sm text-phi-slate">יתרה כוללת</span>
               </div>
               <div className="text-2xl font-bold text-green-600">
                 ₪{summary.total_balance?.toLocaleString("he-IL") || 0}
               </div>
-            </div>
+            </DSCard>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <Shield className="w-5 h-5 text-purple-500" />
-                <span className="text-sm text-gray-600">הפקדה חודשית</span>
+                <span className="text-sm text-phi-slate">הפקדה חודשית</span>
               </div>
               <div className="text-2xl font-bold text-purple-600">
                 ₪{summary.total_monthly_deposit?.toLocaleString("he-IL") || 0}
               </div>
-            </div>
+            </DSCard>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <TrendingUp className="w-5 h-5 text-orange-500" />
-                <span className="text-sm text-gray-600">תשואה ממוצעת</span>
+                <span className="text-sm text-phi-slate">תשואה ממוצעת</span>
               </div>
               <div className="text-2xl font-bold text-orange-600">
                 {summary.average_return?.toFixed(2) || 0}%
               </div>
-            </div>
+            </DSCard>
           </div>
         )}
 
@@ -141,7 +141,7 @@ export default function PensionsPage() {
         </div>
 
         {/* Pensions Table */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <DSCard padding="sm" className="overflow-hidden">
           {pensions.length === 0 ? (
             <div className="text-center py-16 animate-fade-in">
               <div className="mb-6 relative">
@@ -154,7 +154,7 @@ export default function PensionsPage() {
               <p className="text-gray-600 mb-2 max-w-md mx-auto leading-relaxed">
                 פנסיה זה לא רק חובה - זה ההשקעה החשובה ביותר שלך. בגיל 67 תודו לעצמכם של היום.
               </p>
-              <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
+              <p className="text-sm text-phi-slate mb-8 max-w-md mx-auto">
                 הוסף את הקרנות הפנסיוניות שלך ובדוק שהן עובדות בשבילך נכון
               </p>
               <Button 
@@ -246,7 +246,7 @@ export default function PensionsPage() {
               </table>
             </div>
           )}
-        </div>
+        </DSCard>
 
         {/* Info Section */}
         <div className="mt-8 bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6 shadow-sm animate-slide-up">
@@ -290,15 +290,14 @@ export default function PensionsPage() {
             </li>
           </ul>
         </div>
-      </div>
-      
+
       {/* Add Pension Modal */}
       <AddPensionModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
         onSuccess={fetchPensions}
       />
-    </div>
+    </PageWrapper>
   );
 }
 

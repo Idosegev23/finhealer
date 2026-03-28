@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import SmartCategoryPicker from '@/components/transactions/SmartCategoryPicker';
+import { PageWrapper } from '@/components/ui/design-system';
 
 interface MissingDataItem {
   field: string;
@@ -302,8 +303,7 @@ export default function BudgetPage() {
   const hasCriticalMissing = criticalMissing.length > 0;
 
     return (
-    <div className="min-h-screen bg-phi-bg py-8 px-4" dir="rtl">
-      <div className="max-w-7xl mx-auto">
+    <PageWrapper>
 
         {/* Missing Data Alert */}
         {hasCriticalMissing && (
@@ -1371,8 +1371,7 @@ export default function BudgetPage() {
             </Card>
               </motion.div>
             )}
-      </div>
-    </div>
+    </PageWrapper>
   );
 }
 

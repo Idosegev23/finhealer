@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
+import { PageWrapper } from '@/components/ui/design-system';
 
 type SimType = 'loan' | 'savings';
 
@@ -209,8 +210,7 @@ export default function SimulatorPage() {
   const isLoan = simType === 'loan';
 
   return (
-    <div className="min-h-screen bg-phi-bg py-8 px-4" dir="rtl">
-      <div className="max-w-5xl mx-auto">
+    <PageWrapper>
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-phi-dark flex items-center gap-3 mb-2">
@@ -563,7 +563,6 @@ export default function SimulatorPage() {
             </Card>
           </div>
         </div>
-      </div>
-    </div>
+    </PageWrapper>
   );
 }

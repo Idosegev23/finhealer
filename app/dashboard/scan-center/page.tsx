@@ -14,6 +14,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageWrapper } from '@/components/ui/design-system';
 import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
@@ -210,7 +211,7 @@ function ScanCenterContent() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl" dir="rtl">
+    <PageWrapper>
       {/* Header - Hidden Page Notice */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
@@ -362,7 +363,7 @@ function ScanCenterContent() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-xs text-gray-500 mb-2">
+                <div className="text-xs text-phi-slate mb-2">
                   📊 נתונים שנחלץ:
                 </div>
                 <div className="text-sm text-gray-700">
@@ -426,7 +427,7 @@ function ScanCenterContent() {
             <h3 className="text-lg font-semibold text-gray-700 mb-2">
               בחר סוג דוח להעלאה
             </h3>
-            <p className="text-gray-500 text-sm">
+            <p className="text-phi-slate text-sm">
               לחץ על אחד הכרטיסים למעלה כדי להתחיל
             </p>
           </CardContent>
@@ -475,7 +476,7 @@ function ScanCenterContent() {
               <h3 className="text-lg font-semibold text-gray-700 mb-2">
                 אין עדיין היסטוריה
               </h3>
-              <p className="text-gray-500 text-sm">
+              <p className="text-phi-slate text-sm">
                 העלה את הדוח הראשון שלך כדי להתחיל!
               </p>
             </CardContent>
@@ -488,7 +489,7 @@ function ScanCenterContent() {
           </div>
         )}
       </div>
-    </div>
+    </PageWrapper>
   );
 }
 
@@ -577,7 +578,7 @@ function DocumentHistoryCard({ document }: DocumentHistoryCardProps) {
               </Badge>
             </div>
 
-            <div className="flex items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center gap-4 text-sm text-phi-slate">
               <span className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
                 {new Date(document.created_at).toLocaleDateString('he-IL', {
@@ -639,14 +640,14 @@ function DocumentHistoryCard({ document }: DocumentHistoryCardProps) {
 export default function ScanCenterPage() {
   return (
     <Suspense fallback={
-      <div className="container mx-auto p-6 max-w-7xl" dir="rtl">
+      <PageWrapper>
         <Card>
           <CardContent className="py-12 text-center">
             <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
-            <p className="text-gray-600">טוען...</p>
+            <p className="text-phi-slate">טוען...</p>
           </CardContent>
         </Card>
-      </div>
+      </PageWrapper>
     }>
       <ScanCenterContent />
     </Suspense>

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { PageWrapper } from '@/components/ui/design-system';
 
 interface RecurringItem {
   vendor: string;
@@ -73,8 +74,7 @@ export default function RecurringPage() {
   const incomes = recurring.filter(r => r.type === 'income');
 
   return (
-    <div className="min-h-screen bg-phi-bg py-8 px-4" dir="rtl">
-      <div className="max-w-7xl mx-auto">
+    <PageWrapper>
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <div className="flex items-center justify-between flex-wrap gap-4">
@@ -311,7 +311,6 @@ export default function RecurringPage() {
             </Card>
           </motion.div>
         )}
-      </div>
-    </div>
+    </PageWrapper>
   );
 }

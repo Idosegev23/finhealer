@@ -25,6 +25,7 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 import type { Goal, GoalAllocationResult } from '@/types/goals';
+import { Card as DSCard, EmptyState, PageWrapper, PageHeader } from '@/components/ui/design-system';
 import { GoalModal } from '@/components/goals/GoalModal';
 import { GoalsListCard } from '@/components/goals/GoalsListCard';
 import { GoalsDragList } from '@/components/goals/GoalsDragList';
@@ -237,20 +238,14 @@ export default function GoalsPage() {
   const isSimulationActive = simulationResult !== null;
   
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl" dir="rtl">
+    <PageWrapper className="max-w-7xl">
       {/* כותרת וכפתור יעד חדש */}
-      <div className="mb-8 flex justify-between items-start">
-        <div>
-          <h1 className="text-4xl font-bold text-phi-dark flex items-center gap-3 mb-2">
-            <Target className="w-10 h-10 text-phi-gold" />
-            φ היעדים שלך
-          </h1>
-          <p className="text-phi-slate text-lg">
-            {goals.length === 0
-              ? 'הגדר יעדים פיננסיים ונתחיל לעבוד לקראתם'
-              : `${goals.length} יעדים פעילים`}
-          </p>
-          </div>
+      <PageHeader
+        title="φ היעדים שלך"
+        subtitle={goals.length === 0
+          ? 'הגדר יעדים פיננסיים ונתחיל לעבוד לקראתם'
+          : `${goals.length} יעדים פעילים`}
+        action={
           <div className="flex gap-3">
             <Button onClick={() => setIsDragMode(true)} size="lg" variant="outline" className="gap-2">
               <ArrowUpDown className="w-5 h-5" />
@@ -261,13 +256,13 @@ export default function GoalsPage() {
               יעד חדש
             </Button>
           </div>
-        </div>
+        }
+      />
         
       {/* סיכום כללי */}
       {allocationResult && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-gradient-to-br from-phi-mint/20 to-phi-mint/5 border-phi-mint/30">
-            <CardContent className="pt-6">
+          <DSCard className="bg-gradient-to-br from-phi-mint/20 to-phi-mint/5 border-phi-mint/30">
                 <div className="flex items-center justify-between">
                   <div>
                   <p className="text-sm text-phi-slate mb-1">הכנסה חודשית</p>
@@ -277,11 +272,9 @@ export default function GoalsPage() {
                   </div>
                 <DollarSign className="w-10 h-10 text-phi-mint" />
                 </div>
-              </CardContent>
-            </Card>
-            
-          <Card className="bg-gradient-to-br from-phi-gold/20 to-phi-gold/5 border-phi-gold/30">
-            <CardContent className="pt-6">
+          </DSCard>
+
+          <DSCard className="bg-gradient-to-br from-phi-gold/20 to-phi-gold/5 border-phi-gold/30">
                 <div className="flex items-center justify-between">
                   <div>
                   <p className="text-sm text-phi-slate mb-1">זמין ליעדים</p>
@@ -291,11 +284,9 @@ export default function GoalsPage() {
                   </div>
                 <Target className="w-10 h-10 text-phi-gold" />
                 </div>
-              </CardContent>
-            </Card>
-            
-          <Card className="bg-gradient-to-br from-phi-coral/20 to-phi-coral/5 border-phi-coral/30">
-            <CardContent className="pt-6">
+          </DSCard>
+
+          <DSCard className="bg-gradient-to-br from-phi-coral/20 to-phi-coral/5 border-phi-coral/30">
                 <div className="flex items-center justify-between">
                   <div>
                   <p className="text-sm text-phi-slate mb-1">סה״כ מוקצה</p>
@@ -305,15 +296,13 @@ export default function GoalsPage() {
                   </div>
                 <TrendingUp className="w-10 h-10 text-phi-coral" />
                 </div>
-              </CardContent>
-            </Card>
-            
-          <Card className={`bg-gradient-to-br ${
+          </DSCard>
+
+          <DSCard className={`bg-gradient-to-br ${
             allocationResult.safetyCheck.passed
               ? 'from-green-500/20 to-green-500/5 border-green-500/30'
               : 'from-red-500/20 to-red-500/5 border-red-500/30'
           }`}>
-            <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
                   <p className="text-sm text-phi-slate mb-1">מצב תקציבי</p>
@@ -330,8 +319,7 @@ export default function GoalsPage() {
                   <AlertCircle className="w-10 h-10 text-red-600" />
                 )}
                 </div>
-              </CardContent>
-            </Card>
+          </DSCard>
           </div>
         )}
         
@@ -551,13 +539,11 @@ export default function GoalsPage() {
               })}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <Target className="w-16 h-16 text-phi-slate/30 mx-auto mb-4" />
-              <p className="text-phi-slate text-lg mb-4">אין עדיין יעדים פעילים</p>
-              <Button className="bg-phi-gold hover:bg-phi-gold/90">
-                הוסף יעד ראשון
-              </Button>
-            </div>
+            <EmptyState
+              icon={Target}
+              title="אין עדיין יעדים פעילים"
+              action={{ label: 'הוסף יעד ראשון', onClick: handleNewGoal }}
+            />
           )}
         </CardContent>
       </Card>
@@ -609,7 +595,7 @@ export default function GoalsPage() {
         goal={editingGoal}
         userId={userId}
       />
-      
+
       {/* Drag & Drop Dialog */}
       <Dialog open={isDragMode} onOpenChange={setIsDragMode}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto" dir="rtl">
@@ -626,6 +612,6 @@ export default function GoalsPage() {
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </PageWrapper>
   );
 }

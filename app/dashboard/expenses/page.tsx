@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, DollarSign } from 'lu
 import Link from 'next/link';
 import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner';
 import TransactionDetailsView from '@/components/dashboard/TransactionDetailsView';
+import { PageWrapper, Card as DSCard } from '@/components/ui/design-system';
 
 interface MonthData {
   month: string;
@@ -86,15 +87,14 @@ export default function ExpensesPage() {
   const sortedMonths = Object.keys(monthlyDetails).sort().reverse(); // מהחדש לישן
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <PageWrapper>
         <WhatsAppBanner message="רוצה לרשום הוצאה חדשה? פשוט תכתוב לבוט! 📝" />
-        
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">הוצאות</h1>
-            <p className="text-gray-600 mt-1">מעקב והיסטוריה של כל ההוצאות שלך</p>
+            <p className="text-phi-slate mt-1">מעקב והיסטוריה של כל ההוצאות שלך</p>
           </div>
           <Link
             href="/dashboard/data/expenses"
@@ -105,7 +105,7 @@ export default function ExpensesPage() {
         </div>
 
         {/* Mini Dashboard - גרף חודשי */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <DSCard padding="lg">
           <h2 className="text-xl font-semibold mb-6">מגמת הוצאות חודשית</h2>
           
           {chartData.length > 0 ? (
@@ -125,13 +125,13 @@ export default function ExpensesPage() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-phi-slate">
               <DollarSign className="mx-auto h-12 w-12 mb-4 text-gray-300" />
               <p>אין נתונים להצגה</p>
               <p className="text-sm mt-2">התחל להוסיף הוצאות כדי לראות את הגרף</p>
             </div>
           )}
-        </div>
+        </DSCard>
 
         {/* פירוט חודשי */}
         <div className="space-y-4">
@@ -152,21 +152,20 @@ export default function ExpensesPage() {
               );
             })
           ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+            <DSCard className="text-center" padding="lg">
               <DollarSign className="mx-auto h-16 w-16 mb-4 text-gray-300" />
               <h3 className="text-xl font-semibold text-gray-700 mb-2">אין הוצאות עדיין</h3>
-              <p className="text-gray-500 mb-6">התחל להוסיף הוצאות כדי לראות אותן כאן</p>
+              <p className="text-phi-slate mb-6">התחל להוסיף הוצאות כדי לראות אותן כאן</p>
               <Link
                 href="/dashboard/data/expenses"
                 className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
               >
                 הוסף הוצאה ראשונה
               </Link>
-            </div>
+            </DSCard>
           )}
         </div>
-      </div>
-    </div>
+    </PageWrapper>
   );
 }
 
@@ -188,7 +187,7 @@ function MonthCard({ month, data, isExpanded, onToggle, onRefresh }: MonthCardPr
   const specialPercent = data.total > 0 ? (data.byType.special / data.total) * 100 : 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+    <DSCard padding="sm" className="overflow-hidden">
       {/* כותרת - ניתן ללחיצה */}
       <button
         onClick={onToggle}
@@ -197,19 +196,19 @@ function MonthCard({ month, data, isExpanded, onToggle, onRefresh }: MonthCardPr
         <div className="flex items-center gap-4">
           <div>
             <h3 className="text-xl font-semibold text-gray-900">{monthName}</h3>
-            <p className="text-sm text-gray-500">{data.count} תנועות</p>
+            <p className="text-sm text-phi-slate">{data.count} תנועות</p>
           </div>
         </div>
 
         <div className="flex items-center gap-6">
           <div className="text-end">
             <p className="text-2xl font-bold text-gray-900">₪{data.total.toLocaleString('he-IL')}</p>
-            <p className="text-sm text-gray-500">סה&quot;כ הוצאות</p>
+            <p className="text-sm text-phi-slate">סה&quot;כ הוצאות</p>
           </div>
           {isExpanded ? (
-            <ChevronUp className="h-6 w-6 text-gray-400" />
+            <ChevronUp className="h-6 w-6 text-phi-slate" />
           ) : (
-            <ChevronDown className="h-6 w-6 text-gray-400" />
+            <ChevronDown className="h-6 w-6 text-phi-slate" />
           )}
         </div>
       </button>
@@ -278,7 +277,7 @@ function MonthCard({ month, data, isExpanded, onToggle, onRefresh }: MonthCardPr
           </div>
         </div>
       )}
-    </div>
+    </DSCard>
   );
 }
 
@@ -379,13 +378,13 @@ function CategoryGroup({ title, categories, transactions, type, onRefresh }: Cat
               >
                 <div className="flex items-center gap-3">
                   {isExpanded ? (
-                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                    <ChevronUp className="h-5 w-5 text-phi-slate" />
                   ) : (
-                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                    <ChevronDown className="h-5 w-5 text-phi-slate" />
                   )}
                   <div className="text-right">
                 <p className="font-medium text-gray-900">{category}</p>
-                <p className="text-sm text-gray-500">{items.length} תנועות</p>
+                <p className="text-sm text-phi-slate">{items.length} תנועות</p>
                   </div>
               </div>
               <p className="font-semibold text-gray-900">₪{total.toLocaleString('he-IL')}</p>
@@ -398,7 +397,7 @@ function CategoryGroup({ title, categories, transactions, type, onRefresh }: Cat
                       <div className="flex justify-between items-start mb-1">
                         <div>
                           <p className="font-medium text-gray-900">{tx.vendor || 'לא צוין'}</p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-phi-slate">
                             {new Date(tx.tx_date).toLocaleDateString('he-IL')}
                             {tx.payment_method && ` • ${tx.payment_method}`}
                           </p>

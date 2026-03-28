@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import {
   Plus,
   DollarSign,
@@ -19,6 +19,7 @@ import ConversationalIncomeWizard from '@/components/income/ConversationalIncome
 import IncomeTable from '@/components/income/IncomeTable';
 import { SmartIncomeCalculator } from '@/components/income/SmartIncomeCalculator';
 import AdvancedTransactionsTable from '@/components/shared/AdvancedTransactionsTable';
+import { StatCard, PageWrapper, PageHeader } from '@/components/ui/design-system';
 
 // ============================================================================
 // טיפוסים
@@ -85,7 +86,7 @@ export default function IncomePage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl" dir="rtl">
+    <PageWrapper className="max-w-7xl">
       <WhatsAppBanner message="רוצה להוסיף מקור הכנסה? לעדכן תלוש משכורת? דבר עם הבוט! 💼" />
 
       {/* Month Selector */}
@@ -120,63 +121,58 @@ export default function IncomePage() {
       </div>
       
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            💰 ההכנסות שלי
-          </h1>
-          <p className="text-gray-600">
-            נהל את כל מקורות ההכנסה שלך במקום אחד
-          </p>
-        </div>
+      <PageHeader
+        title="💰 ההכנסות שלי"
+        subtitle="נהל את כל מקורות ההכנסה שלך במקום אחד"
+        action={
+          <div className="flex items-center gap-3">
+            {/* View Toggle */}
+            {incomeSources.length > 0 && (
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`px-3 py-2 rounded-md transition-colors ${
+                    viewMode === 'table'
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <List className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`px-3 py-2 rounded-md transition-colors ${
+                    viewMode === 'cards'
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Grid3x3 className="w-5 h-5" />
+                </button>
+              </div>
+            )}
 
-        <div className="flex items-center gap-3">
-          {/* View Toggle */}
-          {incomeSources.length > 0 && (
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('table')}
-                className={`px-3 py-2 rounded-md transition-colors ${
-                  viewMode === 'table'
-                    ? 'bg-white shadow-sm text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <List className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setViewMode('cards')}
-                className={`px-3 py-2 rounded-md transition-colors ${
-                  viewMode === 'cards'
-                    ? 'bg-white shadow-sm text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Grid3x3 className="w-5 h-5" />
-              </button>
-            </div>
-          )}
+            {/* Refresh */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={loadIncome}
+              disabled={loading}
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
 
-          {/* Refresh */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={loadIncome}
-            disabled={loading}
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-
-          {/* Add Income */}
-          <Button
-            onClick={() => setShowWizard(true)}
-            className="bg-phi-mint hover:bg-phi-mint/90 text-white"
-          >
-            <Plus className="w-4 h-4 ml-2" />
-            הוסף הכנסה
-          </Button>
-        </div>
-      </div>
+            {/* Add Income */}
+            <Button
+              onClick={() => setShowWizard(true)}
+              className="bg-phi-mint hover:bg-phi-mint/90 text-white"
+            >
+              <Plus className="w-4 h-4 ml-2" />
+              הוסף הכנסה
+            </Button>
+          </div>
+        }
+      />
 
       {loading && incomeSources.length === 0 ? (
         <div className="flex items-center justify-center py-20">
@@ -187,31 +183,35 @@ export default function IncomePage() {
           {/* Stats */}
           {stats && (incomeSources.length > 0 || transactionIncome.length > 0) && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <StatsCard
-                title="הכנסה ממקורות קבועים"
+              <StatCard
+                label="הכנסה ממקורות קבועים"
                 value={SmartIncomeCalculator.formatAmount(stats.totalMonthlyIncome)}
                 icon={DollarSign}
-                color="blue"
+                iconColor="text-blue-600"
+                iconBg="bg-blue-50"
               />
-              <StatsCard
-                title="הכנסה מתנועות החודש"
+              <StatCard
+                label="הכנסה מתנועות החודש"
                 value={`₪${stats.totalMonthlyIncomeFromTransactions?.toLocaleString('he-IL') || '0'}`}
                 subtitle={`${stats.transactionIncomeCount || 0} תנועות`}
                 icon={TrendingUp}
-                color="green"
+                iconColor="text-green-600"
+                iconBg="bg-green-50"
               />
-              <StatsCard
-                title="סה״כ הכנסה כוללת"
+              <StatCard
+                label="סה״כ הכנסה כוללת"
                 value={`₪${stats.totalCombinedIncome?.toLocaleString('he-IL') || '0'}`}
                 icon={BarChart3}
-                color="purple"
+                iconColor="text-purple-600"
+                iconBg="bg-purple-50"
               />
-              <StatsCard
-                title="מספר מקורות"
+              <StatCard
+                label="מספר מקורות"
                 value={stats.total.toString()}
                 subtitle="מקורות קבועים"
                 icon={BarChart3}
-                color="blue"
+                iconColor="text-blue-600"
+                iconBg="bg-blue-50"
               />
             </div>
           )}
@@ -295,50 +295,13 @@ export default function IncomePage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </PageWrapper>
   );
 }
 
 // ============================================================================
 // קומפוננטות עזר
 // ============================================================================
-
-function StatsCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  color = 'blue',
-}: {
-  title: string;
-  value: string;
-  subtitle?: string;
-  icon: any;
-  color?: 'blue' | 'green' | 'purple';
-}) {
-  const colors = {
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-green-50 text-green-600',
-    purple: 'bg-purple-50 text-purple-600',
-  };
-
-  return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`w-12 h-12 rounded-xl ${colors[color]} flex items-center justify-center`}>
-            <Icon className="w-6 h-6" />
-          </div>
-        </div>
-        <div>
-          <p className="text-sm text-gray-600 mb-1">{title}</p>
-          <p className="text-3xl font-bold text-gray-900">{value}</p>
-          {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function EmptyState({ onAddIncome }: { onAddIncome: () => void }) {
   return (

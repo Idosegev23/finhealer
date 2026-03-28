@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Phone, MessageSquare, Bell, User, CreditCard, Lock, Loader2, CheckCircle, Plus, Pencil, Trash2, Baby, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { PageWrapper, Card as DSCard } from '@/components/ui/design-system';
 
 type Tab = 'profile' | 'whatsapp' | 'notifications' | 'subscription' | 'privacy';
 
@@ -17,17 +18,16 @@ function SettingsContent() {
   }, [searchParams]);
 
   return (
-    <div className="min-h-screen bg-gray-50" dir="rtl">
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
+    <PageWrapper>
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-gray-900">הגדרות</h1>
-          <p className="text-sm text-gray-500">ניהול פרופיל, התראות ומנוי</p>
+          <p className="text-sm text-phi-slate">ניהול פרופיל, התראות ומנוי</p>
         </div>
 
         <div className="grid lg:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm p-4 space-y-2">
+            <DSCard padding="sm" className="space-y-2">
               <TabButton
                 icon={<User className="w-5 h-5" />}
                 label="פרופיל אישי"
@@ -71,7 +71,7 @@ function SettingsContent() {
                   התנתק
                 </button>
               </div>
-            </div>
+            </DSCard>
           </div>
 
           {/* Content */}
@@ -83,8 +83,7 @@ function SettingsContent() {
             {activeTab === 'privacy' && <PrivacyTab />}
           </div>
         </div>
-      </div>
-    </div>
+    </PageWrapper>
   );
 }
 
@@ -372,14 +371,14 @@ function ProfileTab() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
+      <DSCard padding="lg" className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-phi-dark" />
-      </div>
+      </DSCard>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
+    <DSCard padding="lg">
       <h2 className="text-xl font-bold text-gray-900 mb-6">פרופיל אישי</h2>
 
       {error && (
@@ -416,7 +415,7 @@ function ProfileTab() {
             className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-100 cursor-not-allowed"
             placeholder="email@example.com"
           />
-          <p className="text-xs text-gray-500 mt-1">לא ניתן לשנות את כתובת המייל</p>
+          <p className="text-xs text-phi-slate mt-1">לא ניתן לשנות את כתובת המייל</p>
         </div>
 
         <div>
@@ -521,7 +520,7 @@ function ProfileTab() {
               </h4>
               <button
                 onClick={cancelChildForm}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-phi-slate hover:text-gray-600"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -587,10 +586,10 @@ function ProfileTab() {
 
         {childrenLoading ? (
           <div className="text-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-phi-slate" />
           </div>
         ) : children.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-phi-slate">
             <Baby className="w-12 h-12 mx-auto mb-2 text-gray-300" />
             <p className="text-sm">טרם הוספת פרטי ילדים</p>
             <p className="text-xs mt-1">לחץ על &quot;הוסף ילד&quot; כדי להתחיל</p>
@@ -609,11 +608,11 @@ function ProfileTab() {
                       גיל {calculateAge(child.birth_date)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-phi-slate">
                     תאריך לידה: {new Date(child.birth_date).toLocaleDateString('he-IL')}
                   </p>
                   {child.notes && (
-                    <p className="text-xs text-gray-400 mt-1">{child.notes}</p>
+                    <p className="text-xs text-phi-slate mt-1">{child.notes}</p>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -635,7 +634,7 @@ function ProfileTab() {
           </div>
         )}
       </div>
-    </div>
+    </DSCard>
   );
 }
 
@@ -675,14 +674,14 @@ function WhatsAppTab() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
+      <DSCard padding="lg" className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-phi-dark" />
-      </div>
+      </DSCard>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
+    <DSCard padding="lg">
       <h2 className="text-xl font-bold text-gray-900 mb-6">חיבור WhatsApp</h2>
 
       {!isConnected ? (
@@ -735,13 +734,13 @@ function WhatsAppTab() {
           </p>
         </div>
       )}
-    </div>
+    </DSCard>
   );
 }
 
 function NotificationsTab() {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
+    <DSCard padding="lg">
       <h2 className="text-xl font-bold text-gray-900 mb-6">התראות</h2>
       <div className="space-y-4">
         <NotificationToggle
@@ -765,7 +764,7 @@ function NotificationsTab() {
           defaultChecked={true}
         />
       </div>
-    </div>
+    </DSCard>
   );
 }
 
@@ -901,9 +900,9 @@ function SubscriptionTab() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
+      <DSCard padding="lg" className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-phi-dark" />
-      </div>
+      </DSCard>
     );
   }
 
@@ -911,7 +910,7 @@ function SubscriptionTab() {
   const currentAmount = subscription?.amount || 49;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
+    <DSCard padding="lg">
       <h2 className="text-xl font-bold text-gray-900 mb-6">מנוי ותשלומים</h2>
 
       {error && (
@@ -996,7 +995,7 @@ function SubscriptionTab() {
           )}
         </button>
       </div>
-    </div>
+    </DSCard>
   );
 }
 
@@ -1073,14 +1072,14 @@ function PrivacyTab() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
+      <DSCard padding="lg" className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-phi-dark" />
-      </div>
+      </DSCard>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
+    <DSCard padding="lg">
       <h2 className="text-xl font-bold text-gray-900 mb-6">פרטיות ואבטחה</h2>
       <div className="space-y-4">
         {isEmailPasswordUser && (
@@ -1259,7 +1258,7 @@ function PrivacyTab() {
           </div>
         </div>
       </div>
-    </div>
+    </DSCard>
   );
 }
 

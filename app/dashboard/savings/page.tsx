@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, PiggyBank, Target, TrendingUp, Calendar } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { Card as DSCard, PageWrapper, PageHeader } from '@/components/ui/design-system';
 import { AddSavingsModal } from "@/components/savings/AddSavingsModal";
 
 interface SavingsAccount {
@@ -72,101 +73,91 @@ export default function SavingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
-        <div className="max-w-7xl mx-auto px-4">
+    <PageWrapper className="max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <PiggyBank className="w-8 h-8 text-phi-mint" />
-                חשבונות חיסכון
-                <InfoTooltip
-                  content="כאן תוכל לנהל את כל חשבונות החיסכון שלך - קופות חירום, פיקדונות, השקעות ויעדי חיסכון"
-                  type="info"
-                />
-              </h1>
-              <p className="text-gray-600 mt-2">ניהול מרכזי של כל החיסכונות שלך</p>
-            </div>
-            <Button 
+        <PageHeader
+          title="חשבונות חיסכון"
+          subtitle="ניהול מרכזי של כל החיסכונות שלך"
+          action={
+            <Button
               onClick={() => setShowAddModal(true)}
               className="bg-phi-mint hover:bg-phi-mint/90 text-white"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף חשבון חיסכון
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Summary Cards */}
         {summary && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <PiggyBank className="w-5 h-5 text-blue-500" />
-                <span className="text-sm text-gray-600">סה&quot;כ חשבונות</span>
+                <span className="text-sm text-phi-slate">סה&quot;כ חשבונות</span>
               </div>
               <div className="text-2xl font-bold text-gray-900">
                 {summary.total_accounts}
               </div>
-            </div>
+            </DSCard>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <TrendingUp className="w-5 h-5 text-green-500" />
-                <span className="text-sm text-gray-600">יתרה כוללת</span>
+                <span className="text-sm text-phi-slate">יתרה כוללת</span>
               </div>
               <div className="text-2xl font-bold text-green-600">
                 ₪{summary.total_balance?.toLocaleString("he-IL") || 0}
               </div>
-            </div>
+            </DSCard>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <Calendar className="w-5 h-5 text-purple-500" />
-                <span className="text-sm text-gray-600">הפקדה חודשית</span>
+                <span className="text-sm text-phi-slate">הפקדה חודשית</span>
               </div>
               <div className="text-2xl font-bold text-purple-600">
                 ₪{summary.total_monthly_deposit?.toLocaleString("he-IL") || 0}
               </div>
-            </div>
+            </DSCard>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <Target className="w-5 h-5 text-orange-500" />
-                <span className="text-sm text-gray-600">התקדמות ליעד</span>
+                <span className="text-sm text-phi-slate">התקדמות ליעד</span>
               </div>
               <div className="text-2xl font-bold text-orange-600">
                 {summary.progress_percentage?.toFixed(1) || 0}%
               </div>
-            </div>
+            </DSCard>
           </div>
         )}
 
         {/* Savings Cards Grid */}
         {savings.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm text-center py-16 animate-fade-in">
+          <DSCard className="text-center py-16 animate-fade-in">
             <div className="mb-6 relative">
               <div className="absolute inset-0 bg-green-100 rounded-full blur-3xl opacity-30 animate-pulse"></div>
               <PiggyBank className="w-20 h-20 text-phi-mint mx-auto relative animate-bounce-slow" />
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-3">
-              בואו נתחיל לחסוך יחד 💰
+              בואו נתחיל לחסוך יחד
             </h3>
-            <p className="text-gray-600 mb-2 max-w-md mx-auto leading-relaxed">
+            <p className="text-phi-slate mb-2 max-w-md mx-auto leading-relaxed">
               חיסכון זה לא על לוותר - זה על לתכנן נכון. כל שקל שתחסוך עכשיו עובד בשבילך בעתיד.
             </p>
-            <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
+            <p className="text-sm text-phi-slate mb-8 max-w-md mx-auto">
               הגדר חשבונות חיסכון עם יעדים ברורים ותראה את הכסף גדל
             </p>
-            <Button 
+            <Button
               onClick={() => setShowAddModal(true)}
               className="bg-phi-mint hover:bg-phi-mint/90 text-white shadow-lg hover:shadow-xl transition-all"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               פתח חשבון חיסכון ראשון
             </Button>
-          </div>
+          </DSCard>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {savings.map((account) => {
@@ -178,9 +169,10 @@ export default function SavingsPage() {
                 : 0;
 
               return (
-                <div
+                <DSCard
                   key={account.id}
-                  className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
+                  padding="lg"
+                  hover
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -283,14 +275,14 @@ export default function SavingsPage() {
                     )}
                   </div>
 
-                </div>
+                </DSCard>
               );
             })}
           </div>
         )}
 
         {/* Info Section */}
-        <div className="mt-8 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-sm animate-slide-up">
+        <DSCard className="mt-8 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 animate-slide-up" padding="lg">
           <div className="flex items-start gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
               <span className="text-xl">💡</span>
@@ -330,15 +322,14 @@ export default function SavingsPage() {
               </span>
             </li>
           </ul>
-        </div>
-      </div>
-      
+        </DSCard>
+
       {/* Add Savings Modal */}
       <AddSavingsModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
         onSuccess={fetchSavings}
       />
-    </div>
+    </PageWrapper>
   );
 }

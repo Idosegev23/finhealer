@@ -6,6 +6,7 @@ import { PlusCircle, Shield, Heart, AlertTriangle } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { AddInsuranceModal } from "@/components/insurance/AddInsuranceModal";
 import { RequestPensionReport } from "@/components/pension/RequestPensionReport";
+import { PageWrapper, Card as DSCard } from '@/components/ui/design-system';
 
 interface Insurance {
   id: string;
@@ -70,8 +71,7 @@ export default function InsurancePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8" dir="rtl">
-        <div className="max-w-7xl mx-auto px-4">
+    <PageWrapper>
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -84,7 +84,7 @@ export default function InsurancePage() {
                   type="info"
                 />
               </h1>
-              <p className="text-gray-600 mt-2">ניהול מרכזי של כל הביטוחים שלך</p>
+              <p className="text-phi-slate mt-2">ניהול מרכזי של כל הביטוחים שלך</p>
             </div>
             <Button 
               onClick={() => setShowAddModal(true)}
@@ -132,41 +132,41 @@ export default function InsurancePage() {
         {/* Summary Cards */}
         {summary && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <Shield className="w-5 h-5 text-blue-500" />
-                <span className="text-sm text-gray-600">סה&quot;כ ביטוחים</span>
+                <span className="text-sm text-phi-slate">סה&quot;כ ביטוחים</span>
               </div>
               <div className="text-2xl font-bold text-gray-900">
                 {summary.total_policies}
               </div>
-            </div>
+            </DSCard>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <Heart className="w-5 h-5 text-red-500" />
-                <span className="text-sm text-gray-600">פרמיה חודשית</span>
+                <span className="text-sm text-phi-slate">פרמיה חודשית</span>
               </div>
               <div className="text-2xl font-bold text-red-600">
                 ₪{summary.monthly_total?.toLocaleString("he-IL") || 0}
               </div>
-            </div>
+            </DSCard>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
                 <Shield className="w-5 h-5 text-purple-500" />
-                <span className="text-sm text-gray-600">פרמיה שנתית</span>
+                <span className="text-sm text-phi-slate">פרמיה שנתית</span>
               </div>
               <div className="text-2xl font-bold text-purple-600">
                 ₪{summary.annual_total?.toLocaleString("he-IL") || 0}
               </div>
-            </div>
+            </DSCard>
           </div>
         )}
 
         {/* Insurances Grid */}
         {insurances.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm text-center py-16 animate-fade-in">
+          <DSCard padding="lg" className="text-center py-16 animate-fade-in">
             <div className="mb-6 relative">
               <div className="absolute inset-0 bg-green-100 rounded-full blur-3xl opacity-30 animate-pulse"></div>
               <Shield className="w-20 h-20 text-phi-mint mx-auto relative animate-bounce-slow" />
@@ -177,25 +177,26 @@ export default function InsurancePage() {
             <p className="text-gray-600 mb-2 max-w-md mx-auto leading-relaxed">
               ביטוחים זה לא הוצאה - זה ביטחון. הגנה על המשפחה והנכסים שלך.
             </p>
-            <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
+            <p className="text-sm text-phi-slate mb-8 max-w-md mx-auto">
               התחל לנהל את תיק הביטוח שלך בצורה מקצועית ובדוק שיש לך את הכיסויים החשובים
             </p>
-            <Button 
+            <Button
               onClick={() => setShowAddModal(true)}
               className="bg-phi-mint hover:bg-phi-mint/90 text-white shadow-lg hover:shadow-xl transition-all"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף ביטוח ראשון
             </Button>
-          </div>
+          </DSCard>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {insurances.map((insurance) => {
               const typeInfo = INSURANCE_TYPE_LABELS[insurance.insurance_type];
               return (
-                <div
+                <DSCard
                   key={insurance.id}
-                  className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
+                  padding="lg"
+                  hover
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -243,7 +244,7 @@ export default function InsurancePage() {
                     </div>
                   </div>
 
-                </div>
+                </DSCard>
               );
             })}
           </div>
@@ -297,14 +298,13 @@ export default function InsurancePage() {
             </li>
           </ul>
         </div>
-      </div>
-      
+
       {/* Add Insurance Modal */}
       <AddInsuranceModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
         onSuccess={fetchInsurances}
       />
-    </div>
+    </PageWrapper>
   );
 }
