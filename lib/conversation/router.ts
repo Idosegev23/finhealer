@@ -26,8 +26,7 @@ import type { RouterContext, RouterResult, UserState } from './shared';
 
 // State handlers
 import { handleStart, handleWaitingForName, handleWaitingForDocument } from './states/onboarding';
-// Old classification engine kept as import for legacy fallback ONLY
-// import { handleClassificationState, handleClassificationResponse, startClassification } from './states/classification';
+// classification.ts (old engine) is no longer imported — smart-classification.ts replaces it
 import { handleSmartClassification } from './states/smart-classification';
 import { phiBrain } from '@/lib/ai/phi-brain';
 import { handleBehaviorPhase } from './states/behavior';

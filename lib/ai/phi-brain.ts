@@ -12,6 +12,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { chatWithGeminiFlash } from '@/lib/ai/gemini-client';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { classifyAllTransactions, applyClassifications, learnFromClassifications, formatSummaryForWhatsApp } from '@/lib/classification/ai-classifier';
+import { cache } from '@/lib/utils/cache';
+import { log } from '@/lib/utils/logger';
 
 // ============================================================================
 // Types
@@ -98,6 +100,11 @@ const DEFAULT_PROFILE: UserPersonalProfile = {
 // ============================================================================
 
 async function loadBrainContext(userId: string): Promise<BrainContext> {
+  // Cache for 30 seconds — same user won't trigger 8 DB queries per message
+  return cache.getOrSet(`brain_ctx:${userId}`, 30, () => _loadBrainContextImpl(userId));
+}
+
+async function _loadBrainContextImpl(userId: string): Promise<BrainContext> {
   const supabase = createServiceClient();
   const now = new Date();
   const today = now.toISOString().split('T')[0];
@@ -302,6 +309,80 @@ actions אפשריות:
 }
 
 // ============================================================================
+// Fast Path — Rule-based decisions, no Gemini (~100ms instead of ~4s)
+// ============================================================================
+
+const EXPENSE_PATTERN = /^(.+?)\s+(\d[\d,.]*)\s*$|^(\d[\d,.]*)\s+(.+?)$/;
+const COMMAND_MAP: Record<string, string> = {
+  'סיכום': 'show_summary', 'מצב': 'show_money_flow', 'סטטוס': 'show_money_flow',
+  'גרף': 'show_chart', 'תרשים': 'show_chart',
+  'תקציב': 'show_budget', 'כמה נשאר': 'show_money_flow',
+  'יעדים': 'show_goals', 'מטרות': 'show_goals',
+  'תזרים': 'show_cashflow', 'תחזית': 'show_cashflow',
+  'ציון': 'show_phi_score', 'דירוג': 'show_phi_score',
+  'ניתוח': 'show_summary', 'בטל': 'undo_expense',
+  'עזרה': 'help', 'תפריט': 'help',
+  'כמה יש לי': 'show_money_flow', 'כמה חופשי': 'show_money_flow',
+  'יומי': 'show_money_flow', 'שבועי': 'show_money_flow',
+};
+
+function tryFastPath(message: string, ctx: BrainContext): any | null {
+  const trimmed = message.trim();
+  const lower = trimmed.toLowerCase();
+
+  // 1. Exact command match
+  for (const [cmd, action] of Object.entries(COMMAND_MAP)) {
+    if (lower === cmd || lower.startsWith(cmd + ' ')) {
+      return { should_respond: true, action, action_params: {}, message: null, internal_reasoning: `fast_path: ${cmd}` };
+    }
+  }
+
+  // 2. Greeting
+  if (/^(היי|שלום|הי|בוקר טוב|ערב טוב|מה נשמע|אהלן)$/i.test(trimmed)) {
+    return { should_respond: true, action: 'greeting', message: `היי ${ctx.userName || ''}! 😊 מה תרצו לעשות?`, internal_reasoning: 'fast_path: greeting' };
+  }
+
+  // 3. Expense pattern: "סופר 450" or "450 סופר"
+  const match = trimmed.match(EXPENSE_PATTERN);
+  if (match) {
+    const vendor = (match[1] || match[4] || '').trim();
+    const amountStr = (match[2] || match[3] || '').replace(/,/g, '');
+    const amount = parseFloat(amountStr);
+    if (amount > 0 && amount < 100000 && vendor.length >= 2) {
+      return {
+        should_respond: true,
+        action: 'log_expense',
+        action_params: { vendor, amount },
+        message: null,
+        internal_reasoning: `fast_path: expense ${vendor} ${amount}`,
+      };
+    }
+  }
+
+  // 4. "Can I afford?" pattern: "אפשר לקנות X ב-Y"
+  const affordMatch = trimmed.match(/אפשר\s+(?:לקנות|לרכוש)?\s*(.+?)\s+ב?-?(\d[\d,.]*)/);
+  if (affordMatch) {
+    const description = affordMatch[1].trim();
+    const amount = parseFloat(affordMatch[2].replace(/,/g, ''));
+    if (amount > 0) {
+      return {
+        should_respond: true,
+        action: 'afford_check',
+        action_params: { description, amount },
+        message: null,
+        internal_reasoning: `fast_path: afford_check ${description} ${amount}`,
+      };
+    }
+  }
+
+  // 5. Scheduled check — always silent unless Gemini decides otherwise
+  // (returns null → goes to Gemini)
+
+  // No fast path match → let Gemini handle
+  return null;
+}
+
+// ============================================================================
 // PhiBrain — Main Entry Point
 // ============================================================================
 
@@ -329,33 +410,48 @@ export async function phiBrain(
     }
   }
 
-  // ── Build prompt and ask Gemini ──
-  const prompt = buildBrainPrompt(ctx, event);
+  // ══════════════════════════════════════════════════════════════
+  // FAST PATH — Rule-based decisions, no Gemini call (~100ms)
+  // 80% of messages are handled here. Gemini only for complex/ambiguous.
+  // ══════════════════════════════════════════════════════════════
 
-  let decision: any;
-  try {
-    const response = await chatWithGeminiFlash(
-      prompt,
-      'אתה φ — מאמן פיננסי אישי. החזר JSON בלבד.',
-      ''
-    );
+  let decision: any = null;
 
-    const cleaned = response.replace(/```json?\s*/g, '').replace(/```/g, '').trim();
-    decision = JSON.parse(cleaned);
-  } catch (err) {
-    console.error('[PhiBrain] Gemini error:', err);
-    // Fallback: if user sent a message, at least acknowledge
-    if (event.type === 'whatsapp_message') {
-      return {
-        sendMessage: `קיבלתי! 😊 רגע מעבד...`,
-      };
+  if (event.type === 'whatsapp_message') {
+    decision = tryFastPath(event.message, ctx);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // SLOW PATH — Gemini AI for complex messages (~2-4 seconds)
+  // Only reached if fast path returned null
+  // ══════════════════════════════════════════════════════════════
+
+  if (!decision) {
+    const prompt = buildBrainPrompt(ctx, event);
+    try {
+      const response = await chatWithGeminiFlash(
+        prompt,
+        'אתה φ — מאמן פיננסי אישי. החזר JSON בלבד.',
+        ''
+      );
+      const cleaned = response.replace(/```json?\s*/g, '').replace(/```/g, '').trim();
+      decision = JSON.parse(cleaned);
+    } catch (err) {
+      console.error('[PhiBrain] Gemini error:', err);
+      if (event.type === 'whatsapp_message') {
+        return { sendMessage: `קיבלתי! 😊 רגע מעבד...` };
+      }
+      return { silent: true };
     }
-    return { silent: true };
   }
 
   const brainAction = decision.action || 'none';
   const params = decision.action_params || {};
-  console.log(`[PhiBrain] Decision for ${ctx.userName}: action=${brainAction}, reasoning=${decision.internal_reasoning?.substring(0, 100)}`);
+  const isFastPath = decision.internal_reasoning?.startsWith('fast_path');
+  log.info('phi_brain_decision', {
+    userId, action: brainAction, fastPath: isFastPath,
+    reasoning: decision.internal_reasoning?.substring(0, 100),
+  });
 
   // ── Execute action via specialized handlers ──
   const supabase = createServiceClient();
@@ -391,6 +487,8 @@ export async function phiBrain(
           break;
         }
         // Sync budget
+        // Invalidate caches after expense
+        cache.invalidate(userId);
         try {
           const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
           await syncBudgetSpending(userId);

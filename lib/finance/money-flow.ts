@@ -18,6 +18,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
+import { cache } from '@/lib/utils/cache';
 
 // ============================================================================
 // Types
@@ -104,6 +105,11 @@ export interface MonthComparison {
 // ============================================================================
 
 export async function calculateMoneyFlow(userId: string, month?: string): Promise<MoneyFlowResult> {
+  const cacheKey = `money_flow:${userId}:${month || 'current'}`;
+  return cache.getOrSet(cacheKey, 60, () => _calculateMoneyFlowImpl(userId, month));
+}
+
+async function _calculateMoneyFlowImpl(userId: string, month?: string): Promise<MoneyFlowResult> {
   const supabase = createServiceClient();
   const now = new Date();
   const targetMonth = month || now.toISOString().substring(0, 7);

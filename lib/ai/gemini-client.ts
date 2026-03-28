@@ -79,6 +79,17 @@ export async function chatWithGeminiFlash(
   userContext: string,
   conversationHistory?: ConversationMessage[]
 ): Promise<string> {
+  // Rate limit: max 5 concurrent Gemini calls
+  const { geminiLimiter } = await import('@/lib/utils/rate-limiter');
+  return geminiLimiter.execute(() => _chatWithGeminiFlashImpl(message, systemPrompt, userContext, conversationHistory));
+}
+
+async function _chatWithGeminiFlashImpl(
+  message: string,
+  systemPrompt: string,
+  userContext: string,
+  conversationHistory?: ConversationMessage[]
+): Promise<string> {
   try {
     return await retryWithBackoff(async () => {
       const client = getClient();
@@ -140,6 +151,14 @@ export async function chatWithGeminiFlash(
  * Use for: intent parsing JSON, category matching
  */
 export async function chatWithGeminiFlashMinimal(
+  message: string,
+  systemPrompt: string
+): Promise<string> {
+  const { geminiLimiter } = await import('@/lib/utils/rate-limiter');
+  return geminiLimiter.execute(() => _chatWithGeminiFlashMinimalImpl(message, systemPrompt));
+}
+
+async function _chatWithGeminiFlashMinimalImpl(
   message: string,
   systemPrompt: string
 ): Promise<string> {
