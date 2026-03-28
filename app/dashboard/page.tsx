@@ -149,7 +149,7 @@ export default async function DashboardPage() {
 
         {/* Greeting */}
         <div>
-          <p className="text-gray-400 text-sm">{greeting},</p>
+          <p className="text-phi-slate text-sm">{greeting},</p>
           <h1 className="text-2xl font-bold text-gray-900">{u.name || 'משתמש'}</h1>
           <p className="text-xs text-gray-400 mt-0.5">
             {now.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}

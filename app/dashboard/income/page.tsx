@@ -170,7 +170,7 @@ export default function IncomePage() {
           {/* Add Income */}
           <Button
             onClick={() => setShowWizard(true)}
-            className="bg-[#7ED957] hover:bg-[#6BC847] text-white"
+            className="bg-phi-mint hover:bg-phi-mint/90 text-white"
           >
             <Plus className="w-4 h-4 ml-2" />
             הוסף הכנסה
@@ -359,7 +359,7 @@ function EmptyState({ onAddIncome }: { onAddIncome: () => void }) {
           ease: "easeInOut"
         }}
       >
-        <DollarSign className="w-12 h-12 text-[#3A7BD5]" />
+        <DollarSign className="w-12 h-12 text-phi-dark" />
       </motion.div>
       <h2 className="text-2xl font-bold text-gray-900 mb-3">
         עדיין לא הוספת הכנסות
@@ -390,7 +390,7 @@ function EmptyState({ onAddIncome }: { onAddIncome: () => void }) {
       <Button
         onClick={onAddIncome}
         size="lg"
-        className="bg-[#7ED957] hover:bg-[#6BC847] text-white"
+        className="bg-phi-mint hover:bg-phi-mint/90 text-white"
       >
         <Plus className="w-5 h-5 ml-2" />
         הוסף הכנסה ראשונה

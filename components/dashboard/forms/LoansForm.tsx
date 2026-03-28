@@ -202,7 +202,7 @@ export default function LoansForm({ initialLoans }: LoansFormProps) {
         <button
           type="button"
           onClick={() => setShowScanner(!showScanner)}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-l from-[#3A7BD5] to-[#7ED957] text-white rounded-lg hover:shadow-lg transition-all font-semibold"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-l from-phi-dark to-phi-mint text-white rounded-lg hover:shadow-lg transition-all font-semibold"
         >
           <Scan className="w-5 h-5" />
           {showScanner ? 'סגור סורק דוח סילוקין' : 'סרוק דוח סילוקין (מילוי אוטומטי!)'}
@@ -216,7 +216,7 @@ export default function LoansForm({ initialLoans }: LoansFormProps) {
           >
             <div className="space-y-4">
               <div className="text-center">
-                <FileText className="w-12 h-12 text-[#3A7BD5] mx-auto mb-3" />
+                <FileText className="w-12 h-12 text-phi-dark mx-auto mb-3" />
                 <h3 className="font-semibold text-[#1E2A3B] mb-2">העלאת דוח סילוקין</h3>
                 <p className="text-sm text-[#555555]">המערכת תמלא אוטומטית את כל הפרטים מהדוח</p>
               </div>
@@ -239,12 +239,12 @@ export default function LoansForm({ initialLoans }: LoansFormProps) {
                     <div className="border-2 border-dashed border-[#3A7BD5] rounded-lg p-6 cursor-pointer hover:bg-white transition-colors text-center">
                       {statementPreview ? (
                         <div className="flex items-center justify-center gap-2">
-                          <FileText className="w-6 h-6 text-[#3A7BD5]" />
+                          <FileText className="w-6 h-6 text-phi-dark" />
                           <p className="text-sm text-[#1E2A3B] font-medium">{statementPreview}</p>
                         </div>
                       ) : (
                         <div className="py-4">
-                          <Upload className="w-10 h-10 text-[#3A7BD5] mx-auto mb-2" />
+                          <Upload className="w-10 h-10 text-phi-dark mx-auto mb-2" />
                           <p className="text-sm text-[#555555]">לחץ להעלאה או גרור קובץ לכאן</p>
                           <p className="text-xs text-[#888888] mt-1">PDF, JPG, PNG</p>
                         </div>
@@ -256,15 +256,15 @@ export default function LoansForm({ initialLoans }: LoansFormProps) {
 
               {isScanning && (
                 <div className="text-center py-8">
-                  <Loader2 className="w-12 h-12 text-[#3A7BD5] mx-auto mb-3 animate-spin" />
+                  <Loader2 className="w-12 h-12 text-phi-dark mx-auto mb-3 animate-spin" />
                   <p className="text-[#1E2A3B] font-semibold">סורק ומנתח...</p>
                   <p className="text-sm text-[#555555] mt-1">זה יכול לקחת כמה שניות</p>
                 </div>
               )}
 
               {scanSuccess && (
-                <div className="text-center py-8 bg-[#E8F5E9] rounded-lg">
-                  <CheckCircle className="w-12 h-12 text-[#7ED957] mx-auto mb-3" />
+                <div className="text-center py-8 bg-green-50 rounded-lg">
+                  <CheckCircle className="w-12 h-12 text-phi-mint mx-auto mb-3" />
                   <p className="text-[#1E2A3B] font-semibold">סריקה הושלמה בהצלחה!</p>
                   <p className="text-sm text-[#555555] mt-1">הפרטים מולאו אוטומטית</p>
                 </div>
@@ -287,7 +287,7 @@ export default function LoansForm({ initialLoans }: LoansFormProps) {
                     const input = document.getElementById('loan-statement-upload') as HTMLInputElement;
                     handleScanLoanStatement(input?.files?.[0] || null);
                   }}
-                  className="w-full bg-[#3A7BD5] hover:bg-[#2E5EA5]"
+                  className="w-full bg-phi-dark hover:bg-[#2E5EA5]"
                 >
                   <Scan className="w-4 h-4 mr-2" />
                   התחל סריקה
@@ -303,7 +303,7 @@ export default function LoansForm({ initialLoans }: LoansFormProps) {
         <Button
           type="button"
           onClick={addLoan}
-          className="bg-[#7ED957] hover:bg-[#6BBF4A] text-white flex items-center gap-2"
+          className="bg-phi-mint hover:bg-[#6BBF4A] text-white flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           הוסף הלוואה ידנית
@@ -440,7 +440,7 @@ export default function LoansForm({ initialLoans }: LoansFormProps) {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#E8F5E9] border border-[#7ED957] rounded-lg p-4 text-center"
+          className="bg-green-50 border border-phi-mint rounded-lg p-4 text-center"
         >
           <p className="text-[#1E2A3B] font-semibold">{successMessage}</p>
         </motion.div>
@@ -460,7 +460,7 @@ export default function LoansForm({ initialLoans }: LoansFormProps) {
           type="button"
           onClick={handleSave}
           disabled={loading}
-          className="bg-[#3A7BD5] hover:bg-[#2E5EA5] text-white px-8"
+          className="bg-phi-dark hover:bg-[#2E5EA5] text-white px-8"
         >
           {loading ? (
             <>

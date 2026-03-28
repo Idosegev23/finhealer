@@ -259,7 +259,7 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
       <SheetContent className="w-full sm:max-w-3xl overflow-y-auto" dir="rtl">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-2xl">
-            <FileText className="w-6 h-6 text-[#3A7BD5]" />
+            <FileText className="w-6 h-6 text-phi-dark" />
             בקשה לאיחוד הלוואות
           </SheetTitle>
           <SheetDescription>
@@ -277,7 +277,7 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
-              className="bg-[#3A7BD5] h-2 rounded-full transition-all duration-300"
+              className="bg-phi-dark h-2 rounded-full transition-all duration-300"
               style={{ width: `${(currentStep / 3) * 100}%` }}
             />
           </div>
@@ -627,7 +627,7 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
             <Button
               onClick={nextStep}
               disabled={loading}
-              className="flex-1 bg-[#3A7BD5] hover:bg-[#2E5EA5] text-white"
+              className="flex-1 bg-phi-dark hover:bg-[#2E5EA5] text-white"
             >
               {loading ? (
                 <>

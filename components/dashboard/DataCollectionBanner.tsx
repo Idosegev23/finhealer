@@ -47,7 +47,7 @@ export default function DataCollectionBanner({ userName, daysOfData, hasBankStat
       animate={{ opacity: 1, y: 0 }}
       className="mb-6"
     >
-      <div className="bg-gradient-to-l from-[#3A7BD5] to-[#7ED957] rounded-2xl shadow-xl overflow-hidden">
+      <div className="bg-gradient-to-l from-phi-dark to-phi-mint rounded-2xl shadow-xl overflow-hidden">
         <div className="p-6">
           <div className="flex items-center justify-between">
             <div className="flex-1">
@@ -91,7 +91,7 @@ export default function DataCollectionBanner({ userName, daysOfData, hasBankStat
                     <SheetTrigger asChild>
                       <Button 
                         size="lg"
-                        className="bg-white text-[#3A7BD5] hover:bg-gray-100 font-bold shadow-lg px-8"
+                        className="bg-white text-phi-dark hover:bg-gray-100 font-bold shadow-lg px-8"
                       >
                         {remainingSections === 0 ? 'צפה בפרטים' : 'השלם עכשיו'}
                       </Button>

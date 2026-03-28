@@ -22,7 +22,7 @@ export default function ReportsPage() {
             <Link key={page.href} href={page.href}>
               <div className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow cursor-pointer h-full p-6 border border-gray-100">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-gradient-to-br from-[#3A7BD5] to-[#7ED957] rounded-lg flex items-center justify-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-phi-dark to-phi-mint rounded-lg flex items-center justify-center">
                     <Icon className="h-5 w-5 text-white" />
                   </div>
                   <h2 className="text-lg font-bold text-[#1E2A3B]">{page.label}</h2>

@@ -97,7 +97,7 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
           className="bg-white rounded-2xl shadow-lg p-6 border-2 border-green-200"
         >
           <h3 className="text-lg font-bold text-[#1E2A3B] mb-2">סה&quot;כ השקעות רשומות</h3>
-          <p className="text-3xl font-bold text-[#7ED957]">
+          <p className="text-3xl font-bold text-phi-mint">
             {existingTotal.toLocaleString('he-IL')} ₪
           </p>
           <p className="text-sm text-gray-500 mt-2">עדכן למטה אם יש שינויים</p>
@@ -111,7 +111,7 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
         className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200"
       >
         <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#7ED957] to-[#6BBF4A] rounded-full flex items-center justify-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-phi-mint to-[#6BBF4A] rounded-full flex items-center justify-center">
             <TrendingUp className="w-8 h-8 text-white" />
           </div>
           <div>
@@ -125,8 +125,8 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
             onClick={() => setHasInvestments(true)}
             className={`p-6 rounded-xl border-2 transition-all ${
               hasInvestments === true
-                ? 'border-[#7ED957] bg-[#E8F5E9]'
-                : 'border-gray-200 hover:border-[#7ED957] hover:bg-[#F5F6F8]'
+                ? 'border-phi-mint bg-green-50'
+                : 'border-gray-200 hover:border-phi-mint hover:bg-phi-bg'
             }`}
           >
             <div className="text-center">
@@ -141,7 +141,7 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
             className={`p-6 rounded-xl border-2 transition-all ${
               hasInvestments === false
                 ? 'border-[#3A7BD5] bg-[#E8F4FD]'
-                : 'border-gray-200 hover:border-[#3A7BD5] hover:bg-[#F5F6F8]'
+                : 'border-gray-200 hover:border-[#3A7BD5] hover:bg-phi-bg'
             }`}
           >
             <div className="text-center">
@@ -161,7 +161,7 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
           className="space-y-6"
         >
           {/* Total Summary */}
-          <div className="bg-gradient-to-l from-[#7ED957] to-[#6BBF4A] text-white rounded-2xl p-6 shadow-xl">
+          <div className="bg-gradient-to-l from-phi-mint to-[#6BBF4A] text-white rounded-2xl p-6 shadow-xl">
             <div className="text-center">
               <h3 className="text-lg font-semibold mb-2">סך כל ההשקעות</h3>
               <p className="text-5xl font-bold">
@@ -328,15 +328,15 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
             <h3 className="font-bold text-[#1E2A3B] mb-2">למה זה חשוב?</h3>
             <ul className="space-y-2 text-sm text-[#555555]">
               <li className="flex items-start gap-2">
-                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span className="text-phi-mint mt-0.5">✓</span>
                 <span>מאפשר לנו לתת לך תמונה מלאה של <strong>השווי הנקי</strong> שלך</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span className="text-phi-mint mt-0.5">✓</span>
                 <span>עוזר להעריך אם יש לך <strong>פיזור סיכונים נכון</strong></span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span className="text-phi-mint mt-0.5">✓</span>
                 <span>נוכל להמליץ על אסטרטגיות השקעה מתאימות לגילך ומצבך</span>
               </li>
             </ul>
@@ -349,7 +349,7 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#E8F5E9] border border-[#7ED957] rounded-lg p-4 text-center"
+          className="bg-green-50 border border-phi-mint rounded-lg p-4 text-center"
         >
           <p className="text-[#1E2A3B] font-semibold">{successMessage}</p>
         </motion.div>
@@ -369,7 +369,7 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
           type="button"
           onClick={handleSave}
           disabled={loading || hasInvestments === null}
-          className="bg-[#3A7BD5] hover:bg-[#2E5EA5] text-white px-8"
+          className="bg-phi-dark hover:bg-[#2E5EA5] text-white px-8"
         >
           {loading ? (
             <>

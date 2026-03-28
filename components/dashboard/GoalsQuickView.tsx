@@ -16,12 +16,12 @@ export default function GoalsQuickView({ profile, activeGoals }: GoalsQuickViewP
     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-[#1E2A3B] flex items-center gap-2">
-          <Target className="w-5 h-5 text-[#3A7BD5]" />
+          <Target className="w-5 h-5 text-phi-dark" />
           המטרות שלך
         </h3>
         <Link 
           href="/goals"
-          className="text-sm text-[#3A7BD5] hover:underline font-medium"
+          className="text-sm text-phi-dark hover:underline font-medium"
         >
           ניהול מלא →
         </Link>
@@ -56,7 +56,7 @@ export default function GoalsQuickView({ profile, activeGoals }: GoalsQuickViewP
                 
                 <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                   <div 
-                    className="bg-[#7ED957] h-2 rounded-full transition-all duration-500"
+                    className="bg-phi-mint h-2 rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(progress, 100)}%` }}
                   />
                 </div>
@@ -75,11 +75,11 @@ export default function GoalsQuickView({ profile, activeGoals }: GoalsQuickViewP
           {profile.short_term_goal && (
             <div className="p-4 bg-[#E3F2FD] rounded-lg border-r-4 border-[#3A7BD5]">
               <div className="flex items-start gap-3">
-                <Target className="w-5 h-5 text-[#3A7BD5] mt-0.5" />
+                <Target className="w-5 h-5 text-phi-dark mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-[#1E2A3B] mb-1">מטרה קצרה</p>
                   <p className="text-xs text-[#555555]">{profile.short_term_goal}</p>
-                  <button className="text-xs text-[#3A7BD5] font-medium mt-2 hover:underline">
+                  <button className="text-xs text-phi-dark font-medium mt-2 hover:underline">
                     צור יעד לחיסכון →
                   </button>
                 </div>
@@ -111,7 +111,7 @@ export default function GoalsQuickView({ profile, activeGoals }: GoalsQuickViewP
           <p className="text-sm text-[#555555] mb-4">עדיין לא הגדרת יעדים</p>
           <Link 
             href="/goals"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#3A7BD5] text-white rounded-full text-sm font-medium hover:bg-[#2E5EA5] transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-phi-dark text-white rounded-full text-sm font-medium hover:bg-[#2E5EA5] transition-colors"
           >
             <Plus className="w-4 h-4" />
             הוסף יעד ראשון
@@ -124,7 +124,7 @@ export default function GoalsQuickView({ profile, activeGoals }: GoalsQuickViewP
         <div className="pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between text-sm">
             <span className="text-[#555555]">סה&quot;כ חיסכון ביעדים:</span>
-            <span className="font-bold text-[#7ED957] flex items-center gap-1">
+            <span className="font-bold text-phi-mint flex items-center gap-1">
               <TrendingUp className="w-4 h-4" />
               {activeGoals.reduce((sum, g) => sum + (g.current_amount || 0), 0).toLocaleString('he-IL')} ₪
             </span>

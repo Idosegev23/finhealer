@@ -296,7 +296,7 @@ export default function TransactionsTable({
       <div className="grid md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl p-6 border border-gray-100">
           <p className="text-sm text-[#555555] mb-1">הכנסות החודש</p>
-          <p className="text-3xl font-bold text-[#7ED957]">
+          <p className="text-3xl font-bold text-phi-mint">
             {stats.totalIncome.toLocaleString('he-IL')} ₪
           </p>
         </div>
@@ -515,7 +515,7 @@ export default function TransactionsTable({
 
                   // שורה רגילה
                   return (
-                    <tr key={tx.id} className={`hover:bg-[#F5F6F8] transition-colors ${isDeleting ? 'opacity-50' : ''}`}>
+                    <tr key={tx.id} className={`hover:bg-phi-bg transition-colors ${isDeleting ? 'opacity-50' : ''}`}>
                       <td className="px-4 py-4 text-sm text-[#333333]">
                         {new Date(tx.tx_date || tx.date).toLocaleDateString('he-IL')}
                       </td>
@@ -531,7 +531,7 @@ export default function TransactionsTable({
                       </td>
                       <td className="px-4 py-4">
                         {(tx.category || tx.expense_category || tx.income_category) ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-[#3A7BD5]">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E3F2FD] text-phi-dark">
                             {tx.category || tx.expense_category || tx.income_category}
                           </span>
                         ) : (
@@ -572,7 +572,7 @@ export default function TransactionsTable({
                       </td>
                       <td className="px-4 py-4">
                         <span className={`text-sm font-semibold ${
-                          tx.type === 'income' ? 'text-[#7ED957]' : 'text-[#D64541]'
+                          tx.type === 'income' ? 'text-phi-mint' : 'text-[#D64541]'
                         }`}>
                           {tx.type === 'income' ? '+' : '-'}{tx.amount.toLocaleString('he-IL')} ₪
                         </span>
@@ -621,7 +621,7 @@ export default function TransactionsTable({
 function StatusBadge({ status }: { status: 'pending' | 'confirmed' }) {
   if (status === 'confirmed') {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E8F5E9] text-[#7ED957]">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-phi-mint">
         <CheckCircle className="w-3 h-3" />
         מאושר
       </span>

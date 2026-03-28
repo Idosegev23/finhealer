@@ -304,7 +304,7 @@ export default function LoansSimulatorPage() {
                   onClick={addLoan}
                   disabled={loans.length >= 5 || loadingLoans}
                   size="sm"
-                  className="bg-[#7ED957] hover:bg-[#6BC949] text-white"
+                  className="bg-phi-mint hover:bg-phi-mint/90 text-white"
                 >
                   <PlusCircle className="w-4 h-4 ml-2" />
                   הוסף הלוואה
@@ -388,7 +388,7 @@ export default function LoansSimulatorPage() {
                       <div className="pt-3 border-t border-gray-200">
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">תשלום חודשי:</span>
-                          <span className="font-bold text-[#3A7BD5]">
+                          <span className="font-bold text-phi-dark">
                             {formatCurrency(currentLoans.find((l) => l.id === loan.id)?.monthlyPayment)}
                           </span>
                         </div>
@@ -411,7 +411,7 @@ export default function LoansSimulatorPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">תשלום חודשי כולל:</span>
-                  <span className="font-bold text-[#3A7BD5]">
+                  <span className="font-bold text-phi-dark">
                     {formatCurrency(currentTotals.monthlyPayment)}
                   </span>
                 </div>
@@ -464,7 +464,7 @@ export default function LoansSimulatorPage() {
                 <div className="mt-6 bg-blue-50 rounded-lg p-4 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-700">תשלום חודשי:</span>
-                    <span className="font-bold text-[#3A7BD5]">
+                    <span className="font-bold text-phi-dark">
                       {formatCurrency(consolidatedLoan.monthlyPayment)}
                     </span>
                   </div>
@@ -482,7 +482,7 @@ export default function LoansSimulatorPage() {
           {/* Right Column - Results & Charts */}
           <div className="space-y-6">
             {/* Savings Summary */}
-            <div className="bg-gradient-to-r from-[#7ED957] to-[#6BC949] text-white rounded-lg p-6">
+            <div className="bg-gradient-to-r from-phi-mint to-phi-mint/90 text-white rounded-lg p-6">
               <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
                 <TrendingDown className="w-6 h-6" />
                 החיסכון שלך

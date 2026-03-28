@@ -21,7 +21,7 @@ interface Loan {
   created_at: string;
 }
 
-const COLORS = ['#3A7BD5', '#F6A623', '#7ED957', '#E74C3C', '#9B59B6', '#1ABC9C'];
+const COLORS = ['#074259', '#F6A623', '#7ED957', '#E74C3C', '#9B59B6', '#1ABC9C'];
 
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([]);

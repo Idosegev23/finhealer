@@ -35,7 +35,7 @@ export default function DataCollectionProgress({ sections, onComplete }: DataCol
         <h2 className="text-xl font-bold text-[#1E2A3B]">
           התקדמות איסוף נתונים 📊
         </h2>
-        <div className="text-2xl font-bold text-[#3A7BD5]">
+        <div className="text-2xl font-bold text-phi-dark">
           {percentage}%
         </div>
       </div>
@@ -43,7 +43,7 @@ export default function DataCollectionProgress({ sections, onComplete }: DataCol
       {/* Progress Bar */}
       <div className="w-full bg-gray-200 rounded-full h-4 mb-6 overflow-hidden">
         <div 
-          className="h-full bg-gradient-to-l from-[#3A7BD5] to-[#7ED957] transition-all duration-500 ease-out rounded-full"
+          className="h-full bg-gradient-to-l from-phi-dark to-phi-mint transition-all duration-500 ease-out rounded-full"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -59,8 +59,8 @@ export default function DataCollectionProgress({ sections, onComplete }: DataCol
           </p>
         )}
         {isComplete && (
-          <div className="mt-4 p-4 bg-[#E8F5E9] border-2 border-[#7ED957] rounded-lg">
-            <CheckCircle className="w-8 h-8 text-[#7ED957] mx-auto mb-2" />
+          <div className="mt-4 p-4 bg-green-50 border-2 border-phi-mint rounded-lg">
+            <CheckCircle className="w-8 h-8 text-phi-mint mx-auto mb-2" />
             <p className="font-bold text-[#1E2A3B]">
               🎉 מעולה! השלמת את איסוף הנתונים!
             </p>
@@ -82,7 +82,7 @@ export default function DataCollectionProgress({ sections, onComplete }: DataCol
             <div key={idx} className="bg-white rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-[#1E2A3B]">{category.category}</h3>
-                <span className="text-sm text-[#3A7BD5] font-medium">
+                <span className="text-sm text-phi-dark font-medium">
                   {catCompleted}/{catTotal}
                 </span>
               </div>
@@ -90,7 +90,7 @@ export default function DataCollectionProgress({ sections, onComplete }: DataCol
                 {category.subsections.map((subsection, subIdx) => (
                   <div key={subIdx} className="flex items-center gap-2 text-sm">
                     {subsection.completed ? (
-                      <CheckCircle className="w-4 h-4 text-[#7ED957] flex-shrink-0" />
+                      <CheckCircle className="w-4 h-4 text-phi-mint flex-shrink-0" />
                     ) : (
                       <Circle className="w-4 h-4 text-gray-300 flex-shrink-0" />
                     )}

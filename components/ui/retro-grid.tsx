@@ -33,7 +33,7 @@ export function RetroGrid({ className }: { className?: string }) {
       
       {/* Animated Gradient Orb */}
       <div 
-        className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-[#3A7BD5]/20 via-[#7ED957]/20 to-[#3A7BD5]/20 blur-3xl animate-pulse"
+        className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-phi-dark/20 via-phi-mint/20 to-[#3A7BD5]/20 blur-3xl animate-pulse"
       />
     </div>
   );

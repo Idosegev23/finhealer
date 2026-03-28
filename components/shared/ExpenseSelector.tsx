@@ -157,7 +157,7 @@ export default function ExpenseSelector({
                 onClick={() => setActiveTab('search')}
                 className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === 'search'
-                    ? 'text-[#3A7BD5] border-b-2 border-[#3A7BD5]'
+                    ? 'text-phi-dark border-b-2 border-[#3A7BD5]'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -168,7 +168,7 @@ export default function ExpenseSelector({
                 onClick={() => setActiveTab('browse')}
                 className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === 'browse'
-                    ? 'text-[#3A7BD5] border-b-2 border-[#3A7BD5]'
+                    ? 'text-phi-dark border-b-2 border-[#3A7BD5]'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >

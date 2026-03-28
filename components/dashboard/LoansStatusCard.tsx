@@ -131,7 +131,7 @@ export function LoansStatusCard() {
         </Link>
         {loans.length > 1 && (
           <Link href="/loans-simulator" className="flex-1">
-            <Button size="sm" className="w-full bg-[#7ED957] hover:bg-[#6BC949]">
+            <Button size="sm" className="w-full bg-phi-mint hover:bg-phi-mint/90">
               סימולטור
             </Button>
           </Link>

@@ -104,7 +104,7 @@ function TabButton({
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-right transition-all ${
         active
-          ? 'bg-[#3A7BD5] text-white shadow-md'
+          ? 'bg-phi-dark text-white shadow-md'
           : 'text-[#555555] hover:bg-gray-100'
       }`}
     >
@@ -373,7 +373,7 @@ function ProfileTab() {
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#3A7BD5]" />
+        <Loader2 className="w-8 h-8 animate-spin text-phi-dark" />
       </div>
     );
   }
@@ -482,7 +482,7 @@ function ProfileTab() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="bg-[#3A7BD5] text-white px-6 py-2 rounded-lg hover:bg-[#2E5EA5] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="bg-phi-dark text-white px-6 py-2 rounded-lg hover:bg-[#2E5EA5] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {saving ? (
             <>
@@ -505,7 +505,7 @@ function ProfileTab() {
           {!showAddChild && (
             <button
               onClick={() => setShowAddChild(true)}
-              className="flex items-center gap-2 text-[#3A7BD5] hover:text-[#2E5EA5] transition"
+              className="flex items-center gap-2 text-phi-dark hover:text-[#2E5EA5] transition"
             >
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">הוסף ילד</span>
@@ -570,7 +570,7 @@ function ProfileTab() {
                 <button
                   onClick={editingChild ? handleUpdateChild : handleAddChild}
                   disabled={saving}
-                  className="flex-1 bg-[#3A7BD5] text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition disabled:opacity-50 text-sm font-medium"
+                  className="flex-1 bg-phi-dark text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition disabled:opacity-50 text-sm font-medium"
                 >
                   {editingChild ? 'עדכן' : 'הוסף'}
                 </button>
@@ -619,7 +619,7 @@ function ProfileTab() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => startEditChild(child)}
-                    className="p-2 text-[#3A7BD5] hover:bg-blue-50 rounded-lg transition"
+                    className="p-2 text-phi-dark hover:bg-blue-50 rounded-lg transition"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
@@ -676,7 +676,7 @@ function WhatsAppTab() {
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#3A7BD5]" />
+        <Loader2 className="w-8 h-8 animate-spin text-phi-dark" />
       </div>
     );
   }
@@ -789,7 +789,7 @@ function NotificationToggle({
       <button
         onClick={() => setChecked(!checked)}
         className={`relative w-12 h-6 rounded-full transition-colors ${
-          checked ? 'bg-[#3A7BD5]' : 'bg-gray-300'
+          checked ? 'bg-phi-dark' : 'bg-gray-300'
         }`}
       >
         <div
@@ -902,7 +902,7 @@ function SubscriptionTab() {
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#3A7BD5]" />
+        <Loader2 className="w-8 h-8 animate-spin text-phi-dark" />
       </div>
     );
   }
@@ -927,7 +927,7 @@ function SubscriptionTab() {
         </div>
       )}
 
-      <div className="border border-[#3A7BD5] rounded-lg p-6 mb-6 bg-[#3A7BD5]/5">
+      <div className="border border-phi-dark rounded-lg p-6 mb-6 bg-phi-dark/5">
         <div className="flex items-center justify-between mb-4">
           <div className="text-right">
             <h3 className="text-lg font-bold text-gray-900">
@@ -935,7 +935,7 @@ function SubscriptionTab() {
             </h3>
             <p className="text-sm text-gray-600">מנוי חודשי פעיל</p>
           </div>
-          <span className="text-3xl font-bold text-[#3A7BD5]">{currentAmount} &#8362;</span>
+          <span className="text-3xl font-bold text-phi-dark">{currentAmount} &#8362;</span>
         </div>
         <p className="text-sm text-gray-600 mb-4">
           מנוי חודשי מתחדש אוטומטית
@@ -1074,7 +1074,7 @@ function PrivacyTab() {
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-sm p-6 flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#3A7BD5]" />
+        <Loader2 className="w-8 h-8 animate-spin text-phi-dark" />
       </div>
     );
   }
@@ -1124,7 +1124,7 @@ function PrivacyTab() {
               <button
                 onClick={handleChangePassword}
                 disabled={changingPassword}
-                className="bg-[#3A7BD5] text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-phi-dark text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {changingPassword ? (
                   <>
@@ -1178,7 +1178,7 @@ function PrivacyTab() {
               }
             }}
             disabled={exporting}
-            className="bg-[#3A7BD5] text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-phi-dark text-white px-4 py-2 rounded-lg hover:bg-[#2E5EA5] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {exporting ? (
               <>

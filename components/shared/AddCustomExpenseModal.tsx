@@ -189,7 +189,7 @@ export default function AddCustomExpenseModal({ onClose, onSuccess }: AddCustomE
             </Button>
             <Button
               type="submit"
-              className="flex-1 bg-[#3A7BD5] hover:bg-[#2E5EA5]"
+              className="flex-1 bg-phi-dark hover:bg-[#2E5EA5]"
               disabled={loading}
             >
               {loading ? 'שומר...' : 'הוסף הוצאה'}

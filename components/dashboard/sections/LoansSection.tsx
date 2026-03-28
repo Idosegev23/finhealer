@@ -152,7 +152,7 @@ export default function LoansSection({ onSave, initialLoans = [] }: LoansSection
         <Button
           type="button"
           onClick={addLoan}
-          className="gap-2 bg-[#3A7BD5] hover:bg-[#2E5EA5]"
+          className="gap-2 bg-phi-dark hover:bg-[#2E5EA5]"
         >
           <Plus className="w-4 h-4" />
           הוסף הלוואה
@@ -223,8 +223,8 @@ export default function LoansSection({ onSave, initialLoans = [] }: LoansSection
 
               {/* Success/Error Messages */}
               {isSuccess && (
-                <div className="mb-4 p-3 bg-[#E8F5E9] border border-[#7ED957] rounded-lg flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-[#7ED957]" />
+                <div className="mb-4 p-3 bg-green-50 border border-phi-mint rounded-lg flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-phi-mint" />
                   <p className="text-sm text-[#1E2A3B] font-medium">
                     הדוח נסרק בהצלחה! הפרטים מולאו אוטומטית
                   </p>
@@ -437,7 +437,7 @@ export default function LoansSection({ onSave, initialLoans = [] }: LoansSection
         <Button
           onClick={handleSave}
           disabled={saving || loans.length === 0}
-          className="px-8 bg-[#3A7BD5] hover:bg-[#2E5EA5]"
+          className="px-8 bg-phi-dark hover:bg-[#2E5EA5]"
         >
           {saving ? 'שומר...' : 'שמור הלוואות'}
         </Button>

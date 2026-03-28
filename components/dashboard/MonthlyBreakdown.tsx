@@ -210,7 +210,7 @@ export default function MonthlyBreakdown({ profile }: MonthlyBreakdownProps) {
       <div className="mt-6 p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-[#3A7BD5]" />
+            <TrendingUp className="w-5 h-5 text-phi-dark" />
             <span className="text-sm font-medium text-gray-700">התחייבויות חודשיות</span>
           </div>
           <div className="text-left">

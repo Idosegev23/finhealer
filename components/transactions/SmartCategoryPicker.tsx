@@ -141,7 +141,7 @@ export default function SmartCategoryPicker({ value, vendor, onChange }: SmartCa
                     <p className="text-xs text-gray-500 mb-2">לא נמצאו תוצאות</p>
                     <button
                       onClick={() => selectRaw(search)}
-                      className="text-xs text-[#3A7BD5] hover:underline"
+                      className="text-xs text-phi-dark hover:underline"
                     >
                       השתמש ב-&quot;{search}&quot; כקטגוריה חופשית
                     </button>

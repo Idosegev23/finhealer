@@ -45,7 +45,7 @@ export default function SmartInsights({ profile, monthlyExpenses, behaviorInsigh
               insight.type === 'warning' 
                 ? 'bg-[#FFF3E0] border-[#F6A623]' 
                 : insight.type === 'success'
-                ? 'bg-[#E8F5E9] border-[#7ED957]'
+                ? 'bg-green-50 border-phi-mint'
                 : 'bg-[#E3F2FD] border-[#3A7BD5]'
             }`}
           >
@@ -57,7 +57,7 @@ export default function SmartInsights({ profile, monthlyExpenses, behaviorInsigh
                 <p className="text-sm font-medium text-[#1E2A3B] mb-1">{insight.title}</p>
                 <p className="text-xs text-[#555555]">{insight.description}</p>
                 {insight.action && (
-                  <button className="text-xs text-[#3A7BD5] font-medium mt-2 hover:underline">
+                  <button className="text-xs text-phi-dark font-medium mt-2 hover:underline">
                     {insight.action} →
                   </button>
                 )}
@@ -74,10 +74,10 @@ export default function SmartInsights({ profile, monthlyExpenses, behaviorInsigh
 function mapBehaviorInsight(insight: BehaviorInsight) {
   const iconMap: Record<string, JSX.Element> = {
     'spending_spike': <TrendingUp className="w-5 h-5 text-[#D64541]" />,
-    'positive_change': <TrendingDown className="w-5 h-5 text-[#7ED957]" />,
-    'category_trend': <Target className="w-5 h-5 text-[#3A7BD5]" />,
+    'positive_change': <TrendingDown className="w-5 h-5 text-phi-mint" />,
+    'category_trend': <Target className="w-5 h-5 text-phi-dark" />,
     'subscription_found': <RefreshCw className="w-5 h-5 text-[#F6A623]" />,
-    'saving_opportunity': <Lightbulb className="w-5 h-5 text-[#7ED957]" />,
+    'saving_opportunity': <Lightbulb className="w-5 h-5 text-phi-mint" />,
     'warning': <AlertTriangle className="w-5 h-5 text-[#F6A623]" />,
   };
   
@@ -94,7 +94,7 @@ function mapBehaviorInsight(insight: BehaviorInsight) {
   return {
     id: insight.id,
     type: typeMap[insight.insight_type] || 'info',
-    icon: iconMap[insight.insight_type] || <Lightbulb className="w-5 h-5 text-[#3A7BD5]" />,
+    icon: iconMap[insight.insight_type] || <Lightbulb className="w-5 h-5 text-phi-dark" />,
     title: insight.title,
     description: insight.description,
     action: insight.suggested_action,
@@ -114,7 +114,7 @@ function generateInsights(profile: any, monthlyExpenses: number) {
   if (profile.children_count > 0) {
     insights.push({
       type: 'info',
-      icon: <Users className="w-5 h-5 text-[#3A7BD5]" />,
+      icon: <Users className="w-5 h-5 text-phi-dark" />,
       title: `יש לך ${profile.children_count} ילדים`,
       description: `מומלץ לפתוח יעד חיסכון לכל ילד. זה יעזור לך להתכונן לעתיד שלהם.`,
       action: 'הגדר יעדי חיסכון'
@@ -160,7 +160,7 @@ function generateInsights(profile: any, monthlyExpenses: number) {
   if (profile.short_term_goal) {
     insights.push({
       type: 'success',
-      icon: <Target className="w-5 h-5 text-[#7ED957]" />,
+      icon: <Target className="w-5 h-5 text-phi-mint" />,
       title: 'המטרה שלך: ' + profile.short_term_goal,
       description: `נעבוד ביחד כדי להגשים את זה! בואו נבנה תוכנית חיסכון מותאמת.`,
       action: 'צור יעד'

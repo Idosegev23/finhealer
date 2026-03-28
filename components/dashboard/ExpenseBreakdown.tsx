@@ -21,7 +21,7 @@ const categories = [
   {
     name: 'ביטוחים',
     icon: Shield,
-    color: '#7ED957',
+    color: '#1C8C63',
     fields: ['life_insurance', 'health_insurance', 'car_insurance', 'home_insurance'],
     labels: {
       life_insurance: 'ביטוח חיים',

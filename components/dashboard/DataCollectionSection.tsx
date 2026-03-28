@@ -18,10 +18,10 @@ function DataCollectionSection({ title, description, status, onEdit, icon: Icon 
   const isCompleted = status === 'completed';
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm p-6 border-2 ${isCompleted ? 'border-[#7ED957]' : 'border-gray-200'}`}>
+    <div className={`bg-white rounded-xl shadow-sm p-6 border-2 ${isCompleted ? 'border-phi-mint' : 'border-gray-200'}`}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <div className={`p-3 rounded-full ${isCompleted ? 'bg-[#E8F5E9] text-[#7ED957]' : 'bg-gray-100 text-gray-500'}`}>
+          <div className={`p-3 rounded-full ${isCompleted ? 'bg-green-50 text-phi-mint' : 'bg-gray-100 text-gray-500'}`}>
             <Icon className="w-6 h-6" />
           </div>
           <div>
@@ -30,7 +30,7 @@ function DataCollectionSection({ title, description, status, onEdit, icon: Icon 
           </div>
         </div>
         {isCompleted && (
-          <div className="flex items-center gap-2 text-[#7ED957] font-semibold">
+          <div className="flex items-center gap-2 text-phi-mint font-semibold">
             <CheckCircle className="w-5 h-5" />
             <span>הושלם</span>
           </div>
@@ -40,7 +40,7 @@ function DataCollectionSection({ title, description, status, onEdit, icon: Icon 
         <Button 
           onClick={onEdit} 
           variant="outline" 
-          className={`flex items-center gap-2 ${isCompleted ? 'border-[#7ED957] text-[#7ED957] hover:bg-[#E8F5E9]' : 'border-[#3A7BD5] text-[#3A7BD5] hover:bg-[#E8F4FD]'}`}
+          className={`flex items-center gap-2 ${isCompleted ? 'border-phi-mint text-phi-mint hover:bg-green-50' : 'border-[#3A7BD5] text-phi-dark hover:bg-[#E8F4FD]'}`}
         >
           {isCompleted ? 'ערוך פרטים' : 'השלם פרטים'}
         </Button>

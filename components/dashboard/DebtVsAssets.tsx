@@ -48,16 +48,16 @@ export default function DebtVsAssets({ profile }: DebtVsAssetsProps) {
         <div>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#7ED957]" />
+              <TrendingUp className="w-4 h-4 text-phi-mint" />
               <span className="text-sm font-medium text-[#555555]">נכסים נזילים</span>
             </div>
-            <span className="text-lg font-bold text-[#7ED957]">
+            <span className="text-lg font-bold text-phi-mint">
               {totalAssets.toLocaleString('he-IL')} ₪
             </span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-3">
             <div 
-              className="bg-[#7ED957] h-3 rounded-full transition-all duration-500"
+              className="bg-phi-mint h-3 rounded-full transition-all duration-500"
               style={{ width: `${assetsPercentage}%` }}
             />
           </div>
@@ -72,10 +72,10 @@ export default function DebtVsAssets({ profile }: DebtVsAssetsProps) {
         <div className="border-t border-gray-200 my-3"></div>
 
         {/* מאזן */}
-        <div className={`p-4 rounded-lg ${netWorth >= 0 ? 'bg-[#E8F5E9]' : 'bg-[#FFEBEE]'}`}>
+        <div className={`p-4 rounded-lg ${netWorth >= 0 ? 'bg-green-50' : 'bg-[#FFEBEE]'}`}>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-[#555555]">מאזן נכסים - חובות</span>
-            <span className={`text-2xl font-bold ${netWorth >= 0 ? 'text-[#7ED957]' : 'text-[#D64541]'}`}>
+            <span className={`text-2xl font-bold ${netWorth >= 0 ? 'text-phi-mint' : 'text-[#D64541]'}`}>
               {netWorth >= 0 ? '+' : ''}{netWorth.toLocaleString('he-IL')} ₪
             </span>
           </div>

@@ -70,9 +70,9 @@ export default function PhaseProgress({ currentPhase }: PhaseProgressProps) {
               <div key={phase.key} className="relative flex items-start gap-3">
                 <div className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full border-2 ${
                   isCompleted 
-                    ? 'bg-[#7ED957] border-[#7ED957]' 
+                    ? 'bg-phi-mint border-phi-mint' 
                     : isCurrent
-                    ? 'bg-[#3A7BD5] border-[#3A7BD5]'
+                    ? 'bg-phi-dark border-[#3A7BD5]'
                     : 'bg-white border-gray-300'
                 }`}>
                   {isCompleted ? (
@@ -86,7 +86,7 @@ export default function PhaseProgress({ currentPhase }: PhaseProgressProps) {
                 
                 <div className="flex-1 pt-1">
                   <p className={`font-semibold ${
-                    isCurrent ? 'text-[#3A7BD5]' : isCompleted ? 'text-[#7ED957]' : 'text-gray-400'
+                    isCurrent ? 'text-phi-dark' : isCompleted ? 'text-phi-mint' : 'text-gray-400'
                   }`}>
                     {phase.label}
                   </p>
@@ -102,7 +102,7 @@ export default function PhaseProgress({ currentPhase }: PhaseProgressProps) {
       <div className="mt-6 p-4 bg-[#E3F2FD] rounded-lg">
         <p className="text-sm font-medium text-[#1E2A3B] mb-1">{message.description}</p>
         <div className="flex items-center justify-between mt-3">
-          <button className="text-sm font-semibold text-[#3A7BD5] hover:underline">
+          <button className="text-sm font-semibold text-phi-dark hover:underline">
             {message.nextStep} →
           </button>
           {message.daysUntil > 0 && (

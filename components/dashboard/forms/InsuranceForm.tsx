@@ -103,12 +103,12 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className={`bg-white rounded-2xl shadow-lg p-8 border-2 ${hasConnected ? 'border-[#7ED957]' : 'border-gray-200'}`}
+        className={`bg-white rounded-2xl shadow-lg p-8 border-2 ${hasConnected ? 'border-phi-mint' : 'border-gray-200'}`}
       >
         <div className="flex items-start gap-4 mb-6">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${hasConnected ? 'bg-[#E8F5E9]' : 'bg-gradient-to-br from-[#3A7BD5] to-[#7ED957]'}`}>
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${hasConnected ? 'bg-green-50' : 'bg-gradient-to-br from-phi-dark to-phi-mint'}`}>
             {hasConnected ? (
-              <CheckCircle className="w-8 h-8 text-[#7ED957]" />
+              <CheckCircle className="w-8 h-8 text-phi-mint" />
             ) : (
               <Shield className="w-8 h-8 text-white" />
             )}
@@ -125,7 +125,7 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
         {!hasConnected ? (
           <Button
             onClick={handleConnectToMaslaka}
-            className="w-full bg-gradient-to-l from-[#3A7BD5] to-[#7ED957] hover:shadow-lg"
+            className="w-full bg-gradient-to-l from-phi-dark to-phi-mint hover:shadow-lg"
             size="lg"
           >
             <Shield className="w-5 h-5 ml-2" />
@@ -133,8 +133,8 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
             <ExternalLink className="w-4 h-4 mr-2" />
           </Button>
         ) : (
-          <div className="bg-[#E8F5E9] border border-[#7ED957] rounded-lg p-4 flex items-center gap-3">
-            <CheckCircle className="w-6 h-6 text-[#7ED957]" />
+          <div className="bg-green-50 border border-phi-mint rounded-lg p-4 flex items-center gap-3">
+            <CheckCircle className="w-6 h-6 text-phi-mint" />
             <div>
               <div className="font-bold text-[#1E2A3B]">מחובר בהצלחה!</div>
               <div className="text-sm text-[#555555]">קיבלנו את כל פרטי הביטוחים שלך</div>
@@ -164,7 +164,7 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
 
         <div className="space-y-4">
           {/* Appendix A */}
-          <div className={`p-6 rounded-xl border-2 ${hasSignedAppendixA ? 'border-[#7ED957] bg-[#E8F5E9]' : 'border-gray-200'}`}>
+          <div className={`p-6 rounded-xl border-2 ${hasSignedAppendixA ? 'border-phi-mint bg-green-50' : 'border-gray-200'}`}>
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
                 <h3 className="font-bold text-[#1E2A3B] text-lg mb-1">נספח א&apos; - הסכמה לקבלת מידע</h3>
@@ -173,7 +173,7 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
                 </p>
               </div>
               {hasSignedAppendixA && (
-                <CheckCircle className="w-8 h-8 text-[#7ED957] flex-shrink-0" />
+                <CheckCircle className="w-8 h-8 text-phi-mint flex-shrink-0" />
               )}
             </div>
             {!hasSignedAppendixA ? (
@@ -186,12 +186,12 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
                 פתח וחתום על נספח א&apos;
               </Button>
             ) : (
-              <div className="text-sm text-[#7ED957] font-semibold">✓ נחתם בהצלחה</div>
+              <div className="text-sm text-phi-mint font-semibold">✓ נחתם בהצלחה</div>
             )}
           </div>
 
           {/* Appendix E */}
-          <div className={`p-6 rounded-xl border-2 ${hasSignedAppendixE ? 'border-[#7ED957] bg-[#E8F5E9]' : 'border-gray-200'}`}>
+          <div className={`p-6 rounded-xl border-2 ${hasSignedAppendixE ? 'border-phi-mint bg-green-50' : 'border-gray-200'}`}>
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
                 <h3 className="font-bold text-[#1E2A3B] text-lg mb-1">נספח ה&apos; - הרשאה לפעולה</h3>
@@ -200,7 +200,7 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
                 </p>
               </div>
               {hasSignedAppendixE && (
-                <CheckCircle className="w-8 h-8 text-[#7ED957] flex-shrink-0" />
+                <CheckCircle className="w-8 h-8 text-phi-mint flex-shrink-0" />
               )}
             </div>
             {!hasSignedAppendixE ? (
@@ -213,7 +213,7 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
                 פתח וחתום על נספח ה&apos;
               </Button>
             ) : (
-              <div className="text-sm text-[#7ED957] font-semibold">✓ נחתם בהצלחה</div>
+              <div className="text-sm text-phi-mint font-semibold">✓ נחתם בהצלחה</div>
             )}
           </div>
         </div>
@@ -227,20 +227,20 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
         className="bg-gradient-to-br from-[#E8F4FD] to-[#FFF3E0] p-6 rounded-xl border-2 border-[#3A7BD5]/30"
       >
         <div className="flex items-start gap-3">
-          <AlertCircle className="w-6 h-6 text-[#3A7BD5] flex-shrink-0 mt-1" />
+          <AlertCircle className="w-6 h-6 text-phi-dark flex-shrink-0 mt-1" />
           <div>
             <h3 className="font-bold text-[#1E2A3B] mb-2">מידע חשוב</h3>
             <ul className="space-y-2 text-sm text-[#555555]">
               <li className="flex items-start gap-2">
-                <span className="text-[#3A7BD5] mt-0.5">•</span>
+                <span className="text-phi-dark mt-0.5">•</span>
                 <span>החתימה נעשית באופן דיגיטלי ומאובטח לחלוטין</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#3A7BD5] mt-0.5">•</span>
+                <span className="text-phi-dark mt-0.5">•</span>
                 <span>ניתן לבטל את ההסכמה בכל עת דרך ההגדרות</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#3A7BD5] mt-0.5">•</span>
+                <span className="text-phi-dark mt-0.5">•</span>
                 <span>המידע משמש אך ורק לצורך ניתוח ומתן המלצות פיננסיות</span>
               </li>
             </ul>
@@ -253,7 +253,7 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#E8F5E9] border border-[#7ED957] rounded-lg p-4 text-center"
+          className="bg-green-50 border border-phi-mint rounded-lg p-4 text-center"
         >
           <p className="text-[#1E2A3B] font-semibold">{successMessage}</p>
         </motion.div>
@@ -273,7 +273,7 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
           type="button"
           onClick={handleSave}
           disabled={loading}
-          className="bg-[#3A7BD5] hover:bg-[#2E5EA5] text-white px-8"
+          className="bg-phi-dark hover:bg-[#2E5EA5] text-white px-8"
         >
           {loading ? (
             <>

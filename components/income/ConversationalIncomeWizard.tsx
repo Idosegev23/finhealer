@@ -236,7 +236,7 @@ export default function ConversationalIncomeWizard({
       <div className="mb-8">
         <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
           <motion.div
-            className="h-full bg-gradient-to-r from-[#3A7BD5] to-[#7ED957]"
+            className="h-full bg-gradient-to-r from-phi-dark to-phi-mint"
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
             transition={{ duration: 0.3 }}
@@ -379,14 +379,14 @@ function Step1EmploymentType({
               }}
               className={`p-4 rounded-xl border-2 transition-all text-right ${
                 isSelected
-                  ? 'border-[#3A7BD5] bg-[#3A7BD5]/10 shadow-md'
+                  ? 'border-[#3A7BD5] bg-phi-dark/10 shadow-md'
                   : `border-transparent ${type.color}`
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
               <div className="flex items-start gap-2">
-                <Icon className={`w-6 h-6 flex-shrink-0 mt-0.5 ${isSelected ? 'text-[#3A7BD5]' : ''}`} />
+                <Icon className={`w-6 h-6 flex-shrink-0 mt-0.5 ${isSelected ? 'text-phi-dark' : ''}`} />
                 <div className="flex-1 text-right">
                   <span className="text-sm font-semibold block">{type.label}</span>
                   {type.description && (
@@ -490,12 +490,12 @@ function Step2SourceName({
             <div className="flex flex-col items-center gap-2">
               {uploadingPayslip ? (
                 <>
-                  <Loader2 className="w-8 h-8 text-[#3A7BD5] animate-spin" />
+                  <Loader2 className="w-8 h-8 text-phi-dark animate-spin" />
                   <p className="text-sm text-gray-600">קורא את התלוש...</p>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-8 h-8 text-[#3A7BD5]" />
+                  <Sparkles className="w-8 h-8 text-phi-dark" />
                   <p className="font-semibold text-gray-900">יש לך תלוש משכורת?</p>
                   <p className="text-sm text-gray-600">העלה אותו ונמלא הכל אוטומטית! ✨</p>
                   <p className="text-xs text-gray-500 mt-1">תומך בתמונות ו-PDF</p>
@@ -514,7 +514,7 @@ function Step2SourceName({
         <Button
           onClick={onNext}
           disabled={!value.trim()}
-          className="flex-1 bg-[#3A7BD5] hover:bg-[#2E6BB7]"
+          className="flex-1 bg-phi-dark hover:bg-[#2E6BB7]"
         >
           המשך
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -1347,7 +1347,7 @@ function Step3Amount({
         <Button
           onClick={onNext}
           disabled={!canProceed()}
-          className="flex-1 bg-[#3A7BD5] hover:bg-[#2E6BB7]"
+          className="flex-1 bg-phi-dark hover:bg-[#2E6BB7]"
         >
           המשך
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -1398,17 +1398,17 @@ function Step4Frequency({
               }}
               className={`w-full p-4 rounded-xl border-2 flex items-center gap-4 transition-all ${
                 isSelected
-                  ? 'border-[#3A7BD5] bg-[#3A7BD5]/10 shadow-md'
+                  ? 'border-[#3A7BD5] bg-phi-dark/10 shadow-md'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <Icon className={`w-6 h-6 ${isSelected ? 'text-[#3A7BD5]' : 'text-gray-400'}`} />
-              <span className={`text-lg font-medium ${isSelected ? 'text-[#3A7BD5]' : 'text-gray-700'}`}>
+              <Icon className={`w-6 h-6 ${isSelected ? 'text-phi-dark' : 'text-gray-400'}`} />
+              <span className={`text-lg font-medium ${isSelected ? 'text-phi-dark' : 'text-gray-700'}`}>
                 {option.label}
               </span>
-              {isSelected && <CheckCircle className="w-6 h-6 text-[#7ED957] mr-auto" />}
+              {isSelected && <CheckCircle className="w-6 h-6 text-phi-mint mr-auto" />}
             </motion.button>
           );
         })}
@@ -1589,7 +1589,7 @@ function Step5Confirm({
             </div>
                     <div className="flex justify-between items-center bg-white/60 rounded-lg p-3 -mx-2">
                       <span className="text-gray-700 font-medium">ממוצע חודשי:</span>
-                      <span className="font-bold text-2xl text-[#3A7BD5]">
+                      <span className="font-bold text-2xl text-phi-dark">
                         {SmartIncomeCalculator.formatAmount((data.min_amount + data.max_amount) / 2)}
                       </span>
           </div>
@@ -1599,7 +1599,7 @@ function Step5Confirm({
             ) : (
               <div className="flex justify-between items-center bg-white/60 rounded-lg p-3 -mx-2">
                 <span className="text-gray-700 font-medium">הכנסה חודשית:</span>
-                <span className="font-bold text-2xl text-[#3A7BD5]">
+                <span className="font-bold text-2xl text-phi-dark">
                   {SmartIncomeCalculator.formatAmount(data.actual_bank_amount)}
                 </span>
               </div>
@@ -1611,7 +1611,7 @@ function Step5Confirm({
         {['rental', 'investment', 'pension', 'other'].includes(data.employment_type) && (
           <div className="flex justify-between items-center bg-white/60 rounded-lg p-3 -mx-2">
             <span className="text-gray-700 font-medium">סכום חודשי:</span>
-            <span className="font-bold text-2xl text-[#3A7BD5]">
+            <span className="font-bold text-2xl text-phi-dark">
               {SmartIncomeCalculator.formatAmount(data.actual_bank_amount)}
             </span>
           </div>
@@ -1646,7 +1646,7 @@ function Step5Confirm({
         <Button
           onClick={onSubmit}
           disabled={loading}
-          className="flex-1 bg-[#7ED957] hover:bg-[#6BC847] text-white"
+          className="flex-1 bg-phi-mint hover:bg-phi-mint/90 text-white"
         >
           {loading ? (
             <>

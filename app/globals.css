@@ -2,16 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme Variables - Light Mode Only */
+/* ============================================================================
+   φ Design Tokens — Single Source of Truth
+   ============================================================================ */
 :root {
+  /* Surfaces */
   --bg-dashboard: #f5f6f8;
   --bg-card: #ffffff;
   --bg-card-hover: #f9fafb;
+
+  /* Text */
   --text-primary: #1e2a3b;
-  --text-secondary: #555555;
-  --text-tertiary: #888888;
+  --text-secondary: #4C566A;   /* = phi-slate */
+  --text-tertiary: #9ca3af;    /* gray-400 */
+
+  /* Borders */
   --border-color: #e5e7eb;
   --border-color-strong: #d1d5db;
+
+  /* φ Brand */
+  --phi-dark: #074259;
+  --phi-gold: #F2C166;
+  --phi-mint: #1C8C63;
+  --phi-coral: #A66C26;
+  --phi-slate: #4C566A;
+  --phi-frost: #D8DEE9;
+  --phi-bg: #ECEFF4;
+
+  /* Semantic */
+  --color-success: #1C8C63;    /* = phi-mint */
+  --color-warning: #F2C166;    /* = phi-gold */
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
 }
 
 /* Apply Theme */
@@ -48,7 +70,7 @@
 }
 
 .dashboard-gradient {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--phi-dark) 0%, var(--phi-slate) 100%);
 }
 
 .card-hover {
@@ -192,7 +214,7 @@
   }
   
   .gradient-primary {
-    background: linear-gradient(135deg, #3A7BD5 0%, #00D2FF 100%);
+    background: linear-gradient(135deg, var(--phi-dark) 0%, var(--phi-mint) 100%);
   }
   
   .gradient-dark {
@@ -214,12 +236,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3A7BD5;
+  background: var(--phi-frost);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #2d63b3;
+  background: var(--phi-slate);
 }
 
 /* Animations */

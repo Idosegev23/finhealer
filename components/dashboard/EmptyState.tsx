@@ -33,7 +33,7 @@ export function EmptyState({
       <h3 className="text-xl font-bold text-theme-primary mb-2">{title}</h3>
       <p className="text-theme-secondary mb-6 max-w-md">{description}</p>
       <Link href={actionHref}>
-        <Button className="bg-[#3A7BD5] hover:bg-[#2A5BA5] text-white px-6">
+        <Button className="bg-phi-dark hover:bg-[#2A5BA5] text-white px-6">
           {actionText}
         </Button>
       </Link>

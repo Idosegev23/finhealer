@@ -64,7 +64,7 @@ export default function SavingsPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3A7BD5] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-phi-dark mx-auto mb-4"></div>
           <p className="text-gray-600">טוען...</p>
         </div>
       </div>
@@ -79,7 +79,7 @@ export default function SavingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <PiggyBank className="w-8 h-8 text-[#7ED957]" />
+                <PiggyBank className="w-8 h-8 text-phi-mint" />
                 חשבונות חיסכון
                 <InfoTooltip
                   content="כאן תוכל לנהל את כל חשבונות החיסכון שלך - קופות חירום, פיקדונות, השקעות ויעדי חיסכון"
@@ -90,7 +90,7 @@ export default function SavingsPage() {
             </div>
             <Button 
               onClick={() => setShowAddModal(true)}
-              className="bg-[#7ED957] hover:bg-[#6BC949] text-white"
+              className="bg-phi-mint hover:bg-phi-mint/90 text-white"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף חשבון חיסכון
@@ -148,7 +148,7 @@ export default function SavingsPage() {
           <div className="bg-white rounded-lg shadow-sm text-center py-16 animate-fade-in">
             <div className="mb-6 relative">
               <div className="absolute inset-0 bg-green-100 rounded-full blur-3xl opacity-30 animate-pulse"></div>
-              <PiggyBank className="w-20 h-20 text-[#7ED957] mx-auto relative animate-bounce-slow" />
+              <PiggyBank className="w-20 h-20 text-phi-mint mx-auto relative animate-bounce-slow" />
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-3">
               בואו נתחיל לחסוך יחד 💰
@@ -161,7 +161,7 @@ export default function SavingsPage() {
             </p>
             <Button 
               onClick={() => setShowAddModal(true)}
-              className="bg-[#7ED957] hover:bg-[#6BC949] text-white shadow-lg hover:shadow-xl transition-all"
+              className="bg-phi-mint hover:bg-phi-mint/90 text-white shadow-lg hover:shadow-xl transition-all"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               פתח חשבון חיסכון ראשון

@@ -154,7 +154,7 @@ export function AddInsuranceModal({ open, onOpenChange, onSuccess }: AddInsuranc
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto" dir="rtl">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-2xl">
-            <Shield className="w-6 h-6 text-[#3A7BD5]" />
+            <Shield className="w-6 h-6 text-phi-dark" />
             הוסף ביטוח חדש
           </SheetTitle>
           <SheetDescription>מלא את פרטי הביטוח כדי לנהל את כל הפוליסות במקום אחד</SheetDescription>
@@ -344,7 +344,7 @@ export function AddInsuranceModal({ open, onOpenChange, onSuccess }: AddInsuranc
             <Button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex-1 bg-[#3A7BD5] hover:bg-[#2A5BA5] text-white"
+              className="flex-1 bg-phi-dark hover:bg-[#2A5BA5] text-white"
             >
               {loading ? (
                 <>

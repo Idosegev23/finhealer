@@ -66,7 +66,7 @@ export default function SavingsForm({ initialData }: SavingsFormProps) {
         className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200"
       >
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#7ED957] to-[#6BBF4A] rounded-full flex items-center justify-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-phi-mint to-[#6BBF4A] rounded-full flex items-center justify-center">
             <PiggyBank className="w-8 h-8 text-white" />
           </div>
           <div>
@@ -88,7 +88,7 @@ export default function SavingsForm({ initialData }: SavingsFormProps) {
               placeholder="0"
               className="text-left text-2xl font-bold h-16 pr-16"
             />
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-[#7ED957]">₪</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-phi-mint">₪</span>
           </div>
           <p className="text-xs text-[#888888] mt-2">
             כולל: קרן פנסיה, קרן השתלמות, קופת גמל, חסכונות בבנק, פיקדונות וכו&apos;
@@ -107,7 +107,7 @@ export default function SavingsForm({ initialData }: SavingsFormProps) {
 
         <div className="space-y-6">
           {/* Owns Home */}
-          <div className="flex items-center gap-4 p-4 rounded-lg hover:bg-[#F5F6F8] transition-colors">
+          <div className="flex items-center gap-4 p-4 rounded-lg hover:bg-phi-bg transition-colors">
             <Checkbox
               id="ownsHome"
               checked={ownsHome}
@@ -115,7 +115,7 @@ export default function SavingsForm({ initialData }: SavingsFormProps) {
               className="w-6 h-6"
             />
             <label htmlFor="ownsHome" className="flex items-center gap-3 cursor-pointer flex-1">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#3A7BD5] to-[#2E5EA5] rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-phi-dark to-[#2E5EA5] rounded-full flex items-center justify-center">
                 <Home className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -126,7 +126,7 @@ export default function SavingsForm({ initialData }: SavingsFormProps) {
           </div>
 
           {/* Owns Car */}
-          <div className="flex items-center gap-4 p-4 rounded-lg hover:bg-[#F5F6F8] transition-colors">
+          <div className="flex items-center gap-4 p-4 rounded-lg hover:bg-phi-bg transition-colors">
             <Checkbox
               id="ownsCar"
               checked={ownsCar}
@@ -190,15 +190,15 @@ export default function SavingsForm({ initialData }: SavingsFormProps) {
             <h3 className="font-bold text-[#1E2A3B] mb-2">למה זה חשוב?</h3>
             <ul className="space-y-2 text-sm text-[#555555]">
               <li className="flex items-start gap-2">
-                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span className="text-phi-mint mt-0.5">✓</span>
                 <span>מאפשר לנו לחשב את <strong>שווי הנקי</strong> שלך (נכסים מינוס חובות)</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span className="text-phi-mint mt-0.5">✓</span>
                 <span>עוזר לתכנן את העתיד - האם יש לך מספיק חסכונות לפנסיה?</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span className="text-phi-mint mt-0.5">✓</span>
                 <span>מזהה נכסים שאפשר למנף או למכור במצב חירום</span>
               </li>
             </ul>
@@ -211,7 +211,7 @@ export default function SavingsForm({ initialData }: SavingsFormProps) {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#E8F5E9] border border-[#7ED957] rounded-lg p-4 text-center"
+          className="bg-green-50 border border-phi-mint rounded-lg p-4 text-center"
         >
           <p className="text-[#1E2A3B] font-semibold">{successMessage}</p>
         </motion.div>
@@ -231,7 +231,7 @@ export default function SavingsForm({ initialData }: SavingsFormProps) {
           type="button"
           onClick={handleSave}
           disabled={loading}
-          className="bg-[#3A7BD5] hover:bg-[#2E5EA5] text-white px-8"
+          className="bg-phi-dark hover:bg-[#2E5EA5] text-white px-8"
         >
           {loading ? (
             <>

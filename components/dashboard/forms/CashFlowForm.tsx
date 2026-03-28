@@ -59,7 +59,7 @@ export default function CashFlowForm({ initialBalance }: CashFlowFormProps) {
         className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200"
       >
         <div className="flex flex-col items-center mb-6">
-          <div className="w-20 h-20 bg-gradient-to-br from-[#3A7BD5] to-[#7ED957] rounded-full flex items-center justify-center mb-4">
+          <div className="w-20 h-20 bg-gradient-to-br from-phi-dark to-phi-mint rounded-full flex items-center justify-center mb-4">
             <Wallet className="w-10 h-10 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-[#1E2A3B] mb-2">יתרת חשבון עו&quot;ש</h2>
@@ -81,14 +81,14 @@ export default function CashFlowForm({ initialBalance }: CashFlowFormProps) {
               placeholder="0"
               className="text-center text-3xl font-bold h-20 pr-16"
             />
-            <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-bold text-[#3A7BD5]">₪</span>
+            <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-bold text-phi-dark">₪</span>
           </div>
 
           {/* Visual Indicator */}
           <div className="mt-6 p-4 rounded-lg bg-[#F5F6F8] flex items-center justify-center gap-3">
             {balance > 0 ? (
               <>
-                <TrendingUp className="w-6 h-6 text-[#7ED957]" />
+                <TrendingUp className="w-6 h-6 text-phi-mint" />
                 <span className="text-sm text-[#555555]">
                   יתרה חיובית - מצב תקין ✓
                 </span>
@@ -122,15 +122,15 @@ export default function CashFlowForm({ initialBalance }: CashFlowFormProps) {
             <h3 className="font-bold text-[#1E2A3B] mb-2">למה זה חשוב?</h3>
             <ul className="space-y-2 text-sm text-[#555555]">
               <li className="flex items-start gap-2">
-                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span className="text-phi-mint mt-0.5">✓</span>
                 <span>מאפשר לנו לחשב את תזרים המזומנים החודשי שלך</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span className="text-phi-mint mt-0.5">✓</span>
                 <span>עוזר לזהות אם אתה חי מחודש לחודש או יש לך מרווח נשימה</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#7ED957] mt-0.5">✓</span>
+                <span className="text-phi-mint mt-0.5">✓</span>
                 <span>נקודת התחלה לבניית קרן חירום</span>
               </li>
             </ul>
@@ -143,7 +143,7 @@ export default function CashFlowForm({ initialBalance }: CashFlowFormProps) {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#E8F5E9] border border-[#7ED957] rounded-lg p-4 text-center"
+          className="bg-green-50 border border-phi-mint rounded-lg p-4 text-center"
         >
           <p className="text-[#1E2A3B] font-semibold">{successMessage}</p>
         </motion.div>
@@ -163,7 +163,7 @@ export default function CashFlowForm({ initialBalance }: CashFlowFormProps) {
           type="button"
           onClick={handleSave}
           disabled={loading}
-          className="bg-[#3A7BD5] hover:bg-[#2E5EA5] text-white px-8"
+          className="bg-phi-dark hover:bg-[#2E5EA5] text-white px-8"
         >
           {loading ? (
             <>

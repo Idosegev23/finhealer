@@ -1,0 +1,269 @@
+/**
+ * φ Design System — Unified Components
+ *
+ * Single source of truth for:
+ * - Card (with variants)
+ * - Button (with variants)
+ * - EmptyState
+ * - StatCard
+ * - Badge
+ * - SectionTitle
+ * - ProgressBar
+ *
+ * All pages import from here. No more inline styling chaos.
+ */
+
+import React from 'react';
+import { LucideIcon } from 'lucide-react';
+
+// ============================================================================
+// CARD — unified card component
+// ============================================================================
+
+interface CardProps {
+  children: React.ReactNode;
+  className?: string;
+  padding?: 'sm' | 'md' | 'lg';
+  hover?: boolean;
+}
+
+const CARD_PADDING = {
+  sm: 'p-3',
+  md: 'p-5',
+  lg: 'p-6',
+};
+
+export function Card({ children, className = '', padding = 'md', hover = false }: CardProps) {
+  return (
+    <div className={`bg-white rounded-xl border border-gray-100 shadow-sm ${CARD_PADDING[padding]} ${hover ? 'transition-all hover:shadow-md hover:-translate-y-0.5' : ''} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+// ============================================================================
+// STAT CARD — for KPIs and metrics
+// ============================================================================
+
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  icon?: LucideIcon;
+  iconColor?: string;
+  iconBg?: string;
+  trend?: 'up' | 'down' | 'neutral';
+  subtitle?: string;
+  className?: string;
+}
+
+export function StatCard({ label, value, icon: Icon, iconColor = 'text-phi-dark', iconBg = 'bg-gray-50', trend, subtitle, className = '' }: StatCardProps) {
+  const trendColor = trend === 'up' ? 'text-phi-mint' : trend === 'down' ? 'text-red-500' : 'text-gray-600';
+
+  return (
+    <Card className={className}>
+      <div className="flex items-center gap-2 mb-2">
+        {Icon && (
+          <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center`}>
+            <Icon className={`w-4 h-4 ${iconColor}`} />
+          </div>
+        )}
+        <span className="text-xs font-medium text-gray-400">{label}</span>
+      </div>
+      <p className={`text-xl font-bold ${trendColor}`}>{value}</p>
+      {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+    </Card>
+  );
+}
+
+// ============================================================================
+// SECTION TITLE — consistent heading for every section
+// ============================================================================
+
+interface SectionTitleProps {
+  icon?: LucideIcon;
+  iconColor?: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+  className?: string;
+}
+
+export function SectionTitle({ icon: Icon, iconColor = 'text-phi-gold', children, action, className = '' }: SectionTitleProps) {
+  return (
+    <div className={`flex items-center justify-between mb-3 ${className}`}>
+      <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+        {Icon && <Icon className={`w-4 h-4 ${iconColor}`} />}
+        {children}
+      </h3>
+      {action}
+    </div>
+  );
+}
+
+// ============================================================================
+// EMPTY STATE — unified for all pages
+// ============================================================================
+
+interface EmptyStateProps {
+  icon: LucideIcon;
+  title: string;
+  description?: string;
+  action?: {
+    label: string;
+    href?: string;
+    onClick?: () => void;
+  };
+  className?: string;
+}
+
+export function EmptyState({ icon: Icon, title, description, action, className = '' }: EmptyStateProps) {
+  return (
+    <Card className={`text-center py-8 ${className}`}>
+      <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-3">
+        <Icon className="w-6 h-6 text-gray-300" />
+      </div>
+      <p className="text-sm font-medium text-gray-700 mb-1">{title}</p>
+      {description && <p className="text-xs text-gray-400 mb-3">{description}</p>}
+      {action && (
+        action.href ? (
+          <a href={action.href} className="inline-block text-xs font-medium text-phi-gold hover:underline">
+            {action.label}
+          </a>
+        ) : (
+          <button onClick={action.onClick} className="text-xs font-medium text-phi-gold hover:underline">
+            {action.label}
+          </button>
+        )
+      )}
+    </Card>
+  );
+}
+
+// ============================================================================
+// PROGRESS BAR — budget/goals tracking
+// ============================================================================
+
+interface ProgressBarProps {
+  value: number; // 0-100
+  max?: number;
+  size?: 'sm' | 'md';
+  className?: string;
+}
+
+export function ProgressBar({ value, max = 100, size = 'sm', className = '' }: ProgressBarProps) {
+  const pct = Math.min(100, Math.round((value / max) * 100));
+  const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-phi-gold' : 'bg-phi-mint';
+  const height = size === 'sm' ? 'h-1.5' : 'h-2.5';
+
+  return (
+    <div className={`${height} bg-gray-100 rounded-full overflow-hidden ${className}`}>
+      <div
+        className={`${height} rounded-full transition-all duration-500 ${color}`}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
+// ============================================================================
+// BADGE — status indicators
+// ============================================================================
+
+interface BadgeProps {
+  variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+  children: React.ReactNode;
+  className?: string;
+}
+
+const BADGE_STYLES = {
+  success: 'bg-green-50 text-phi-mint border-green-200',
+  warning: 'bg-amber-50 text-amber-700 border-amber-200',
+  danger: 'bg-red-50 text-red-600 border-red-200',
+  info: 'bg-blue-50 text-blue-600 border-blue-200',
+  neutral: 'bg-gray-50 text-gray-600 border-gray-200',
+};
+
+export function Badge({ variant, children, className = '' }: BadgeProps) {
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${BADGE_STYLES[variant]} ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+// ============================================================================
+// BUTTON — unified styles
+// ============================================================================
+
+interface PhiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  icon?: LucideIcon;
+}
+
+const BUTTON_VARIANTS = {
+  primary: 'bg-phi-dark text-white hover:bg-phi-slate',
+  secondary: 'bg-phi-gold text-phi-dark hover:bg-phi-gold/90',
+  outline: 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
+  ghost: 'text-gray-600 hover:bg-gray-50',
+  danger: 'bg-red-500 text-white hover:bg-red-600',
+};
+
+const BUTTON_SIZES = {
+  sm: 'px-3 py-1.5 text-xs',
+  md: 'px-4 py-2 text-sm',
+  lg: 'px-6 py-3 text-base',
+};
+
+export function PhiButton({ variant = 'primary', size = 'md', icon: Icon, children, className = '', ...props }: PhiButtonProps) {
+  return (
+    <button
+      className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${BUTTON_VARIANTS[variant]} ${BUTTON_SIZES[size]} ${className}`}
+      {...props}
+    >
+      {Icon && <Icon className="w-4 h-4" />}
+      {children}
+    </button>
+  );
+}
+
+// ============================================================================
+// PAGE HEADER — consistent page header
+// ============================================================================
+
+interface PageHeaderProps {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  className?: string;
+}
+
+export function PageHeader({ title, subtitle, action, className = '' }: PageHeaderProps) {
+  return (
+    <div className={`flex items-start justify-between mb-5 ${className}`}>
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+        {subtitle && <p className="text-sm text-gray-400 mt-0.5">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+// ============================================================================
+// PAGE WRAPPER — consistent page layout
+// ============================================================================
+
+interface PageWrapperProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export function PageWrapper({ children, className = '' }: PageWrapperProps) {
+  return (
+    <div className={`min-h-screen bg-gray-50 p-4 md:p-6 ${className}`} dir="rtl">
+      <div className="max-w-5xl mx-auto space-y-5">
+        {children}
+      </div>
+    </div>
+  );
+}

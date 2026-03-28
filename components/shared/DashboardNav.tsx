@@ -381,7 +381,7 @@ export function DashboardNav() {
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all ${
                         isActive
-                          ? "bg-[#3A7BD5] text-white shadow-lg"
+                          ? "bg-phi-dark text-white shadow-lg"
                           : isDark 
                             ? "text-gray-400 hover:bg-gray-800 hover:text-white"
                             : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"

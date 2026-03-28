@@ -170,7 +170,7 @@ export function AddPensionModal({ open, onOpenChange, onSuccess }: AddPensionMod
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto" dir="rtl">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-2xl">
-            <Landmark className="w-6 h-6 text-[#3A7BD5]" />
+            <Landmark className="w-6 h-6 text-phi-dark" />
             הוסף קרן פנסיה / גמל
           </SheetTitle>
           <SheetDescription>מלא את הפרטים כדי לעקוב אחרי החיסכון הפנסיוני שלך</SheetDescription>
@@ -450,7 +450,7 @@ export function AddPensionModal({ open, onOpenChange, onSuccess }: AddPensionMod
             <Button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex-1 bg-[#3A7BD5] hover:bg-[#2A5BA5] text-white"
+              className="flex-1 bg-phi-dark hover:bg-[#2A5BA5] text-white"
             >
               {loading ? (
                 <>

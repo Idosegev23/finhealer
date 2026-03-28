@@ -94,7 +94,7 @@ export default function PayslipScanner({ onDataExtracted }: PayslipScannerProps)
           variant="outline"
           onClick={() => fileInputRef.current?.click()}
           disabled={true}
-          className="flex-1 border-dashed border-2 border-[#3A7BD5] text-[#3A7BD5] hover:bg-blue-50"
+          className="flex-1 border-dashed border-2 border-[#3A7BD5] text-phi-dark hover:bg-blue-50"
         >
           {isScanning ? (
             <>

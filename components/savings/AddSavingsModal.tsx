@@ -144,7 +144,7 @@ export function AddSavingsModal({ open, onOpenChange, onSuccess }: AddSavingsMod
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto" dir="rtl">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-2xl">
-            <Wallet className="w-6 h-6 text-[#7ED957]" />
+            <Wallet className="w-6 h-6 text-phi-mint" />
             הוסף חשבון חיסכון
           </SheetTitle>
           <SheetDescription>מלא את הפרטים כדי להתחיל לעקוב אחרי החיסכונות שלך</SheetDescription>
@@ -302,7 +302,7 @@ export function AddSavingsModal({ open, onOpenChange, onSuccess }: AddSavingsMod
             <Button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex-1 bg-[#7ED957] hover:bg-[#6BC949] text-white"
+              className="flex-1 bg-phi-mint hover:bg-phi-mint/90 text-white"
             >
               {loading ? (
                 <>

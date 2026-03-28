@@ -84,7 +84,7 @@ export default function IncomeTemplates({ onSelect }: IncomeTemplatesProps) {
           >
             <div className="flex items-center gap-3 mb-3">
               <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                <Icon className="w-6 h-6 text-[#3A7BD5]" />
+                <Icon className="w-6 h-6 text-phi-dark" />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900">{template.name}</h3>
