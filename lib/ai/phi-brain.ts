@@ -259,33 +259,44 @@ ${Math.round(ctx.hoursSinceLastContact)} שעות
 ${eventDescription}
 
 == מה לעשות ==
-החזר JSON בלבד:
+בחר פעולה אחת מהרשימה וכתוב ב-action. החזר JSON בלבד:
 {
   "should_respond": true/false,
-  "message": "ההודעה בעברית (או null אם should_respond=false)",
-  "actions": ["classify", "update_state", "none"],
-  "new_state": "monitoring/behavior/budget/goals/null",
-  "profile_updates": {
-    "tone": "...",
-    "financial_personality": "...",
-    "patterns": {},
-    "last_coached_on": "...",
-    "preferred_message_length": "short/medium/detailed"
+  "action": "log_expense|undo_expense|show_summary|show_chart|show_budget|show_goals|show_cashflow|show_phi_score|classify|coaching|greeting|help|general_chat|none",
+  "action_params": {
+    "vendor": "...", "amount": 0, "category": "..."
   },
-  "internal_reasoning": "מדוע החלטת כך (לא נשלח למשתמש)"
+  "message": "ההודעה בעברית (רק אם action=coaching/greeting/general_chat, אחרת null)",
+  "new_state": "monitoring/behavior/budget/goals/null",
+  "profile_updates": {},
+  "internal_reasoning": "מדוע (לא נשלח למשתמש)"
 }
 
+actions אפשריות:
+- log_expense: המשתמש רושם הוצאה. חובה: action_params.vendor + action_params.amount. אופציונלי: action_params.category.
+  דוגמאות: "סופר 450", "קפה 15", "200 נעליים", "דלק 300"
+- undo_expense: המשתמש רוצה לבטל. "בטל", "טעות", "מחק"
+- show_summary: "סיכום", "מצב", "סטטוס"
+- show_chart: "גרף", "תרשים", "תראה לי גרף"
+- show_budget: "תקציב", "כמה נשאר", "כמה אפשר להוציא"
+- show_goals: "יעדים", "מטרות", "חיסכון"
+- show_cashflow: "תזרים", "תחזית"
+- show_phi_score: "ציון", "דירוג", "בריאות פיננסית"
+- classify: "סווג", "תנועות ממתינות"
+- coaching: הודעה יזומה/תגובה כללית — כתוב ב-message
+- greeting: שלום, היי
+- help: עזרה, תפריט
+- general_chat: שאלה חופשית
+- none: scheduled_check ואין מה להגיד
+
 כללים:
-1. אם האירוע הוא scheduled_check ואין סיבה טובה — should_respond=false. אל תמציא סיבה.
-2. אם המשתמש שלח הודעה — תמיד should_respond=true.
-3. הודעות קצרות. מקסימום 500 תווים. פסקה אחת או שתיים.
-4. לא "חרגת ⚠️". אלא "שמתי לב ש..." בטון חברי.
-5. אם המשתמש כתב הוצאה ("סופר 450") — רשום, אשר בקצרה, תן קונטקסט תקציבי.
-6. אם יש תנועות pending — סווג אוטומטית ודווח בקצרה.
-7. אם עבר דוח — תן סיכום חכם, לא דאטה.
-8. עדכן profile_updates רק אם למדת משהו חדש על המשתמש.
-9. אל תשתמש במילים: "בוא", "אתה" (זכר) — השתמש בשפה ניטרלית או פנייה אישית בשם.
-10. החזר JSON בלבד, בלי markdown.`;
+1. scheduled_check ואין סיבה → action=none
+2. הודעה מהמשתמש → תמיד action (לא none)
+3. "סופר 450" → action=log_expense, action_params={vendor:"סופר",amount:450}
+4. "200 נעליים" → action=log_expense, action_params={vendor:"נעליים",amount:200}
+5. message רק כש-action=coaching/greeting/general_chat/help. לשאר ה-handler מייצר הודעה.
+6. שפה ניטרלית מגדרית. פנייה בשם.
+7. JSON בלבד, בלי markdown.`;
 }
 
 // ============================================================================
@@ -340,46 +351,203 @@ export async function phiBrain(
     return { silent: true };
   }
 
-  console.log(`[PhiBrain] Decision for ${ctx.userName}: should_respond=${decision.should_respond}, reasoning=${decision.internal_reasoning?.substring(0, 100)}`);
+  const brainAction = decision.action || 'none';
+  const params = decision.action_params || {};
+  console.log(`[PhiBrain] Decision for ${ctx.userName}: action=${brainAction}, reasoning=${decision.internal_reasoning?.substring(0, 100)}`);
 
-  // ── Execute decision ──
-  const action: PhiAction = {};
-
-  if (decision.should_respond && decision.message) {
-    action.sendMessage = decision.message;
-  } else {
-    action.silent = true;
-  }
-
-  if (decision.actions?.includes('classify')) {
-    action.classify = true;
-  }
-
-  if (decision.new_state) {
-    action.updateState = decision.new_state;
-  }
-
-  if (decision.profile_updates && Object.keys(decision.profile_updates).length > 0) {
-    action.updateProfile = decision.profile_updates;
-  }
-
-  // ── Apply actions ──
+  // ── Execute action via specialized handlers ──
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
+  const action: PhiAction = {};
 
-  if (action.sendMessage) {
+  try {
+    switch (brainAction) {
+      // ── LOG EXPENSE ──
+      case 'log_expense': {
+        const vendor = params.vendor || 'הוצאה';
+        const amount = Number(params.amount) || 0;
+        if (amount <= 0) {
+          action.sendMessage = 'לא הצלחתי לזהות סכום. נסו שוב: "סופר 450"';
+          break;
+        }
+        // Create transaction
+        const category = params.category || 'אחר';
+        const { error } = await supabase.from('transactions').insert({
+          user_id: userId,
+          vendor,
+          amount,
+          type: 'expense',
+          status: 'confirmed',
+          source: 'whatsapp',
+          tx_date: new Date().toISOString().split('T')[0],
+          expense_category: category,
+          category,
+          auto_categorized: !!params.category,
+        });
+        if (error) {
+          action.sendMessage = 'שגיאה בשמירה. נסו שוב.';
+          break;
+        }
+        // Sync budget
+        try {
+          const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
+          await syncBudgetSpending(userId);
+        } catch {}
+        // Build response with budget context
+        const amountStr = amount.toLocaleString('he-IL');
+        let response = `✅ ${amountStr}₪ ${vendor}`;
+        if (ctx.budgetRemaining > 0) {
+          const newRemaining = ctx.budgetRemaining - amount;
+          response += `. נותר ${Math.max(0, Math.round(newRemaining)).toLocaleString('he-IL')}₪ מהתקציב`;
+        }
+        action.sendMessage = response;
+        break;
+      }
+
+      // ── UNDO EXPENSE ──
+      case 'undo_expense': {
+        const { data: lastTx } = await supabase
+          .from('transactions')
+          .select('id, vendor, amount')
+          .eq('user_id', userId)
+          .eq('source', 'whatsapp')
+          .eq('status', 'confirmed')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (!lastTx) {
+          action.sendMessage = 'לא מצאתי הוצאה אחרונה לביטול.';
+          break;
+        }
+        await supabase.from('transactions').delete().eq('id', lastTx.id).eq('user_id', userId);
+        try {
+          const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
+          await syncBudgetSpending(userId);
+        } catch {}
+        action.sendMessage = `🗑️ בוטל: ${Math.abs(Number(lastTx.amount)).toLocaleString('he-IL')}₪ ${lastTx.vendor}`;
+        break;
+      }
+
+      // ── SHOW SUMMARY ──
+      case 'show_summary': {
+        const { handleMonitoring } = await import('@/lib/conversation/states/monitoring');
+        const monCtx = { userId, phone: ctx.phone, state: 'monitoring' as any, userName: ctx.userName };
+        await handleMonitoring(monCtx, 'summary', ctx.userName, async (c) => ({ success: true }));
+        action.silent = true; // monitoring handler already sent the message
+        break;
+      }
+
+      // ── SHOW CHART ──
+      case 'show_chart': {
+        const { handleMonitoring } = await import('@/lib/conversation/states/monitoring');
+        const monCtx = { userId, phone: ctx.phone, state: 'monitoring' as any, userName: ctx.userName };
+        await handleMonitoring(monCtx, 'expense_chart', ctx.userName, async (c) => ({ success: true }));
+        action.silent = true;
+        break;
+      }
+
+      // ── SHOW BUDGET ──
+      case 'show_budget': {
+        const { handleMonitoring } = await import('@/lib/conversation/states/monitoring');
+        const monCtx = { userId, phone: ctx.phone, state: 'monitoring' as any, userName: ctx.userName };
+        await handleMonitoring(monCtx, 'budget_status', ctx.userName, async (c) => ({ success: true }));
+        action.silent = true;
+        break;
+      }
+
+      // ── SHOW GOALS ──
+      case 'show_goals': {
+        const { handleMonitoring } = await import('@/lib/conversation/states/monitoring');
+        const monCtx = { userId, phone: ctx.phone, state: 'monitoring' as any, userName: ctx.userName };
+        await handleMonitoring(monCtx, 'to_goals', ctx.userName, async (c) => ({ success: true }));
+        action.silent = true;
+        break;
+      }
+
+      // ── SHOW CASH FLOW ──
+      case 'show_cashflow': {
+        const { handleMonitoring } = await import('@/lib/conversation/states/monitoring');
+        const monCtx = { userId, phone: ctx.phone, state: 'monitoring' as any, userName: ctx.userName };
+        await handleMonitoring(monCtx, 'cash_flow', ctx.userName, async (c) => ({ success: true }));
+        action.silent = true;
+        break;
+      }
+
+      // ── SHOW PHI SCORE ──
+      case 'show_phi_score': {
+        const { handleMonitoring } = await import('@/lib/conversation/states/monitoring');
+        const monCtx = { userId, phone: ctx.phone, state: 'monitoring' as any, userName: ctx.userName };
+        await handleMonitoring(monCtx, 'phi_score', ctx.userName, async (c) => ({ success: true }));
+        action.silent = true;
+        break;
+      }
+
+      // ── CLASSIFY ──
+      case 'classify': {
+        action.classify = true;
+        action.sendMessage = decision.message || 'מסווג תנועות...';
+        break;
+      }
+
+      // ── HELP ──
+      case 'help': {
+        action.sendMessage =
+          `📋 *מה אפשר לעשות:*\n\n` +
+          `💸 רישום הוצאה: *"סופר 450"*\n` +
+          `🗑️ ביטול: *"בטל"*\n` +
+          `📊 סיכום: *"סיכום"*\n` +
+          `📈 גרף: *"גרף"*\n` +
+          `💰 תקציב: *"תקציב"*\n` +
+          `🎯 יעדים: *"יעדים"*\n` +
+          `📉 תזרים: *"תזרים"*\n` +
+          `⭐ ציון: *"ציון"*\n` +
+          `📄 שליחת דוח: שלחו PDF/תמונה`;
+        break;
+      }
+
+      // ── COACHING / GREETING / GENERAL CHAT ──
+      case 'coaching':
+      case 'greeting':
+      case 'general_chat': {
+        action.sendMessage = decision.message;
+        break;
+      }
+
+      // ── NONE (silent) ──
+      case 'none':
+      default: {
+        action.silent = true;
+        break;
+      }
+    }
+  } catch (handlerErr) {
+    console.error(`[PhiBrain] Handler error for action=${brainAction}:`, handlerErr);
+    // Fallback: use Gemini's message if handler failed
+    if (decision.message) {
+      action.sendMessage = decision.message;
+    }
+  }
+
+  // ── Send message if handler produced one ──
+  if (action.sendMessage && !action.silent) {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: action.sendMessage,
     });
 
-    // Log
     await supabase.from('alerts').insert({
       user_id: userId,
-      type: `phi_brain_${event.type}`,
+      type: `phi_brain_${brainAction}`,
       message: action.sendMessage.substring(0, 200),
       status: 'sent',
     });
+  }
+
+  if (decision.new_state) {
+    action.updateState = decision.new_state;
+  }
+  if (decision.profile_updates && Object.keys(decision.profile_updates).length > 0) {
+    action.updateProfile = decision.profile_updates;
   }
 
   if (action.updateState) {
