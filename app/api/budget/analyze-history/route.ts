@@ -46,15 +46,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 });
     }
 
-    // בדיקה אם יש מספיק נתונים (לפחות 30 תנועות או 2 חודשים מלאים)
-    const canCreateBudget = (transactions?.length || 0) >= 30;
-    
+    // בדיקה אם יש מספיק נתונים — 15 תנועות מספיקות לתקציב בסיסי
+    const txCount = transactions?.length || 0;
+    const canCreateBudget = txCount >= 15;
+
     if (!canCreateBudget) {
       return NextResponse.json({
         canCreateBudget: false,
         monthsAnalyzed: 0,
-        message: 'נדרשות לפחות 30 תנועות מ-3 חודשים אחרונים כדי ליצור תקציב חכם',
-        transactionsFound: transactions?.length || 0
+        message: `נמצאו רק ${txCount} תנועות. נדרשות לפחות 15 ליצירת תקציב. העלו עוד דוחות.`,
+        transactionsFound: txCount
       });
     }
 

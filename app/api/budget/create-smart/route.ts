@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     if (!analysisData.canCreateBudget) {
       return NextResponse.json({
         success: false,
-        error: 'אין מספיק נתונים ליצירת תקציב. נדרשות לפחות 30 תנועות מ-3 חודשים אחרונים.'
+        error: 'אין מספיק נתונים ליצירת תקציב. נדרשות לפחות 15 תנועות. העלו עוד דוחות.'
       }, { status: 400 });
     }
 

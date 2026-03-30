@@ -46,12 +46,15 @@ export interface PhaseInfo {
 
 const PHASE_ORDER: Phase[] = ['data_collection', 'behavior', 'budget', 'goals', 'monitoring'];
 
+// v3.1: Data-gating, not time-gating.
+// If user uploads 6 months of history on day 1, they get budget immediately.
+// These thresholds are MINIMUMS — actual gating also checks transaction count.
 const PHASE_THRESHOLDS: Record<Phase, number> = {
   data_collection: 0,
-  behavior: 30,
-  budget: 60,
-  goals: 90,
-  monitoring: 120,
+  behavior: 14,    // 2 weeks of data (was 30)
+  budget: 28,      // 1 month of data (was 60)
+  goals: 28,       // same as budget — goals and budget can happen together
+  monitoring: 28,  // once budget exists (was 120)
 };
 
 const PHASE_NAMES: Record<Phase, string> = {
@@ -111,12 +114,30 @@ export async function getDaysOfData(userId: string): Promise<number> {
  */
 export async function calculatePhase(userId: string): Promise<Phase> {
   const days = await getDaysOfData(userId);
+  const supabase = createServiceClient();
 
-  if (days < 30) return 'data_collection';
-  if (days < 60) return 'behavior';
-  if (days < 90) return 'budget';
-  if (days < 120) return 'goals';
-  return 'monitoring';
+  // Also check transaction count — data-gating, not just time-gating
+  const { count: txCount } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'confirmed');
+
+  const { count: budgetCount } = await supabase
+    .from('budgets')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  // v3.1 data-gating:
+  // <14 days OR <15 transactions → still collecting
+  if (days < 14 || (txCount || 0) < 15) return 'data_collection';
+  // Has enough data for behavior analysis
+  if (days < 28 && (txCount || 0) < 30) return 'behavior';
+  // Has budget → monitoring
+  if ((budgetCount || 0) > 0) return 'monitoring';
+  // Enough data for budget (28+ days OR 30+ transactions)
+  if (days >= 28 || (txCount || 0) >= 30) return 'budget';
+  return 'behavior';
 }
 
 /**
@@ -136,12 +157,11 @@ export async function getPhaseInfo(userId: string): Promise<PhaseInfo> {
   const number = getPhaseNumber(phase);
   const name = getPhaseName(phase);
 
-  // Calculate days until next phase
+  // Calculate days until next phase (v3.1 thresholds)
   let daysUntilNext = 0;
-  if (daysOfData < 30) daysUntilNext = 30 - daysOfData;
-  else if (daysOfData < 60) daysUntilNext = 60 - daysOfData;
-  else if (daysOfData < 90) daysUntilNext = 90 - daysOfData;
-  else if (daysOfData < 120) daysUntilNext = 120 - daysOfData;
+  if (daysOfData < 14) daysUntilNext = 14 - daysOfData;
+  else if (daysOfData < 28) daysUntilNext = 28 - daysOfData;
+  else daysUntilNext = 0; // enough data for all phases
 
   // Calculate progress within current phase
   const currentThreshold = PHASE_THRESHOLDS[phase];

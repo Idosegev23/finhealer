@@ -563,16 +563,64 @@ async function approveAndAdvance(ctx: RouterContext): Promise<RouterResult> {
     .update({ onboarding_state: nextState, phase: nextPhase })
     .eq('id', ctx.userId);
 
-  let msg: string;
-  if (nextPhase === 'data_collection') {
-    msg = `✅ *מעולה, הכל מסודר!*\n\n📄 שלחו עוד דוחות — 3 חודשים אחרונים מומלץ.`;
-  } else if (nextPhase === 'behavior' || nextPhase === 'budget') {
-    msg = `✅ *מעולה!*\n\n📊 עכשיו אבדוק את הדפוסים.\nכתבו *"ניתוח"* להתחיל.`;
-  } else {
-    msg = `✅ *הכל מסודר!* 🎉\n\n🎯 אפשר להגדיר יעדים ולעקוב.\nכתבו *"יעדים"* או *"סיכום"*.`;
+  // Build smart next-step message based on data
+  let msg = `✅ *הכל מסודר!*\n\n`;
+
+  // Quick financial snapshot
+  const { data: monthTx } = await supabase
+    .from('transactions')
+    .select('type, amount')
+    .eq('user_id', ctx.userId)
+    .eq('status', 'confirmed')
+    .or('is_summary.is.null,is_summary.eq.false')
+    .gte('tx_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+
+  const income = (monthTx || []).filter((t: any) => t.type === 'income').reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0);
+  const expenses = (monthTx || []).filter((t: any) => t.type === 'expense').reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0);
+
+  if (income > 0 || expenses > 0) {
+    msg += `📊 *סיכום חודשי:*\n`;
+    if (income > 0) msg += `💚 הכנסות: ${income.toLocaleString('he-IL')}₪\n`;
+    msg += `💸 הוצאות: ${expenses.toLocaleString('he-IL')}₪\n`;
+    if (income > 0) {
+      const balance = income - expenses;
+      msg += `${balance >= 0 ? '💰' : '⚠️'} יתרה: ${balance.toLocaleString('he-IL')}₪\n`;
+    }
+    msg += `\n`;
   }
 
-  await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: msg });
+  // Suggest next steps with clear CTAs
+  if (nextPhase === 'data_collection') {
+    msg += `📄 שלחו עוד דוחות — 3 חודשים אחרונים מומלץ.\nככל שיש יותר נתונים, הניתוח מדויק יותר.`;
+  } else if (nextPhase === 'budget') {
+    msg += `💡 *מה הלאה:*\n`;
+    msg += `💰 *"תקציב"* — אבנה תקציב אוטומטי\n`;
+    msg += `📊 *"סיכום"* — סיכום מלא\n`;
+    msg += `✏️ *"סופר 450"* — רישום הוצאה`;
+  } else {
+    msg += `💡 *מה הלאה:*\n`;
+    msg += `📊 *"סיכום"* — סיכום חודשי\n`;
+    msg += `💰 *"תקציב"* — מצב תקציב\n`;
+    msg += `🎯 *"יעדים"* — הגדרת יעדי חיסכון\n`;
+    msg += `✏️ *"סופר 450"* — רישום הוצאה`;
+  }
+
+  try {
+    const { sendWhatsAppInteractiveButtons } = await import('@/lib/greenapi/client');
+    await sendWhatsAppInteractiveButtons(ctx.phone, {
+      message: msg,
+      buttons: nextPhase === 'data_collection'
+        ? [{ buttonId: 'help', buttonText: 'עזרה 📋' }]
+        : [
+            { buttonId: 'summary', buttonText: 'סיכום 📊' },
+            { buttonId: 'budget_status', buttonText: 'תקציב 💰' },
+            { buttonId: 'help', buttonText: 'עזרה 📋' },
+          ],
+    });
+  } catch {
+    await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: msg });
+  }
+
   return { success: true, newState: nextState as any };
 }
 
