@@ -621,6 +621,13 @@ async function approveAndAdvance(ctx: RouterContext): Promise<RouterResult> {
       is_auto_generated: true,
       status: expenses >= totalBudget ? 'exceeded' : expenses >= totalBudget * 0.9 ? 'warning' : 'active',
     });
+  } else if (!budgetExists) {
+    // Explain why no budget was created
+    if (income === 0) {
+      msg += `\n📄 *תקציב:* לא זיהיתי הכנסות — שלחו דוח עם הכנסות (תלוש, עו"ש) ואבנה תקציב.\n`;
+    } else if (txList.length < 15) {
+      msg += `\n📄 *תקציב:* צריך עוד קצת נתונים (${txList.length}/15 תנועות). שלחו עוד דוח ואבנה תקציב.\n`;
+    }
   }
 
   // 3. Detect loans automatically

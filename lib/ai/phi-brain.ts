@@ -400,6 +400,49 @@ function tryFastPath(message: string, ctx: BrainContext): any | null {
 }
 
 // ============================================================================
+// Scheduled Check Fast Path — rule-based, no Gemini
+// ============================================================================
+
+function tryScheduledFastPath(ctx: BrainContext): any | null {
+  // Rule: first week — always silent
+  // (handled by cron already, but double-check)
+
+  // Rule: if user has pending transactions, nudge
+  if (ctx.pendingCount > 5) {
+    return {
+      should_respond: true,
+      action: 'coaching',
+      message: `היי ${ctx.userName || ''}! יש ${ctx.pendingCount} תנועות שממתינות לסיווג.\nכתבו *"נמשיך"* ואסדר הכל 😊`,
+      internal_reasoning: 'scheduled: pending_transactions',
+    };
+  }
+
+  // Rule: if spending velocity is high (>150% of daily budget), warn
+  if (ctx.budgetRemaining < 0) {
+    return {
+      should_respond: true,
+      action: 'coaching',
+      message: `${ctx.userName || ''}, שמתי לב שחרגתם מהתקציב החודשי.\nכתבו *"כמה יש לי"* לראות את המצב.`,
+      internal_reasoning: 'scheduled: budget_exceeded',
+    };
+  }
+
+  // Rule: if today's expenses are unusually high
+  if (ctx.todayExpenses.length >= 5) {
+    const todayTotal = ctx.todayExpenses.reduce((s, e) => s + e.amount, 0);
+    return {
+      should_respond: true,
+      action: 'coaching',
+      message: `יום פעיל! ${ctx.todayExpenses.length} הוצאות, ${todayTotal.toLocaleString('he-IL')}₪.\nכתבו *"סיכום"* לראות את התמונה.`,
+      internal_reasoning: 'scheduled: busy_spending_day',
+    };
+  }
+
+  // Default: silent — nothing interesting to report
+  return { should_respond: false, action: 'none', internal_reasoning: 'scheduled: nothing_to_report' };
+}
+
+// ============================================================================
 // PhiBrain — Main Entry Point
 // ============================================================================
 
@@ -436,6 +479,11 @@ export async function phiBrain(
 
   if (event.type === 'whatsapp_message') {
     decision = tryFastPath(event.message, ctx);
+  }
+
+  // Fast path for scheduled_check — rule-based, no Gemini
+  if (event.type === 'scheduled_check') {
+    decision = tryScheduledFastPath(ctx);
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -485,8 +533,32 @@ export async function phiBrain(
           action.sendMessage = 'לא הצלחתי לזהות סכום. נסו שוב: "סופר 450"';
           break;
         }
-        // Create transaction
-        const category = params.category || 'אחר';
+        // Classify using hard rules + learned rules (no Gemini needed)
+        let category = params.category || '';
+        let expenseType = 'variable';
+        if (!category) {
+          // Try hard rules first
+          const { findBestMatch } = await import('@/lib/finance/categories');
+          const hardMatch = findBestMatch(vendor);
+          if (hardMatch) {
+            category = hardMatch.name;
+            expenseType = hardMatch.type;
+          }
+        }
+        if (!category) {
+          // Try user's learned rules
+          const { data: userRule } = await supabase
+            .from('user_category_rules')
+            .select('category')
+            .eq('user_id', userId)
+            .ilike('vendor_pattern', `%${vendor.toLowerCase().trim()}%`)
+            .order('confidence', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (userRule?.category) category = userRule.category;
+        }
+        if (!category) category = 'אחר';
+
         const { error } = await supabase.from('transactions').insert({
           user_id: userId,
           vendor,
@@ -496,8 +568,9 @@ export async function phiBrain(
           source: 'whatsapp',
           tx_date: new Date().toISOString().split('T')[0],
           expense_category: category,
+          expense_type: expenseType,
           category,
-          auto_categorized: !!params.category,
+          auto_categorized: category !== 'אחר',
         });
         if (error) {
           action.sendMessage = 'שגיאה בשמירה. נסו שוב.';
@@ -510,12 +583,13 @@ export async function phiBrain(
           const { syncBudgetSpending } = await import('@/lib/services/BudgetSyncService');
           await syncBudgetSpending(userId);
         } catch {}
-        // Build response with budget context
+        // Build response with category + budget context
         const amountStr = amount.toLocaleString('he-IL');
         let response = `✅ ${amountStr}₪ ${vendor}`;
+        if (category !== 'אחר') response += ` (${category})`;
         if (ctx.budgetRemaining > 0) {
           const newRemaining = ctx.budgetRemaining - amount;
-          response += `. נותר ${Math.max(0, Math.round(newRemaining)).toLocaleString('he-IL')}₪ מהתקציב`;
+          response += `\nנותר ${Math.max(0, Math.round(newRemaining)).toLocaleString('he-IL')}₪ מהתקציב`;
         }
         action.sendMessage = response;
         break;
