@@ -102,13 +102,10 @@ export async function routeMessage(
   // Load conversation context for continuity
   const conversationCtx = await getOrCreateContext(userId);
 
-  // Check if context is stale (no interaction for 24+ hours)
+  // Stale context — DON'T send a separate "שמח שחזרת" message.
+  // The greeting handler below will handle it properly with buttons.
   if (isContextStale(conversationCtx)) {
-    const { context: resumedCtx, message: resumeMsg } = await resumeStaleContext(userId);
-    console.log(`[Router] STALE_CONTEXT: resumed for userId=${userId.substring(0,8)}...`);
-    if (resumeMsg) {
-      await greenAPI.sendMessage({ phoneNumber: phone, message: resumeMsg });
-    }
+    console.log(`[Router] STALE_CONTEXT: userId=${userId.substring(0,8)}, handled by greeting`);
   }
 
   // Load user
@@ -175,7 +172,22 @@ export async function routeMessage(
             if (closestGoal.progress >= 75) greeting += ` — כמעט שם! 🔥`;
             greeting += `\n`;
           }
-          greeting += `\nמה תרצה לעשות? כתוב *"עזרה"* לתפריט`;
+          greeting += `\nמה נעשה?`;
+          // Send with buttons — clear CTAs, no open questions
+          try {
+            await greenAPI.sendInteractiveButtons({
+              phoneNumber: phone,
+              message: greeting,
+              buttons: [
+                { buttonId: 'summary', buttonText: 'סיכום 📊' },
+                { buttonId: 'budget_status', buttonText: 'תקציב 💰' },
+                { buttonId: 'help', buttonText: 'עזרה 📋' },
+              ],
+            });
+            return { success: true };
+          } catch {
+            // fallback below
+          }
         } else if (state === 'classification' || state === 'classification_income' || state === 'classification_expense') {
           if (d.pendingCount > 0) {
             greeting += `📋 יש לך ${d.pendingCount} הוצאות/הכנסות שצריך לסדר.\n`;
@@ -205,8 +217,29 @@ export async function routeMessage(
             greeting += `\n`;
           }
           greeting += `מה תרצה לעשות?`;
+        } else if (state === 'waiting_for_document') {
+          greeting += `📄 *שלחו דוח מהבנק* — PDF, תמונה, או אקסל.\n`;
+          greeting += `אני מסווג הכל אוטומטית ומראה סיכום תוך שניות.`;
         } else {
           greeting += getStateGuidance(state, d.name);
+        }
+
+        // Send with buttons when possible
+        try {
+          const buttons = state === 'waiting_for_document'
+            ? [{ buttonId: 'help', buttonText: 'עזרה 📋' }]
+            : [
+                { buttonId: 'summary', buttonText: 'סיכום 📊' },
+                { buttonId: 'help', buttonText: 'עזרה 📋' },
+              ];
+          await greenAPI.sendInteractiveButtons({
+            phoneNumber: phone,
+            message: greeting,
+            buttons,
+          });
+          return { success: true };
+        } catch {
+          // Fallback to plain text
         }
 
         await greenAPI.sendMessage({ phoneNumber: phone, message: greeting });

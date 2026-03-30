@@ -337,9 +337,26 @@ function tryFastPath(message: string, ctx: BrainContext): any | null {
     }
   }
 
-  // 2. Greeting
+  // 2. Greeting — always with clear guidance, never open-ended
   if (/^(היי|שלום|הי|בוקר טוב|ערב טוב|מה נשמע|אהלן)$/i.test(trimmed)) {
-    return { should_respond: true, action: 'greeting', message: `היי ${ctx.userName || ''}! 😊 מה תרצו לעשות?`, internal_reasoning: 'fast_path: greeting' };
+    // Build a useful greeting, not an open question
+    const name = ctx.userName || '';
+    let greetMsg = `היי ${name}! 😊\n\n`;
+
+    if (ctx.monthlyIncome > 0 || ctx.monthlyExpenses > 0) {
+      const balance = ctx.monthlyIncome - ctx.monthlyExpenses;
+      greetMsg += `📊 החודש: ${ctx.monthlyExpenses.toLocaleString('he-IL')}₪ הוצאות`;
+      if (balance >= 0) greetMsg += ` | +${balance.toLocaleString('he-IL')}₪ 💚`;
+      greetMsg += `\n`;
+    }
+
+    greetMsg += `\n💡 מה אפשר לעשות:\n`;
+    greetMsg += `📊 *"סיכום"* — סיכום חודשי\n`;
+    greetMsg += `💰 *"תקציב"* — מצב תקציב\n`;
+    greetMsg += `✏️ *"סופר 450"* — רישום הוצאה\n`;
+    greetMsg += `📋 *"עזרה"* — תפריט מלא`;
+
+    return { should_respond: true, action: 'greeting', message: greetMsg, internal_reasoning: 'fast_path: greeting_with_guidance' };
   }
 
   // 3. Expense pattern: "סופר 450" or "450 סופר"
