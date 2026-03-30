@@ -563,59 +563,107 @@ async function approveAndAdvance(ctx: RouterContext): Promise<RouterResult> {
     .update({ onboarding_state: nextState, phase: nextPhase })
     .eq('id', ctx.userId);
 
-  // Build smart next-step message based on data
-  let msg = `✅ *הכל מסודר!*\n\n`;
+  // ══════════════════════════════════════════════════════════════
+  // DON'T ASK — DO.
+  // After classification, automatically: show summary → build budget → suggest goals
+  // ══════════════════════════════════════════════════════════════
 
-  // Quick financial snapshot
-  const { data: monthTx } = await supabase
+  // 1. Always show financial snapshot
+  const { data: allTx } = await supabase
     .from('transactions')
-    .select('type, amount')
+    .select('type, amount, expense_type, expense_category')
     .eq('user_id', ctx.userId)
     .eq('status', 'confirmed')
-    .or('is_summary.is.null,is_summary.eq.false')
-    .gte('tx_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+    .or('is_summary.is.null,is_summary.eq.false');
 
-  const income = (monthTx || []).filter((t: any) => t.type === 'income').reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0);
-  const expenses = (monthTx || []).filter((t: any) => t.type === 'expense').reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0);
+  const txList = allTx || [];
+  const income = txList.filter((t: any) => t.type === 'income').reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0);
+  const expenses = txList.filter((t: any) => t.type === 'expense').reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0);
+  const fixed = txList.filter((t: any) => t.expense_type === 'fixed').reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0);
+  const variable = txList.filter((t: any) => t.expense_type === 'variable').reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0);
+  const balance = income - expenses;
 
-  if (income > 0 || expenses > 0) {
-    msg += `📊 *סיכום חודשי:*\n`;
-    if (income > 0) msg += `💚 הכנסות: ${income.toLocaleString('he-IL')}₪\n`;
-    msg += `💸 הוצאות: ${expenses.toLocaleString('he-IL')}₪\n`;
-    if (income > 0) {
-      const balance = income - expenses;
-      msg += `${balance >= 0 ? '💰' : '⚠️'} יתרה: ${balance.toLocaleString('he-IL')}₪\n`;
-    }
-    msg += `\n`;
+  let msg = `✅ *הכל מסודר! הנה התמונה:*\n\n`;
+
+  if (income > 0) {
+    msg += `💚 הכנסות: ${income.toLocaleString('he-IL')}₪\n`;
+  }
+  msg += `💸 הוצאות: ${expenses.toLocaleString('he-IL')}₪\n`;
+  if (fixed > 0) msg += `   🔒 קבועות: ${fixed.toLocaleString('he-IL')}₪\n`;
+  if (variable > 0) msg += `   🔄 משתנות: ${variable.toLocaleString('he-IL')}₪\n`;
+  if (income > 0) {
+    msg += `${balance >= 0 ? '💰' : '⚠️'} יתרה: ${balance >= 0 ? '+' : ''}${balance.toLocaleString('he-IL')}₪\n`;
   }
 
-  // Suggest next steps with clear CTAs
-  if (nextPhase === 'data_collection') {
-    msg += `📄 שלחו עוד דוחות — 3 חודשים אחרונים מומלץ.\nככל שיש יותר נתונים, הניתוח מדויק יותר.`;
-  } else if (nextPhase === 'budget') {
-    msg += `💡 *מה הלאה:*\n`;
-    msg += `💰 *"תקציב"* — אבנה תקציב אוטומטי\n`;
-    msg += `📊 *"סיכום"* — סיכום מלא\n`;
-    msg += `✏️ *"סופר 450"* — רישום הוצאה`;
-  } else {
-    msg += `💡 *מה הלאה:*\n`;
-    msg += `📊 *"סיכום"* — סיכום חודשי\n`;
-    msg += `💰 *"תקציב"* — מצב תקציב\n`;
-    msg += `🎯 *"יעדים"* — הגדרת יעדי חיסכון\n`;
-    msg += `✏️ *"סופר 450"* — רישום הוצאה`;
+  // 2. Auto-build budget if enough data and no budget exists
+  const { count: budgetExists } = await supabase
+    .from('budgets')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId);
+
+  if (!budgetExists && txList.length >= 15 && income > 0) {
+    const savingsPercent = 10;
+    const savingsGoal = Math.round(income * savingsPercent / 100);
+    const totalBudget = Math.round(income - savingsGoal);
+
+    msg += `\n💰 *בניתי תקציב אוטומטי:*\n`;
+    msg += `   תקציב חודשי: ${totalBudget.toLocaleString('he-IL')}₪\n`;
+    msg += `   יעד חיסכון: ${savingsGoal.toLocaleString('he-IL')}₪ (${savingsPercent}%)\n`;
+
+    // Actually create the budget
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    await supabase.from('budgets').insert({
+      user_id: ctx.userId,
+      month: currentMonth,
+      total_budget: totalBudget,
+      total_spent: expenses,
+      savings_goal: savingsGoal,
+      is_auto_generated: true,
+      status: expenses >= totalBudget ? 'exceeded' : expenses >= totalBudget * 0.9 ? 'warning' : 'active',
+    });
   }
+
+  // 3. Detect loans automatically
+  const loanPatterns = txList.filter((t: any) => {
+    const cat = (t.expense_category || '').toLowerCase();
+    return cat.includes('הלוואה') || cat.includes('משכנתא');
+  });
+  if (loanPatterns.length > 0) {
+    const loanTotal = loanPatterns.reduce((s: number, t: any) => s + Math.abs(Number(t.amount)), 0);
+    const monthlyLoan = Math.round(loanTotal / Math.max(1, new Set(loanPatterns.map((t: any) => (t.tx_date || '').substring(0, 7))).size));
+    msg += `\n🏦 *זיהיתי הלוואות:* ~${monthlyLoan.toLocaleString('he-IL')}₪/חודש\n`;
+  }
+
+  // 4. Top spending insight
+  const categoryMap = new Map<string, number>();
+  txList.filter((t: any) => t.type === 'expense' && t.expense_category).forEach((t: any) => {
+    const cat = t.expense_category;
+    categoryMap.set(cat, (categoryMap.get(cat) || 0) + Math.abs(Number(t.amount)));
+  });
+  const topCategories = Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  if (topCategories.length > 0) {
+    msg += `\n📊 *הוצאות עיקריות:*\n`;
+    topCategories.forEach(([cat, amount]) => {
+      msg += `   ${cat}: ${Math.round(amount).toLocaleString('he-IL')}₪\n`;
+    });
+  }
+
+  // 5. Clear next steps
+  msg += `\n💡 *מה עכשיו:*\n`;
+  msg += `📊 *"סיכום"* — סיכום מפורט\n`;
+  msg += `💰 *"כמה יש לי"* — כמה חופשי להוציא\n`;
+  msg += `✏️ *"סופר 450"* — רישום הוצאה\n`;
+  msg += `📋 *"עזרה"* — כל האפשרויות`;
 
   try {
     const { sendWhatsAppInteractiveButtons } = await import('@/lib/greenapi/client');
     await sendWhatsAppInteractiveButtons(ctx.phone, {
       message: msg,
-      buttons: nextPhase === 'data_collection'
-        ? [{ buttonId: 'help', buttonText: 'עזרה 📋' }]
-        : [
-            { buttonId: 'summary', buttonText: 'סיכום 📊' },
-            { buttonId: 'budget_status', buttonText: 'תקציב 💰' },
-            { buttonId: 'help', buttonText: 'עזרה 📋' },
-          ],
+      buttons: [
+        { buttonId: 'summary', buttonText: 'סיכום 📊' },
+        { buttonId: 'show_money_flow', buttonText: 'כמה חופשי? 💰' },
+        { buttonId: 'help', buttonText: 'עזרה 📋' },
+      ],
     });
   } catch {
     await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: msg });
