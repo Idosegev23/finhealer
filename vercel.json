@@ -3,22 +3,13 @@
     "app/api/documents/process/route.ts": {
       "maxDuration": 600
     },
+    "app/api/cron/phi-brain-check/route.ts": {
+      "maxDuration": 300
+    },
     "app/api/cron/analyze-patterns/route.ts": {
       "maxDuration": 300
     },
-    "app/api/cron/daily-summary/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/cron/weekly-summary/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/cron/monthly-review/route.ts": {
-      "maxDuration": 300
-    },
     "app/api/cron/goals-check/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/cron/cash-flow-alerts/route.ts": {
       "maxDuration": 300
     },
     "app/api/cron/savings-sync/route.ts": {
@@ -33,36 +24,16 @@
   },
   "crons": [
     {
-      "path": "/api/cron/process-alerts",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/check-recurring",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/phi-brain-check",
+      "schedule": "0 8,20 * * *"
     },
     {
       "path": "/api/cron/refresh-views",
       "schedule": "0 */6 * * *"
     },
     {
-      "path": "/api/cron/reminders",
-      "schedule": "0,15,30,45 * * * *"
-    },
-    {
       "path": "/api/cron/analyze-patterns",
       "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/daily-summary",
-      "schedule": "30 20 * * *"
-    },
-    {
-      "path": "/api/cron/weekly-summary",
-      "schedule": "0 9 * * 0"
-    },
-    {
-      "path": "/api/cron/monthly-review",
-      "schedule": "0 9 1 * *"
     },
     {
       "path": "/api/cron/goals-check",
@@ -73,20 +44,12 @@
       "schedule": "0 9 * * *"
     },
     {
-      "path": "/api/cron/cash-flow-alerts",
-      "schedule": "0 8 * * *"
-    },
-    {
       "path": "/api/cron/savings-sync",
       "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/milestone-notifications",
       "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/re-engagement",
-      "schedule": "0 11 * * *"
     },
     {
       "path": "/api/cron/update-phases",

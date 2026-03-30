@@ -657,12 +657,29 @@ export async function phiBrain(
       message: action.sendMessage,
     });
 
+    // Log to alerts (short summary)
     await supabase.from('alerts').insert({
       user_id: userId,
       type: `phi_brain_${brainAction}`,
       message: action.sendMessage.substring(0, 200),
       status: 'sent',
     });
+
+    // Log FULL message to wa_messages (conversation history)
+    await supabase.from('wa_messages').insert({
+      user_id: userId,
+      direction: 'outgoing',
+      msg_type: 'text',
+      payload: {
+        body: action.sendMessage,
+        action: brainAction,
+        fast_path: isFastPath || false,
+      },
+      status: 'sent',
+    });
+
+    // Invalidate brain context cache (new message = stale context)
+    cache.invalidate(userId);
   }
 
   if (decision.new_state) {
