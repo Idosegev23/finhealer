@@ -135,10 +135,11 @@ export async function routeMessage(
   // For PhiBrain states — skip universal intents, brain handles everything
   // ══════════════════════════════════════════════════════════════════════════
 
+  // Only monitoring + classification are PhiBrain-managed for greetings
+  // behavior/goals/budget have their own handlers that handle greetings
   const brainManagedStates = [
     'classification', 'classification_income', 'classification_expense', 'smart_classification',
-    'behavior', 'goals_setup', 'goals', 'budget',
-    'loan_consolidation_offer', 'waiting_for_loan_docs', 'monitoring',
+    'monitoring',
   ];
   const isBrainManaged = brainManagedStates.includes(state);
 
@@ -452,11 +453,36 @@ export async function routeMessage(
   // Handles: classification, behavior, goals, budget, monitoring, loans
   // ══════════════════════════════════════════════════════════════════════════
 
+  // PhiBrain handles: monitoring (daily usage) + classification
+  // State handlers handle: behavior, goals, budget (have their own wizard flows)
   const brainStates = [
     'classification', 'classification_income', 'classification_expense', 'smart_classification',
-    'behavior', 'goals_setup', 'goals', 'budget',
-    'loan_consolidation_offer', 'waiting_for_loan_docs', 'monitoring',
+    'monitoring',
   ];
+
+  // Wizard states — these have their own multi-step flows, PhiBrain can't handle them
+  if (state === 'behavior') {
+    console.log(`[Router] DISPATCH: state=behavior → handleBehaviorPhase()`);
+    return await handleBehaviorPhase(ctx, msg);
+  }
+  if (state === 'goals_setup') {
+    console.log(`[Router] DISPATCH: state=goals_setup → handleGoalsSetup()`);
+    return await handleGoalsSetup(ctx, msg);
+  }
+  if (state === 'goals') {
+    console.log(`[Router] DISPATCH: state=goals → handleGoalsPhase()`);
+    return await handleGoalsPhase(ctx, msg);
+  }
+  if (state === 'budget') {
+    console.log(`[Router] DISPATCH: state=budget → handleBudgetPhase()`);
+    return await handleBudgetPhase(ctx, msg);
+  }
+  if (state === 'loan_consolidation_offer') {
+    return await handleLoanConsolidationOffer(ctx, msg);
+  }
+  if (state === 'waiting_for_loan_docs') {
+    return await handleWaitingForLoanDocs(ctx, msg);
+  }
 
   if (brainStates.includes(state)) {
     console.log(`[Router] DISPATCH: state=${state} → PhiBrain`);
@@ -466,19 +492,12 @@ export async function routeMessage(
       return { success: true, newState: action.updateState as any };
     } catch (brainErr) {
       console.error(`[Router] PhiBrain error, falling back to legacy handler:`, brainErr);
-      // Fallback: use legacy handlers if brain fails
       if (state === 'monitoring') {
         return await handleMonitoring(ctx, msg, userName, startClassification);
       }
       if (state.startsWith('classification') || state === 'smart_classification') {
         return await handleSmartClassification(ctx, msg);
       }
-      if (state === 'behavior') return await handleBehaviorPhase(ctx, msg);
-      if (state === 'goals_setup') return await handleGoalsSetup(ctx, msg);
-      if (state === 'goals') return await handleGoalsPhase(ctx, msg);
-      if (state === 'budget') return await handleBudgetPhase(ctx, msg);
-      if (state === 'loan_consolidation_offer') return await handleLoanConsolidationOffer(ctx, msg);
-      if (state === 'waiting_for_loan_docs') return await handleWaitingForLoanDocs(ctx, msg);
     }
   }
 
