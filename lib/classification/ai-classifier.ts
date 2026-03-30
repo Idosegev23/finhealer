@@ -169,6 +169,29 @@ const HARD_RULES: Record<string, { category: string; expense_type?: string; is_c
   'זארה': { category: 'ביגוד', expense_type: 'variable' },
   'fox': { category: 'ביגוד', expense_type: 'variable' },
   'גולף': { category: 'ביגוד', expense_type: 'variable' },
+  // — מסעדות ומשלוחים —
+  'מקדונלדס': { category: 'מסעדות', expense_type: 'variable' },
+  'בורגר קינג': { category: 'מסעדות', expense_type: 'variable' },
+  'דומינוס': { category: 'מסעדות', expense_type: 'variable' },
+  'פיצה האט': { category: 'מסעדות', expense_type: 'variable' },
+  'קפה קפה': { category: 'מסעדות', expense_type: 'variable' },
+  'ארומה': { category: 'מסעדות', expense_type: 'variable' },
+  'גרג': { category: 'מסעדות', expense_type: 'variable' },
+  'וולט': { category: 'מסעדות', expense_type: 'variable' },
+  'wolt': { category: 'מסעדות', expense_type: 'variable' },
+  'תן ביס': { category: 'מסעדות', expense_type: 'variable' },
+  'משלוחה': { category: 'מסעדות', expense_type: 'variable' },
+  'japanika': { category: 'מסעדות', expense_type: 'variable' },
+  'מסעדה': { category: 'מסעדות', expense_type: 'variable' },
+  'מסעדת': { category: 'מסעדות', expense_type: 'variable' },
+  // — קניות אונליין —
+  'amazon': { category: 'קניות אונליין', expense_type: 'variable' },
+  'aliexpress': { category: 'קניות אונליין', expense_type: 'variable' },
+  'shein': { category: 'קניות אונליין', expense_type: 'variable' },
+  'ebay': { category: 'קניות אונליין', expense_type: 'variable' },
+  // — חינוך —
+  'גן ילדים': { category: 'חינוך גנים ובתי ספר', expense_type: 'fixed' },
+  'בית ספר': { category: 'חינוך גנים ובתי ספר', expense_type: 'fixed' },
 };
 
 // ============================================================================
