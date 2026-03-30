@@ -651,13 +651,14 @@ export async function phiBrain(
   }
 
   // ── Send message if handler produced one ──
+  // All messages go through GreenAPI client which auto-logs to wa_messages
   if (action.sendMessage && !action.silent) {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: action.sendMessage,
     });
 
-    // Log to alerts (short summary)
+    // Log to alerts (short summary for dashboard)
     await supabase.from('alerts').insert({
       user_id: userId,
       type: `phi_brain_${brainAction}`,
@@ -665,20 +666,6 @@ export async function phiBrain(
       status: 'sent',
     });
 
-    // Log FULL message to wa_messages (conversation history)
-    await supabase.from('wa_messages').insert({
-      user_id: userId,
-      direction: 'outgoing',
-      msg_type: 'text',
-      payload: {
-        body: action.sendMessage,
-        action: brainAction,
-        fast_path: isFastPath || false,
-      },
-      status: 'sent',
-    });
-
-    // Invalidate brain context cache (new message = stale context)
     cache.invalidate(userId);
   }
 

@@ -106,6 +106,33 @@ export class GreenAPIClient {
 
       const data = await response.json();
       console.log(`✅ GreenAPI message sent to ${normalizedPhone}@c.us:`, data.idMessage);
+
+      // Log ALL outgoing messages to wa_messages for conversation history
+      try {
+        const { createServiceClient: createSC } = await import('@/lib/supabase/server');
+        const sb = createSC();
+        // Find user by phone
+        const { data: user } = await sb
+          .from('users')
+          .select('id')
+          .or(`phone.eq.${normalizedPhone},phone.eq.+${normalizedPhone},phone.eq.0${normalizedPhone.substring(3)}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (user?.id) {
+          await sb.from('wa_messages').insert({
+            user_id: user.id,
+            direction: 'outgoing',
+            msg_type: 'text',
+            payload: { body: message.substring(0, 2000) },
+            status: 'sent',
+            provider_msg_id: data.idMessage || null,
+          });
+        }
+      } catch {
+        // Non-fatal — don't break message sending if logging fails
+      }
+
       return data;
     } catch (error) {
       console.error('❌ GreenAPI send error:', error);
