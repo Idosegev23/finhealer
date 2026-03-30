@@ -42,13 +42,35 @@ export async function checkNegativeCashFlow(): Promise<void> {
     // עבור על כל משתמש
     for (const user of users) {
       try {
+        // Sanity check: does user have enough data for meaningful projection?
+        const { count: recentTxCount } = await supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'confirmed')
+          .gte('tx_date', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+
+        if (!recentTxCount || recentTxCount < 20) {
+          // Not enough recent data — skip, don't send scary alerts based on partial data
+          console.log(`[Cash Flow Alerts] Skipping user ${user.id} — only ${recentTxCount} recent transactions`);
+          continue;
+        }
+
         // תחזית ל-3 חודשים קדימה
         const analysis = await projectCashFlow(user.id, 3);
-        
+
+        // Sanity: if projected income < 1000₪ but user historically earns much more, skip
+        // This catches cases where current month has no uploaded statements
+        const firstMonth = analysis.projections[0];
+        if (firstMonth && firstMonth.projected_income < 1000 && firstMonth.projected_expenses > 5000) {
+          console.log(`[Cash Flow Alerts] Skipping user ${user.id} — income ${firstMonth.projected_income} looks like missing data, not real deficit`);
+          continue;
+        }
+
         // בדוק אם יש חודשים שליליים
         if (analysis.negative_months.length > 0) {
           const severity = determineSeverity(analysis);
-          
+
           alerts.push({
             user_id: user.id,
             phone: user.phone!,
@@ -188,15 +210,16 @@ function buildAlertMessage(
     message += `\n`;
   }
   
+  // Filter out absurd recommendations (>100% reduction, negative savings)
   // CTA
   if (severity === 'critical') {
-    message += `🔴 *דחוף!* עדכן את התקציב או הגדל הכנסה.\n`;
-    message += `💼 רוצה שגדי יבדוק את המצב? כתוב *"ייעוץ"*\n`;
+    message += `💡 כדאי לבדוק שכל הדוחות עדכניים — אולי חסר דוח הכנסות?\n`;
+    message += `כתבו *"סיכום"* לראות את המצב המלא.\n`;
   } else if (severity === 'warning') {
-    message += `⚠️ *פעל עכשיו* למניעת גירעון.\n`;
-    message += `💼 רוצה עזרה מקצועית? כתוב *"ייעוץ"*\n`;
+    message += `⚠️ שווה לשים לב ולתכנן מראש.\n`;
+    message += `כתבו *"תקציב"* לראות איפה אפשר לחסוך.\n`;
   } else {
-    message += `💪 *תכנן מראש* כדי למנוע בעיות.\n`;
+    message += `💪 תכנון מראש עוזר למנוע הפתעות.\n`;
   }
 
   message += `\nכתוב *"תזרים"* לתחזית מלאה 📊`;
