@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { ToasterProvider } from '@/components/ui/toaster';
 import { Menu } from 'lucide-react';
 
 export default function AdminLayout({
@@ -12,6 +13,7 @@ export default function AdminLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
+    <ToasterProvider>
     <div className="flex h-screen bg-gray-900 overflow-hidden" dir="rtl">
       {/* Sidebar */}
       <AdminSidebar
@@ -39,5 +41,6 @@ export default function AdminLayout({
         </main>
       </div>
     </div>
+    </ToasterProvider>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { PendingExpensesProvider } from "@/contexts/PendingExpensesContext";
+import { ToasterProvider } from "@/components/ui/toaster";
 
 export default function LoansSimulatorLayout({
   children,
@@ -8,9 +9,11 @@ export default function LoansSimulatorLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PendingExpensesProvider>
-      {children}
-    </PendingExpensesProvider>
+    <ToasterProvider>
+      <PendingExpensesProvider>
+        {children}
+      </PendingExpensesProvider>
+    </ToasterProvider>
   );
 }
 
