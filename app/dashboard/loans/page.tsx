@@ -27,6 +27,7 @@ const COLORS = ['#074259', '#F6A623', '#7ED957', '#E74C3C', '#9B59B6', '#1ABC9C'
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expandedLoan, setExpandedLoan] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function LoansPage() {
 
   async function fetchLoans() {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch('/api/loans/list');
       if (!response.ok) throw new Error('Failed to fetch loans');
@@ -42,6 +44,7 @@ export default function LoansPage() {
       setLoans(data.loans || []);
     } catch (error) {
       console.error('Error fetching loans:', error);
+      setError('שגיאה בטעינת ההלוואות. נסה לרענן את הדף.');
     } finally {
       setLoading(false);
     }
@@ -85,6 +88,21 @@ export default function LoansPage() {
       <DashboardWrapper>
       <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </DashboardWrapper>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardWrapper>
+        <div className="min-h-screen bg-gray-50 p-4 md:p-6 flex items-center justify-center" dir="rtl">
+          <div className="text-center space-y-4">
+            <div className="text-red-500 text-lg font-semibold">{error}</div>
+            <Button onClick={fetchLoans} className="bg-blue-600 hover:bg-blue-700 text-white">
+              נסה שוב
+            </Button>
+          </div>
         </div>
       </DashboardWrapper>
     );

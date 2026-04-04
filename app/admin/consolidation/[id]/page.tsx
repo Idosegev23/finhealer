@@ -10,8 +10,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@/lib/supabase/client';
 import type { ConsolidationRequest } from '@/types/loans';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/toaster';
 
 export default function ConsolidationRequestDetailPage() {
+  const { addToast } = useToast();
   const params = useParams();
   const router = useRouter();
   const [request, setRequest] = useState<any>(null);
@@ -67,10 +69,10 @@ export default function ConsolidationRequestDetailPage() {
     });
     
     if (res.ok) {
-      alert('הבקשה עודכנה בהצלחה!');
+      addToast({ title: 'הבקשה עודכנה בהצלחה!', type: 'success' });
       fetchRequest();
     } else {
-      alert('שגיאה בעדכון הבקשה');
+      addToast({ title: 'שגיאה בעדכון הבקשה', type: 'error' });
     }
     
     setUpdating(false);
@@ -88,10 +90,10 @@ export default function ConsolidationRequestDetailPage() {
     });
     
     if (res.ok) {
-      alert('הליד נשלח בהצלחה לגדי!');
+      addToast({ title: 'הליד נשלח בהצלחה לגדי!', type: 'success' });
       fetchRequest();
     } else {
-      alert('שגיאה בשליחת הליד');
+      addToast({ title: 'שגיאה בשליחת הליד', type: 'error' });
     }
     
     setUpdating(false);

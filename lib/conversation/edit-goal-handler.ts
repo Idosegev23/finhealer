@@ -8,18 +8,8 @@ import { mergeClassificationContext as mergeContext } from './shared';
 import type { Goal } from '@/types/goals';
 
 async function removeEditGoalContext(userId: string): Promise<void> {
-  const supabase = createServiceClient();
-  const { data: ctxUser } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-  const ctxData = ctxUser?.classification_context || {};
-  const { editGoal: _removed, ...restCtx } = ctxData as any;
-  await supabase
-    .from('users')
-    .update({ classification_context: Object.keys(restCtx).length > 0 ? restCtx : null })
-    .eq('id', userId);
+  const { removeClassificationContextKey } = await import('./shared');
+  await removeClassificationContextKey(userId, 'editGoal');
 }
 
 export interface EditGoalContext {

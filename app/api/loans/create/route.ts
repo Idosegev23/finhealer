@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 
 /**
  * API Route: /api/loans/create
@@ -7,6 +8,8 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function POST(request: NextRequest) {
   try {
+    const limited = checkApiRateLimit(request, 20, 60_000);
+    if (limited) return limited;
     const supabase = await createClient();
 
     // Get user
@@ -30,6 +33,10 @@ export async function POST(request: NextRequest) {
     // Validate
     if (!lender_name || !loan_type || !original_amount || !current_balance || !monthly_payment) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    if (Number(original_amount) > 50_000_000 || Number(current_balance) > 50_000_000 || Number(monthly_payment) > 1_000_000) {
+      return NextResponse.json({ error: 'סכום גבוה מדי' }, { status: 400 });
     }
 
     // Insert

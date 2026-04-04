@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 import {
   calculateOptimalAllocations,
   saveAllocationHistory,
@@ -14,6 +15,9 @@ import {
 import type { GoalAllocationInput } from '@/types/goals';
 
 export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { userId, monthlyIncome, fixedExpenses, minimumLivingBudget, applyChanges = false } = body;
@@ -84,6 +88,9 @@ export async function POST(request: NextRequest) {
  * GET - קבלת הקצאות נוכחיות
  */
 export async function GET(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');

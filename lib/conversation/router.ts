@@ -21,6 +21,7 @@ import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { getOrCreateContext, updateContext, isContextStale, resumeStaleContext } from './context-manager';
 import { tryRuleBasedParsing, detectUserMood } from '@/lib/ai/intent-parser';
 import { buildUserSnapshot } from '@/lib/ai/user-snapshot';
+import { maskPhone } from '@/lib/utils/mask-pii';
 
 import type { RouterContext, RouterResult, UserState } from './shared';
 
@@ -87,7 +88,7 @@ export async function routeMessage(
   const msg = message.trim();
 
   console.log(`[Router] ═══════════════════════════════════════`);
-  console.log(`[Router] INCOMING: userId=${userId.substring(0,8)}..., phone=${phone.substring(0,6)}..., msg="${msg.substring(0, 80)}"`);
+  console.log(`[Router] INCOMING: userId=${userId.substring(0,8)}..., phone=${maskPhone(phone)}, msg="${msg.substring(0, 80)}"`);
 
   // Guard: empty message (e.g. from failed button extraction)
   if (!msg) {

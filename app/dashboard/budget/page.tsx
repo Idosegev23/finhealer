@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import SmartCategoryPicker from '@/components/transactions/SmartCategoryPicker';
 import { PageWrapper } from '@/components/ui/design-system';
+import { useToast } from '@/components/ui/toaster';
 
 interface MissingDataItem {
   field: string;
@@ -70,6 +71,7 @@ interface BudgetData {
 }
 
 export default function BudgetPage() {
+  const { addToast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().substring(0, 7));
   const [data, setData] = useState<BudgetData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -125,7 +127,7 @@ export default function BudgetPage() {
         loadBudget();
       } else {
         const error = await response.json();
-        alert(`❌ ${error.error || 'שגיאה ביצירת תקציב'}`);
+        addToast({ title: error.error || 'שגיאה ביצירת תקציב', type: 'error' });
       }
     } catch (error) {
       console.error('Error creating budget:', error);
@@ -242,7 +244,7 @@ export default function BudgetPage() {
         loadBudget();
       } else {
         const err = await res.json();
-        alert(err.error || 'שגיאה ביצירת תקציב');
+        addToast({ title: err.error || 'שגיאה ביצירת תקציב', type: 'error' });
       }
     } catch (err) {
       console.error('Manual budget error:', err);
@@ -274,7 +276,7 @@ export default function BudgetPage() {
         loadBudget();
       } else {
         const err = await res.json();
-        alert(err.error || 'שגיאה בהוספת קטגוריה');
+        addToast({ title: err.error || 'שגיאה בהוספת קטגוריה', type: 'error' });
       }
     } catch (err) {
       console.error('Add category error:', err);

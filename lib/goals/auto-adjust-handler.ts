@@ -299,22 +299,9 @@ export async function confirmAndApplyAdjustments(
       .update({ monthly_income: incomeChange.newIncome })
       .eq('id', userId);
 
-    // נקה רק autoAdjust מה-context
-    const { data: ctxUser } = await supabase
-      .from('users')
-      .select('classification_context')
-      .eq('id', userId)
-      .single();
-
-    const ctxData = ctxUser?.classification_context || {};
-    const { autoAdjust: _removed, ...restContext } = ctxData as any;
-
-    await supabase
-      .from('users')
-      .update({
-        classification_context: Object.keys(restContext).length > 0 ? restContext : null,
-      })
-      .eq('id', userId);
+    // נקה רק autoAdjust מה-context (atomic key removal)
+    const { removeClassificationContextKey } = await import('@/lib/conversation/shared');
+    await removeClassificationContextKey(userId, 'autoAdjust');
 
     // שלח אישור
     await greenAPI.sendMessage({
@@ -343,22 +330,9 @@ export async function cancelAdjustments(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
-  // נקה רק autoAdjust מה-context
-  const { data: ctxUser } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-
-  const ctxData = ctxUser?.classification_context || {};
-  const { autoAdjust: _removed, ...restCtx } = ctxData as any;
-
-  await supabase
-    .from('users')
-    .update({
-      classification_context: Object.keys(restCtx).length > 0 ? restCtx : null,
-    })
-    .eq('id', userId);
+  // נקה רק autoAdjust מה-context (atomic key removal)
+  const { removeClassificationContextKey } = await import('@/lib/conversation/shared');
+  await removeClassificationContextKey(userId, 'autoAdjust');
 
   await greenAPI.sendMessage({
     phoneNumber: phone,

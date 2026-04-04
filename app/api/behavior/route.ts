@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 import { runFullAnalysis, type BehaviorAnalysisResult } from '@/lib/analysis/behavior-engine';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,9 @@ export const dynamic = 'force-dynamic';
  * Returns the latest behavior analysis for the authenticated user
  */
 export async function GET(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
     
@@ -52,9 +56,12 @@ export async function GET(request: NextRequest) {
  * Body: { periodMonths?: number }
  */
 export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
-    
+
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     

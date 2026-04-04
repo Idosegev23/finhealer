@@ -145,16 +145,8 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
         targetAmount: amount,
       };
 
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('classification_context')
-        .eq('id', userId)
-        .single();
-      const existing = existingUser?.classification_context || {};
-      await supabase
-        .from('users')
-        .update({ classification_context: { ...existing, advancedGoalCreation: updatedCtx } })
-        .eq('id', userId);
+      const { mergeClassificationContext } = await import('../shared');
+      await mergeClassificationContext(userId, { advancedGoalCreation: updatedCtx });
 
       await greenAPI.sendMessage({
         phoneNumber: phone,
@@ -184,16 +176,8 @@ export async function handleGoalsSetup(ctx: RouterContext, msg: string): Promise
         deadline,
       };
 
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('classification_context')
-        .eq('id', userId)
-        .single();
-      const existing = existingUser?.classification_context || {};
-      await supabase
-        .from('users')
-        .update({ classification_context: { ...existing, advancedGoalCreation: updatedCtx } })
-        .eq('id', userId);
+      const { mergeClassificationContext } = await import('../shared');
+      await mergeClassificationContext(userId, { advancedGoalCreation: updatedCtx });
 
       const { confirmAndCreateGoal } = await import('../advanced-goals-handler');
       await confirmAndCreateGoal(userId, phone, updatedCtx);
@@ -316,9 +300,8 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
         }
         console.log(`[Goals] STEP_TRANSITION: amount → deadline (amount=${amount})`);
         const updatedCtx = { ...advancedGoalCreation, step: 'deadline' as const, targetAmount: amount };
-        const { data: eu } = await supabase.from('users').select('classification_context').eq('id', userId).single();
-        const ex = eu?.classification_context || {};
-        await supabase.from('users').update({ classification_context: { ...ex, advancedGoalCreation: updatedCtx } }).eq('id', userId);
+        const { mergeClassificationContext } = await import('../shared');
+        await mergeClassificationContext(userId, { advancedGoalCreation: updatedCtx });
         await greenAPI.sendMessage({
           phoneNumber: phone,
           message: `📅 *מועד יעד*\n\nמתי תרצה להשיג את היעד?\n\nדוגמאות:\n• 31/12/2026\n• עוד 6 חודשים\n• עוד שנה\n• *"אין"* - ללא מועד`,
@@ -330,9 +313,8 @@ export async function handleGoalsPhase(ctx: RouterContext, msg: string): Promise
         console.log(`[Goals] PHASE_DEADLINE: input="${msg}", parsed=${deadline || 'null'}`);
         console.log(`[Goals] STEP_TRANSITION: deadline → confirm`);
         const updatedCtx = { ...advancedGoalCreation, step: 'confirm' as const, deadline };
-        const { data: eu } = await supabase.from('users').select('classification_context').eq('id', userId).single();
-        const ex = eu?.classification_context || {};
-        await supabase.from('users').update({ classification_context: { ...ex, advancedGoalCreation: updatedCtx } }).eq('id', userId);
+        const { mergeClassificationContext } = await import('../shared');
+        await mergeClassificationContext(userId, { advancedGoalCreation: updatedCtx });
         const { confirmAndCreateGoal } = await import('../advanced-goals-handler');
         await confirmAndCreateGoal(userId, phone, updatedCtx);
         return { success: true };

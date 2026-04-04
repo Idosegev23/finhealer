@@ -6,10 +6,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 import { calculateOptimalAllocations } from '@/lib/goals/goals-balancer';
 import type { SimulationScenario, SimulationResult, Goal, GoalAllocationInput } from '@/types/goals';
 
 export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 10, 60_000);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { userId, scenario } = body as { userId: string; scenario: SimulationScenario };

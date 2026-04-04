@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/components/ui/toaster';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -45,6 +46,7 @@ const GOAL_TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
 };
 
 export function GoalsListCard({ goals, onEdit, onDelete, onReorder, onDeposit }: GoalsListCardProps) {
+  const { addToast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (goalId: string, goalName: string) => {
@@ -57,7 +59,7 @@ export function GoalsListCard({ goals, onEdit, onDelete, onReorder, onDeposit }:
       await onDelete(goalId);
     } catch (error) {
       console.error('Error deleting goal:', error);
-      alert('שגיאה במחיקת היעד');
+      addToast({ title: 'שגיאה במחיקת היעד', type: 'error' });
     } finally {
       setDeletingId(null);
     }

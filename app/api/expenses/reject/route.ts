@@ -1,11 +1,15 @@
 import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 
 /**
  * API Route: POST /api/expenses/reject
  * מטרה: דחיית הוצאה
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 30, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
     

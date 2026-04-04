@@ -500,7 +500,12 @@ export async function phiBrain(
         ''
       );
       const cleaned = response.replace(/```json?\s*/g, '').replace(/```/g, '').trim();
-      decision = JSON.parse(cleaned);
+      try {
+        decision = JSON.parse(cleaned);
+      } catch (parseErr) {
+        console.error('[PhiBrain] JSON parse error:', parseErr, 'raw:', cleaned.substring(0, 200));
+        decision = { action: 'none', should_respond: false, internal_reasoning: 'json_parse_fail' };
+      }
     } catch (err) {
       console.error('[PhiBrain] Gemini error:', err);
       if (event.type === 'whatsapp_message') {
@@ -783,17 +788,8 @@ export async function phiBrain(
       dont_repeat: [...(existing.dont_repeat || []), ...(action.updateProfile.last_coached_on ? [action.updateProfile.last_coached_on] : [])].slice(-20),
     };
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('classification_context')
-      .eq('id', userId)
-      .single();
-
-    const classCtx = userData?.classification_context || {};
-    await supabase
-      .from('users')
-      .update({ classification_context: { ...classCtx, phi_profile: merged } })
-      .eq('id', userId);
+    const { mergeClassificationContext } = await import('../conversation/shared');
+    await mergeClassificationContext(userId, { phi_profile: merged });
   }
 
   return action;

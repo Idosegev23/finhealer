@@ -205,6 +205,7 @@ export async function linkCreditCardToBank(
 
   if (error) {
     console.error('Failed to link CC to bank:', error);
+    throw new Error(`Failed to link credit card to bank: ${error.message}`);
   }
 }
 
@@ -225,7 +226,7 @@ export async function getUserAccounts(
 
   if (error) {
     console.error('Failed to get user accounts:', error);
-    return [];
+    throw new Error(`Failed to get user accounts: ${error.message}`);
   }
 
   return data || [];

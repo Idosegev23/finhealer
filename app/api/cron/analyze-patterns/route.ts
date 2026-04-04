@@ -7,14 +7,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/server";
 import { detectPatterns, savePatterns } from "@/lib/learning/pattern-detector";
 import { isQuietTime } from '@/lib/utils/quiet-hours';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export async function GET(request: NextRequest) {
   // Verify cron secret
@@ -32,7 +27,8 @@ export async function GET(request: NextRequest) {
 
   console.log("[Cron] Starting pattern analysis...");
   const startTime = Date.now();
-  
+  const supabaseAdmin = createServiceClient();
+
   try {
     // Get all active users who have transactions
     const { data: users, error: usersError } = await supabaseAdmin

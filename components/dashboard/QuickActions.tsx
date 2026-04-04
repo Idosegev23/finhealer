@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Receipt, Target, X } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 import { QuickExpenseForm } from './QuickExpenseForm';
 
 export function QuickActions() {
+  const { addToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<'expense' | 'receipt' | 'goal' | null>(null);
 
@@ -60,7 +62,7 @@ export function QuickActions() {
               {/* Upload Receipt */}
               <button
                 onClick={() => {
-                  alert('🚧 תכונת סריקת קבלות נמצאת בפיתוח. אנא הוסיפו הוצאות ידנית בינתיים.');
+                  addToast({ title: 'תכונת סריקת קבלות נמצאת בפיתוח. אנא הוסיפו הוצאות ידנית בינתיים.', type: 'info' });
                   setIsOpen(false);
                 }}
                 className="flex items-center gap-3 bg-white shadow-lg rounded-full py-3 px-5 hover:shadow-xl transition-all group opacity-60"

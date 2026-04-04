@@ -1,8 +1,12 @@
 // @ts-nocheck
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 3, 300_000)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()

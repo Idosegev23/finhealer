@@ -36,24 +36,13 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-    console.log('🔐 exchangeCodeForSession result:', { 
-      hasUser: !!data.user, 
-      userId: data.user?.id,
-      hasSession: !!data.session,
-      error: error?.message 
-    })
-
     if (!error && data.user) {
-      console.log('✅ התחברות הצליחה:', data.user.id, 'email:', data.user.email)
-
-      // תמיד הפנה לאונבורדינג - middleware יטפל בהפניה מדויקת
-      console.log('🎯 מפנה לאונבורדינג (middleware יחליט על המסלול)')
       response = NextResponse.redirect(new URL('/onboarding', origin))
       return response
     }
 
     if (error) {
-      console.error('❌ שגיאה בהתחברות:', error)
+      console.error('❌ Auth callback error:', error.message);
     }
   }
 

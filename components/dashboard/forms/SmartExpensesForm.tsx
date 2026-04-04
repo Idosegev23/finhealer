@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/components/ui/toaster';
 
 interface SmartExpensesFormProps {
   initialData: any;
@@ -153,6 +154,7 @@ const FIELD_CONFIG: Record<string, any> = {
 
 export default function SmartExpensesForm({ initialData }: SmartExpensesFormProps) {
   const router = useRouter();
+  const { addToast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [expenses, setExpenses] = useState<Record<string, any>>(() => {
     const initial: Record<string, any> = {};
@@ -298,7 +300,7 @@ export default function SmartExpensesForm({ initialData }: SmartExpensesFormProp
 
     } catch (error) {
       console.error('Error saving expenses:', error);
-      alert('אירעה שגיאה בשמירת הנתונים');
+      addToast({ title: 'אירעה שגיאה בשמירת הנתונים', type: 'error' });
     } finally {
       setLoading(false);
     }

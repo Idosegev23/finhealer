@@ -20,6 +20,12 @@
     },
     "app/api/wa/webhook/route.ts": {
       "maxDuration": 600
+    },
+    "app/api/cron/refresh-views/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/update-phases/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -54,6 +60,10 @@
     {
       "path": "/api/cron/update-phases",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0 9,18 * * *"
     }
   ]
 }

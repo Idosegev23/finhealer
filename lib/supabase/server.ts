@@ -55,8 +55,6 @@ export function createServiceClient() {
     throw new Error('Invalid SUPABASE_SERVICE_ROLE_KEY format');
   }
   
-  console.log('✅ Service role client created (key present)');
-  
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     serviceRoleKey,

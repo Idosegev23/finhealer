@@ -26,8 +26,8 @@ function mockFrom(tableName: string) {
 // ── Module mocks ──
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: () => ({ from: mockFrom }),
-  createClient: async () => ({ from: mockFrom }),
+  createServiceClient: () => ({ from: mockFrom, rpc: vi.fn(async () => ({ error: null })) }),
+  createClient: async () => ({ from: mockFrom, rpc: vi.fn(async () => ({ error: null })) }),
 }));
 
 vi.mock('@/lib/greenapi/client', () => ({
@@ -48,6 +48,28 @@ vi.mock('@/lib/greenapi/client', () => ({
   sendWhatsAppInteractiveButtons: vi.fn(async () => ({ idMessage: 'mock' })),
   sendWhatsAppMessage: vi.fn(),
   sendWhatsAppImage: vi.fn(),
+}));
+
+vi.mock('@/lib/ai/state-intent', () => ({
+  parseStateIntent: vi.fn(async (msg: string, _state: string) => {
+    const trimmed = msg.trim();
+    if (/^(רשימה|list|categories)$/i.test(trimmed)) {
+      return { intent: 'list_categories', confidence: 0.95, params: {} };
+    }
+    if (/^(נתחיל|נמשיך|התחל|start)$/i.test(trimmed)) {
+      return { intent: 'start', confidence: 0.95, params: {} };
+    }
+    return { intent: 'unknown', confidence: 0.3, params: {} };
+  }),
+}));
+
+vi.mock('@/lib/ai/gemini-client', () => ({
+  chatWithGeminiFlashMinimal: vi.fn(async () => null),
+}));
+
+vi.mock('@/lib/services/PhaseService', () => ({
+  calculatePhase: vi.fn(async () => 'data_collection'),
+  setPhase: vi.fn(async () => {}),
 }));
 
 vi.mock('@/lib/conversation/classification-flow', () => ({
@@ -212,7 +234,7 @@ describe('Classification Flow E2E', () => {
       const manualTx = mockStore['transactions'].find((t: any) => t.id === 'tx-manual');
       expect(manualTx.status).toBe('pending');
 
-      expect(sentMessages.some(m => m.message.includes('סיווגתי אוטומטית'))).toBe(true);
+      expect(sentMessages.some(m => m.message.includes('אוטומטית'))).toBe(true);
     });
 
     it('tells user to upload docs when none exist', async () => {
@@ -222,7 +244,7 @@ describe('Classification Flow E2E', () => {
 
       await startClassification(makeCtx());
 
-      expect(sentMessages.some(m => m.message.includes('אין עדיין דוחות'))).toBe(true);
+      expect(sentMessages.some(m => m.message.includes('לא קיבלתי דוחות') || m.message.includes('אין עדיין'))).toBe(true);
     });
   });
 

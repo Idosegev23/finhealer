@@ -42,23 +42,7 @@ export interface RouterResult {
 // ============================================================================
 
 export async function saveSuggestionsToCache(userId: string, suggestions: string[]): Promise<void> {
-  const supabase = createServiceClient();
-  const { data: existing } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        ...existing?.classification_context,
-        suggestions,
-        updated_at: new Date().toISOString()
-      }
-    })
-    .eq('id', userId);
+  await mergeClassificationContext(userId, { suggestions, updated_at: new Date().toISOString() });
 }
 
 export async function getSuggestionsFromCache(userId: string): Promise<string[] | null> {
@@ -73,23 +57,7 @@ export async function getSuggestionsFromCache(userId: string): Promise<string[] 
 }
 
 export async function saveCurrentGroupToCache(userId: string, txIds: string[]): Promise<void> {
-  const supabase = createServiceClient();
-  const { data: existing } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-
-  await supabase
-    .from('users')
-    .update({
-      classification_context: {
-        ...existing?.classification_context,
-        group_ids: txIds,
-        updated_at: new Date().toISOString()
-      }
-    })
-    .eq('id', userId);
+  await mergeClassificationContext(userId, { group_ids: txIds, updated_at: new Date().toISOString() });
 }
 
 export async function getCurrentGroupFromCache(userId: string): Promise<string[] | null> {
@@ -101,6 +69,37 @@ export async function getCurrentGroupFromCache(userId: string): Promise<string[]
     .single();
 
   return data?.classification_context?.group_ids || null;
+}
+
+// ============================================================================
+// Command Detection
+// ============================================================================
+
+/**
+ * Check if a message matches any of the given commands.
+ * Strips emojis/whitespace and does case-insensitive substring matching.
+ */
+export function isCommand(message: string, commands: string[]): boolean {
+  if (!message || commands.length === 0) return false;
+  const cleaned = message.replace(/[▶️⬛⬜☑️✅❌⭐️⚡️]/g, '').trim().toLowerCase();
+  if (!cleaned) return false;
+  return commands.some(cmd => {
+    const c = cmd.toLowerCase();
+    return cleaned === c || cleaned.includes(c);
+  });
+}
+
+// ============================================================================
+// Progress Bar
+// ============================================================================
+
+/**
+ * Create a text progress bar (10 chars wide)
+ */
+export function createProgressBar(percent: number): string {
+  const clamped = Math.max(0, Math.min(100, percent));
+  const filled = Math.round(clamped / 10);
+  return '▓'.repeat(filled) + '░'.repeat(10 - filled);
 }
 
 // ============================================================================
@@ -152,6 +151,40 @@ export async function mergeClassificationContext(
   await supabase
     .from('users')
     .update({ classification_context: { ...existing, ...update } })
+    .eq('id', userId);
+}
+
+/**
+ * Removes a key from the user's classification_context atomically.
+ * Uses PostgreSQL JSONB - operator (no read-then-write race).
+ * Falls back to fetch-remove-write if RPC unavailable.
+ */
+export async function removeClassificationContextKey(
+  userId: string,
+  key: string
+): Promise<void> {
+  const supabase = createServiceClient();
+
+  const { error: rpcError } = await supabase.rpc('remove_classification_context_key', {
+    p_user_id: userId,
+    p_key: key,
+  });
+
+  if (!rpcError) return;
+
+  // Fallback: fetch-remove-write
+  console.warn(`[shared] remove_classification_context_key RPC unavailable, using fallback:`, rpcError.message);
+  const { data } = await supabase
+    .from('users')
+    .select('classification_context')
+    .eq('id', userId)
+    .single();
+
+  const ctx = data?.classification_context || {};
+  const { [key]: _removed, ...rest } = ctx as any;
+  await supabase
+    .from('users')
+    .update({ classification_context: Object.keys(rest).length > 0 ? rest : null })
     .eq('id', userId);
 }
 

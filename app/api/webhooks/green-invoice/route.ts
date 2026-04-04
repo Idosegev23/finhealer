@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { maskEmail } from '@/lib/utils/mask-pii';
 
 /**
  * Green Invoice Webhook Handler
@@ -14,16 +15,21 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get('x-gi-signature');
     const webhookSecret = process.env.GI_WEBHOOK_SECRET;
     
-    if (webhookSecret && signature) {
-      const expectedSignature = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(JSON.stringify(body))
-        .digest('hex');
-      
-      if (signature !== expectedSignature) {
-        console.error('❌ Invalid webhook signature');
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-      }
+    if (!webhookSecret) {
+      console.error('❌ GI_WEBHOOK_SECRET not configured — rejecting webhook');
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
+    }
+    if (!signature) {
+      console.error('❌ Missing webhook signature');
+      return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+    }
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(JSON.stringify(body))
+      .digest('hex');
+    if (signature !== expectedSignature) {
+      console.error('❌ Invalid webhook signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     const { event, data } = body;
@@ -52,7 +58,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (userError || !userRecord) {
-        console.error('❌ User not found:', customer_email);
+        console.error('❌ User not found:', maskEmail(customer_email));
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
@@ -160,7 +166,7 @@ export async function POST(request: NextRequest) {
         })
         .eq('user_id', cancelledUserData.id);
 
-      console.log(`🚫 Subscription cancelled for ${customer_email}`);
+      console.log(`🚫 Subscription cancelled for ${maskEmail(customer_email)}`);
 
       return NextResponse.json({ success: true, message: 'Subscription cancelled' });
     }
@@ -183,7 +189,7 @@ export async function POST(request: NextRequest) {
           .update({ status: 'past_due' })
           .eq('user_id', failedUserData.id);
 
-        console.log(`⚠️ Payment failed for ${customer_email}`);
+        console.log(`⚠️ Payment failed for ${maskEmail(customer_email)}`);
       }
 
       return NextResponse.json({ success: true, message: 'Payment failure recorded' });

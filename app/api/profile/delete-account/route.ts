@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,46 +26,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // מחיקת כל הנתונים של המשתמש
-    // סדר חשוב: ילדים לפני הורים (FK constraints)
-    const tablesToDelete = [
-      'transaction_details',   // FK → transactions
-      'transactions',
-      'loans',
-      'goals',
-      'budget_categories',
-      'savings_accounts',
-      'insurance',
-      'pension_insurance',
-      'bank_accounts',
-      'payslips',
-      'uploaded_statements',
-      'wa_messages',
-      'alerts',
-      'subscriptions',
-      'user_data_sections',
-      'user_financial_profile',
-      'user_category_rules',
-      'audit_logs',
-      'reminders',
-      'conversation_context',
-      'loan_consolidation_requests',
-    ];
+    // מחיקת כל הנתונים של המשתמש באמצעות DB function (CASCADE)
+    // Fallback: hardcoded table list if RPC not available
+    const adminSupabase = createServiceClient();
+
+    // Try DB-level cascade delete first (handles FK order automatically)
+    const { error: rpcError } = await adminSupabase.rpc('delete_user_data', {
+      p_user_id: user.id,
+    });
 
     const failedTables: string[] = [];
-    for (const table of tablesToDelete) {
-      const { error: delErr } = await supabase
-        .from(table)
-        .delete()
-        .eq('user_id', user.id);
-      if (delErr) {
-        console.error(`Failed to delete from ${table}:`, delErr.message);
-        failedTables.push(table);
+
+    if (rpcError) {
+      // Fallback: manual deletion in FK order
+      console.warn('[delete-account] RPC unavailable, using manual fallback:', rpcError.message);
+      const tablesToDelete = [
+        'transaction_details',
+        'transactions',
+        'loans',
+        'goals',
+        'budget_categories',
+        'budgets',
+        'savings_accounts',
+        'insurance',
+        'pension_insurance',
+        'bank_accounts',
+        'payslips',
+        'uploaded_statements',
+        'wa_messages',
+        'alerts',
+        'subscriptions',
+        'user_data_sections',
+        'user_financial_profile',
+        'user_category_rules',
+        'audit_logs',
+        'reminders',
+        'conversation_context',
+        'loan_consolidation_requests',
+      ];
+
+      for (const table of tablesToDelete) {
+        const { error: delErr } = await adminSupabase
+          .from(table)
+          .delete()
+          .eq('user_id', user.id);
+        if (delErr && !delErr.message.includes('does not exist')) {
+          console.error(`Failed to delete from ${table}:`, delErr.message);
+          failedTables.push(table);
+        }
       }
     }
 
     // מחיקת המשתמש מטבלת users
-    const { error: userDelErr } = await supabase
+    const { error: userDelErr } = await adminSupabase
       .from('users')
       .delete()
       .eq('id', user.id);
@@ -76,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     // מחיקת החשבון מ-Supabase Auth
-    const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(
+    const { error: deleteAuthError } = await adminSupabase.auth.admin.deleteUser(
       user.id
     );
 

@@ -1,6 +1,7 @@
 // @ts-nocheck
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 
 /**
  * POST /api/expenses/custom
@@ -13,10 +14,13 @@ import { createClient } from '@/lib/supabase/server';
  *   category_group?: string
  * }
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
-    
+
     // אימות משתמש
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -101,7 +105,10 @@ export async function POST(request: Request) {
  * DELETE /api/expenses/custom?id=xxx
  * מחיקת הוצאה מותאמת אישית
  */
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
     

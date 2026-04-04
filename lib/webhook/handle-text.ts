@@ -71,12 +71,9 @@ export async function handleText(ctx: WebhookContext): Promise<NextResponse> {
         }
       }
 
-      // Clean up editing context
-      const existingCtx = editCtxUser?.classification_context || {};
-      const { editing_tx_id: _, ...restCtx } = existingCtx as any;
-      await supabase.from('users').update({
-        classification_context: Object.keys(restCtx).length > 0 ? restCtx : null
-      }).eq('id', userData.id);
+      // Clean up editing context (atomic key removal)
+      const { removeClassificationContextKey } = await import('@/lib/conversation/shared');
+      await removeClassificationContextKey(userData.id, 'editing_tx_id');
 
       return NextResponse.json({ status: 'edit_completed' });
     }

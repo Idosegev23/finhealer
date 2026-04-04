@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { getPromptForDocumentType } from '@/lib/ai/document-prompts';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { matchCreditTransactions, isCreditCardCompany } from '@/lib/reconciliation/credit-matcher';
+import { maskPhone } from '@/lib/utils/mask-pii';
 import { parseDate, parseDateWithFallback } from '@/lib/utils/date-parser';
 import { detectAccountFromDocument } from '@/lib/services/AccountService';
 import * as XLSX from 'xlsx';
@@ -56,8 +57,8 @@ export async function POST(request: NextRequest) {
   try {
     // Verify internal API secret (set by upload route)
     const internalSecret = request.headers.get('x-internal-secret');
-    const validSecret = process.env.INTERNAL_API_SECRET || process.env.CRON_SECRET;
-    if (!validSecret || internalSecret !== validSecret) {
+    const validSecret = process.env.INTERNAL_API_SECRET || process.env.CRON_SECRET || '';
+    if (!validSecret || !internalSecret || internalSecret !== validSecret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -71,17 +72,7 @@ export async function POST(request: NextRequest) {
     console.log(`🚀 [BG] Processing document: ${statementId}`);
 
     // Create service role client (bypass RLS)
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabase = createServiceClient();
 
     // 1. Get statement info
     const { data: statement, error: stmtError } = await supabase
@@ -382,12 +373,8 @@ export async function POST(request: NextRequest) {
     // Update status to failed with retry logic
     if (statementId) {
       try {
-        const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-        const supabase = createSupabaseClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
-        
+        const supabase = createServiceClient();
+
         // Get current retry count
         const { data: stmt } = await supabase
           .from('uploaded_statements')
@@ -580,11 +567,7 @@ async function analyzeLargePDF(buffer: Buffer, fileType: string, fileName: strin
     // Load expense categories
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
     if (fileType === 'bank_statement' || fileType === 'credit_statement') {
-      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-      const supabaseClient = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
+      const supabaseClient = createServiceClient();
       const { data: categories } = await supabaseClient
         .from('expense_categories')
         .select('name, expense_type, category_group')
@@ -773,11 +756,7 @@ async function analyzePDFWithAI(buffer: Buffer, fileType: string, fileName: stri
     // Load expense categories from database (for bank & credit statements)
     let expenseCategories: Array<{name: string; expense_type: string; category_group: string}> = [];
     if (fileType === 'bank_statement' || fileType === 'credit_statement') {
-      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-      const supabaseClient = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
+      const supabaseClient = createServiceClient();
       const { data: categories } = await supabaseClient
         .from('expense_categories')
         .select('name, expense_type, category_group')
@@ -2769,12 +2748,8 @@ async function savePayslips(supabase: any, result: any, userId: string, document
 
 async function sendWhatsAppNotification(userId: string, itemsCount: number, docType: string, documentId?: string) {
   try {
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    
+    const supabase = createServiceClient();
+
     const { data: userData } = await supabase
       .from('users')
       .select('phone, name')
@@ -2792,7 +2767,7 @@ async function sendWhatsAppNotification(userId: string, itemsCount: number, docT
     if (docType.includes('credit') || docType.includes('bank')) {
       const { onDocumentProcessed } = await import('@/lib/conversation/phi-router');
       await onDocumentProcessed(userId, user.phone, documentId);
-      console.log(`✅ φ Router notification sent to ${user.phone}`);
+      console.log(`✅ φ Router notification sent to ${maskPhone(user.phone)}`);
       return;
     }
 
@@ -2818,7 +2793,7 @@ async function sendWhatsAppNotification(userId: string, itemsCount: number, docT
       message,
     });
 
-    console.log(`✅ WhatsApp sent to ${user.phone}`);
+    console.log(`✅ WhatsApp sent to ${maskPhone(user.phone)}`);
   } catch (error) {
     console.error('Failed to send WhatsApp:', error);
   }

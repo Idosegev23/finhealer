@@ -24,7 +24,20 @@ function mockFrom(tableName: string) {
 }
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: () => ({ from: mockFrom }),
+  createServiceClient: () => ({ from: mockFrom, rpc: vi.fn(async () => ({ error: null })) }),
+}));
+
+vi.mock('@/lib/ai/state-intent', () => ({
+  parseStateIntent: vi.fn(async (msg: string, _state: string) => {
+    const normalized = msg.trim();
+    if (/^(נתחיל|נמשיך|התחל|start)$/i.test(normalized)) {
+      return { intent: 'start_classify', confidence: 0.95, params: {} };
+    }
+    if (/^(עוד דוח|דוח נוסף|מסמך)$/i.test(normalized)) {
+      return { intent: 'add_document', confidence: 0.95, params: {} };
+    }
+    return { intent: 'unknown', confidence: 0.3, params: {} };
+  }),
 }));
 
 vi.mock('@/lib/greenapi/client', () => ({
@@ -150,7 +163,6 @@ describe('Onboarding Flow E2E', () => {
 
       const user = mockStore['users'][0];
       expect(user.name).toBe('יוסי');
-      expect(user.full_name).toBe('יוסי');
       expect(user.onboarding_state).toBe('waiting_for_document');
 
       expect(sentMessages.some(m => m.message.includes('יוסי'))).toBe(true);

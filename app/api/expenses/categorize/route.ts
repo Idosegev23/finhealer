@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter'
 import OpenAI from 'openai'
 
 function getOpenAI() {
@@ -13,13 +14,20 @@ function getOpenAI() {
  * לומד מהעדפות המשתמש ומשפר את עצמו עם הזמן
  */
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 10, 60_000)
+  if (limited) return limited
+
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: 'AI service unavailable' }, { status: 503 })
     }
 
     const body = await request.json()

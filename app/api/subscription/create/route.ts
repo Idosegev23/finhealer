@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { maskPhone } from '@/lib/utils/mask-pii';
 
 // All tables with user_id foreign key that need migration during merge
 const USER_CHILD_TABLES = [
@@ -49,16 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Admin client (bypasses RLS)
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabaseAdmin = createServiceClient();
 
     // Clean phone number
     let cleanPhone = phone;
@@ -196,7 +187,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`✅ User ${user.id} created (trial). Phone: ${phone === '0000000000' ? 'temporary' : cleanPhone}`);
+    console.log(`✅ User ${user.id} created (trial). Phone: ${phone === '0000000000' ? 'temporary' : maskPhone(cleanPhone)}`);
 
     return NextResponse.json({
       success: true,

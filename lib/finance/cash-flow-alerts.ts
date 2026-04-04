@@ -6,6 +6,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { sendWhatsAppMessage } from '@/lib/greenapi/client';
 import { projectCashFlow, type CashFlowAnalysis } from './cash-flow-projector';
+import { maskPhone } from '@/lib/utils/mask-pii';
 
 interface CashFlowAlert {
   user_id: string;
@@ -137,11 +138,11 @@ async function sendCashFlowAlert(alert: CashFlowAlert): Promise<void> {
     const sent = await sendWhatsAppMessage(phone, message);
     
     if (!sent) {
-      console.error(`[Cash Flow Alerts] Failed to send alert to ${phone}`);
+      console.error(`[Cash Flow Alerts] Failed to send alert to ${maskPhone(phone)}`);
       return;
     }
     
-    console.log(`[Cash Flow Alerts] Alert sent to ${phone} (${severity})`);
+    console.log(`[Cash Flow Alerts] Alert sent to ${maskPhone(phone)} (${severity})`);
     
     // שמור לוג של ההתראה
     const supabase = createServiceClient();
@@ -157,7 +158,7 @@ async function sendCashFlowAlert(alert: CashFlowAlert): Promise<void> {
       });
     
   } catch (error) {
-    console.error(`[Cash Flow Alerts] Error sending alert to ${phone}:`, error);
+    console.error(`[Cash Flow Alerts] Error sending alert to ${maskPhone(phone)}:`, error);
   }
 }
 

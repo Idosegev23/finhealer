@@ -631,17 +631,8 @@ export async function buildFinancialDNA(userId: string): Promise<FinancialDNA> {
   }
 
   // Save to user profile
-  const { data: user } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-
-  const ctx = user?.classification_context || {};
-  await supabase
-    .from('users')
-    .update({ classification_context: { ...ctx, financial_dna: dna } })
-    .eq('id', userId);
+  const { mergeClassificationContext } = await import('../conversation/shared');
+  await mergeClassificationContext(userId, { financial_dna: dna });
 
   return dna;
 }

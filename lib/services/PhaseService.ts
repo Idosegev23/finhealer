@@ -189,7 +189,7 @@ export async function setPhase(userId: string, phase: Phase): Promise<void> {
     .eq('id', userId);
 
   if (error) {
-    console.error(`[PhaseService] setPhase failed for ${userId.substring(0,8)}:`, error.message);
+    throw new Error(`[PhaseService] setPhase failed for ${userId.substring(0,8)}: ${error.message}`);
   }
 }
 
@@ -204,7 +204,7 @@ export async function setState(userId: string, state: OnboardingState): Promise<
     .eq('id', userId);
 
   if (error) {
-    console.error(`[PhaseService] setState failed for ${userId.substring(0,8)}:`, error.message);
+    throw new Error(`[PhaseService] setState failed for ${userId.substring(0,8)}: ${error.message}`);
   }
 }
 
@@ -227,7 +227,7 @@ export async function setPhaseAndState(
     .eq('id', userId);
 
   if (error) {
-    console.error(`[PhaseService] setPhaseAndState failed for ${userId.substring(0,8)}:`, error.message);
+    throw new Error(`[PhaseService] setPhaseAndState failed for ${userId.substring(0,8)}: ${error.message}`);
   }
 }
 

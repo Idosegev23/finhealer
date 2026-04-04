@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { createContext, updateContext, getOrCreateContext } from '@/lib/conversation/context-manager';
+import { maskPhone } from '@/lib/utils/mask-pii';
 
 /**
  * WhatsApp Send API
@@ -93,9 +94,15 @@ export async function POST(request: NextRequest) {
       phoneNumber = userData.phone;
       targetUserId = userData.id;
     } 
-    // מצב 2: שליחה לפי phone ישירות
+    // מצב 2: שליחה לפי phone ישירות (only for own phone)
     else {
-      // נקה את מספר הטלפון
+      // Verify the user is sending to their own phone
+      const { data: ownUser } = await supabase
+        .from('users')
+        .select('phone')
+        .eq('id', authUser.id)
+        .single();
+
       let cleanPhone = phone!.replace(/\D/g, '');
       
       // המר לפורמט בינלאומי
@@ -106,7 +113,13 @@ export async function POST(request: NextRequest) {
       }
       
       phoneNumber = cleanPhone;
-      console.log(`🔍 Looking for user with phone: ${phoneNumber}`);
+
+      // Block sending to arbitrary phones — must be user's own phone
+      if (ownUser?.phone && ownUser.phone !== phoneNumber) {
+        return NextResponse.json({ error: 'Can only send to your own phone' }, { status: 403 });
+      }
+
+      console.log(`🔍 Looking for user with phone: ${maskPhone(phoneNumber)}`);
 
       // נסה למצוא משתמש לפי טלפון (לשמירת ההודעה)
       const { data: user, error: userError } = await supabase
@@ -123,7 +136,7 @@ export async function POST(request: NextRequest) {
         targetUserId = user.id;
         console.log(`✅ Found user: ${targetUserId}`);
       } else {
-        console.log(`❌ No user found for phone: ${phoneNumber}`);
+        console.log(`❌ No user found for phone: ${maskPhone(phoneNumber)}`);
       }
     }
 
@@ -131,7 +144,7 @@ export async function POST(request: NextRequest) {
     const greenAPI = getGreenAPIClient();
     let result;
 
-    console.log(`📱 Sending WhatsApp to: ${phoneNumber}`);
+    console.log(`📱 Sending WhatsApp to: ${maskPhone(phoneNumber)}`);
 
     if (buttons && buttons.length > 0) {
       result = await greenAPI.sendButtons({

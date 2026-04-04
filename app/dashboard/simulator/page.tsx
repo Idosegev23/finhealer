@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { PageWrapper } from '@/components/ui/design-system';
+import { useToast } from '@/components/ui/toaster';
 
 type SimType = 'loan' | 'savings';
 
@@ -141,6 +142,7 @@ function calculateSavings(
 }
 
 export default function SimulatorPage() {
+  const { addToast } = useToast();
   const [simType, setSimType] = useState<SimType>('loan');
   const [amount, setAmount] = useState(50000);
   const [rate, setRate] = useState(5.5);
@@ -198,10 +200,10 @@ export default function SimulatorPage() {
       if (res.ok) {
         setGoalSaved(true);
       } else {
-        alert('שגיאה בשמירת היעד');
+        addToast({ title: 'שגיאה בשמירת היעד', type: 'error' });
       }
     } catch {
-      alert('שגיאה בשמירת היעד');
+      addToast({ title: 'שגיאה בשמירת היעד', type: 'error' });
     } finally {
       setSavingGoal(false);
     }

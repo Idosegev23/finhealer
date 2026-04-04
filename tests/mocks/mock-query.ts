@@ -57,6 +57,40 @@ export class MockQuery {
     return this;
   }
 
+  not(col: string, op: string, val: any) {
+    if (op === 'is') {
+      this.filters.push(row => row[col] !== val && row[col] !== null && row[col] !== undefined);
+    } else {
+      this.filters.push(row => row[col] !== val);
+    }
+    return this;
+  }
+
+  or(_expr: string) {
+    // Simplified: just pass through — or() filters are complex to mock
+    return this;
+  }
+
+  ilike(col: string, pattern: string) {
+    // Convert SQL LIKE pattern to regex: %foo% → /foo/i
+    const regex = new RegExp(
+      pattern.replace(/%/g, '.*').replace(/_/g, '.'),
+      'i'
+    );
+    this.filters.push(row => regex.test(row[col] ?? ''));
+    return this;
+  }
+
+  is(col: string, val: any) {
+    this.filters.push(row => row[col] === val);
+    return this;
+  }
+
+  maybeSingle() {
+    this._isSingle = true;
+    return this._exec();
+  }
+
   order(col: string, opts?: { ascending?: boolean }) {
     this._orderCol = col;
     this._orderAsc = opts?.ascending ?? true;

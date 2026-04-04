@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Save, ArrowRight, Loader2, TrendingDown, DollarSign, Building, Bitcoin } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { useToast } from '@/components/ui/toaster';
 
 interface InvestmentsFormProps {
   initialData: any;
@@ -25,6 +26,7 @@ interface InvestmentAmounts {
 
 export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
   const router = useRouter();
+  const { addToast } = useToast();
   const existingTotal = initialData?.investments || 0;
   const [hasInvestments, setHasInvestments] = useState<boolean | null>(
     existingTotal > 0 ? true : null
@@ -81,7 +83,7 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
 
     } catch (error) {
       console.error('Error saving investments:', error);
-      alert('אירעה שגיאה בשמירת הנתונים');
+      addToast({ title: 'אירעה שגיאה בשמירת הנתונים', type: 'error' });
     } finally {
       setLoading(false);
     }

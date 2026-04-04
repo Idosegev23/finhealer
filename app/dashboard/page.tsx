@@ -132,7 +132,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50" dir="rtl">
+    <div className="min-h-screen bg-gray-50" dir="rtl" role="main" aria-label="דשבורד ראשי">
       <div className="container mx-auto px-4 py-6 max-w-5xl space-y-5">
 
         {/* Real-time: auto-refresh when WhatsApp bot processes documents */}
@@ -175,7 +175,7 @@ export default async function DashboardPage() {
             <Clock className="w-3.5 h-3.5" />
             {now.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })} — חודש נוכחי
           </p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" role="region" aria-label="מדדים חודשיים">
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">

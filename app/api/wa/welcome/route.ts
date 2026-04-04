@@ -8,10 +8,22 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createAuthClient, createServiceClient } from '@/lib/supabase/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit to prevent phone enumeration
+    const limited = checkApiRateLimit(request, 5, 60_000);
+    if (limited) return limited;
+
+    // Auth check — only authenticated users (during onboarding)
+    const authSupabase = await createAuthClient();
+    const { data: { user: authUser } } = await authSupabase.auth.getUser();
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get('phone');
     
@@ -20,10 +32,7 @@ export async function GET(request: NextRequest) {
     
     // אם יש טלפון, נבדוק את ה-state של המשתמש
     if (phone) {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
+      const supabase = createServiceClient();
       
       // נרמול מספר טלפון
       let cleanPhone = phone.replace(/\D/g, '');
@@ -87,11 +96,9 @@ export async function GET(request: NextRequest) {
 בוא נתחיל - *מה השם שלך?*`;
     }
     
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message,
-      state: onboardingState,
-      hasName: !!userName,
     });
   } catch (error) {
     console.error('[WelcomeAPI] Error:', error);

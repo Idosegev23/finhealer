@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 import Tesseract from "tesseract.js";
 
 // Helper function to extract numbers from text
@@ -34,6 +35,9 @@ function extractEmployerName(text: string): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const limited = checkApiRateLimit(request, 5, 60_000);
+    if (limited) return limited;
+
     const supabase = await createClient();
 
     const {

@@ -77,7 +77,7 @@ export async function learnRule(
 
   if (existing) {
     const newCount = (existing.learn_count || 1) + 1;
-    await supabase
+    const { error } = await supabase
       .from('user_category_rules')
       .update({
         category,
@@ -88,8 +88,9 @@ export async function learnRule(
         updated_at: new Date().toISOString(),
       })
       .eq('id', existing.id);
+    if (error) console.error('[ClassificationService] learnRule update failed:', error.message);
   } else {
-    await supabase
+    const { error } = await supabase
       .from('user_category_rules')
       .insert({
         user_id: userId,
@@ -102,6 +103,7 @@ export async function learnRule(
         last_used_at: new Date().toISOString(),
         auto_approved: false,
       });
+    if (error) console.error('[ClassificationService] learnRule insert failed:', error.message);
   }
 }
 
@@ -237,7 +239,7 @@ export async function autoClassify(userId: string): Promise<number> {
     );
 
     if (matchingRule) {
-      await supabase
+      const { error } = await supabase
         .from('transactions')
         .update({
           status: 'confirmed',
@@ -249,7 +251,8 @@ export async function autoClassify(userId: string): Promise<number> {
         })
         .eq('id', tx.id);
 
-      classified++;
+      if (!error) classified++;
+      else console.error(`[ClassificationService] autoClassify failed for tx ${tx.id}:`, error.message);
     }
   }
 
@@ -267,18 +270,8 @@ export async function cacheSuggestions(
   userId: string,
   suggestions: string[]
 ): Promise<void> {
-  const supabase = createServiceClient();
-  const { data: user } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-
-  const ctx = user?.classification_context || {};
-  await supabase
-    .from('users')
-    .update({ classification_context: { ...ctx, cachedSuggestions: suggestions } })
-    .eq('id', userId);
+  const { mergeClassificationContext } = await import('@/lib/conversation/shared');
+  await mergeClassificationContext(userId, { cachedSuggestions: suggestions });
 }
 
 /**
@@ -302,18 +295,8 @@ export async function cacheCurrentGroup(
   userId: string,
   txIds: string[]
 ): Promise<void> {
-  const supabase = createServiceClient();
-  const { data: user } = await supabase
-    .from('users')
-    .select('classification_context')
-    .eq('id', userId)
-    .single();
-
-  const ctx = user?.classification_context || {};
-  await supabase
-    .from('users')
-    .update({ classification_context: { ...ctx, currentGroupTxIds: txIds } })
-    .eq('id', userId);
+  const { mergeClassificationContext } = await import('@/lib/conversation/shared');
+  await mergeClassificationContext(userId, { currentGroupTxIds: txIds });
 }
 
 /**

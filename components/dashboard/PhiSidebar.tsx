@@ -18,6 +18,7 @@ import {
   Repeat,
   Gift,
   Calculator,
+  TableProperties,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -45,6 +46,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard/expenses", label: "הוצאות", icon: TrendingDown },
   { href: "/dashboard/income", label: "הכנסות", icon: TrendingUp },
   { href: "/dashboard/transactions", label: "תנועות", icon: Receipt },
+  { href: "/dashboard/financial-table", label: "טבלה פיננסית", icon: TableProperties },
   { href: "/dashboard/recurring", label: "מנויים וחוזרות", icon: Repeat },
 
   { href: "/dashboard/goals", label: "יעדים", icon: Target, separator: true },
@@ -93,7 +95,7 @@ export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProp
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto" role="navigation" aria-label="תפריט ראשי">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href ||
@@ -107,6 +109,7 @@ export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProp
               <Link
                 href={item.href}
                 onClick={onLinkClick}
+                aria-current={isActive ? "page" : undefined}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all group ${
                   isActive
                     ? "bg-phi-gold/20 text-phi-gold"
@@ -160,6 +163,7 @@ export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProp
             <button
               onClick={closeMobileMenu}
               className="absolute top-4 left-4 text-gray-400 hover:text-white"
+              aria-label="סגור תפריט"
             >
               <X className="w-6 h-6" />
             </button>

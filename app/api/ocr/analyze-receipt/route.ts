@@ -16,6 +16,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: 'AI service unavailable' }, { status: 503 })
+    }
+
     const formData = await request.formData()
     const imageFile = formData.get('image') as File
     const source = formData.get('source') as string || 'manual' // manual / whatsapp

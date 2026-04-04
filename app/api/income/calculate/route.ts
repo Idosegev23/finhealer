@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 import { SmartIncomeCalculator } from '@/components/income/SmartIncomeCalculator';
 
 /**
@@ -19,6 +20,17 @@ import { SmartIncomeCalculator } from '@/components/income/SmartIncomeCalculator
  */
 export async function POST(request: NextRequest) {
   try {
+    const limited = checkApiRateLimit(request, 20, 60_000);
+    if (limited) return limited;
+
+    // Auth check — only authenticated users can calculate
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     
     const {
@@ -100,6 +112,14 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Auth check
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const gross = parseFloat(searchParams.get('gross') || '0');
     const employmentType = (searchParams.get('employmentType') || 'employee') as any;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 
 /**
  * API Route: /api/documents/upload
@@ -7,6 +8,8 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function POST(request: NextRequest) {
   try {
+    const limited = checkApiRateLimit(request, 10, 60_000);
+    if (limited) return limited;
     const supabase = await createClient();
 
     // Get user

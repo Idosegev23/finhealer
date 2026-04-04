@@ -136,7 +136,7 @@ export async function confirmTransaction(
   }
 ): Promise<void> {
   const supabase = createServiceClient();
-  await supabase
+  const { error } = await supabase
     .from('transactions')
     .update({
       status: 'confirmed',
@@ -147,6 +147,7 @@ export async function confirmTransaction(
       classified_at: new Date().toISOString(),
     })
     .eq('id', txId);
+  if (error) throw new Error(`confirmTransaction failed: ${error.message}`);
 }
 
 /**
@@ -162,7 +163,7 @@ export async function confirmBatch(
   }
 ): Promise<void> {
   const supabase = createServiceClient();
-  await supabase
+  const { error } = await supabase
     .from('transactions')
     .update({
       status: 'confirmed',
@@ -173,6 +174,7 @@ export async function confirmBatch(
       classified_at: new Date().toISOString(),
     })
     .in('id', txIds);
+  if (error) throw new Error(`confirmBatch failed: ${error.message}`);
 }
 
 // ============================================================================
@@ -332,7 +334,7 @@ export async function getDateRange(
     .or('is_summary.is.null,is_summary.eq.false')
     .order('tx_date', { ascending: true })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const { data: newest } = await supabase
     .from('transactions')
@@ -342,7 +344,7 @@ export async function getDateRange(
     .or('is_summary.is.null,is_summary.eq.false')
     .order('tx_date', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   return {
     oldest: oldest?.tx_date || null,

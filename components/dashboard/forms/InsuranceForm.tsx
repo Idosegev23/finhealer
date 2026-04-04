@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Shield, FileText, CheckCircle, ExternalLink, Save, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 
 interface InsuranceFormProps {
   initialData: any;
@@ -12,6 +13,7 @@ interface InsuranceFormProps {
 
 export default function InsuranceForm({ initialData }: InsuranceFormProps) {
   const router = useRouter();
+  const { addToast } = useToast();
   const [hasConnected, setHasConnected] = useState<boolean>(initialData.insurance_connected || false);
   const [hasSignedAppendixA, setHasSignedAppendixA] = useState<boolean>(initialData.signed_appendix_a || false);
   const [hasSignedAppendixE, setHasSignedAppendixE] = useState<boolean>(initialData.signed_appendix_e || false);
@@ -20,13 +22,13 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
 
   const handleConnectToMaslaka = () => {
     // This would open a modal or redirect to Maslaka connection flow
-    alert('חיבור למסלקה יהיה זמין בקרוב! 🚀\n\nבינתיים, נוכל להמשיך בלי זה.');
+    addToast({ title: 'חיבור למסלקה יהיה זמין בקרוב! בינתיים, נוכל להמשיך בלי זה.', type: 'info' });
     setHasConnected(true);
   };
 
   const handleSignAppendix = (appendixType: 'A' | 'E') => {
     // This would open a modal with the document to sign
-    alert(`חתימה על נספח ${appendixType} תהיה זמינה בקרוב! 🚀\n\nבינתיים, נסמן שזה בוצע.`);
+    addToast({ title: `חתימה על נספח ${appendixType} תהיה זמינה בקרוב! בינתיים, נסמן שזה בוצע.`, type: 'info' });
     
     if (appendixType === 'A') {
       setHasSignedAppendixA(true);
@@ -63,7 +65,7 @@ export default function InsuranceForm({ initialData }: InsuranceFormProps) {
 
     } catch (error) {
       console.error('Error saving insurance data:', error);
-      alert('אירעה שגיאה בשמירת הנתונים');
+      addToast({ title: 'אירעה שגיאה בשמירת הנתונים', type: 'error' });
     } finally {
       setLoading(false);
     }

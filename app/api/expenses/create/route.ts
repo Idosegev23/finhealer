@@ -1,12 +1,15 @@
 import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 
 /**
  * API ליצירת הוצאה ידנית
  * משתמש מזין הוצאה בעצמו - מאושרת אוטומטית
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const limited = checkApiRateLimit(request, 30, 60_000);
+    if (limited) return limited;
     const supabase = await createClient();
     
     // בדיקת אימות
@@ -33,6 +36,13 @@ export async function POST(request: Request) {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       return NextResponse.json(
         { error: 'סכום חייב להיות מספר חיובי' },
+        { status: 400 }
+      );
+    }
+
+    if (Number(amount) > 10_000_000) {
+      return NextResponse.json(
+        { error: 'סכום גבוה מדי' },
         { status: 400 }
       );
     }

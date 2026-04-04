@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PiggyBank, Home, Car, Landmark, Save, ArrowRight, Loader2 } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 
 interface SavingsFormProps {
   initialData: any;
@@ -15,6 +16,7 @@ interface SavingsFormProps {
 
 export default function SavingsForm({ initialData }: SavingsFormProps) {
   const router = useRouter();
+  const { addToast } = useToast();
   const [totalSavings, setTotalSavings] = useState<number>(initialData.total_savings || 0);
   const [ownsHome, setOwnsHome] = useState<boolean>(initialData.owns_home || false);
   const [ownsCar, setOwnsCar] = useState<boolean>(initialData.owns_car || false);
@@ -51,7 +53,7 @@ export default function SavingsForm({ initialData }: SavingsFormProps) {
 
     } catch (error) {
       console.error('Error saving savings:', error);
-      alert('אירעה שגיאה בשמירת הנתונים');
+      addToast({ title: 'אירעה שגיאה בשמירת הנתונים', type: 'error' });
     } finally {
       setLoading(false);
     }

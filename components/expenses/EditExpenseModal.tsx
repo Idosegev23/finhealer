@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import ExpenseCategorySelector from '@/components/expenses/expense-category-selector';
 import IncomeCategorySelector from '@/components/income/IncomeCategorySelector';
+import { useToast } from '@/components/ui/toaster';
 
 interface EditExpenseModalProps {
   expense: {
@@ -29,6 +30,7 @@ interface EditExpenseModalProps {
 }
 
 export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalProps) {
+  const { addToast } = useToast();
   const isIncome = expense.type === 'income';
   
   const [formData, setFormData] = useState({
@@ -55,11 +57,11 @@ export function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalP
     // ✅ Validation: אי אפשר לאשר ללא קטגוריה
     if (shouldApprove) {
       if (isIncome && !formData.income_category) {
-        alert('יש לבחור קטגוריית הכנסה לפני אישור התנועה');
+        addToast({ title: 'יש לבחור קטגוריית הכנסה לפני אישור התנועה', type: 'info' });
         return;
       }
       if (!isIncome && !formData.expense_category_id) {
-        alert('יש לבחור קטגוריה לפני אישור התנועה');
+        addToast({ title: 'יש לבחור קטגוריה לפני אישור התנועה', type: 'info' });
         return;
       }
     }

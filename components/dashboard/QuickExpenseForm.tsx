@@ -26,7 +26,7 @@ export function QuickExpenseForm({ onClose, employmentStatus }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || parseFloat(amount) <= 0) {
-      alert('נא להזין סכום תקין');
+      addToast({ title: 'נא להזין סכום תקין', type: 'info' });
       return;
     }
 
@@ -68,6 +68,9 @@ export function QuickExpenseForm({ onClose, employmentStatus }: Props) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="הוצאה מהירה"
       onClick={onClose}
     >
       <motion.div
@@ -86,13 +89,14 @@ export function QuickExpenseForm({ onClose, employmentStatus }: Props) {
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+            aria-label="סגור טופס"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" aria-label="טופס הוצאה מהירה">
           <div className="space-y-2">
             <Label htmlFor="amount">סכום *</Label>
             <div className="relative">
@@ -106,7 +110,9 @@ export function QuickExpenseForm({ onClose, employmentStatus }: Props) {
                 className="text-lg pr-10"
                 autoFocus
                 required
+                aria-describedby="amount-hint"
               />
+              <span id="amount-hint" className="sr-only">הזן סכום בשקלים</span>
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-textMuted">
                 ₪
               </span>

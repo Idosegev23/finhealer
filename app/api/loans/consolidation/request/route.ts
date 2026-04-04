@@ -5,8 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientServerClient } from '@/lib/supabase/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 
 export async function POST(req: NextRequest) {
+  const limited = checkApiRateLimit(req, 5, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClientServerClient();
     

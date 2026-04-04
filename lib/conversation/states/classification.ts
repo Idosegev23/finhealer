@@ -13,6 +13,7 @@ import { getGreenAPIClient, sendWhatsAppInteractiveButtons } from '@/lib/greenap
 import { CATEGORIES, findBestMatch, findTopMatches } from '@/lib/finance/categories';
 import { INCOME_CATEGORIES, findBestIncomeMatch, findTopIncomeMatches } from '@/lib/finance/income-categories';
 import { chatWithGeminiFlashMinimal } from '@/lib/ai/gemini-client';
+import { maskPhone } from '@/lib/utils/mask-pii';
 import { parseStateIntent } from '@/lib/ai/state-intent';
 
 // ============================================================================
@@ -101,7 +102,7 @@ export async function handleClassificationState(ctx: RouterContext, msg: string)
  */
 export async function startClassification(ctx: RouterContext): Promise<RouterResult> {
   console.log(`[Classification] ═══════════════════════════════════════`);
-  console.log(`[Classification] START: userId=${ctx.userId.substring(0,8)}..., phone=${ctx.phone}`);
+  console.log(`[Classification] START: userId=${ctx.userId.substring(0,8)}..., phone=${maskPhone(ctx.phone)}`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 

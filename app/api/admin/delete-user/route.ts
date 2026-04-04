@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/server';
+import { maskEmail } from '@/lib/utils/mask-pii';
 
 /**
  * DELETE User - Admin Only
@@ -24,16 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create admin client
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabaseAdmin = createServiceClient();
 
     // 1. מצא את ה-user_id
     const { data: authUser, error: findError } = await supabaseAdmin.auth.admin.listUsers();
@@ -57,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     const userId = targetUser.id;
 
-    console.log(`🗑️ Deleting user: ${email} (${userId})`);
+    console.log(`🗑️ Deleting user: ${maskEmail(email)} (${userId})`);
 
     // 2. מחק מ-Auth (זה ימחק אוטומטית גם מ-public.users אם יש trigger)
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -70,7 +62,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`✅ User ${email} deleted successfully from auth.users`);
+    console.log(`✅ User ${maskEmail(email)} deleted successfully from auth.users`);
 
     // 3. מחק מ-public.users (למקרה שלא נמחק אוטומטית)
     const { error: publicDeleteError } = await supabaseAdmin

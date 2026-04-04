@@ -19,6 +19,10 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: 'AI service unavailable' }, { status: 503 });
+    }
+
     const formData = await request.formData();
     const idCardImage = formData.get('idCard') as File | null;
     const appendixImage = formData.get('appendix') as File | null;

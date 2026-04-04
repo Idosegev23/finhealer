@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/components/ui/toaster';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -143,6 +144,7 @@ function SortableGoalItem({ goal, index }: { goal: Goal; index: number }) {
 }
 
 export function GoalsDragList({ goals, onSave, onClose }: GoalsDragListProps) {
+  const { addToast } = useToast();
   const [items, setItems] = useState(goals);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -186,7 +188,7 @@ export function GoalsDragList({ goals, onSave, onClose }: GoalsDragListProps) {
       onClose();
     } catch (error) {
       console.error('Error saving priorities:', error);
-      alert('שגיאה בשמירת עדיפויות');
+      addToast({ title: 'שגיאה בשמירת עדיפויות', type: 'error' });
     } finally {
       setIsSaving(false);
     }

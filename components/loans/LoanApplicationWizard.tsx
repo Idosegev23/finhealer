@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Loader2, FileText, Upload, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
 import { getRequiredDocuments, calculateCompletionPercentage, getMissingDocuments, DocumentRequirement } from "@/lib/loanDocuments";
+import { useToast } from "@/components/ui/toaster";
 
 type LoanApplication = any;
 
@@ -32,6 +33,7 @@ const APPLICATION_TYPES = [
 ];
 
 export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingLoans = [] }: LoanApplicationWizardProps) {
+  const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -208,7 +210,7 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
       
     } catch (error: any) {
       console.error("Error uploading file:", error);
-      alert("שגיאה בהעלאת הקובץ");
+      addToast({ title: "שגיאה בהעלאת הקובץ", type: "error" });
     } finally {
       setUploading(false);
     }
@@ -216,7 +218,7 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
 
   const handleSubmit = async () => {
     if (missingDocs.length > 0) {
-      alert(`חסרים ${missingDocs.length} מסמכים נדרשים`);
+      addToast({ title: `חסרים ${missingDocs.length} מסמכים נדרשים`, type: "info" });
       return;
     }
 
@@ -230,12 +232,12 @@ export function LoanApplicationWizard({ open, onOpenChange, onSuccess, existingL
 
       if (!res.ok) throw new Error("Failed to submit application");
 
-      alert("✓ הבקשה נשלחה בהצלחה! גדי יחזור אליך בקרוב");
+      addToast({ title: "הבקשה נשלחה בהצלחה! גדי יחזור אליך בקרוב", type: "success" });
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error submitting:", error);
-      alert("שגיאה בשליחת הבקשה");
+      addToast({ title: "שגיאה בשליחת הבקשה", type: "error" });
     } finally {
       setLoading(false);
     }

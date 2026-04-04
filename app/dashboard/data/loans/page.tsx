@@ -7,11 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CreditCard } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/toaster';
 
 /**
  * דף הזנת הלוואות
  */
 export default function LoansDataPage() {
+  const { addToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [lenderName, setLenderName] = useState('');
@@ -41,7 +43,7 @@ export default function LoansDataPage() {
       });
 
       if (response.ok) {
-        alert('✅ הלוואה נוספה בהצלחה!');
+        addToast({ title: 'הלוואה נוספה בהצלחה!', type: 'success' });
         // Reset
         setLenderName('');
         setOriginalAmount('');
@@ -49,18 +51,18 @@ export default function LoansDataPage() {
         setMonthlyPayment('');
         setInterestRate('');
       } else {
-        alert('❌ שגיאה בהוספת הלוואה');
+        addToast({ title: 'שגיאה בהוספת הלוואה', type: 'error' });
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('❌ שגיאה בהוספת הלוואה');
+      addToast({ title: 'שגיאה בהוספת הלוואה', type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-4xl" dir="rtl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">הוסף הלוואה 🏦</h1>
         <p className="mt-2 text-gray-600">

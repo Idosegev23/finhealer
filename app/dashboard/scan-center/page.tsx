@@ -19,6 +19,7 @@ import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useToast } from '@/components/ui/toaster';
 import {
   Banknote,
   CreditCard,
@@ -147,6 +148,7 @@ interface ScannedDocument {
 }
 
 function ScanCenterContent() {
+  const { addToast } = useToast();
   const searchParams = useSearchParams();
   const requiredDocId = searchParams?.get('required');
   const preselectedType = searchParams?.get('type') as DocumentType | null;
@@ -189,6 +191,7 @@ function ScanCenterContent() {
       }
     } catch (error) {
       console.error('Error checking for bank statement:', error);
+      addToast({ title: 'שגיאה בבדיקת דוח בנק', type: 'error' });
     } finally {
       setCheckingBankStatement(false);
     }
@@ -205,6 +208,7 @@ function ScanCenterContent() {
       }
     } catch (error) {
       console.error('Failed to load scanned history:', error);
+      addToast({ title: 'שגיאה בטעינת היסטוריית סריקות', type: 'error' });
     } finally {
       setLoadingHistory(false);
     }
@@ -410,7 +414,7 @@ function ScanCenterContent() {
                 // Don't reset activeType - let user continue scanning
               }}
               onError={(error) => {
-                alert(`❌ שגיאה: ${error}`);
+                addToast({ title: error, type: 'error' });
               }}
               acceptedFormats=".pdf,.jpg,.jpeg,.png,.xlsx,.xls"
               maxSizeMB={50}

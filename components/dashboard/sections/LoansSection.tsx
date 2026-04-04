@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Upload, Scan, Loader2, CheckCircle, XCircle, FileText, DollarSign } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 
 interface Loan {
   id: string;
@@ -38,6 +39,7 @@ const loanTypes = [
 ];
 
 export default function LoansSection({ onSave, initialLoans = [] }: LoansSectionProps) {
+  const { addToast } = useToast();
   const [loans, setLoans] = useState<Loan[]>(initialLoans);
   const [saving, setSaving] = useState(false);
   const [scanningIndex, setScanningIndex] = useState<number | null>(null);
@@ -125,7 +127,7 @@ export default function LoansSection({ onSave, initialLoans = [] }: LoansSection
       await onSave(loans);
     } catch (error) {
       console.error('Save error:', error);
-      alert('שגיאה בשמירת ההלוואות');
+      addToast({ title: 'שגיאה בשמירת ההלוואות', type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -199,7 +201,7 @@ export default function LoansSection({ onSave, initialLoans = [] }: LoansSection
                       className="gap-2 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
                       disabled={true}
                       onClick={() => {
-                        alert('🚧 סריקת דוחות נמצאת בפיתוח. אנא מלאו ידנית בינתיים.');
+                        addToast({ title: 'סריקת דוחות נמצאת בפיתוח. אנא מלאו ידנית בינתיים.', type: 'info' });
                       }}
                     >
                       <Scan className="w-4 h-4" />

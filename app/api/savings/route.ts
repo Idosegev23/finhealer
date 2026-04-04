@@ -1,8 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 
 // GET - fetch all savings accounts for current user
 export async function GET(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
 
@@ -71,6 +75,9 @@ export async function GET(request: NextRequest) {
 
 // POST - create new savings account
 export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
 
@@ -130,6 +137,9 @@ export async function POST(request: NextRequest) {
 
 // PATCH - update existing savings account
 export async function PATCH(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
 
@@ -176,6 +186,9 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE - soft delete savings account
 export async function DELETE(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
 

@@ -19,6 +19,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: 'AI service unavailable' }, { status: 503 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const importType = formData.get('importType') as string;

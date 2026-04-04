@@ -53,13 +53,13 @@ export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
   };
 
   return (
-    <header className="z-40 py-4 bg-phi-dark border-b border-phi-slate/30 shadow-lg">
+    <header className="z-40 py-4 bg-phi-dark border-b border-phi-slate/30 shadow-lg" role="banner" aria-label="כותרת ראשית">
       <div className="flex items-center justify-between h-full px-6 mx-auto">
         {/* Mobile hamburger */}
         <button
           className="p-2 rounded-md md:hidden focus:outline-none hover:bg-phi-slate/30 transition-colors"
           onClick={toggleMobileMenu}
-          aria-label="Menu"
+          aria-label="תפריט"
         >
           <Menu className="w-6 h-6 text-white" />
         </button>
@@ -78,7 +78,7 @@ export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
             <button
               className="relative p-2 bg-phi-gold/90 hover:bg-phi-coral/90 rounded-full focus:outline-none transition-colors shadow-md"
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              aria-label="Notifications"
+              aria-label="התראות"
               aria-haspopup="true"
             >
               <Bell className="w-5 h-5 text-white" />
@@ -113,7 +113,7 @@ export function PhiHeader({ toggleMobileMenu }: PhiHeaderProps) {
             <button
               className="flex items-center gap-2 p-2 bg-phi-gold/90 hover:bg-phi-coral/90 rounded-full focus:outline-none transition-colors shadow-md"
               onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-              aria-label="Account"
+              aria-label="חשבון"
               aria-haspopup="true"
             >
               <Settings className="w-5 h-5 text-white" />

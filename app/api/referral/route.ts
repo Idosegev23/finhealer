@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { randomBytes } from 'crypto';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 
 /**
  * GET /api/referral — get user's referral code + stats
@@ -49,6 +50,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 5, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

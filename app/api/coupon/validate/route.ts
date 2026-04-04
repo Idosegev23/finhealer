@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 // Coupon definitions
 const COUPONS: Record<string, { type: 'free' | 'discount'; discount?: number; label: string; trialDays?: number }> = {
@@ -43,11 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Apply coupon — activate subscription
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    const supabaseAdmin = createServiceClient();
 
     const trialDays = coupon.trialDays || 365;
     const expiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString();

@@ -20,22 +20,9 @@ export async function handleConsolidationResponse(
   const supabase = createServiceClient();
 
   if (response === 'no') {
-    // נקה את ה-loanConsolidation מה-context (בלי לדרוס שאר ה-context)
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('classification_context')
-      .eq('id', userId)
-      .single();
-
-    const existingContext = existingUser?.classification_context || {};
-    const { loanConsolidation, ...restContext } = existingContext as any;
-
-    await supabase
-      .from('users')
-      .update({
-        classification_context: Object.keys(restContext).length > 0 ? restContext : null
-      })
-      .eq('id', userId);
+    // נקה את ה-loanConsolidation מה-context (atomic key removal)
+    const { removeClassificationContextKey } = await import('@/lib/conversation/shared');
+    await removeClassificationContextKey(userId, 'loanConsolidation');
 
     return '👍 בסדר גמור! אם תרצה/י בעתיד, תמיד אפשר לשאול אותי.\n\nבינתיים, אני ממשיך לעקוב אחרי התקציב שלך 📊';
   }

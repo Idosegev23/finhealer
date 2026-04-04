@@ -25,8 +25,14 @@ function mockFrom(tableName: string) {
 // ── Module mocks ──
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: () => ({ from: mockFrom }),
-  createClient: async () => ({ from: mockFrom }),
+  createServiceClient: () => ({
+    from: mockFrom,
+    rpc: vi.fn(async () => ({ error: null })),
+  }),
+  createClient: async () => ({
+    from: mockFrom,
+    rpc: vi.fn(async () => ({ error: null })),
+  }),
 }));
 
 vi.mock('@/lib/greenapi/client', () => ({
@@ -59,6 +65,38 @@ vi.mock('@/lib/conversation/classification-flow', () => ({
 
 vi.mock('@/lib/conversation/advanced-goals-handler', () => ({
   startAdvancedGoal: vi.fn(async () => {}),
+}));
+
+vi.mock('@/lib/services/PhaseService', () => ({
+  calculatePhase: vi.fn(async (_userId: string) => {
+    const user = mockStore['users']?.[0];
+    if (user?.phase === 'behavior') return 'goals';
+    // If all transactions are confirmed (none pending), simulate progression to goals
+    const txs = mockStore['transactions'] || [];
+    const pendingCount = txs.filter((t: any) => t.status === 'pending').length;
+    if (pendingCount === 0 && txs.length > 0) return 'goals';
+    return 'data_collection';
+  }),
+  setPhase: vi.fn(async () => {}),
+}));
+
+vi.mock('@/lib/ai/gemini-client', () => ({
+  chatWithGeminiFlashMinimal: vi.fn(async () => null),
+}));
+
+vi.mock('@/lib/ai/state-intent', () => ({
+  parseStateIntent: vi.fn(async (msg: string, _state: string) => {
+    if (/^(ניתוח|analyze)$/i.test(msg.trim())) {
+      return { intent: 'analyze', confidence: 0.95, params: {} };
+    }
+    if (/^(סיכום|summary)$/i.test(msg.trim())) {
+      return { intent: 'summary', confidence: 0.95, params: {} };
+    }
+    if (/^(המשך|next|to_goals)$/i.test(msg.trim())) {
+      return { intent: 'next_phase', confidence: 0.95, params: {} };
+    }
+    return { intent: 'unknown', confidence: 0.3, params: {} };
+  }),
 }));
 
 vi.mock('@/lib/analysis/behavior-analyzer', () => ({

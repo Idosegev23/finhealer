@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Stepper, { Step } from '@/components/ui/stepper';
 import { Smartphone, Zap, Crown, CheckCircle, MessageCircle, ExternalLink, CreditCard, Lock, Shield } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { WHATSAPP_BOT_NUMBER } from '@/lib/constants';
@@ -13,6 +14,7 @@ type Plan = 'basic' | 'premium';
 
 export function OnboardingSelector() {
   const router = useRouter();
+  const { addToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [showWhatsAppRedirect, setShowWhatsAppRedirect] = useState(false);
@@ -80,19 +82,19 @@ export function OnboardingSelector() {
   const handlePayment = async () => {
     // Validate card details
     if (cardNumber.replace(/\s/g, '').length < 16) {
-      alert('אנא הכנס מספר כרטיס תקין');
+      addToast({ title: 'אנא הכנס מספר כרטיס תקין', type: 'info' });
       return false;
     }
     if (cardExpiry.length < 5) {
-      alert('אנא הכנס תאריך תוקף תקין');
+      addToast({ title: 'אנא הכנס תאריך תוקף תקין', type: 'info' });
       return false;
     }
     if (cardCvv.length < 3) {
-      alert('אנא הכנס CVV תקין');
+      addToast({ title: 'אנא הכנס CVV תקין', type: 'info' });
       return false;
     }
     if (!cardName.trim()) {
-      alert('אנא הכנס שם בעל הכרטיס');
+      addToast({ title: 'אנא הכנס שם בעל הכרטיס', type: 'info' });
       return false;
     }
 
@@ -117,7 +119,7 @@ export function OnboardingSelector() {
 
       // Validate phone
       if (!phone) {
-        alert('אנא הכנס מספר טלפון');
+        addToast({ title: 'אנא הכנס מספר טלפון', type: 'info' });
         setIsLoading(false);
         return;
       }
@@ -151,8 +153,6 @@ export function OnboardingSelector() {
         throw new Error(data.error || 'שגיאה ביצירת מנוי');
       }
 
-      console.log('✅ User created with phone:', phoneFormatted);
-      
       setSendingWelcome(true);
 
       // 2. Send WhatsApp welcome message (dynamic based on user state!)
@@ -165,7 +165,6 @@ export function OnboardingSelector() {
             const welcomeResponse = await fetch(`/api/wa/welcome?phone=${encodeURIComponent(phoneFormatted)}`);
             const welcomeData = await welcomeResponse.json();
             welcomeMessage = welcomeData.message;
-            console.log(`📨 Welcome message type: hasName=${welcomeData.hasName}, state=${welcomeData.state}`);
           } catch {
             // Fallback אם נכשל
             welcomeMessage = `היי! 👋
@@ -197,7 +196,6 @@ export function OnboardingSelector() {
           if (!waResponse.ok) {
             console.error('Failed to send WhatsApp welcome message');
           } else {
-            console.log('✅ WhatsApp welcome message sent to:', phoneFormatted);
           }
         } catch (waError) {
           console.error('WhatsApp send error:', waError);
@@ -210,7 +208,7 @@ export function OnboardingSelector() {
 
     } catch (error) {
       console.error('Onboarding error:', error);
-      alert('אירעה שגיאה. נסה שוב.');
+      addToast({ title: 'אירעה שגיאה. נסה שוב.', type: 'error' });
     } finally {
       setIsLoading(false);
       setSendingWelcome(false);
@@ -584,6 +582,7 @@ export function OnboardingSelector() {
                         onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
                         placeholder="1234 5678 9012 3456"
                         maxLength={19}
+                        autoComplete="cc-number"
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-mono"
                         dir="ltr"
                         disabled={paymentProcessing}
@@ -599,6 +598,7 @@ export function OnboardingSelector() {
                         value={cardName}
                         onChange={(e) => setCardName(e.target.value)}
                         placeholder="ישראל ישראלי"
+                        autoComplete="cc-name"
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         disabled={paymentProcessing}
                       />
@@ -615,6 +615,7 @@ export function OnboardingSelector() {
                           onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
                           placeholder="MM/YY"
                           maxLength={5}
+                          autoComplete="cc-exp"
                           className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
                           dir="ltr"
                           disabled={paymentProcessing}
@@ -630,6 +631,7 @@ export function OnboardingSelector() {
                           onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
                           placeholder="123"
                           maxLength={4}
+                          autoComplete="cc-csc"
                           className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
                           dir="ltr"
                           disabled={paymentProcessing}
@@ -644,12 +646,6 @@ export function OnboardingSelector() {
                     <span>התשלום מאובטח בתקן PCI DSS</span>
                   </div>
 
-                  {/* Demo Notice */}
-                  <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
-                    <p className="text-sm text-yellow-800">
-                      🧪 <strong>מצב דמו</strong> - הזן פרטים כלשהם לבדיקה
-                    </p>
-                  </div>
                 </div>
 
                 {/* Trust Badges */}

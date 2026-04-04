@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import ExpenseCategorySelector from '@/components/expenses/expense-category-selector';
 import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { Upload, PenLine } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 
 /**
  * דף הזנת הוצאות - 2 מצבים
@@ -17,6 +18,7 @@ import { Upload, PenLine } from 'lucide-react';
  * 2. הזנה ידנית - טופס פשוט
  */
 export default function ExpensesDataPage() {
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState('manual');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -51,7 +53,7 @@ export default function ExpensesDataPage() {
       });
 
       if (response.ok) {
-        alert('✅ הוצאה נוספה בהצלחה!');
+        addToast({ title: 'הוצאה נוספה בהצלחה!', type: 'success' });
         // Reset form
         setAmount('');
         setVendor('');
@@ -61,11 +63,11 @@ export default function ExpensesDataPage() {
         setExpenseType('');
       } else {
         const errorData = await response.json();
-        alert(`❌ שגיאה: ${errorData.error || 'שגיאה בהוספת הוצאה'}`);
+        addToast({ title: errorData.error || 'שגיאה בהוספת הוצאה', type: 'error' });
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('❌ שגיאה בהוספת הוצאה');
+      addToast({ title: 'שגיאה בהוספת הוצאה', type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -73,7 +75,7 @@ export default function ExpensesDataPage() {
 
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-4xl" dir="rtl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">הוסף הוצאה 💸</h1>
         <p className="mt-2 text-gray-600">
@@ -208,7 +210,7 @@ export default function ExpensesDataPage() {
                   console.log('✅ Credit statement uploaded:', data);
                 }}
                 onError={(error) => {
-                  alert(`❌ שגיאה: ${error}`);
+                  addToast({ title: error, type: 'error' });
                 }}
                 acceptedFormats=".pdf,.jpg,.jpeg,.png,.xlsx,.xls"
                 maxSizeMB={20}

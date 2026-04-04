@@ -7,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { 
-  Plus, Trash2, Upload, Scan, Loader2, CheckCircle, XCircle, FileText, 
-  DollarSign, Home, Car, GraduationCap, CreditCard, Building2, Save, ArrowRight 
+import {
+  Plus, Trash2, Upload, Scan, Loader2, CheckCircle, XCircle, FileText,
+  DollarSign, Home, Car, GraduationCap, CreditCard, Building2, Save, ArrowRight
 } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 
 interface Loan {
   id?: string;
@@ -43,6 +44,7 @@ const loanTypes = [
 
 export default function LoansForm({ initialLoans }: LoansFormProps) {
   const router = useRouter();
+  const { addToast } = useToast();
   const [loans, setLoans] = useState<Loan[]>(
     initialLoans.map(loan => ({
       id: loan.id,
@@ -167,7 +169,7 @@ export default function LoansForm({ initialLoans }: LoansFormProps) {
 
     } catch (error) {
       console.error('Error saving loans:', error);
-      alert('אירעה שגיאה בשמירת הנתונים');
+      addToast({ title: 'אירעה שגיאה בשמירת הנתונים', type: 'error' });
     } finally {
       setLoading(false);
     }

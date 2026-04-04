@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { chatWithGeminiFlashMinimal } from '@/lib/ai/gemini-client';
 import { mergeClassificationContext } from './shared';
+import { maskPhone } from '@/lib/utils/mask-pii';
 import type { GoalType, BudgetSource, Goal } from '@/types/goals';
 
 export interface AdvancedGoalContext {
@@ -127,7 +128,7 @@ export async function startAdvancedGoal(
   phone: string
 ): Promise<void> {
   console.log(`[AdvGoals] ═══════════════════════════════════════`);
-  console.log(`[AdvGoals] startAdvancedGoal: userId=${userId.substring(0,8)}..., phone=${phone}`);
+  console.log(`[AdvGoals] startAdvancedGoal: userId=${userId.substring(0,8)}..., phone=${maskPhone(phone)}`);
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 

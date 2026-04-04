@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -18,10 +18,7 @@ export async function GET(request: NextRequest) {
 
     console.log('🔄 [CRON] Refreshing materialized views...');
     
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = createServiceClient();
 
     const views = ['monthly_snapshots', 'user_current_state'];
     const results: Record<string, boolean> = {};

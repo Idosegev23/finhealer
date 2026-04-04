@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Phone, MessageSquare, Bell, User, CreditCard, Lock, Loader2, CheckCircle, Plus, Pencil, Trash2, Baby, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { PageWrapper, Card as DSCard } from '@/components/ui/design-system';
+import { useToast } from '@/components/ui/toaster';
 
 type Tab = 'profile' | 'whatsapp' | 'notifications' | 'subscription' | 'privacy';
 
@@ -162,6 +163,7 @@ function ProfileTab() {
       }
     } catch (err) {
       console.error('Error loading children:', err);
+      setError('שגיאה בטעינת רשימת הילדים');
     } finally {
       setChildrenLoading(false);
     }
@@ -639,6 +641,7 @@ function ProfileTab() {
 }
 
 function WhatsAppTab() {
+  const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
 
@@ -666,6 +669,7 @@ function WhatsAppTab() {
       setLoading(false);
     } catch (err) {
       console.error('Error:', err);
+      addToast({ title: 'שגיאה בטעינת נתוני WhatsApp', type: 'error' });
       setLoading(false);
     }
   };
@@ -834,6 +838,7 @@ function SubscriptionTab() {
       setLoading(false);
     } catch (err) {
       console.error('Error:', err);
+      setError('שגיאה בטעינת נתוני המנוי');
       setLoading(false);
     }
   };
@@ -1000,6 +1005,7 @@ function SubscriptionTab() {
 }
 
 function PrivacyTab() {
+  const { addToast } = useToast();
   const [changingPassword, setChangingPassword] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -1023,6 +1029,7 @@ function PrivacyTab() {
       setLoading(false);
     } catch (err) {
       console.error('Error:', err);
+      setError('שגיאה בטעינת נתוני המשתמש');
       setLoading(false);
     }
   };
@@ -1235,7 +1242,7 @@ function PrivacyTab() {
                     throw new Error(data.error || 'שגיאה במחיקת החשבון');
                   }
 
-                  alert(data.message);
+                  addToast({ title: data.message, type: 'success' });
                   window.location.href = '/';
                 } catch (err: any) {
                   setError(err.message || 'שגיאה במחיקת החשבון');

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkApiRateLimit } from '@/lib/utils/api-rate-limiter';
 import { chatWithGeminiFlash } from '@/lib/ai/gemini-client';
 import { SYSTEM_PROMPT, buildContextMessage, parseExpenseFromAI, type UserContext } from '@/lib/ai/system-prompt';
 
@@ -15,9 +16,12 @@ import { SYSTEM_PROMPT, buildContextMessage, parseExpenseFromAI, type UserContex
  * - שומר היסטוריה
  */
 export async function POST(request: NextRequest) {
+  const limited = checkApiRateLimit(request, 10, 60_000);
+  if (limited) return limited;
+
   try {
     const supabase = await createClient();
-    
+
     // אימות משתמש
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {

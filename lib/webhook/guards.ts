@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { maskPhone } from '@/lib/utils/mask-pii';
 import type { GreenAPIWebhookPayload } from './types';
 
 // In-memory dedup cache (resets on deploy)
@@ -48,15 +49,16 @@ export async function verifyAndParse(request: NextRequest): Promise<GuardResult>
       console.warn('⚠️ Webhook signature mismatch - rejecting');
       return { ignored: true, statusCode: 401, response: { status: 'unauthorized' } };
     }
-  } else if (process.env.NODE_ENV === 'production' && !webhookToken) {
-    console.warn('⚠️ No webhook auth configured — set WEBHOOK_TOKEN or GREEN_API_WEBHOOK_SECRET');
+  } else if (process.env.NODE_ENV === 'production') {
+    console.error('❌ No webhook auth configured in production — rejecting');
+    return { ignored: true, statusCode: 401, response: { status: 'no_auth_configured' } };
   }
 
   console.log(`[Webhook] ═══════════════════════════════════════`);
   console.log(`[Webhook] INCOMING: type=${payload.typeWebhook}, msgId=${payload.idMessage}`);
-  console.log(`[Webhook] FROM: chatId=${payload.senderData?.chatId}, name=${payload.senderData?.senderName || 'unknown'}`);
+  console.log(`[Webhook] FROM: chatId=${maskPhone(payload.senderData?.chatId)}, name=${(payload.senderData?.senderName || 'unknown').substring(0, 2) + '***'}`);
   console.log(`[Webhook] MSG_TYPE: ${payload.messageData?.typeMessage || 'none'}`);
-  console.log(`[Webhook] CONTENT: ${JSON.stringify(payload.messageData || {}).substring(0, 300)}`);
+  console.log(`[Webhook] CONTENT: ${JSON.stringify(payload.messageData || {}).substring(0, 50)}...`);
 
   // Only process incoming messages
   if (payload.typeWebhook !== 'incomingMessageReceived') {
@@ -73,7 +75,7 @@ export async function verifyAndParse(request: NextRequest): Promise<GuardResult>
       .select('id')
       .eq('provider_msg_id', messageId)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (existingMsg) {
       console.log('🛡️ Duplicate message ignored (DB check):', messageId);

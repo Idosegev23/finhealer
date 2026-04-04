@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { calculateUserPhase, shouldUpgradePhase, getPhaseName, getPhaseNumber } from '@/lib/utils/phase-calculator';
+import { maskId } from '@/lib/utils/mask-pii';
 
 export const maxDuration = 300; // 5 minutes
 export const dynamic = 'force-dynamic';
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
             newPhase,
           });
 
-          console.log(`✅ Updated ${user.name || user.email}: ${oldPhase} → ${newPhase}`);
+          console.log(`✅ Updated ${maskId(user.id)}: ${oldPhase} → ${newPhase}`);
 
           // TODO: Send WhatsApp notification about phase upgrade
           // await sendPhaseUpgradeNotification(user.id, newPhase);

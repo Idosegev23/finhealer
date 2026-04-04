@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Wallet, Save, ArrowRight, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
+import { useToast } from '@/components/ui/toaster';
 
 interface CashFlowFormProps {
   initialBalance: number;
@@ -14,6 +15,7 @@ interface CashFlowFormProps {
 
 export default function CashFlowForm({ initialBalance }: CashFlowFormProps) {
   const router = useRouter();
+  const { addToast } = useToast();
   const [balance, setBalance] = useState<number>(initialBalance);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -44,7 +46,7 @@ export default function CashFlowForm({ initialBalance }: CashFlowFormProps) {
 
     } catch (error) {
       console.error('Error saving balance:', error);
-      alert('אירעה שגיאה בשמירת הנתונים');
+      addToast({ title: 'אירעה שגיאה בשמירת הנתונים', type: 'error' });
     } finally {
       setLoading(false);
     }

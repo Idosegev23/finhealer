@@ -47,17 +47,8 @@ export async function handleButton(ctx: WebhookContext): Promise<NextResponse> {
       });
 
       // Save edit context (merge, don't overwrite)
-      const { data: ctxUser } = await supabase
-        .from('users')
-        .select('classification_context')
-        .eq('id', userData.id)
-        .single();
-
-      const existingCtx = ctxUser?.classification_context || {};
-      await supabase
-        .from('users')
-        .update({ classification_context: { ...existingCtx, editing_tx_id: txId } })
-        .eq('id', userData.id);
+      const { mergeClassificationContext } = await import('@/lib/conversation/shared');
+      await mergeClassificationContext(userData.id, { editing_tx_id: txId });
     }
 
     const btnAction = messageToRoute.startsWith('confirm_') ? 'confirmed' : 'editing';
