@@ -30,6 +30,10 @@ export async function verifyAndParse(request: NextRequest): Promise<GuardResult>
 
   // Token verification (URL-based: /api/wa/webhook?token=xxx)
   const webhookToken = process.env.WEBHOOK_TOKEN;
+  if (!webhookToken && process.env.NODE_ENV === 'production') {
+    console.error('❌ WEBHOOK_TOKEN not configured in production — rejecting');
+    return { ignored: true, statusCode: 401, response: { status: 'no_auth_configured' } };
+  }
   if (webhookToken) {
     const url = new URL(request.url);
     const token = url.searchParams.get('token');
@@ -37,21 +41,6 @@ export async function verifyAndParse(request: NextRequest): Promise<GuardResult>
       console.warn('⚠️ Webhook token mismatch - rejecting');
       return { ignored: true, statusCode: 401, response: { status: 'unauthorized' } };
     }
-  }
-
-  // HMAC signature verification (if provider supports it)
-  const webhookSecret = process.env.GREEN_API_WEBHOOK_SECRET;
-  if (webhookSecret) {
-    const signature = request.headers.get('x-webhook-signature') || '';
-    const { createHmac } = await import('crypto');
-    const expected = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
-    if (signature !== expected && signature !== `sha256=${expected}`) {
-      console.warn('⚠️ Webhook signature mismatch - rejecting');
-      return { ignored: true, statusCode: 401, response: { status: 'unauthorized' } };
-    }
-  } else if (process.env.NODE_ENV === 'production') {
-    console.error('❌ No webhook auth configured in production — rejecting');
-    return { ignored: true, statusCode: 401, response: { status: 'no_auth_configured' } };
   }
 
   console.log(`[Webhook] ═══════════════════════════════════════`);
