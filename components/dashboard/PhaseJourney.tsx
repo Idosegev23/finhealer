@@ -6,8 +6,8 @@ import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
 // ϕ = U+03D5 (mathematical phi)
 const PHI = 'ϕ'
 
-type Phase = 'start' | 'reflection' | 'waiting_for_document' | 'data_collection' | 
-  'classification' | 'classification_income' | 'classification_expense' | 
+type Phase = 'start' | 'waiting_for_document' | 'data_collection' |
+  'classification' | 'classification_income' | 'classification_expense' |
   'behavior' | 'goals' | 'budget' | 'monitoring'
 
 interface PhaseJourneyProps {
@@ -28,9 +28,9 @@ const phases: { id: string; label: string; description: string }[] = [
 function getPhaseIndex(state: string): number {
   const stateMap: Record<string, number> = {
     'start': 0,
-    'reflection': 0,
     'waiting_for_document': 0,
     'data_collection': 0,
+    'reflection': 0, // legacy — treat as data_collection
     'classification': 1,
     'classification_income': 1,
     'classification_expense': 1,

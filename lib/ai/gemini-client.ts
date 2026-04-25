@@ -94,24 +94,8 @@ async function _chatWithGeminiFlashImpl(
     return await retryWithBackoff(async () => {
       const client = getClient();
 
-      // Build contents array with history
+      // Conversation history (oldest first), excluding current message
       const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
-
-      // System context as first user message (Gemini uses systemInstruction or first message)
-      const contextMessage = userContext
-        ? `${systemPrompt}\n\n${userContext}`
-        : systemPrompt;
-
-      contents.push({
-        role: 'user',
-        parts: [{ text: contextMessage }],
-      });
-      contents.push({
-        role: 'model',
-        parts: [{ text: 'הבנתי, אני מוכן לעזור.' }],
-      });
-
-      // Add conversation history
       if (conversationHistory && conversationHistory.length > 0) {
         for (const msg of conversationHistory) {
           contents.push({
@@ -120,17 +104,23 @@ async function _chatWithGeminiFlashImpl(
           });
         }
       }
-
-      // Add current message
       contents.push({
         role: 'user',
         parts: [{ text: message }],
       });
 
+      // systemInstruction is sticky for the call and keeps history clean.
+      // userContext (financial snapshot etc.) is appended to the system prompt —
+      // it's role-specific guidance, not a turn in the conversation.
+      const systemInstruction = userContext
+        ? `${systemPrompt}\n\n${userContext}`
+        : systemPrompt;
+
       const response = await client.models.generateContent({
         model: FLASH_MODEL,
         contents,
         config: {
+          systemInstruction,
           thinkingConfig: { thinkingLevel: 'low' as any },
           maxOutputTokens: 300,
         },
@@ -168,13 +158,9 @@ async function _chatWithGeminiFlashMinimalImpl(
 
       const response = await client.models.generateContent({
         model: FLASH_MODEL,
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: `${systemPrompt}\n\n${message}` }],
-          },
-        ],
+        contents: [{ role: 'user', parts: [{ text: message }] }],
         config: {
+          systemInstruction: systemPrompt,
           thinkingConfig: { thinkingLevel: 'minimal' as any },
           maxOutputTokens: 500,
         },
@@ -208,21 +194,6 @@ export async function chatWithGeminiPro(
 
       const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
 
-      // System + context
-      const contextMessage = userContext
-        ? `${systemPrompt}\n\n${userContext}`
-        : systemPrompt;
-
-      contents.push({
-        role: 'user',
-        parts: [{ text: contextMessage }],
-      });
-      contents.push({
-        role: 'model',
-        parts: [{ text: 'הבנתי, אני מנתח את המידע.' }],
-      });
-
-      // History
       if (conversationHistory && conversationHistory.length > 0) {
         for (const msg of conversationHistory) {
           contents.push({
@@ -231,17 +202,20 @@ export async function chatWithGeminiPro(
           });
         }
       }
-
-      // Current message
       contents.push({
         role: 'user',
         parts: [{ text: message }],
       });
 
+      const systemInstruction = userContext
+        ? `${systemPrompt}\n\n${userContext}`
+        : systemPrompt;
+
       const response = await client.models.generateContent({
         model: FLASH_MODEL,
         contents,
         config: {
+          systemInstruction,
           maxOutputTokens: 2000,
         },
       });
@@ -379,4 +353,210 @@ export async function chatWithGeminiProDeep(
     console.error('[Gemini Pro Deep] Error:', error);
     throw new Error('Deep analysis service temporarily unavailable');
   }
+}
+
+// ============================================================================
+// Structured Output — strict JSON via responseJsonSchema (no markdown stripping)
+// ============================================================================
+
+/**
+ * Generate a JSON response that matches the given JSON Schema.
+ *
+ * Per Gemini docs, `responseMimeType: 'application/json'` + `responseJsonSchema`
+ * guarantees a parseable JSON object — no need for markdown code-fence regex.
+ *
+ * The schema is plain JSON Schema (Draft 7-ish). For Zod schemas, use:
+ *   `zodToJsonSchema(myZodSchema)` from `zod-to-json-schema` (already in deps),
+ * or build the schema by hand using { type, properties, required, enum }.
+ */
+export async function chatStructured<T = unknown>(
+  message: string,
+  systemPrompt: string,
+  jsonSchema: Record<string, any>,
+  opts: {
+    thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
+    maxOutputTokens?: number;
+    history?: ConversationMessage[];
+  } = {}
+): Promise<T> {
+  const { geminiLimiter } = await import('@/lib/utils/rate-limiter');
+  return geminiLimiter.execute(async () => {
+    return await retryWithBackoff(async () => {
+      const client = getClient();
+      const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+      if (opts.history) {
+        for (const m of opts.history) {
+          contents.push({ role: m.role, parts: [{ text: m.content }] });
+        }
+      }
+      contents.push({ role: 'user', parts: [{ text: message }] });
+
+      const response = await client.models.generateContent({
+        model: FLASH_MODEL,
+        contents,
+        config: {
+          systemInstruction: systemPrompt,
+          thinkingConfig: { thinkingLevel: (opts.thinkingLevel || 'low') as any },
+          maxOutputTokens: opts.maxOutputTokens || 1500,
+          responseMimeType: 'application/json',
+          responseJsonSchema: jsonSchema as any,
+        } as any,
+      });
+
+      const raw = response.text || '{}';
+      try {
+        return JSON.parse(raw) as T;
+      } catch (parseErr) {
+        console.error('[chatStructured] JSON.parse failed despite schema constraint:', parseErr, 'raw:', raw.substring(0, 300));
+        throw new Error('Structured output parse failed');
+      }
+    }, 'Gemini Structured');
+  });
+}
+
+// ============================================================================
+// Chat with Memory — multi-turn using ai.chats.create()
+// ============================================================================
+
+export interface ChatTurn {
+  role: 'user' | 'model';
+  text: string;
+}
+
+/**
+ * Run one turn of a multi-turn chat using the SDK's chat helper.
+ *
+ * This preserves Gemini 3 thought signatures across turns automatically,
+ * and `systemInstruction` is sticky for the session — no fake "I understand"
+ * priming, no role flips. Pass `history` (oldest first); the SDK sends only
+ * what's needed and tracks the new exchange internally.
+ *
+ * For our use case: one call per incoming message. We always rebuild the chat
+ * from stored history, since we're stateless across HTTP requests.
+ */
+export async function chatWithMemory(opts: {
+  systemInstruction: string;
+  history: ChatTurn[];
+  userMessage: string;
+  thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
+  maxOutputTokens?: number;
+  responseJsonSchema?: Record<string, any>;
+}): Promise<string> {
+  const { geminiLimiter } = await import('@/lib/utils/rate-limiter');
+  return geminiLimiter.execute(async () => {
+    return await retryWithBackoff(async () => {
+      const client = getClient();
+      const chatConfig: any = {
+        systemInstruction: opts.systemInstruction,
+        thinkingConfig: { thinkingLevel: (opts.thinkingLevel || 'low') as any },
+        maxOutputTokens: opts.maxOutputTokens || 800,
+      };
+      if (opts.responseJsonSchema) {
+        chatConfig.responseMimeType = 'application/json';
+        chatConfig.responseJsonSchema = opts.responseJsonSchema;
+      }
+
+      const chat = client.chats.create({
+        model: FLASH_MODEL,
+        history: opts.history.map(t => ({
+          role: t.role,
+          parts: [{ text: t.text }],
+        })),
+        config: chatConfig,
+      });
+
+      const response = await chat.sendMessage({ message: opts.userMessage });
+      return response.text || '';
+    }, 'Gemini Chat with Memory');
+  });
+}
+
+// ============================================================================
+// Chat with Tools — function calling + memory
+// ============================================================================
+
+export interface ToolDeclaration {
+  name: string;
+  description: string;
+  parameters: any;
+}
+
+/**
+ * Run a chat where the model can call back into our app via function calls.
+ *
+ * Flow:
+ *   1. Send user message to Gemini with tool declarations
+ *   2. If Gemini returns function calls → execute them via `executeTool` callback
+ *   3. Send results back to Gemini
+ *   4. Repeat until Gemini returns plain text (or maxToolHops reached)
+ *
+ * Used for grounding φ's free-form coaching answers in real DB facts.
+ */
+export async function chatWithTools(opts: {
+  systemInstruction: string;
+  history: ChatTurn[];
+  userMessage: string;
+  tools: ToolDeclaration[];
+  executeTool: (name: string, args: Record<string, any>) => Promise<unknown>;
+  thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
+  maxOutputTokens?: number;
+  maxToolHops?: number;
+  /** Optional JSON schema for the FINAL text output (after all tool calls resolve). */
+  responseJsonSchema?: Record<string, any>;
+}): Promise<string> {
+  const { geminiLimiter } = await import('@/lib/utils/rate-limiter');
+  return geminiLimiter.execute(async () => {
+    return await retryWithBackoff(async () => {
+      const client = getClient();
+      const maxHops = opts.maxToolHops ?? 4;
+
+      const chatConfig: any = {
+        systemInstruction: opts.systemInstruction,
+        thinkingConfig: { thinkingLevel: (opts.thinkingLevel || 'low') as any },
+        maxOutputTokens: opts.maxOutputTokens || 1200,
+        tools: [{ functionDeclarations: opts.tools as any }],
+      };
+      if (opts.responseJsonSchema) {
+        chatConfig.responseMimeType = 'application/json';
+        chatConfig.responseJsonSchema = opts.responseJsonSchema;
+      }
+
+      const chat = client.chats.create({
+        model: FLASH_MODEL,
+        history: opts.history.map(t => ({
+          role: t.role,
+          parts: [{ text: t.text }],
+        })),
+        config: chatConfig,
+      });
+
+      let response: any = await chat.sendMessage({ message: opts.userMessage });
+      let hops = 0;
+
+      while (response.functionCalls && response.functionCalls.length > 0 && hops < maxHops) {
+        hops++;
+        const fnResponses: any[] = [];
+        for (const call of response.functionCalls) {
+          let result: unknown;
+          try {
+            result = await opts.executeTool(call.name, call.args || {});
+          } catch (err: any) {
+            result = { error: err.message || 'tool execution failed' };
+          }
+          fnResponses.push({
+            functionResponse: {
+              id: (call as any).id,
+              name: call.name,
+              response: { result },
+            },
+          });
+        }
+
+        // Send all function results back in one turn
+        response = await chat.sendMessage({ message: fnResponses as any });
+      }
+
+      return response.text || '';
+    }, 'Gemini Chat with Tools');
+  });
 }

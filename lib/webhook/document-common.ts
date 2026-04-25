@@ -208,6 +208,9 @@ export async function saveDocumentRecord(
     periodEnd: string | null;
     transactionsExtracted: number;
     transactionsCreated: number;
+    fileHash?: string | null;
+    statementMonth?: string | null;
+    financialAccountId?: string | null;
   }
 ): Promise<string | null> {
   const { data: docRecord, error: docError } = await supabase
@@ -224,6 +227,9 @@ export async function saveDocumentRecord(
       period_end: opts.periodEnd,
       transactions_extracted: opts.transactionsExtracted,
       transactions_created: opts.transactionsCreated,
+      file_hash: opts.fileHash || null,
+      statement_month: opts.statementMonth || null,
+      financial_account_id: opts.financialAccountId || null,
     })
     .select('id')
     .single();

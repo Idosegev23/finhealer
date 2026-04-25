@@ -378,13 +378,19 @@ export interface DuplicateCheckResult {
 
 /**
  * בדיקת כפילויות - האם תנועות אלו כבר קיימות במערכת?
+ *
+ * Two-tier hash: a strict hash (date+amount+vendor+desc) catches re-uploads where OCR
+ * gave identical text, and a loose hash (date+amount) catches re-uploads where OCR
+ * extracted slightly different vendor strings for the same underlying transaction.
+ * Loose-match overlap of 70%+ is treated as a duplicate document — same-day same-amount
+ * coincidences happen, but not at that volume.
  */
 export async function checkForDuplicateTransactions(
   userId: string,
   newTransactions: any[]
 ): Promise<DuplicateCheckResult> {
   const supabase = createServiceClient();
-  
+
   if (!newTransactions || newTransactions.length === 0) {
     return {
       isDuplicate: false,
@@ -393,19 +399,19 @@ export async function checkForDuplicateTransactions(
       overlappingTransactions: 0,
     };
   }
-  
-  // יצירת hashes לתנועות החדשות
-  const newHashes = newTransactions.map(tx => generateTransactionHash(tx));
-  
+
+  const newStrictHashes = newTransactions.map(tx => generateTransactionHash(tx));
+  const newLooseHashes = newTransactions.map(tx => generateLooseHash(tx));
+
   // חילוץ תקופה מהתנועות החדשות
   const dates = newTransactions
     .map(tx => tx.date)
     .filter(d => d)
     .sort();
-  
+
   const periodStart = dates[0];
   const periodEnd = dates[dates.length - 1];
-  
+
   // חיפוש תנועות קיימות באותה תקופה
   const { data: existingTransactions } = await supabase
     .from('transactions')
@@ -413,8 +419,8 @@ export async function checkForDuplicateTransactions(
     .eq('user_id', userId)
     .gte('tx_date', periodStart)
     .lte('tx_date', periodEnd)
-    .limit(500);
-  
+    .limit(2000);
+
   if (!existingTransactions || existingTransactions.length === 0) {
     return {
       isDuplicate: false,
@@ -423,42 +429,62 @@ export async function checkForDuplicateTransactions(
       overlappingTransactions: 0,
     };
   }
-  
-  // יצירת hashes לתנועות קיימות
-  const existingHashes = existingTransactions.map(tx => 
+
+  const existingStrictSet = new Set(existingTransactions.map(tx =>
     generateTransactionHash({
       date: tx.tx_date,
       amount: tx.amount,
       vendor: tx.vendor,
       description: tx.original_description,
     })
-  );
-  
-  // חישוב חפיפה
-  const overlapping = newHashes.filter(hash => existingHashes.includes(hash));
-  const overlapPercent = Math.round((overlapping.length / newHashes.length) * 100);
-  
-  console.log(`[DuplicateCheck] Found ${overlapping.length}/${newHashes.length} overlapping transactions (${overlapPercent}%)`);
-  
+  ));
+  const existingLooseSet = new Set(existingTransactions.map(tx =>
+    generateLooseHash({ date: tx.tx_date, amount: tx.amount })
+  ));
+
+  const strictOverlap = newStrictHashes.filter(h => existingStrictSet.has(h)).length;
+  const looseOverlap = newLooseHashes.filter(h => existingLooseSet.has(h)).length;
+
+  const strictPct = Math.round((strictOverlap / newStrictHashes.length) * 100);
+  const loosePct = Math.round((looseOverlap / newLooseHashes.length) * 100);
+
+  // The reported overlap is the higher of the two — strict catches clean cases,
+  // loose catches OCR-noisy re-uploads of the same statement.
+  const overlapPercent = Math.max(strictPct, loosePct);
+  const overlappingTransactions = Math.max(strictOverlap, looseOverlap);
+
+  console.log(`[DuplicateCheck] strict=${strictOverlap}/${newStrictHashes.length} (${strictPct}%), loose=${looseOverlap}/${newLooseHashes.length} (${loosePct}%)`);
+
   return {
-    isDuplicate: overlapPercent > 80,
-    hasPartialOverlap: overlapPercent >= 30 && overlapPercent <= 80,
+    isDuplicate: overlapPercent >= 70,
+    hasPartialOverlap: overlapPercent >= 25 && overlapPercent < 70,
     overlapPercent,
     overlappingPeriod: periodStart && periodEnd ? `${formatDateShort(periodStart)} - ${formatDateShort(periodEnd)}` : undefined,
-    overlappingTransactions: overlapping.length,
+    overlappingTransactions,
   };
 }
 
 /**
- * יצירת hash לתנועה (לזיהוי כפילויות)
+ * Strict hash — date + amount + vendor + first 30 chars of description.
+ * Matches identical OCR output exactly.
  */
 function generateTransactionHash(tx: any): string {
   const date = tx.date || '';
   const amount = Math.abs(tx.amount || 0).toFixed(2);
   const vendor = (tx.vendor || '').toLowerCase().trim();
   const desc = (tx.description || tx.original_description || '').toLowerCase().trim().substring(0, 30);
-  
+
   return `${date}|${amount}|${vendor}|${desc}`;
+}
+
+/**
+ * Loose hash — date + amount only. Catches re-uploads even when OCR produced
+ * slightly different vendor strings (e.g. "ויזה" vs "VISA" vs "ויזה כאל").
+ */
+function generateLooseHash(tx: any): string {
+  const date = tx.date || '';
+  const amount = Math.abs(Number(tx.amount) || 0).toFixed(2);
+  return `${date}|${amount}`;
 }
 
 /**

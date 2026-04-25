@@ -334,6 +334,46 @@ export async function transitionToBudget(ctx: RouterContext): Promise<RouterResu
     })
     .eq('id', ctx.userId);
 
+  // If a budget already exists for the current month, don't restart from scratch —
+  // ask the user what to do with it. Avoids the silent overwrite bug where the user
+  // re-runs the flow and gets back-to-back "התקציב מוכן" messages.
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const { data: existingBudget } = await supabase
+    .from('budgets')
+    .select('id, total_budget')
+    .eq('user_id', ctx.userId)
+    .eq('month', currentMonth)
+    .maybeSingle();
+
+  if (existingBudget) {
+    let categoryCount = 0;
+    const { count } = await supabase
+      .from('budget_categories')
+      .select('*', { count: 'exact', head: true })
+      .eq('budget_id', existingBudget.id);
+    categoryCount = count || 0;
+
+    const totalStr = Math.round(Number(existingBudget.total_budget) || 0).toLocaleString('he-IL');
+    const existingMsg = `💰 *כבר יש לך תקציב לחודש הזה*\n\n📊 ${totalStr}₪ ב-${categoryCount} נושאים.\n\nמה תרצה לעשות?`;
+
+    try {
+      await sendWhatsAppInteractiveButtons(ctx.phone, {
+        message: existingMsg,
+        buttons: [
+          { buttonId: 'show_budget', buttonText: 'תראה לי את התקציב 👀' },
+          { buttonId: 'manual_budget', buttonText: 'עדכן נושא ✏️' },
+          { buttonId: 'confirm_budget', buttonText: 'הכל בסדר, סיימתי ✅' },
+        ],
+      });
+    } catch {
+      await greenAPI.sendMessage({
+        phoneNumber: ctx.phone,
+        message: `${existingMsg}\n\n• כתוב *"תקציב"* — לראות אותו\n• כתוב *"בעצמי"* — לעדכן נושא\n• כתוב *"סיימתי"* — להמשיך לשלב הבא`,
+      });
+    }
+    return { success: true };
+  }
+
   const introMsg = `💰 *בוא נבנה תקציב חודשי!*\n\nתקציב = כמה כסף מותר להוציא כל חודש על כל נושא.\nאני אעזור לך לדעת בדיוק לאן הולך הכסף.`;
   await greenAPI.sendMessage({ phoneNumber: ctx.phone, message: introMsg });
 

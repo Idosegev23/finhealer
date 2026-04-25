@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Save } from 'lucide-react';
+import { ArrowRight, Save, MessageSquare, Send, StickyNote, Trash2 } from 'lucide-react';
 
 interface UserDetail {
   id: string;
@@ -27,6 +27,13 @@ interface UserStats {
   messageCount: number;
 }
 
+interface AdvisorNote {
+  id: string;
+  note_text: string;
+  advisor_id: string;
+  created_at: string;
+}
+
 export default function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [user, setUser] = useState<UserDetail | null>(null);
@@ -39,6 +46,71 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
   const [editStatus, setEditStatus] = useState('');
   const [editPhase, setEditPhase] = useState('');
   const [editTrialExpires, setEditTrialExpires] = useState('');
+
+  // Advisor notes state
+  const [notes, setNotes] = useState<AdvisorNote[]>([]);
+  const [newNote, setNewNote] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+
+  // Send-message state
+  const [waMessage, setWaMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [sendStatus, setSendStatus] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const fetchNotes = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/users/${id}/notes`);
+      if (res.ok) {
+        const data = await res.json();
+        setNotes(data.notes || []);
+      }
+    } catch { /* ignore */ }
+  }, [id]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  async function addNote() {
+    if (!newNote.trim()) return;
+    setSavingNote(true);
+    try {
+      const res = await fetch(`/api/admin/users/${id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_text: newNote.trim() }),
+      });
+      if (res.ok) {
+        setNewNote('');
+        fetchNotes();
+      }
+    } catch { /* ignore */ }
+    setSavingNote(false);
+  }
+
+  async function sendDirectMessage() {
+    if (!waMessage.trim()) return;
+    setSendingMessage(true);
+    setSendStatus(null);
+    try {
+      const res = await fetch(`/api/admin/users/${id}/send-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: waMessage.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSendStatus({ ok: true, text: `נשלח בהצלחה ל-${data.sent_to}` });
+        setWaMessage('');
+        fetchNotes(); // the message also gets logged as a note
+      } else {
+        setSendStatus({ ok: false, text: data.error || 'שגיאה בשליחה' });
+      }
+    } catch (err: any) {
+      setSendStatus({ ok: false, text: err.message || 'שגיאה בשליחה' });
+    }
+    setSendingMessage(false);
+  }
 
   useEffect(() => {
     fetch(`/api/admin/users/${id}`)
@@ -251,7 +323,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
 
         {/* Goals */}
         {stats && stats.goals.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">יעדים</h2>
             <div className="space-y-3">
               {stats.goals.map((goal) => {
@@ -281,6 +353,96 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
             </div>
           </div>
         )}
+
+        {/* Section: Send WhatsApp message directly to user */}
+        {user.phone && user.wa_opt_in && (
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-emerald-600" />
+              שליחת הודעה ב-WhatsApp
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              ההודעה תישלח כיועץ (גדי), לא כבוט. תיווסף אוטומטית כהערה.
+            </p>
+            <textarea
+              value={waMessage}
+              onChange={(e) => setWaMessage(e.target.value)}
+              placeholder="היי, רציתי לבדוק איך אתה מתקדם השבוע..."
+              rows={4}
+              maxLength={4000}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            />
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-xs text-gray-400">{waMessage.length}/4000</p>
+              <button
+                onClick={sendDirectMessage}
+                disabled={sendingMessage || !waMessage.trim()}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                {sendingMessage ? 'שולח...' : 'שלח'}
+              </button>
+            </div>
+            {sendStatus && (
+              <p className={`mt-3 text-sm ${sendStatus.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+                {sendStatus.text}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Section: Advisor Notes */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+            <StickyNote className="w-5 h-5 text-amber-600" />
+            הערות יועץ
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            הערות פרטיות שלך על המשתמש. לא נשלחות אליו, ועוזרות לזכור הקשר משיחה לשיחה.
+          </p>
+
+          {/* Add new note */}
+          <div className="mb-4">
+            <textarea
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="לדוגמה: התקשר 25/4. דאגה מהלוואת רכב. ביקש לחשוב על איחוד."
+              rows={3}
+              maxLength={5000}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+            />
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-xs text-gray-400">{newNote.length}/5000</p>
+              <button
+                onClick={addNote}
+                disabled={savingNote || !newNote.trim()}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                {savingNote ? 'שומר...' : 'הוסף הערה'}
+              </button>
+            </div>
+          </div>
+
+          {/* Notes list */}
+          {notes.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">עדיין אין הערות.</p>
+          ) : (
+            <div className="space-y-2">
+              {notes.map((note) => (
+                <div key={note.id} className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.note_text}</p>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {new Date(note.created_at).toLocaleString('he-IL', {
+                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                    })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

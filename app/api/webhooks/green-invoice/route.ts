@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
           name: metadata?.customer_name || customer_email.split('@')[0] || '',
           phone: metadata?.customer_phone || null,
           subscription_status: 'active',
-          phase: 'reflection',
+          phase: 'data_collection',
           created_at: existingUser ? undefined : new Date().toISOString(),
         }, {
           onConflict: 'id',

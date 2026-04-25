@@ -1393,13 +1393,14 @@ function generateMonthOptions() {
 
 function getPhaseLabel(phase: string): string {
   const phases: Record<string, string> = {
-    'reflection': '🪞 שיקוף',
+    'data_collection': '📄 איסוף נתונים',
+    'reflection': '📄 איסוף נתונים', // legacy alias
     'document_scanning': '📄 סריקת מסמכים',
     'classification_income': '💰 סיווג הכנסות',
     'classification_expense': '💸 סיווג הוצאות',
-    'behavior': '📊 ניתוח התנהגות',
+    'behavior': '📊 ניתוח דפוסים',
     'goals': '🎯 הגדרת יעדים',
-    'budget': '💼 תקציב',
+    'budget': '💼 תקציב מבוסס יעדים',
     'monitoring': '👁️ מעקב',
     'unknown': '❓ לא ידוע'
   };

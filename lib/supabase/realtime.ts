@@ -110,23 +110,77 @@ export function subscribeToUserPatterns(
 }
 
 /**
- * Subscribe to multiple tables at once
+ * Subscribe to budgets changes (active month / category updates)
+ */
+export function subscribeToBudgets(
+  userId: string,
+  onChange: (payload: TransactionChangePayload) => void
+): RealtimeChannel {
+  const supabase = createClient();
+  return supabase
+    .channel(`budgets:${userId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'budgets', filter: `user_id=eq.${userId}` },
+      onChange
+    )
+    .subscribe();
+}
+
+/**
+ * Subscribe to goals changes (progress, status, milestones)
+ */
+export function subscribeToGoals(
+  userId: string,
+  onChange: (payload: TransactionChangePayload) => void
+): RealtimeChannel {
+  const supabase = createClient();
+  return supabase
+    .channel(`goals:${userId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${userId}` },
+      onChange
+    )
+    .subscribe();
+}
+
+/**
+ * Subscribe to uploaded_statements changes (so dashboard knows a new doc landed
+ * or finished processing).
+ */
+export function subscribeToUploadedStatements(
+  userId: string,
+  onChange: (payload: TransactionChangePayload) => void
+): RealtimeChannel {
+  const supabase = createClient();
+  return supabase
+    .channel(`uploaded:${userId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'uploaded_statements', filter: `user_id=eq.${userId}` },
+      onChange
+    )
+    .subscribe();
+}
+
+/**
+ * Subscribe to multiple tables at once.
+ *
+ * Useful for "anything changed → invalidate all" patterns. For granular UIs that
+ * only re-render specific cards, use the per-table subscribe* helpers instead.
  */
 export function subscribeToAllUserData(
   userId: string,
   onAnyChange: () => void
 ): RealtimeChannel[] {
-  const channels: RealtimeChannel[] = [];
-  
-  channels.push(
-    subscribeToTransactions(userId, { onChange: onAnyChange })
-  );
-  
-  channels.push(
-    subscribeToBehaviorInsights(userId, onAnyChange)
-  );
-  
-  return channels;
+  return [
+    subscribeToTransactions(userId, { onChange: onAnyChange }),
+    subscribeToBehaviorInsights(userId, onAnyChange),
+    subscribeToBudgets(userId, onAnyChange),
+    subscribeToGoals(userId, onAnyChange),
+    subscribeToUploadedStatements(userId, onAnyChange),
+  ];
 }
 
 /**

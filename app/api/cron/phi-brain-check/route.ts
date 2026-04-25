@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { scheduledBrainCheck } from '@/lib/ai/phi-brain';
 import { log } from '@/lib/utils/logger';
+import { isQuietTime } from '@/lib/utils/quiet-hours';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes max
@@ -27,6 +28,13 @@ export async function GET(req: NextRequest) {
 
     if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Defense-in-depth: even if cron schedule slips, never message during quiet hours / Shabbat / holidays
+    const quietCheck = isQuietTime();
+    if (quietCheck.isQuiet) {
+      log.info('phi_brain_cron_skipped_quiet', { reason: quietCheck.reason, description: quietCheck.description });
+      return NextResponse.json({ skipped: true, reason: quietCheck.description });
     }
 
     const supabase = createServiceClient();

@@ -9,11 +9,24 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
-import { chatWithGeminiFlash } from '@/lib/ai/gemini-client';
+import { chatWithTools, type ChatTurn } from '@/lib/ai/gemini-client';
+import { BRAIN_TOOL_DECLARATIONS, executeBrainTool } from '@/lib/ai/brain-tools';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { classifyAllTransactions, applyClassifications, learnFromClassifications, formatSummaryForWhatsApp } from '@/lib/classification/ai-classifier';
 import { cache } from '@/lib/utils/cache';
 import { log } from '@/lib/utils/logger';
+import { getActiveThread, getThreadMessages } from '@/lib/conversation/threading';
+import { getRecentSummaries, type StoredSummary } from '@/lib/ai/conversation-summarizer';
+import { deriveAndStoreFocusIfMissing, renderFocusForPrompt, type CurrentFocus } from '@/lib/ai/current-focus';
+import {
+  PHI_IDENTITY,
+  PHI_OPERATING_PRINCIPLES,
+  PHI_ANTI_PATTERNS,
+  PHI_FEW_SHOT_EXAMPLES,
+  PHI_USE_CONTEXT_RULE,
+  getPhaseGuidance,
+  type Phase as PersonaPhase,
+} from '@/lib/ai/persona';
 
 // ============================================================================
 // Types
@@ -50,6 +63,7 @@ export interface UserPersonalProfile {
   streak: { days_logging: number; record: number };
   dont_repeat: string[];  // topics already covered recently
   preferred_message_length: 'short' | 'medium' | 'detailed';
+  cooldown_until?: string | null;  // ISO timestamp — silence proactive nudges until this time
 }
 
 interface BrainContext {
@@ -75,6 +89,16 @@ interface BrainContext {
   hoursSinceLastContact: number;
   currentHour: number;
   dayOfWeek: number;
+  // Anti-repeat: outgoing message bodies sent in last 72h (lowercased, trimmed)
+  recentOutgoingBodies: string[];
+  // True if user replied to bot in last 48h — warm conversation, prefer silence
+  hasRecentUserReply: boolean;
+  // Open thread (the active conversation): history that gets passed to chats.create
+  threadHistory: ChatTurn[];
+  // Persistent memory across past closed conversations (rolling 10)
+  recentSummaries: StoredSummary[];
+  // φ's current "theory" about what to coach on (stable across calls)
+  currentFocus: CurrentFocus | null;
 }
 
 // ============================================================================
@@ -112,6 +136,9 @@ async function _loadBrainContextImpl(userId: string): Promise<BrainContext> {
   const firstOfMonth = `${currentMonth}-01`;
 
   // Parallel data loading
+  const seventyTwoHoursAgo = new Date(now.getTime() - 72 * 60 * 60 * 1000).toISOString();
+  const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
+
   const [
     { data: user },
     { data: monthlyTx },
@@ -121,6 +148,8 @@ async function _loadBrainContextImpl(userId: string): Promise<BrainContext> {
     { count: pendingCount },
     { data: recentAlerts },
     { data: recentMessages },
+    { data: recentOutgoing },
+    { data: recentIncoming },
   ] = await Promise.all([
     supabase.from('users').select('id, name, phone, phase, onboarding_state, classification_context').eq('id', userId).single(),
     supabase.from('transactions').select('type, amount').eq('user_id', userId).eq('status', 'confirmed').or('is_summary.is.null,is_summary.eq.false').gte('tx_date', firstOfMonth).lte('tx_date', today),
@@ -129,7 +158,9 @@ async function _loadBrainContextImpl(userId: string): Promise<BrainContext> {
     supabase.from('budgets').select('total_budget, total_spent').eq('user_id', userId).eq('month', currentMonth).in('status', ['active', 'warning', 'exceeded']).limit(1).maybeSingle(),
     supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'pending'),
     supabase.from('alerts').select('created_at, type').eq('user_id', userId).order('created_at', { ascending: false }).limit(1),
-    supabase.from('wa_messages').select('body, direction, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
+    supabase.from('wa_messages').select('payload, direction, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
+    supabase.from('wa_messages').select('payload, created_at').eq('user_id', userId).eq('direction', 'outgoing').gte('created_at', seventyTwoHoursAgo).order('created_at', { ascending: false }).limit(50),
+    supabase.from('wa_messages').select('id').eq('user_id', userId).eq('direction', 'incoming').gte('created_at', fortyEightHoursAgo).limit(1),
   ]);
 
   const txList = (monthlyTx || []) as any[];
@@ -165,7 +196,7 @@ async function _loadBrainContextImpl(userId: string): Promise<BrainContext> {
     })),
     recentMessages: (recentMessages || []).map((m: any) => ({
       role: m.direction === 'incoming' ? 'user' as const : 'assistant' as const,
-      content: m.body || '',
+      content: extractMessageBody(m.payload) || '',
       timestamp: m.created_at,
     })).reverse(),
     activeGoals: (goals || []).map((g: any) => ({
@@ -178,135 +209,230 @@ async function _loadBrainContextImpl(userId: string): Promise<BrainContext> {
     hoursSinceLastContact,
     currentHour: now.getHours(),
     dayOfWeek: now.getDay(),
+    recentOutgoingBodies: (recentOutgoing || [])
+      .map((m: any) => extractMessageBody(m.payload).toLowerCase().trim())
+      .filter((s: string) => s.length > 0),
+    hasRecentUserReply: !!(recentIncoming && recentIncoming.length > 0),
+    threadHistory: [],
+    recentSummaries: [],
+    currentFocus: null,
   };
+}
+
+/**
+ * Load brain context AND populate the conversation memory pieces (active thread
+ * + recent summaries). Kept separate from _loadBrainContextImpl so callers that
+ * don't need memory (background jobs) can skip the extra IO.
+ */
+async function loadBrainContextWithMemory(userId: string, includeOpenThread: boolean): Promise<BrainContext> {
+  const ctx = await loadBrainContext(userId);
+
+  const [thread, summaries, focus] = await Promise.all([
+    includeOpenThread ? getActiveThread(userId).then(t =>
+      t.isActive && t.conversationId
+        ? getThreadMessages(userId, t.conversationId, { limit: 50 })
+        : Promise.resolve([])
+    ) : Promise.resolve([]),
+    getRecentSummaries(userId),
+    deriveAndStoreFocusIfMissing(
+      userId,
+      ctx.phase,
+      ctx.activeGoals.length > 0,
+      ctx.budgetRemaining !== 0, // any non-zero budget means budget exists
+      ctx.pendingCount,
+    ),
+  ]);
+
+  ctx.threadHistory = thread.map(m => ({
+    role: m.direction === 'incoming' ? 'user' as const : 'model' as const,
+    text: m.body,
+  }));
+  ctx.recentSummaries = summaries;
+  ctx.currentFocus = focus;
+  return ctx;
+}
+
+/**
+ * Pull the human-readable body out of the wa_messages.payload JSONB.
+ * Outgoing messages: stored as { body: "..." } by sendPhiMessage / GreenAPI client.
+ * Incoming messages: stored as raw GreenAPI webhook payload — drill into messageData.textMessageData.textMessage.
+ */
+function extractMessageBody(payload: any): string {
+  if (!payload) return '';
+  if (typeof payload === 'string') return payload;
+  if (typeof payload.body === 'string') return payload.body;
+  // Incoming GreenAPI shape
+  const md = payload.messageData;
+  if (md) {
+    if (md.textMessageData?.textMessage) return md.textMessageData.textMessage;
+    if (md.extendedTextMessageData?.text) return md.extendedTextMessageData.text;
+  }
+  return '';
+}
+
+/**
+ * Was a similar message already sent in the last 72h?
+ * Match on substring (case-insensitive) so paraphrases of the same nudge are detected.
+ */
+function wasRecentlyNudged(ctx: BrainContext, marker: string): boolean {
+  const m = marker.toLowerCase().trim();
+  return ctx.recentOutgoingBodies.some(b => b.includes(m));
 }
 
 // ============================================================================
 // The Master Prompt
 // ============================================================================
 
-function buildBrainPrompt(ctx: BrainContext, event: PhiEvent): string {
+// ============================================================================
+// Brain Decision Schema — guaranteed parse via responseJsonSchema
+// ============================================================================
+
+const BRAIN_ACTIONS = [
+  'log_expense', 'undo_expense', 'show_money_flow', 'afford_check',
+  'show_summary', 'show_chart', 'show_budget', 'show_goals', 'show_cashflow',
+  'show_phi_score', 'show_patterns', 'check_duplicates',
+  'classify', 'coaching', 'greeting', 'help', 'general_chat', 'none',
+] as const;
+
+const BRAIN_DECISION_SCHEMA: Record<string, any> = {
+  type: 'object',
+  properties: {
+    should_respond: { type: 'boolean', description: 'Whether to send the user a message right now.' },
+    action: {
+      type: 'string',
+      enum: [...BRAIN_ACTIONS],
+      description: 'The handler to invoke. Use "none" for silence on scheduled checks.',
+    },
+    action_params: {
+      type: 'object',
+      description: 'Parameters for the chosen action.',
+      properties: {
+        vendor: { type: 'string' },
+        amount: { type: 'number' },
+        category: { type: 'string' },
+        description: { type: 'string' },
+      },
+    },
+    message: {
+      type: ['string', 'null'],
+      description: 'Hebrew message to send. Required only for action=coaching/greeting/general_chat/help. Null otherwise — handlers generate their own messages.',
+    },
+    new_state: {
+      type: ['string', 'null'],
+      enum: ['monitoring', 'behavior', 'budget', 'goals', null],
+    },
+    internal_reasoning: { type: 'string', description: 'Why this choice (for logs, not shown to user).' },
+  },
+  required: ['should_respond', 'action', 'internal_reasoning'],
+};
+
+// ============================================================================
+// System Instruction Builder — sticky persona + memory + state
+// ============================================================================
+
+function buildSystemInstruction(ctx: BrainContext, event: PhiEvent): string {
   const todayExpStr = ctx.todayExpenses.length > 0
     ? ctx.todayExpenses.map(e => `${e.vendor}: ${e.amount}₪`).join(', ')
     : 'לא נרשמו';
 
   const goalsStr = ctx.activeGoals.length > 0
     ? ctx.activeGoals.map(g => `${g.name}: ${g.percentage}% (${g.current}/${g.target}₪)`).join(', ')
-    : 'אין יעדים';
-
-  const recentChat = ctx.recentMessages.slice(-6).map(m =>
-    `${m.role === 'user' ? 'משתמש' : 'φ'}: ${m.content.substring(0, 100)}`
-  ).join('\n');
+    : 'אין יעדים פעילים';
 
   const budgetStr = ctx.budgetRemaining > 0
-    ? `נותר ${Math.round(ctx.budgetRemaining).toLocaleString('he-IL')}₪ מהתקציב החודשי`
+    ? `נותר ${Math.round(ctx.budgetRemaining).toLocaleString('he-IL')}₪`
     : ctx.budgetRemaining < 0
-    ? `חריגת תקציב: ${Math.abs(Math.round(ctx.budgetRemaining)).toLocaleString('he-IL')}₪`
+    ? `חריגה: ${Math.abs(Math.round(ctx.budgetRemaining)).toLocaleString('he-IL')}₪`
     : 'אין תקציב מוגדר';
 
-  let eventDescription = '';
+  // Past conversation memory — the actual continuity feature
+  const memoryBlock = ctx.recentSummaries.length === 0
+    ? 'אין שיחות קודמות מסוכמות.'
+    : ctx.recentSummaries.slice(-5).map(s => {
+        const date = new Date(s.ended_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+        const topics = s.topics.join(', ');
+        const facts = s.key_facts.length > 0 ? `\n   עובדות: ${s.key_facts.join('; ')}` : '';
+        const open = s.open_threads.length > 0 ? `\n   פתוח: ${s.open_threads.join('; ')}` : '';
+        return `• ${date} — ${topics} (mood: ${s.user_mood}). ${s.outcome}${facts}${open}`;
+      }).join('\n');
+
+  // Cooldown / anti-repeat hints (so the AI knows what NOT to repeat)
+  const dontRepeat = (ctx.profile.dont_repeat || []).slice(-5).join(', ') || 'אין';
+
+  // Phase-specific guidance — what to focus on right now
+  const phaseGuidance = getPhaseGuidance((ctx.phase as PersonaPhase) || 'data_collection');
+
+  return [
+    PHI_IDENTITY,
+    '',
+    PHI_OPERATING_PRINCIPLES,
+    '',
+    PHI_ANTI_PATTERNS,
+    '',
+    PHI_USE_CONTEXT_RULE,
+    '',
+    PHI_FEW_SHOT_EXAMPLES,
+    '',
+    phaseGuidance,
+    '',
+    `## מי ${ctx.userName || 'המשתמש'}`,
+    `- אישיות פיננסית: ${ctx.profile.financial_personality}`,
+    `- סגנון תקשורת: ${ctx.profile.communication_style}`,
+    `- אורך הודעה מועדף: ${ctx.profile.preferred_message_length}`,
+    `- שעות פעילות: ${ctx.profile.active_hours}`,
+    `- נושאים שכבר כיסית לאחרונה (אל תחזור): ${dontRepeat}`,
+    '',
+    '## זיכרון משיחות קודמות',
+    memoryBlock,
+    '',
+    '## פוקוס נוכחי',
+    renderFocusForPrompt(ctx.currentFocus),
+    '',
+    '## מצב פיננסי נוכחי',
+    `- הכנסות החודש: ${Math.round(ctx.monthlyIncome).toLocaleString('he-IL')}₪`,
+    `- הוצאות החודש: ${Math.round(ctx.monthlyExpenses).toLocaleString('he-IL')}₪`,
+    `- יתרה: ${Math.round(ctx.monthlyBalance).toLocaleString('he-IL')}₪`,
+    `- תקציב: ${budgetStr}`,
+    `- יעדים: ${goalsStr}`,
+    `- הוצאות היום: ${todayExpStr}`,
+    `- תנועות ממתינות: ${ctx.pendingCount}`,
+    '',
+    '## כללים טכניים לתשובה',
+    '1. החזר JSON תקני בלבד (הסכמה מאלצת).',
+    '2. whatsapp_message → תמיד action ≠ none. scheduled_check ללא סיבה משמעותית → action=none.',
+    '3. message חובה רק עבור coaching / greeting / general_chat / help. עבור פעולות תצוגה אחרות (show_*, log_expense, וכו\') ה-handler מייצר את ההודעה.',
+    `4. השעה הנוכחית: ${ctx.currentHour}:00.`,
+  ].join('\n');
+}
+
+/**
+ * The "user message" sent to chat.sendMessage — varies by event type.
+ * Conversational triggers send the user's actual text; other triggers send a
+ * synthetic system-style prompt describing what just happened.
+ */
+function buildBrainTriggerMessage(event: PhiEvent, ctx: BrainContext): string {
   switch (event.type) {
     case 'whatsapp_message':
-      eventDescription = `המשתמש שלח הודעה: "${event.message}"`;
-      break;
-    case 'document_processed':
-      eventDescription = `עובד דוח ${event.documentType}. ${event.transactionCount} תנועות חדשות.`;
-      break;
+      return event.message;
     case 'scheduled_check':
-      eventDescription = `בדיקה תקופתית (${ctx.currentHour}:00). האם יש סיבה לפנות?`;
-      break;
+      return `(בדיקה תקופתית, ${ctx.currentHour}:00. החלט אם יש סיבה משמעותית לפנות עכשיו או להישאר שקט.)`;
+    case 'document_processed':
+      return `(עובד דוח ${event.documentType}: ${event.transactionCount} תנועות נוספו.)`;
     case 'expense_logged':
-      eventDescription = `נרשמה הוצאה: ${event.vendor} ${event.amount}₪ (${event.category})`;
-      break;
+      return `(נרשמה הוצאה: ${event.vendor} ${event.amount}₪ — ${event.category}.)`;
     case 'salary_detected':
-      eventDescription = `זוהתה משכורת: ${event.amount.toLocaleString('he-IL')}₪ נכנסו לחשבון`;
-      break;
+      return `(זוהתה משכורת: ${event.amount.toLocaleString('he-IL')}₪.)`;
     case 'budget_exceeded':
-      eventDescription = `חריגת תקציב בסעיף ${event.category}: ${event.spent}/${event.budget}₪`;
-      break;
+      return `(חריגת תקציב בסעיף ${event.category}: ${event.spent}/${event.budget}₪.)`;
     case 'goal_milestone':
-      eventDescription = `יעד "${event.goalName}" הגיע ל-${event.percentage}%!`;
-      break;
+      return `(יעד "${event.goalName}" הגיע ל-${event.percentage}%.)`;
     default:
-      eventDescription = `אירוע: ${(event as any).type}`;
+      return `(אירוע: ${(event as any).type})`;
   }
-
-  return `אתה φ (פי) — מאמן פיננסי אישי בוואטסאפ. לא בוט. מאמן.
-
-== מי אתה ==
-- מדבר בעברית טבעית, בגובה העיניים
-- לא מציק. לא שולח הודעות סתם. כל הודעה חייבת לתת ערך.
-- מתאים את הטון למשתמש: ${ctx.profile.tone}
-- אורך הודעה מועדף: ${ctx.profile.preferred_message_length}
-- לא חוזר על דברים שכבר אמרת. נושאים שכבר כיסית: ${ctx.profile.dont_repeat.slice(-5).join(', ') || 'אין'}
-
-== מי ${ctx.userName || 'המשתמש'} ==
-אישיות פיננסית: ${ctx.profile.financial_personality}
-שעות פעילות: ${ctx.profile.active_hours}
-דפוסים שזיהית: ${JSON.stringify(ctx.profile.patterns)}
-אימון אחרון: ${ctx.profile.last_coached_on || 'לא היה'}
-תוצאות אימון: ${JSON.stringify(ctx.profile.coaching_results)}
-
-== מצב פיננסי ==
-הכנסות החודש: ${Math.round(ctx.monthlyIncome).toLocaleString('he-IL')}₪
-הוצאות החודש: ${Math.round(ctx.monthlyExpenses).toLocaleString('he-IL')}₪
-יתרה: ${Math.round(ctx.monthlyBalance).toLocaleString('he-IL')}₪
-תקציב: ${budgetStr}
-יעדים: ${goalsStr}
-הוצאות היום: ${todayExpStr}
-תנועות ממתינות: ${ctx.pendingCount}
-
-== שיחה אחרונה ==
-${recentChat || 'אין היסטוריה'}
-
-== שעות מאז הודעה אחרונה ==
-${Math.round(ctx.hoursSinceLastContact)} שעות
-
-== אירוע נוכחי ==
-${eventDescription}
-
-== מה לעשות ==
-בחר פעולה אחת מהרשימה וכתוב ב-action. החזר JSON בלבד:
-{
-  "should_respond": true/false,
-  "action": "log_expense|undo_expense|show_money_flow|afford_check|show_summary|show_chart|show_budget|show_goals|show_cashflow|show_phi_score|classify|coaching|greeting|help|general_chat|none",
-  "action_params": {
-    "vendor": "...", "amount": 0, "category": "..."
-  },
-  "message": "ההודעה בעברית (רק אם action=coaching/greeting/general_chat, אחרת null)",
-  "new_state": "monitoring/behavior/budget/goals/null",
-  "profile_updates": {},
-  "internal_reasoning": "מדוע (לא נשלח למשתמש)"
 }
 
-actions אפשריות:
-- log_expense: המשתמש רושם הוצאה. חובה: action_params.vendor + action_params.amount. אופציונלי: action_params.category.
-  דוגמאות: "סופר 450", "קפה 15", "200 נעליים", "דלק 300"
-- undo_expense: המשתמש רוצה לבטל. "בטל", "טעות", "מחק"
-- show_money_flow: "כמה יש לי", "כמה חופשי", "מצב כסף", "כמה אפשר להוציא היום", "יומי", "שבועי"
-- afford_check: "אפשר לקנות X?", "יש לי כסף ל-X?", "אני רוצה לקנות". חובה: action_params.amount + action_params.description
-- show_summary: "סיכום", "מצב", "סטטוס"
-- show_chart: "גרף", "תרשים", "תראה לי גרף"
-- show_budget: "תקציב", "כמה נשאר", "כמה אפשר להוציא"
-- show_goals: "יעדים", "מטרות", "חיסכון"
-- show_cashflow: "תזרים", "תחזית"
-- show_phi_score: "ציון", "דירוג", "בריאות פיננסית"
-- classify: "סווג", "תנועות ממתינות"
-- coaching: הודעה יזומה/תגובה כללית — כתוב ב-message
-- greeting: שלום, היי
-- help: עזרה, תפריט
-- general_chat: שאלה חופשית
-- none: scheduled_check ואין מה להגיד
-
-כללים:
-1. scheduled_check ואין סיבה → action=none
-2. הודעה מהמשתמש → תמיד action (לא none)
-3. "סופר 450" → action=log_expense, action_params={vendor:"סופר",amount:450}
-4. "200 נעליים" → action=log_expense, action_params={vendor:"נעליים",amount:200}
-5. message רק כש-action=coaching/greeting/general_chat/help. לשאר ה-handler מייצר הודעה.
-6. שפה ניטרלית מגדרית. פנייה בשם.
-7. JSON בלבד, בלי markdown.`;
-}
+// (Legacy buildBrainPrompt was removed — replaced by buildSystemInstruction +
+//  buildBrainTriggerMessage, which use chats.create with responseJsonSchema.)
 
 // ============================================================================
 // Fast Path — Rule-based decisions, no Gemini (~100ms instead of ~4s)
@@ -320,7 +446,11 @@ const COMMAND_MAP: Record<string, string> = {
   'יעדים': 'show_goals', 'מטרות': 'show_goals',
   'תזרים': 'show_cashflow', 'תחזית': 'show_cashflow',
   'ציון': 'show_phi_score', 'דירוג': 'show_phi_score',
-  'ניתוח': 'show_summary', 'בטל': 'undo_expense',
+  // ניתוח = real pattern/insights analysis (User Guide promise: "ניתוח דפוסי הוצאות — איפה אפשר לחסוך")
+  'ניתוח': 'show_patterns', 'דפוסים': 'show_patterns', 'תובנות': 'show_patterns',
+  // כפילויות = User Guide promise: "בדיקת חשד לכפל תשלום"
+  'כפילויות': 'check_duplicates', 'כפל': 'check_duplicates', 'כפל תשלום': 'check_duplicates',
+  'בטל': 'undo_expense',
   'עזרה': 'help', 'תפריט': 'help',
   'כמה יש לי': 'show_money_flow', 'כמה חופשי': 'show_money_flow',
   'יומי': 'show_money_flow', 'שבועי': 'show_money_flow',
@@ -403,12 +533,18 @@ function tryFastPath(message: string, ctx: BrainContext): any | null {
 // Scheduled Check Fast Path — rule-based, no Gemini
 // ============================================================================
 
-function tryScheduledFastPath(ctx: BrainContext): any | null {
-  // Rule: first week — always silent
-  // (handled by cron already, but double-check)
+async function tryScheduledFastPath(ctx: BrainContext): Promise<any | null> {
+  // Rule: cooldown active (set after a friendly conversation) → silent
+  const cooldownUntil = ctx.profile?.cooldown_until;
+  if (cooldownUntil && new Date(cooldownUntil) > new Date()) {
+    return { should_respond: false, action: 'none', internal_reasoning: 'scheduled: cooldown_active' };
+  }
 
-  // Rule: if user has pending transactions, nudge
+  // Rule: if user has pending transactions, nudge — but not if we already nudged in last 72h
   if (ctx.pendingCount > 5) {
+    if (wasRecentlyNudged(ctx, 'תנועות שממתינות לסיווג')) {
+      return { should_respond: false, action: 'none', internal_reasoning: 'scheduled: pending_recent_nudge_sent' };
+    }
     return {
       should_respond: true,
       action: 'coaching',
@@ -417,8 +553,11 @@ function tryScheduledFastPath(ctx: BrainContext): any | null {
     };
   }
 
-  // Rule: if spending velocity is high (>150% of daily budget), warn
+  // Rule: budget exceeded — only warn if (a) it's a new condition and (b) we didn't already say it this week
   if (ctx.budgetRemaining < 0) {
+    if (wasRecentlyNudged(ctx, 'שמתי לב שחרגתם מהתקציב')) {
+      return { should_respond: false, action: 'none', internal_reasoning: 'scheduled: budget_exceeded_recent_nudge_sent' };
+    }
     return {
       should_respond: true,
       action: 'coaching',
@@ -427,15 +566,38 @@ function tryScheduledFastPath(ctx: BrainContext): any | null {
     };
   }
 
-  // Rule: if today's expenses are unusually high
+  // Rule: today's expenses unusually high — only fire once per day max
   if (ctx.todayExpenses.length >= 5) {
     const todayTotal = ctx.todayExpenses.reduce((s, e) => s + e.amount, 0);
+    if (wasRecentlyNudged(ctx, 'יום פעיל')) {
+      return { should_respond: false, action: 'none', internal_reasoning: 'scheduled: busy_day_recent_nudge_sent' };
+    }
     return {
       should_respond: true,
       action: 'coaching',
       message: `יום פעיל! ${ctx.todayExpenses.length} הוצאות, ${todayTotal.toLocaleString('he-IL')}₪.\nכתבו *"סיכום"* לראות את התמונה.`,
       internal_reasoning: 'scheduled: busy_spending_day',
     };
+  }
+
+  // Activate the insights engine — surface a high-priority insight if one exists
+  // and we haven't already shared it recently. Only for users in active phases.
+  if (ctx.phase === 'behavior' || ctx.phase === 'goals' || ctx.phase === 'budget' || ctx.phase === 'monitoring') {
+    try {
+      const { generateInsights } = await import('@/lib/proactive/insights-generator');
+      const insights = await generateInsights(ctx.userId);
+      const highPriority = insights.find(i => i.priority === 'high');
+      if (highPriority && !wasRecentlyNudged(ctx, highPriority.message.substring(0, 30))) {
+        return {
+          should_respond: true,
+          action: 'coaching',
+          message: `💡 ${highPriority.message}${highPriority.suggestedAction ? `\n\n${highPriority.suggestedAction}` : ''}`,
+          internal_reasoning: `scheduled: insight_${highPriority.type}`,
+        };
+      }
+    } catch (err) {
+      console.warn('[PhiBrain] insight generation failed (non-fatal):', err);
+    }
   }
 
   // Default: silent — nothing interesting to report
@@ -448,9 +610,14 @@ function tryScheduledFastPath(ctx: BrainContext): any | null {
 
 export async function phiBrain(
   userId: string,
-  event: PhiEvent
+  event: PhiEvent,
+  opts: { skipChannelSend?: boolean } = {}
 ): Promise<PhiAction> {
-  const ctx = await loadBrainContext(userId);
+  // Memory-aware context: open thread for whatsapp_message, summaries always.
+  // For scheduled_check we don't include the open thread (cron decides based on
+  // state, not on what the user just said).
+  const wantsThread = event.type === 'whatsapp_message' || event.type === 'document_processed';
+  const ctx = await loadBrainContextWithMemory(userId, wantsThread);
 
   // If no phone, can't send WhatsApp
   if (!ctx.phone) {
@@ -483,7 +650,7 @@ export async function phiBrain(
 
   // Fast path for scheduled_check — rule-based, no Gemini
   if (event.type === 'scheduled_check') {
-    decision = tryScheduledFastPath(ctx);
+    decision = await tryScheduledFastPath(ctx);
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -492,18 +659,41 @@ export async function phiBrain(
   // ══════════════════════════════════════════════════════════════
 
   if (!decision) {
-    const prompt = buildBrainPrompt(ctx, event);
+    const systemInstruction = buildSystemInstruction(ctx, event);
+    const triggerMessage = buildBrainTriggerMessage(event, ctx);
+
+    // Drop the very last incoming message from threadHistory if the trigger IS
+    // that same message — chats.create wants history WITHOUT the new turn.
+    let history = ctx.threadHistory;
+    if (event.type === 'whatsapp_message' && history.length > 0) {
+      const last = history[history.length - 1];
+      if (last.role === 'user' && last.text === event.message) {
+        history = history.slice(0, -1);
+      }
+    }
+
     try {
-      const response = await chatWithGeminiFlash(
-        prompt,
-        'אתה φ — מאמן פיננסי אישי. החזר JSON בלבד.',
-        ''
-      );
-      const cleaned = response.replace(/```json?\s*/g, '').replace(/```/g, '').trim();
+      // Use tool-augmented chat: Gemini can call read-only data tools mid-reasoning
+      // (get_loans, get_subscriptions, compare_to_last_month, …) before producing
+      // the final structured action JSON. This grounds φ's answers in DB facts.
+      const raw = await chatWithTools({
+        systemInstruction,
+        history,
+        userMessage: triggerMessage,
+        tools: BRAIN_TOOL_DECLARATIONS as any,
+        executeTool: (name, args) => executeBrainTool(userId, name, args),
+        thinkingLevel: 'low',
+        maxOutputTokens: 1500,
+        maxToolHops: 4,
+        responseJsonSchema: BRAIN_DECISION_SCHEMA,
+      });
       try {
-        decision = JSON.parse(cleaned);
+        decision = JSON.parse(raw);
       } catch (parseErr) {
-        console.error('[PhiBrain] JSON parse error:', parseErr, 'raw:', cleaned.substring(0, 200));
+        // responseJsonSchema is supposed to guarantee parseability. If it ever
+        // fails (e.g. truncation at maxOutputTokens), fall back to silence
+        // rather than send a half-baked answer.
+        console.error('[PhiBrain] JSON parse error despite schema:', parseErr, 'raw:', raw.substring(0, 200));
         decision = { action: 'none', should_respond: false, internal_reasoning: 'json_parse_fail' };
       }
     } catch (err) {
@@ -700,6 +890,40 @@ export async function phiBrain(
         break;
       }
 
+      // ── SHOW PATTERNS / INSIGHTS ──
+      // User Guide promise: "ניתוח | ניתוח דפוסי הוצאות — איפה אפשר לחסוך"
+      case 'show_patterns': {
+        const { generateInsights } = await import('@/lib/proactive/insights-generator');
+        const insights = await generateInsights(userId);
+
+        if (insights.length === 0) {
+          action.sendMessage = `🔍 *ניתוח דפוסים*\n\nעדיין לא זיהיתי דפוסים מובהקים. תמשיך להעלות דוחות ולרשום הוצאות, ואחרי שיהיה לי מספיק דאטה אזהה את ההזדמנויות לחסוך.`;
+        } else {
+          // Show top 5 highest-priority insights
+          const top = insights.slice(0, 5);
+          let msg = `🔍 *ניתוח דפוסים והזדמנויות:*\n\n`;
+          for (const ins of top) {
+            const emoji = ins.priority === 'high' ? '🔴' : ins.priority === 'medium' ? '🟡' : '🟢';
+            msg += `${emoji} ${ins.message}\n`;
+            if (ins.suggestedAction) msg += `   💡 ${ins.suggestedAction}\n`;
+            msg += `\n`;
+          }
+          msg += `_כתוב *"תקציב"* כדי לראות איך זה משפיע, או *"יעדים"* כדי לכוון את החיסכון._`;
+          action.sendMessage = msg;
+        }
+        break;
+      }
+
+      // ── CHECK DUPLICATES ──
+      // User Guide promise: "כפילויות | בדיקת חשד לכפל תשלום"
+      case 'check_duplicates': {
+        const { handleMonitoring } = await import('@/lib/conversation/states/monitoring');
+        const monCtx = { userId, phone: ctx.phone, state: 'monitoring' as any, userName: ctx.userName };
+        await handleMonitoring(monCtx, 'duplicates', ctx.userName, async (c) => ({ success: true }));
+        action.silent = true;
+        break;
+      }
+
       // ── CLASSIFY ──
       case 'classify': {
         action.classify = true;
@@ -713,12 +937,15 @@ export async function phiBrain(
           `📋 *מה אפשר לעשות:*\n\n` +
           `💸 רישום הוצאה: *"סופר 450"*\n` +
           `🗑️ ביטול: *"בטל"*\n` +
-          `📊 סיכום: *"סיכום"*\n` +
-          `📈 גרף: *"גרף"*\n` +
-          `💰 תקציב: *"תקציב"*\n` +
-          `🎯 יעדים: *"יעדים"*\n` +
-          `📉 תזרים: *"תזרים"*\n` +
-          `⭐ ציון: *"ציון"*\n` +
+          `📊 סיכום חודשי: *"סיכום"*\n` +
+          `📈 גרף הוצאות: *"גרף"*\n` +
+          `💰 מצב תקציב: *"תקציב"*\n` +
+          `🎯 התקדמות יעדים: *"יעדים"*\n` +
+          `📉 תזרים 3 חודשים: *"תזרים"*\n` +
+          `⭐ ציון φ: *"ציון"*\n` +
+          `🔍 ניתוח דפוסים: *"ניתוח"*\n` +
+          `⚠️ בדיקת כפילויות: *"כפילויות"*\n` +
+          `🛒 *"אפשר לקנות X ב-Y"* — בדיקת יכולת לרכישה\n` +
           `📄 שליחת דוח: שלחו PDF/תמונה`;
         break;
       }
@@ -747,8 +974,9 @@ export async function phiBrain(
   }
 
   // ── Send message if handler produced one ──
-  // All messages go through GreenAPI client which auto-logs to wa_messages
-  if (action.sendMessage && !action.silent) {
+  // For WhatsApp: sent via GreenAPI (auto-logged to wa_messages by the client).
+  // For web (skipChannelSend=true): caller is responsible for storing/displaying.
+  if (action.sendMessage && !action.silent && !opts.skipChannelSend) {
     await greenAPI.sendMessage({
       phoneNumber: ctx.phone,
       message: action.sendMessage,
@@ -768,8 +996,17 @@ export async function phiBrain(
   if (decision.new_state) {
     action.updateState = decision.new_state;
   }
-  if (decision.profile_updates && Object.keys(decision.profile_updates).length > 0) {
-    action.updateProfile = decision.profile_updates;
+  // Profile updates are NOT taken from the model — too easy to corrupt cooldown_until
+  // or rewrite personality fields. Profile mutations happen only via deterministic
+  // code paths (cooldown writes below, classifier-driven personality, etc).
+
+  // Cooldown: when responding to an incoming user message conversationally,
+  // silence proactive cron nudges for 48h. Prevents the cron from piling on
+  // while the user is actively chatting with the bot.
+  const conversationalActions = new Set(['coaching', 'greeting', 'general_chat', 'help']);
+  if (event.type === 'whatsapp_message' && conversationalActions.has(brainAction) && !action.silent) {
+    const cooldownUntil = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    action.updateProfile = { ...(action.updateProfile || {}), cooldown_until: cooldownUntil };
   }
 
   if (action.updateState) {

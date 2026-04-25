@@ -103,6 +103,21 @@ export async function handlePdf(
     const pdfBuffer = await pdfResponse.arrayBuffer();
     const buffer = Buffer.from(pdfBuffer);
 
+    // Compute file hash + check for exact duplicate before doing any expensive work
+    const { computeFileHash, detectDuplicateDocument } = await import('@/lib/classification/ocr-validator');
+    const fileHash = computeFileHash(buffer);
+    const dupCheck = await detectDuplicateDocument(userData.id, fileHash);
+
+    if (dupCheck.status === 'exact_duplicate') {
+      console.log(`⏭️ Duplicate file (hash match) — skipping. existing=${dupCheck.existingDocumentId}`);
+      progressUpdater.stop();
+      await greenAPI.sendMessage({
+        phoneNumber,
+        message: `📄 *זה אותו קובץ בדיוק שכבר העלית קודם.*\n\nאני לא מוסיף אותו פעם נוספת כדי שלא ייווצרו תנועות כפולות. אם רצית להחליף את הדוח, כתוב *"החלף דוח"*.`,
+      });
+      return NextResponse.json({ status: 'duplicate_file_skipped' });
+    }
+
     console.log(`🤖 Starting PDF analysis (type: ${documentType}) with Gemini Flash...`);
     console.log(`[Webhook] PDF_ANALYSIS_START: docType=${documentType}, fileSize=${buffer.length} bytes, fileName=${fileName}`);
     const pdfStartTime = Date.now();
@@ -338,6 +353,7 @@ export async function handlePdf(
     console.log(`📅 Document period: ${effectivePeriod.start || 'unknown'} - ${effectivePeriod.end || 'unknown'}`);
 
     // Save document record
+    const statementMonth = effectivePeriod.start ? effectivePeriod.start.substring(0, 7) : null;
     const documentId = await saveDocumentRecord(supabase, userData.id, {
       fileName,
       downloadUrl,
@@ -346,6 +362,9 @@ export async function handlePdf(
       periodEnd: effectivePeriod.end,
       transactionsExtracted: allTransactions.length,
       transactionsCreated: insertedIds.length,
+      fileHash,
+      statementMonth,
+      financialAccountId,
     });
 
     // Post-processing

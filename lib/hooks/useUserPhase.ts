@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
-export type Phase = 'reflection' | 'behavior' | 'budget' | 'goals' | 'monitoring';
+// Canonical phase order — Goals BEFORE Budget per Gadi's methodology
+// (PHI_PHASES_CORRECT_FLOW.md): need to know goals before building a budget that supports them.
+export type Phase = 'data_collection' | 'behavior' | 'goals' | 'budget' | 'monitoring';
+
+export const PHASE_ORDER: Phase[] = ['data_collection', 'behavior', 'goals', 'budget', 'monitoring'];
 
 export interface UserPhaseData {
   phase: Phase;
@@ -14,22 +18,9 @@ export interface UserPhaseData {
 
 /**
  * Hook לזיהוי השלב (Phase) של המשתמש במסע ההבראה הפיננסית
- * 
- * @returns {UserPhaseData} מידע על שלב המשתמש
- * 
- * @example
- * ```tsx
- * function Dashboard() {
- *   const { phase, loading, progress } = useUserPhase();
- *   
- *   if (loading) return <Skeleton />;
- *   
- *   return <PhaseComponent phase={phase} />;
- * }
- * ```
  */
 export function useUserPhase(): UserPhaseData {
-  const [phase, setPhase] = useState<Phase>('reflection');
+  const [phase, setPhase] = useState<Phase>('data_collection');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -40,14 +31,11 @@ export function useUserPhase(): UserPhaseData {
         setLoading(true);
         const supabase = createClient();
 
-        // קבל משתמש נוכחי
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
         if (userError || !user) {
           throw new Error('User not authenticated');
         }
 
-        // קבל phase מ-users table
         const { data: userData, error: dbError } = await supabase
           .from('users')
           .select('phase, created_at')
@@ -58,16 +46,12 @@ export function useUserPhase(): UserPhaseData {
           throw dbError;
         }
 
-        // Type assertion for userData
         const userInfo = userData as any;
-
-        const userPhase = (userInfo?.phase as Phase) || 'reflection';
+        const userPhase = (userInfo?.phase as Phase) || 'data_collection';
         setPhase(userPhase);
 
-        // חשב progress לפי שלב
-        const phaseProgress = calculatePhaseProgress(userPhase, userInfo?.created_at);
+        const phaseProgress = calculatePhaseProgress(userPhase);
         setProgress(phaseProgress);
-
       } catch (err) {
         console.error('Error fetching user phase:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -82,64 +66,31 @@ export function useUserPhase(): UserPhaseData {
   const nextPhase = getNextPhase(phase);
   const isReady = !loading && !error;
 
-  return {
-    phase,
-    loading,
-    error,
-    nextPhase,
-    progress,
-    isReady,
-  };
+  return { phase, loading, error, nextPhase, progress, isReady };
 }
 
-/**
- * מחזיר את השלב הבא במסע
- */
 function getNextPhase(currentPhase: Phase): Phase | null {
-  const phases: Phase[] = ['reflection', 'behavior', 'budget', 'goals', 'monitoring'];
-  const currentIndex = phases.indexOf(currentPhase);
-  
-  if (currentIndex === -1 || currentIndex === phases.length - 1) {
-    return null; // כבר בשלב אחרון
+  const currentIndex = PHASE_ORDER.indexOf(currentPhase);
+  if (currentIndex === -1 || currentIndex === PHASE_ORDER.length - 1) {
+    return null;
   }
-  
-  return phases[currentIndex + 1];
+  return PHASE_ORDER[currentIndex + 1];
 }
 
-/**
- * מחשב אחוז התקדמות בשלב הנוכחי
- */
-function calculatePhaseProgress(phase: Phase, createdAt?: string): number {
-  // לוגיקה בסיסית - אפשר להרחיב
+function calculatePhaseProgress(phase: Phase): number {
   const phaseMap: Record<Phase, number> = {
-    reflection: 20,
+    data_collection: 20,
     behavior: 40,
-    budget: 60,
-    goals: 80,
+    goals: 60,
+    budget: 80,
     monitoring: 100,
   };
-  
   return phaseMap[phase] || 0;
 }
 
-/**
- * Hook לעדכון Phase של המשתמש
- * 
- * @example
- * ```tsx
- * function CompleteReflection() {
- *   const updatePhase = useUpdateUserPhase();
- *   
- *   const handleComplete = async () => {
- *     await updatePhase('behavior');
- *   };
- * }
- * ```
- */
 export function useUpdateUserPhase() {
   return async (newPhase: Phase) => {
     const supabase = createClient();
-    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
@@ -149,8 +100,6 @@ export function useUpdateUserPhase() {
       .eq('id', user.id);
 
     if (error) throw error;
-    
     return { success: true };
   };
 }
-

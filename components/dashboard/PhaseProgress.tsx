@@ -6,50 +6,54 @@ interface PhaseProgressProps {
   currentPhase: string;
 }
 
+// Phase order: data_collection → behavior → goals → budget → monitoring
+// (Goals before Budget per Gadi's methodology — need to know targets before setting budget that supports them.)
 const phases = [
-  { key: 'reflection', label: 'שיקוף עבר', description: 'איסוף מידע ראשוני' },
+  { key: 'data_collection', label: 'איסוף נתונים', description: 'העלאת דוחות וסיווג' },
   { key: 'behavior', label: 'התנהלות', description: 'זיהוי דפוסים' },
-  { key: 'budget', label: 'תקציב', description: 'הקמת תקציב חכם' },
   { key: 'goals', label: 'יעדים', description: 'הגדרת מטרות' },
+  { key: 'budget', label: 'תקציב', description: 'בניית תקציב מבוסס יעדים' },
   { key: 'monitoring', label: 'ניטור', description: 'בקרה רציפה' }
 ];
 
 const phaseMessages = {
-  reflection: {
-    title: 'שלב ההתחלה הושלם! 🎉',
-    description: 'עכשיו נתחיל לעקוב אחרי ההוצאות שלך ולזהות דפוסים',
-    nextStep: 'רשום הוצאות יומיות',
-    daysUntil: 30
+  data_collection: {
+    title: 'מתחילים! 🚀',
+    description: 'שלח דוחות בנק/אשראי, ואני אסווג ואצור תמונה ברורה',
+    nextStep: 'שלח דוח בוואטסאפ',
+    daysUntil: 0
   },
   behavior: {
-    title: 'אוספים נתונים... 📊',
-    description: 'המשך לרשום הוצאות. עוד מעט נציע לך תקציב מותאם אישית',
-    nextStep: 'המשך לרשום הוצאות',
-    daysUntil: 23
-  },
-  budget: {
-    title: 'הגיע הזמן לתקציב! 💡',
-    description: 'יש לנו מספיק נתונים להציע לך תקציב חכם',
-    nextStep: 'הגדר תקציב',
+    title: 'מנתחים דפוסים... 📊',
+    description: 'מזהים הרגלי הוצאה. מתחילים להבין את התמונה האמיתית',
+    nextStep: 'המשך להעלות דוחות',
     daysUntil: 0
   },
   goals: {
-    title: 'תקציב הוגדר ✅',
-    description: 'בואו נגדיר יעדים שרוצים להשיג',
-    nextStep: 'הוסף יעדים',
+    title: 'בואו נגדיר יעדים 🎯',
+    description: 'מה אתה רוצה להשיג? חיסכון לרכב, חופשה, סגירת חוב',
+    nextStep: 'הוסף יעד',
+    daysUntil: 0
+  },
+  budget: {
+    title: 'בונים תקציב שתומך ביעדים 💡',
+    description: 'תקציב חכם שמותאם בדיוק לכמה שאתה צריך לחיסכון',
+    nextStep: 'אשר תקציב',
     daysUntil: 0
   },
   monitoring: {
-    title: 'אתה במעקב מלא! 🚀',
-    description: 'המערכת עוקבת אחריך ותעדכן אותך על כל חריגה או הזדמנות',
+    title: 'אתה במעקב מלא! ✨',
+    description: 'אני עוקב אחרי ההוצאות והיעדים, ואעדכן על חריגות והזדמנויות',
     nextStep: 'המשך להתקדם',
     daysUntil: 0
   }
 };
 
 export default function PhaseProgress({ currentPhase }: PhaseProgressProps) {
-  const currentIndex = phases.findIndex(p => p.key === currentPhase);
-  const message = phaseMessages[currentPhase as keyof typeof phaseMessages] || phaseMessages.reflection;
+  // Legacy compat: treat any old "reflection" phase as data_collection
+  const normalizedPhase = currentPhase === 'reflection' ? 'data_collection' : currentPhase;
+  const currentIndex = phases.findIndex(p => p.key === normalizedPhase);
+  const message = phaseMessages[normalizedPhase as keyof typeof phaseMessages] || phaseMessages.data_collection;
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">

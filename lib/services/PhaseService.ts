@@ -44,24 +44,27 @@ export interface PhaseInfo {
 // Constants
 // ============================================================================
 
-const PHASE_ORDER: Phase[] = ['data_collection', 'behavior', 'budget', 'goals', 'monitoring'];
+// Canonical phase order — Goals BEFORE Budget (per Gadi's PHI_PHASES_CORRECT_FLOW.md):
+// "יעדים לפני תקציב! צריך לדעת את היעדים כדי לבנות תקציב שתומך בהם."
+const PHASE_ORDER: Phase[] = ['data_collection', 'behavior', 'goals', 'budget', 'monitoring'];
 
-// v3.1: Data-gating, not time-gating.
-// If user uploads 6 months of history on day 1, they get budget immediately.
-// These thresholds are MINIMUMS — actual gating also checks transaction count.
-const PHASE_THRESHOLDS: Record<Phase, number> = {
-  data_collection: 0,
-  behavior: 14,    // 2 weeks of data (was 30)
-  budget: 28,      // 1 month of data (was 60)
-  goals: 28,       // same as budget — goals and budget can happen together
-  monitoring: 28,  // once budget exists (was 120)
+// Gating combines BOTH data-gating (enough transactions / statements) AND time-gating
+// (enough calendar time elapsed since signup). A user must satisfy both to advance.
+// Time prevents an "all 6 months uploaded on day 1" user from skipping the emotional
+// arc; data prevents a user with thin data from getting budget recommendations from noise.
+const PHASE_THRESHOLDS: Record<Phase, { minDays: number; minDaysSinceSignup: number; minTx: number }> = {
+  data_collection: { minDays: 0, minDaysSinceSignup: 0, minTx: 0 },
+  behavior:        { minDays: 14, minDaysSinceSignup: 14, minTx: 60 },
+  goals:           { minDays: 60, minDaysSinceSignup: 30, minTx: 100 },  // 2+ months of data + 30 days of using the bot
+  budget:          { minDays: 60, minDaysSinceSignup: 30, minTx: 100 },  // gate is "has at least 1 goal" — see calculatePhase
+  monitoring:      { minDays: 60, minDaysSinceSignup: 30, minTx: 100 },  // gate is "has active budget" — see calculatePhase
 };
 
 const PHASE_NAMES: Record<Phase, string> = {
   data_collection: 'איסוף נתונים',
-  behavior: 'ניתוח הרגלים',
-  budget: 'תקציב חכם',
+  behavior: 'ניתוח דפוסים',
   goals: 'הגדרת יעדים',
+  budget: 'תקציב מבוסס יעדים',
   monitoring: 'מעקב רציף',
 };
 
@@ -110,34 +113,70 @@ export async function getDaysOfData(userId: string): Promise<number> {
 }
 
 /**
- * Calculate the appropriate phase for a user based on their data span
+ * Number of days since the user signed up.
+ */
+async function getDaysSinceSignup(userId: string): Promise<number> {
+  const supabase = createServiceClient();
+  const { data: user } = await supabase
+    .from('users')
+    .select('created_at')
+    .eq('id', userId)
+    .single();
+  if (!user?.created_at) return 0;
+  const ms = Date.now() - new Date(user.created_at).getTime();
+  return Math.floor(ms / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Calculate the appropriate phase for a user. Combined data-gating + time-gating.
+ *
+ * Order: data_collection → behavior → goals → budget → monitoring (Goals BEFORE Budget per Gadi).
+ *
+ * Gates (BOTH conditions must hold to advance):
+ *  - data_collection → behavior:  ≥14 days of data AND ≥14 days since signup AND ≥60 transactions
+ *  - behavior → goals:            ≥60 days of data AND ≥30 days since signup AND ≥100 transactions
+ *  - goals → budget:              all of the above AND ≥1 active goal
+ *  - budget → monitoring:         active budget exists
  */
 export async function calculatePhase(userId: string): Promise<Phase> {
-  const days = await getDaysOfData(userId);
   const supabase = createServiceClient();
 
-  // Also check transaction count — data-gating, not just time-gating
-  const { count: txCount } = await supabase
-    .from('transactions')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('status', 'confirmed');
+  const [days, signupDays, txCountResult, budgetCountResult, goalCountResult] = await Promise.all([
+    getDaysOfData(userId),
+    getDaysSinceSignup(userId),
+    supabase.from('transactions').select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).eq('status', 'confirmed'),
+    supabase.from('budgets').select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).in('status', ['active', 'warning', 'exceeded']),
+    supabase.from('goals').select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).eq('status', 'active'),
+  ]);
 
-  const { count: budgetCount } = await supabase
-    .from('budgets')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId);
+  const txCount = txCountResult.count || 0;
+  const budgetCount = budgetCountResult.count || 0;
+  const goalCount = goalCountResult.count || 0;
 
-  // v3.1 data-gating:
-  // <14 days OR <15 transactions → still collecting
-  if (days < 14 || (txCount || 0) < 15) return 'data_collection';
-  // Has enough data for behavior analysis
-  if (days < 28 && (txCount || 0) < 30) return 'behavior';
-  // Has budget → monitoring
-  if ((budgetCount || 0) > 0) return 'monitoring';
-  // Enough data for budget (28+ days OR 30+ transactions)
-  if (days >= 28 || (txCount || 0) >= 30) return 'budget';
-  return 'behavior';
+  const beh = PHASE_THRESHOLDS.behavior;
+  const tgt = PHASE_THRESHOLDS.goals;
+
+  // Data + time floor for behavior analysis
+  if (days < beh.minDays || signupDays < beh.minDaysSinceSignup || txCount < beh.minTx) {
+    return 'data_collection';
+  }
+
+  // monitoring trumps the rest — once a budget is active we're past goals/budget setup
+  if (budgetCount > 0) return 'monitoring';
+
+  // Behavior → Goals gate
+  if (days < tgt.minDays || signupDays < tgt.minDaysSinceSignup || txCount < tgt.minTx) {
+    return 'behavior';
+  }
+
+  // Goals → Budget gate: at least one active goal must exist
+  if (goalCount === 0) return 'goals';
+
+  // Budget setup phase (no active budget yet, but has goals)
+  return 'budget';
 }
 
 /**
@@ -153,23 +192,22 @@ export async function getPhaseInfo(userId: string): Promise<PhaseInfo> {
     .eq('id', userId)
     .single();
 
-  const phase = (user?.phase as Phase) || 'data_collection';
+  // Coerce legacy 'reflection' to data_collection
+  const rawPhase = (user?.phase as string) || 'data_collection';
+  const phase: Phase = (rawPhase === 'reflection' ? 'data_collection' : rawPhase) as Phase;
   const number = getPhaseNumber(phase);
   const name = getPhaseName(phase);
 
-  // Calculate days until next phase (v3.1 thresholds)
-  let daysUntilNext = 0;
-  if (daysOfData < 14) daysUntilNext = 14 - daysOfData;
-  else if (daysOfData < 28) daysUntilNext = 28 - daysOfData;
-  else daysUntilNext = 0; // enough data for all phases
-
-  // Calculate progress within current phase
-  const currentThreshold = PHASE_THRESHOLDS[phase];
+  // Calculate days until next phase based on the days-of-data threshold
   const nextPhase = getNextPhase(phase);
-  const nextThreshold = nextPhase ? PHASE_THRESHOLDS[nextPhase] : currentThreshold + 30;
-  const phaseRange = nextThreshold - currentThreshold;
-  const daysInPhase = Math.max(0, daysOfData - currentThreshold);
-  const progress = nextPhase ? Math.min(100, Math.round((daysInPhase / phaseRange) * 100)) : 100;
+  const nextThresh = nextPhase ? PHASE_THRESHOLDS[nextPhase] : null;
+  const daysUntilNext = nextThresh ? Math.max(0, nextThresh.minDays - daysOfData) : 0;
+
+  // Progress within current phase (rough — based on days-of-data toward next threshold)
+  const currentThresh = PHASE_THRESHOLDS[phase];
+  const phaseRange = nextThresh ? nextThresh.minDays - currentThresh.minDays : 30;
+  const daysInPhase = Math.max(0, daysOfData - currentThresh.minDays);
+  const progress = nextPhase ? Math.min(100, Math.round((daysInPhase / Math.max(phaseRange, 1)) * 100)) : 100;
 
   return { phase, number, name, daysOfData, daysUntilNext, progress };
 }

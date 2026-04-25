@@ -16,9 +16,11 @@ export async function POST(request: Request) {
 
     const { phase } = await request.json();
 
-    // Validate phase
-    const validPhases = ['reflection', 'data_collection', 'behavior', 'budget', 'goals', 'monitoring'];
-    if (!validPhases.includes(phase)) {
+    // Canonical order: data_collection → behavior → goals → budget → monitoring (Goals before Budget per Gadi).
+    const validPhases = ['data_collection', 'behavior', 'goals', 'budget', 'monitoring'];
+    // Coerce legacy `reflection` to `data_collection` rather than rejecting.
+    const normalized = phase === 'reflection' ? 'data_collection' : phase;
+    if (!validPhases.includes(normalized)) {
       return NextResponse.json(
         { error: 'Invalid phase' },
         { status: 400 }
@@ -28,7 +30,7 @@ export async function POST(request: Request) {
     // Update user phase
     const { error } = await (supabase as any)
       .from('users')
-      .update({ phase })
+      .update({ phase: normalized })
       .eq('id', user.id);
 
     if (error) {

@@ -25,10 +25,11 @@ import {
   generateDependencySuggestions,
 } from './dependencies-handler';
 
-const ALGORITHM_VERSION = '1.0.0';
+const ALGORITHM_VERSION = '1.1.0'; // Engine_Complete formula + 70% global goals cap
 const DEFAULT_SAFETY_MARGIN_PERCENT = 10; // 10% מרווח ביטחון
-const MINIMUM_COMFORT_PERCENT = 30; // 30% מההכנסה לאחר הוצאות קבועות
+const MINIMUM_COMFORT_PERCENT = 30; // 30% מההכנסה ל"אוכל בצלחת" — לעולם לא יורד מזה
 const MAX_GOAL_ALLOCATION_PERCENT = 40; // יעד בודד לא יכול לקבל יותר מ-40%
+const MAX_TOTAL_GOALS_PERCENT = 70; // סך כל היעדים לא יכול לעלות על 70% מההכנסה
 const DEPENDENCY_REDUCTION_FACTOR = 0.3; // יעדים תלויים מקבלים 30% מההקצאה המקורית
 
 /**
@@ -184,7 +185,9 @@ async function calculateFinancialData(
     const fixed_expenses = input.fixedExpenses;
     const minimum_living = input.minimumLivingBudget || total_income * 0.3;
     const safety_margin = total_income * ((input.safetyMarginPercent || DEFAULT_SAFETY_MARGIN_PERCENT) / 100);
-    const available_for_goals = Math.max(0, total_income - fixed_expenses - minimum_living - safety_margin);
+    // After all subtractions, also enforce the 70% global goals cap.
+    const rawAvailable = Math.max(0, total_income - fixed_expenses - minimum_living - safety_margin);
+    const available_for_goals = Math.min(rawAvailable, total_income * (MAX_TOTAL_GOALS_PERCENT / 100));
     
     return {
       total_income,
@@ -267,43 +270,52 @@ async function calculateFinancialData(
 /**
  * חישוב ציון דחיפות (Urgency Score)
  * 
- * נוסחה: urgency = (priority × 0.4) + (timeProximity × 0.4) + (progressGap × 0.2)
+ * Engine_Complete formula (canonical per PHI_GOALS_ENGINE_COMPLETE.md):
+ *   urgency = (priority × 0.4) + (time_proximity × 0.3) + (progress_gap × 0.3)
+ *             × dependency_factor
+ *
+ * Replaces the older Balancer formula (0.4/0.4/0.2). Difference: progress_gap is
+ * weighted higher so a goal that's truly behind gets a budget boost; time gets
+ * slightly less weight since it was double-counted with priority.
+ *
+ * Dependency factor is applied externally by the caller (sortGoalsByDependencies +
+ * getDependencyReductionFactor) — see calculateOptimalAllocations.
  */
 export function calculateUrgencyScore(goal: Goal): UrgencyCalculation {
   // Priority Score: 1-10 → 1-0 (1=urgent, 10=not urgent)
   const priority_score = 1 - ((goal.priority - 1) / 9);
-  
+
   // Time Proximity: כמה קרוב לדדליין
   let time_proximity_score = 0.5; // ברירת מחדל אם אין deadline
-  
+
   if (goal.deadline) {
     const now = new Date();
     const deadline = new Date(goal.deadline);
     const start = goal.start_date ? new Date(goal.start_date) : now;
-    
+
     const totalTime = deadline.getTime() - start.getTime();
     const elapsed = now.getTime() - start.getTime();
     const remaining = deadline.getTime() - now.getTime();
-    
+
     if (remaining <= 0) {
       time_proximity_score = 1; // עבר הזמן!
     } else if (totalTime > 0) {
       time_proximity_score = elapsed / totalTime; // 0-1, ככל שקרוב יותר לסוף
     }
   }
-  
+
   // Progress Gap: כמה רחוק מהמטרה
   const remaining_amount = goal.target_amount - goal.current_amount;
-  const progress_gap_score = remaining_amount > 0 
+  const progress_gap_score = remaining_amount > 0
     ? Math.min(1, remaining_amount / goal.target_amount)
     : 0;
-  
-  // חישוב מסכם
-  const urgency_score = 
-    (priority_score * 0.4) + 
-    (time_proximity_score * 0.4) + 
-    (progress_gap_score * 0.2);
-  
+
+  // Engine_Complete weights: 0.4 / 0.3 / 0.3
+  const urgency_score =
+    (priority_score * 0.4) +
+    (time_proximity_score * 0.3) +
+    (progress_gap_score * 0.3);
+
   return {
     goal_id: goal.id,
     priority_score,
