@@ -367,6 +367,8 @@ const BRAIN_ACTIONS = [
   'classify', 'coaching', 'greeting', 'help', 'general_chat', 'none',
 ] as const;
 
+// Simplified schema — no nullable types, no `null` in enums (those don't play nice
+// with structured-output mode). Optional fields are just absent rather than null.
 const BRAIN_DECISION_SCHEMA: Record<string, any> = {
   type: 'object',
   properties: {
@@ -378,7 +380,6 @@ const BRAIN_DECISION_SCHEMA: Record<string, any> = {
     },
     action_params: {
       type: 'object',
-      description: 'Parameters for the chosen action.',
       properties: {
         vendor: { type: 'string' },
         amount: { type: 'number' },
@@ -387,17 +388,15 @@ const BRAIN_DECISION_SCHEMA: Record<string, any> = {
         name: { type: 'string', description: 'Used by set_user_name — the human name extracted from the user message.' },
       },
     },
-    message: {
-      type: ['string', 'null'],
-      description: 'Hebrew message to send. Required only for action=coaching/greeting/general_chat/help. Null otherwise — handlers generate their own messages.',
-    },
+    message: { type: 'string', description: 'Hebrew message to send. Required for coaching/greeting/general_chat/help/set_user_name/request_document/mark_skip_document. Empty string for view actions where the handler generates the message.' },
     new_state: {
-      type: ['string', 'null'],
-      enum: ['monitoring', 'behavior', 'budget', 'goals', null],
+      type: 'string',
+      enum: ['monitoring', 'behavior', 'budget', 'goals', 'classification', ''],
+      description: 'Optional — leave empty string if no state change needed.',
     },
     internal_reasoning: { type: 'string', description: 'Why this choice (for logs, not shown to user).' },
   },
-  required: ['should_respond', 'action', 'internal_reasoning'],
+  required: ['action', 'should_respond'],
 };
 
 // ============================================================================
@@ -1121,7 +1120,9 @@ export async function phiBrain(
     cache.invalidate(userId);
   }
 
-  if (decision.new_state) {
+  // Empty string means "no change" — schema uses '' instead of null because
+  // structured-output mode doesn't reliably accept null as an enum value.
+  if (decision.new_state && decision.new_state !== '') {
     action.updateState = decision.new_state;
   }
   // Profile updates are NOT taken from the model — too easy to corrupt cooldown_until
