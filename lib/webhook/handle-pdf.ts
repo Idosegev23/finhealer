@@ -352,8 +352,9 @@ export async function handlePdf(
 
     console.log(`📅 Document period: ${effectivePeriod.start || 'unknown'} - ${effectivePeriod.end || 'unknown'}`);
 
-    // Save document record
-    const statementMonth = effectivePeriod.start ? effectivePeriod.start.substring(0, 7) : null;
+    // Save document record. statement_month is a DATE column in Postgres,
+    // so we must pass YYYY-MM-DD (use the 1st of the month), not YYYY-MM.
+    const statementMonth = effectivePeriod.start ? `${effectivePeriod.start.substring(0, 7)}-01` : null;
     const documentId = await saveDocumentRecord(supabase, userData.id, {
       fileName,
       downloadUrl,

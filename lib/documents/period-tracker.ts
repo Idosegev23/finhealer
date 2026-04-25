@@ -51,43 +51,63 @@ export interface UploadedDocument {
  * 1. מנסה לקחת מ-report_info (ה-AI חילץ מכותרת הדוח)
  * 2. אם אין - מחשב מהתנועות עצמן (תאריך ראשון עד אחרון)
  */
+/**
+ * Parse a date string from Gemini OCR. Hebrew bank reports come in dd/MM/yyyy.
+ * Native `new Date('15/10/2025')` chokes (and silently mis-parses '12/11/2025'
+ * as MM/DD), so we handle dd/MM/yyyy explicitly first.
+ */
+function parseOCRDate(input: string | null | undefined): Date | null {
+  if (!input || typeof input !== 'string') return null;
+  const trimmed = input.trim();
+
+  // dd/MM/yyyy or d/M/yyyy
+  const ddmm = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmm) {
+    const [, d, m, y] = ddmm;
+    const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    const dt = new Date(iso);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const dt = new Date(trimmed);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  // Last resort
+  const dt = new Date(trimmed);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
 export function extractPeriodFromOCR(ocrData: any): { start: Date | null; end: Date | null } {
   try {
     const reportInfo = ocrData.report_info || ocrData.reportInfo || {};
-    
-    // נסה למצוא תקופה מ-report_info (מכותרת הדוח)
-    let start = reportInfo.period_start || reportInfo.periodStart;
-    let end = reportInfo.period_end || reportInfo.periodEnd;
     let source = 'report_info';
-    
-    // אם אין - נסה לחשב מהתנועות
-    if (!start || !end) {
+
+    // First try the explicit period from the report header
+    let startDate = parseOCRDate(reportInfo.period_start || reportInfo.periodStart);
+    let endDate = parseOCRDate(reportInfo.period_end || reportInfo.periodEnd);
+
+    // Fallback: derive from transaction dates
+    if (!startDate || !endDate) {
       source = 'transactions';
-      const transactions = getAllTransactions(ocrData);
-      
-      if (transactions.length > 0) {
-        const dates = transactions
-          .map(tx => tx.date)
-          .filter(d => d)
-          .map(d => new Date(d))
-          .filter(d => !isNaN(d.getTime()))
-          .sort((a, b) => a.getTime() - b.getTime());
-        
-        if (dates.length > 0) {
-          start = dates[0].toISOString().split('T')[0];
-          end = dates[dates.length - 1].toISOString().split('T')[0];
-        }
+      const dates = getAllTransactions(ocrData)
+        .map(tx => parseOCRDate(tx.date))
+        .filter((d): d is Date => d !== null)
+        .sort((a, b) => a.getTime() - b.getTime());
+
+      if (dates.length > 0) {
+        startDate = dates[0];
+        endDate = dates[dates.length - 1];
       }
     }
-    
-    const startDate = start ? new Date(start) : null;
-    const endDate = end ? new Date(end) : null;
-    
+
     console.log(`[PeriodTracker] 📅 Period extracted from ${source}:`, {
       start: startDate?.toISOString().split('T')[0] || 'none',
       end: endDate?.toISOString().split('T')[0] || 'none',
     });
-    
+
     return { start: startDate, end: endDate };
   } catch (error) {
     console.error('[PeriodTracker] Error extracting period:', error);

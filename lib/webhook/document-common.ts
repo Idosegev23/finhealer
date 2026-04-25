@@ -246,6 +246,25 @@ export async function saveDocumentRecord(
 // ============================================================================
 // Calculate effective period from OCR data or transaction dates
 // ============================================================================
+
+/** Parse Gemini OCR date which can be dd/MM/yyyy or already-ISO YYYY-MM-DD. */
+function parseOCRDateForPeriod(input: any): Date | null {
+  if (!input || typeof input !== 'string') return null;
+  const trimmed = input.trim();
+  const ddmm = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmm) {
+    const [, d, m, y] = ddmm;
+    const dt = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const dt = new Date(trimmed);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  const dt = new Date(trimmed);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
 export function calculateEffectivePeriod(
   ocrPeriodStart: Date | null,
   ocrPeriodEnd: Date | null,
@@ -256,8 +275,8 @@ export function calculateEffectivePeriod(
 
   if (!effectiveStart || !effectiveEnd) {
     const txDates = allTransactions
-      .map((tx: any) => new Date(tx.tx_date || tx.date))
-      .filter((d: Date) => !isNaN(d.getTime()));
+      .map((tx: any) => parseOCRDateForPeriod(tx.tx_date || tx.date))
+      .filter((d): d is Date => d !== null);
     if (txDates.length > 0) {
       txDates.sort((a: Date, b: Date) => a.getTime() - b.getTime());
       if (!effectiveStart) effectiveStart = txDates[0];
