@@ -501,8 +501,16 @@ export async function chatWithTools(opts: {
   thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
   maxOutputTokens?: number;
   maxToolHops?: number;
-  /** Optional JSON schema for the FINAL text output (after all tool calls resolve). */
-  responseJsonSchema?: Record<string, any>;
+  /**
+   * Optional JSON schema for the FINAL text output.
+   * Note: Gemini's combination of tools + responseJsonSchema is fragile — when the
+   * model decides to make a function call, the schema can get ignored and the
+   * .text property becomes empty. We deliberately do NOT pass the schema to the
+   * SDK here; instead, the system instruction tells the model what JSON shape to
+   * return, and the caller must handle both well-formed JSON and falling back to
+   * raw text if parsing fails.
+   */
+  responseJsonSchema?: Record<string, any>; // accepted for API symmetry, intentionally unused
 }): Promise<string> {
   const { geminiLimiter } = await import('@/lib/utils/rate-limiter');
   return geminiLimiter.execute(async () => {
@@ -513,13 +521,10 @@ export async function chatWithTools(opts: {
       const chatConfig: any = {
         systemInstruction: opts.systemInstruction,
         thinkingConfig: { thinkingLevel: (opts.thinkingLevel || 'low') as any },
-        maxOutputTokens: opts.maxOutputTokens || 1200,
+        maxOutputTokens: opts.maxOutputTokens || 2000,
         tools: [{ functionDeclarations: opts.tools as any }],
       };
-      if (opts.responseJsonSchema) {
-        chatConfig.responseMimeType = 'application/json';
-        chatConfig.responseJsonSchema = opts.responseJsonSchema;
-      }
+      // Schema intentionally not set — see doc comment above.
 
       const chat = client.chats.create({
         model: FLASH_MODEL,

@@ -285,7 +285,74 @@ function wasRecentlyNudged(ctx: BrainContext, marker: string): boolean {
 // ============================================================================
 
 // ============================================================================
-// Brain Decision Schema — guaranteed parse via responseJsonSchema
+// Brain response parser — graceful fallback when model returns non-JSON
+// ============================================================================
+
+/**
+ * Parse the raw model output. Two cases:
+ *  1. Valid JSON matching our schema → use as-is.
+ *  2. Plain text (model gave up on JSON, or output got mangled by tool calls) →
+ *     wrap as a coaching message so we still respond to the user.
+ *
+ * The brain rarely fails this way, but when it does we don't want the user to
+ * see silence. A graceful "here's what I have" reply beats a 30s timeout.
+ */
+function parseBrainResponse(raw: string, event: PhiEvent): any {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) {
+    // Empty response → silence on scheduled checks; gentle fallback on user message
+    if (event.type === 'whatsapp_message') {
+      return {
+        action: 'general_chat',
+        should_respond: true,
+        message: 'רגע, מעבד את מה שאמרת… 😊',
+        internal_reasoning: 'empty_model_output_fallback',
+      };
+    }
+    return { action: 'none', should_respond: false, internal_reasoning: 'empty_model_output' };
+  }
+
+  // Strip markdown code fences if present
+  const cleaned = trimmed.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (parsed && typeof parsed === 'object' && parsed.action) {
+      return parsed;
+    }
+  } catch { /* fall through */ }
+
+  // Try to extract an embedded JSON object (common when model adds preamble)
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed && typeof parsed === 'object' && parsed.action) {
+        return parsed;
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Last resort: treat the raw text as a coaching message. This is what
+  // makes the bot graceful — instead of dying on a JSON parse, we send
+  // whatever the model said. Better imperfect than silent.
+  if (event.type === 'whatsapp_message' && cleaned.length > 0) {
+    console.warn('[PhiBrain] Falling back to raw text as coaching message:', cleaned.substring(0, 200));
+    return {
+      action: 'coaching',
+      should_respond: true,
+      message: cleaned.substring(0, 1500),
+      internal_reasoning: 'raw_text_fallback',
+    };
+  }
+
+  return { action: 'none', should_respond: false, internal_reasoning: 'unparseable_output' };
+}
+
+// ============================================================================
+// Brain Decision Schema — used as documentation in the system prompt
+// (not enforced via responseJsonSchema in the chatWithTools path due to
+// SDK fragility when combined with function calling)
 // ============================================================================
 
 const BRAIN_ACTIONS = [
@@ -407,10 +474,15 @@ function buildSystemInstruction(ctx: BrainContext, event: PhiEvent): string {
     `- תנועות ממתינות: ${ctx.pendingCount}`,
     '',
     '## כללים טכניים לתשובה',
-    '1. החזר JSON תקני בלבד (הסכמה מאלצת).',
-    '2. whatsapp_message → תמיד action ≠ none. scheduled_check ללא סיבה משמעותית → action=none.',
-    '3. message חובה רק עבור coaching / greeting / general_chat / help. עבור פעולות תצוגה אחרות (show_*, log_expense, וכו\') ה-handler מייצר את ההודעה.',
-    `4. השעה הנוכחית: ${ctx.currentHour}:00.`,
+    '1. **החזר JSON בלבד** — בלי טקסט סביבו, בלי markdown fences. זו ההודעה האחרונה שלך, היא חייבת להיות JSON parseable.',
+    '   הסכמה: { "action": "...", "should_respond": true|false, "action_params": {...}, "message": "...", "new_state": "...", "internal_reasoning": "..." }',
+    '2. אם אתה צריך לבדוק נתונים (תנועות אחרונות, הלוואות, חריגות) — קודם תקרא ל-tools, ואז תרכיב את ה-JSON הסופי עם המסקנה.',
+    '3. whatsapp_message → תמיד action ≠ none. scheduled_check ללא סיבה משמעותית → action=none.',
+    '4. message חובה רק עבור coaching / greeting / general_chat / help / set_user_name / request_document / mark_skip_document. עבור פעולות תצוגה אחרות (show_*, log_expense, וכו\') ה-handler מייצר את ההודעה.',
+    `5. השעה הנוכחית: ${ctx.currentHour}:00.`,
+    '',
+    'דוגמה ל-JSON תקני:',
+    '{"action":"coaching","should_respond":true,"message":"היי דני! בוא נתחיל...","internal_reasoning":"greeting_with_context"}',
   ].join('\n');
 }
 
@@ -684,7 +756,9 @@ export async function phiBrain(
     try {
       // Use tool-augmented chat: Gemini can call read-only data tools mid-reasoning
       // (get_loans, get_subscriptions, compare_to_last_month, …) before producing
-      // the final structured action JSON. This grounds φ's answers in DB facts.
+      // the final response. The system instruction tells the model what JSON
+      // shape to return, but we don't pass responseJsonSchema to the SDK — that
+      // combination is fragile when the model also wants to make function calls.
       const raw = await chatWithTools({
         systemInstruction,
         history,
@@ -692,19 +766,10 @@ export async function phiBrain(
         tools: BRAIN_TOOL_DECLARATIONS as any,
         executeTool: (name, args) => executeBrainTool(userId, name, args),
         thinkingLevel: 'low',
-        maxOutputTokens: 1500,
+        maxOutputTokens: 2000,
         maxToolHops: 4,
-        responseJsonSchema: BRAIN_DECISION_SCHEMA,
       });
-      try {
-        decision = JSON.parse(raw);
-      } catch (parseErr) {
-        // responseJsonSchema is supposed to guarantee parseability. If it ever
-        // fails (e.g. truncation at maxOutputTokens), fall back to silence
-        // rather than send a half-baked answer.
-        console.error('[PhiBrain] JSON parse error despite schema:', parseErr, 'raw:', raw.substring(0, 200));
-        decision = { action: 'none', should_respond: false, internal_reasoning: 'json_parse_fail' };
-      }
+      decision = parseBrainResponse(raw, event);
     } catch (err) {
       console.error('[PhiBrain] Gemini error:', err);
       if (event.type === 'whatsapp_message') {
