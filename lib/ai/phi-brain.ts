@@ -9,7 +9,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server';
-import { chatWithTools, type ChatTurn } from '@/lib/ai/gemini-client';
+import { type ChatTurn } from '@/lib/ai/gemini-client';
 import { BRAIN_TOOL_DECLARATIONS, executeBrainTool } from '@/lib/ai/brain-tools';
 import { getGreenAPIClient } from '@/lib/greenapi/client';
 import { classifyAllTransactions, applyClassifications, learnFromClassifications, formatSummaryForWhatsApp } from '@/lib/classification/ai-classifier';
@@ -530,6 +530,8 @@ const COMMAND_MAP: Record<string, string> = {
   'ניתוח': 'show_patterns', 'דפוסים': 'show_patterns', 'תובנות': 'show_patterns',
   // כפילויות = User Guide promise: "בדיקת חשד לכפל תשלום"
   'כפילויות': 'check_duplicates', 'כפל': 'check_duplicates', 'כפל תשלום': 'check_duplicates',
+  // Classification triggers — direct route, no LLM needed
+  'נתחיל': 'classify', 'נמשיך': 'classify', 'סווג': 'classify', 'בוא נתחיל': 'classify',
   'בטל': 'undo_expense',
   'עזרה': 'help', 'תפריט': 'help',
   'כמה יש לי': 'show_money_flow', 'כמה חופשי': 'show_money_flow',
@@ -753,22 +755,38 @@ export async function phiBrain(
     }
 
     try {
-      // Tool-augmented chat with structured output. Per Gemini 3 docs
-      // ("Structured outputs with tools" preview), this combo is supported:
-      // model can call read-only tools mid-reasoning AND return schema-compliant
-      // JSON as the final part. parseBrainResponse stays as a safety net for
-      // the rare case where the model emits non-JSON.
-      const raw = await chatWithTools({
-        systemInstruction,
-        history,
-        userMessage: triggerMessage,
-        tools: BRAIN_TOOL_DECLARATIONS as any,
-        executeTool: (name, args) => executeBrainTool(userId, name, args),
-        thinkingLevel: 'low',
-        maxOutputTokens: 2000,
-        maxToolHops: 4,
-        responseJsonSchema: BRAIN_DECISION_SCHEMA,
-      });
+      // Tools are only useful when the user already has data to ground answers in.
+      // For new users (no transactions), the brain should respond directly — adding
+      // tools causes degenerate "call → no data → call another → ..." loops where
+      // the model exhausts maxToolHops without producing text.
+      const userHasData = ctx.monthlyExpenses > 0 || ctx.monthlyIncome > 0 || ctx.pendingCount > 0;
+
+      let raw: string;
+      if (userHasData) {
+        const { chatWithTools } = await import('@/lib/ai/gemini-client');
+        raw = await chatWithTools({
+          systemInstruction,
+          history,
+          userMessage: triggerMessage,
+          tools: BRAIN_TOOL_DECLARATIONS as any,
+          executeTool: (name, args) => executeBrainTool(userId, name, args),
+          thinkingLevel: 'low',
+          maxOutputTokens: 2000,
+          maxToolHops: 4,
+          responseJsonSchema: BRAIN_DECISION_SCHEMA,
+        });
+      } else {
+        // No data → no tools. Plain memory chat with strict schema.
+        const { chatWithMemory } = await import('@/lib/ai/gemini-client');
+        raw = await chatWithMemory({
+          systemInstruction,
+          history,
+          userMessage: triggerMessage,
+          thinkingLevel: 'low',
+          maxOutputTokens: 1500,
+          responseJsonSchema: BRAIN_DECISION_SCHEMA,
+        });
+      }
       decision = parseBrainResponse(raw, event);
     } catch (err) {
       console.error('[PhiBrain] Gemini error:', err);

@@ -579,7 +579,22 @@ export async function chatWithTools(opts: {
         .join('\n');
       if (partsText.length > 0) return partsText;
 
-      // Truly empty — caller's parseBrainResponse will handle this gracefully.
+      // No text and we hit max hops — model is in a tool-call loop. Force a final
+      // text response by sending a nudge. This rescues degenerate cases where the
+      // model keeps calling tools instead of emitting JSON.
+      if (hops >= maxHops) {
+        console.warn(`[chatWithTools] Hit ${hops} tool hops with no text — sending final nudge`);
+        try {
+          const nudge = await chat.sendMessage({
+            message: 'תפסיק לקרוא ל-tools. החזר עכשיו את ה-JSON הסופי לפי הסכמה. רק JSON, בלי טקסט מסביב.',
+          });
+          const nudgeText = nudge.text || '';
+          if (nudgeText.trim().length > 0) return nudgeText;
+        } catch (nudgeErr) {
+          console.warn(`[chatWithTools] Nudge failed:`, nudgeErr);
+        }
+      }
+
       console.warn(`[chatWithTools] Empty response after ${hops} tool hops`);
       return '';
     }, 'Gemini Chat with Tools');
