@@ -754,11 +754,11 @@ export async function phiBrain(
     }
 
     try {
-      // Use tool-augmented chat: Gemini can call read-only data tools mid-reasoning
-      // (get_loans, get_subscriptions, compare_to_last_month, …) before producing
-      // the final response. The system instruction tells the model what JSON
-      // shape to return, but we don't pass responseJsonSchema to the SDK — that
-      // combination is fragile when the model also wants to make function calls.
+      // Tool-augmented chat with structured output. Per Gemini 3 docs
+      // ("Structured outputs with tools" preview), this combo is supported:
+      // model can call read-only tools mid-reasoning AND return schema-compliant
+      // JSON as the final part. parseBrainResponse stays as a safety net for
+      // the rare case where the model emits non-JSON.
       const raw = await chatWithTools({
         systemInstruction,
         history,
@@ -768,6 +768,7 @@ export async function phiBrain(
         thinkingLevel: 'low',
         maxOutputTokens: 2000,
         maxToolHops: 4,
+        responseJsonSchema: BRAIN_DECISION_SCHEMA,
       });
       decision = parseBrainResponse(raw, event);
     } catch (err) {

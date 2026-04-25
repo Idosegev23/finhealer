@@ -503,14 +503,12 @@ export async function chatWithTools(opts: {
   maxToolHops?: number;
   /**
    * Optional JSON schema for the FINAL text output.
-   * Note: Gemini's combination of tools + responseJsonSchema is fragile — when the
-   * model decides to make a function call, the schema can get ignored and the
-   * .text property becomes empty. We deliberately do NOT pass the schema to the
-   * SDK here; instead, the system instruction tells the model what JSON shape to
-   * return, and the caller must handle both well-formed JSON and falling back to
-   * raw text if parsing fails.
+   * Per Gemini 3 docs ("Structured outputs with tools" — Preview), this combo
+   * IS supported on gemini-3-flash-preview / gemini-3.1-pro-preview. The model
+   * can call functions during reasoning and still return schema-compliant JSON
+   * as the final text part.
    */
-  responseJsonSchema?: Record<string, any>; // accepted for API symmetry, intentionally unused
+  responseJsonSchema?: Record<string, any>;
 }): Promise<string> {
   const { geminiLimiter } = await import('@/lib/utils/rate-limiter');
   return geminiLimiter.execute(async () => {
@@ -524,7 +522,10 @@ export async function chatWithTools(opts: {
         maxOutputTokens: opts.maxOutputTokens || 2000,
         tools: [{ functionDeclarations: opts.tools as any }],
       };
-      // Schema intentionally not set — see doc comment above.
+      if (opts.responseJsonSchema) {
+        chatConfig.responseMimeType = 'application/json';
+        chatConfig.responseJsonSchema = opts.responseJsonSchema;
+      }
 
       const chat = client.chats.create({
         model: FLASH_MODEL,
@@ -538,10 +539,14 @@ export async function chatWithTools(opts: {
       let response: any = await chat.sendMessage({ message: opts.userMessage });
       let hops = 0;
 
-      while (response.functionCalls && response.functionCalls.length > 0 && hops < maxHops) {
+      // Tool-execution loop. Continue while the model emits function calls.
+      while (hops < maxHops) {
+        const calls = response.functionCalls;
+        if (!calls || calls.length === 0) break;
+
         hops++;
         const fnResponses: any[] = [];
-        for (const call of response.functionCalls) {
+        for (const call of calls) {
           let result: unknown;
           try {
             result = await opts.executeTool(call.name, call.args || {});
@@ -557,11 +562,26 @@ export async function chatWithTools(opts: {
           });
         }
 
-        // Send all function results back in one turn
         response = await chat.sendMessage({ message: fnResponses as any });
       }
 
-      return response.text || '';
+      // Final response — should be schema-compliant JSON if responseJsonSchema was set.
+      // If `.text` is empty but the response has parts, try to recover the text.
+      const text = response.text || '';
+      if (text.trim().length > 0) return text;
+
+      // Fallback: try to extract any text from candidates manually.
+      const candidates = response.candidates || [];
+      const partsText = candidates
+        .flatMap((c: any) => c?.content?.parts || [])
+        .map((p: any) => p?.text || '')
+        .filter((t: string) => t.length > 0)
+        .join('\n');
+      if (partsText.length > 0) return partsText;
+
+      // Truly empty — caller's parseBrainResponse will handle this gracefully.
+      console.warn(`[chatWithTools] Empty response after ${hops} tool hops`);
+      return '';
     }, 'Gemini Chat with Tools');
   });
 }
