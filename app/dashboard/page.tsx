@@ -30,13 +30,19 @@ export default async function DashboardPage() {
 
   const { data: userData } = await supabase
     .from('users')
-    .select('id, name, subscription_status, phase, onboarding_state')
+    .select('id, name, phone, subscription_status, phase, onboarding_state')
     .eq('id', user.id)
     .single()
 
   if (!userData) redirect('/login')
 
   const u = userData as any
+
+  // Onboarding gate: anyone without a phone or still on 'start' goes to /onboarding.
+  // This is the canonical check — handles email login, OAuth, deep links, refreshes.
+  if (!u.phone || !u.onboarding_state || u.onboarding_state === 'start') {
+    redirect('/onboarding')
+  }
 
   // Current month range
   const now = new Date()

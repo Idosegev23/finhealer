@@ -42,7 +42,7 @@ export default function LoginPage() {
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       setIsLoading(true)
       setError(null)
@@ -55,7 +55,21 @@ export default function LoginPage() {
       if (error) throw error
 
       if (data.user) {
-        window.location.href = '/dashboard'
+        // Decide destination by onboarding completeness — same gate the OAuth callback uses.
+        // If the user has no phone yet or hasn't moved past 'start', they need onboarding.
+        const { data: profile } = await supabase
+          .from('users')
+          .select('phone, onboarding_state')
+          .eq('id', data.user.id)
+          .maybeSingle()
+
+        const needsOnboarding =
+          !profile ||
+          !profile.phone ||
+          !profile.onboarding_state ||
+          profile.onboarding_state === 'start'
+
+        window.location.href = needsOnboarding ? '/onboarding' : '/dashboard'
       }
     } catch (err: any) {
       setError(err.message || 'אירעה שגיאה בהתחברות')
