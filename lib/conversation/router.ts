@@ -435,18 +435,51 @@ export async function routeMessage(
     return result;
   }
 
-  if (state === 'waiting_for_name') {
-    console.log(`[Router] DISPATCH: state=waiting_for_name → handleWaitingForName()`);
-    const result = await handleWaitingForName(ctx, msg, supabase, greenAPI);
-    console.log(`[Router] RESULT: state=waiting_for_name, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
-  }
+  // ── ONBOARDING SUB-STATES → PhiBrain ──
+  // The brain has state-aware guidance (persona.getStateGuidance) and dedicated
+  // actions (set_user_name, request_document, mark_skip_document) that replace
+  // the legacy canned handlers. This is what makes the conversation feel natural.
+  // Button-click events still bypass to handlers below (deterministic UI).
+  if (state === 'waiting_for_name' || state === 'waiting_for_document') {
+    // First — let the legacy handler grab button-click events (start_classify,
+    // add_document button IDs). Those are deterministic UI signals, not free text.
+    const trimmed = msg.trim();
+    const isLikelyButtonClick =
+      trimmed === 'start_classify' || trimmed === 'add_bank' || trimmed === 'add_credit' || trimmed === 'add_doc' ||
+      trimmed === '▶️ נתחיל לסווג' || trimmed === 'נתחיל לסווג ▶️' ||
+      trimmed === '▶️ נמשיך לסווג' || trimmed === 'נמשיך לסווג ▶️';
+    if (isLikelyButtonClick) {
+      const handler = state === 'waiting_for_name' ? handleWaitingForName : handleWaitingForDocument;
+      const args = state === 'waiting_for_name'
+        ? [ctx, msg, supabase, greenAPI] as const
+        : [ctx, msg, supabase, greenAPI, startClassification] as const;
+      // @ts-ignore — variadic spread is fine here
+      return await handler(...args);
+    }
 
-  if (state === 'waiting_for_document') {
-    console.log(`[Router] DISPATCH: state=waiting_for_document → handleWaitingForDocument()`);
-    const result = await handleWaitingForDocument(ctx, msg, supabase, greenAPI, startClassification);
-    console.log(`[Router] RESULT: state=waiting_for_document, success=${result.success}, newState=${result.newState || 'unchanged'}`);
-    return result;
+    // Free-form message → route to brain.
+    console.log(`[Router] DISPATCH: state=${state} → PhiBrain (natural conversation)`);
+    try {
+      const action = await phiBrain(userId, { type: 'whatsapp_message', message: msg });
+      // If brain stayed silent (rare on direct user input), fall back to legacy handler
+      if (action.silent && !action.sendMessage) {
+        const handler = state === 'waiting_for_name' ? handleWaitingForName : handleWaitingForDocument;
+        const args = state === 'waiting_for_name'
+          ? [ctx, msg, supabase, greenAPI] as const
+          : [ctx, msg, supabase, greenAPI, startClassification] as const;
+        // @ts-ignore — variadic spread is fine here
+        return await handler(...args);
+      }
+      return { success: true, newState: action.updateState as any };
+    } catch (brainErr) {
+      console.error(`[Router] PhiBrain error in onboarding state ${state}, falling back:`, brainErr);
+      const handler = state === 'waiting_for_name' ? handleWaitingForName : handleWaitingForDocument;
+      const args = state === 'waiting_for_name'
+        ? [ctx, msg, supabase, greenAPI] as const
+        : [ctx, msg, supabase, greenAPI, startClassification] as const;
+      // @ts-ignore — variadic spread is fine here
+      return await handler(...args);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

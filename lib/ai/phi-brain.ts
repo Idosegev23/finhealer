@@ -25,6 +25,7 @@ import {
   PHI_FEW_SHOT_EXAMPLES,
   PHI_USE_CONTEXT_RULE,
   getPhaseGuidance,
+  getStateGuidance,
   type Phase as PersonaPhase,
 } from '@/lib/ai/persona';
 
@@ -288,9 +289,14 @@ function wasRecentlyNudged(ctx: BrainContext, marker: string): boolean {
 // ============================================================================
 
 const BRAIN_ACTIONS = [
-  'log_expense', 'undo_expense', 'show_money_flow', 'afford_check',
-  'show_summary', 'show_chart', 'show_budget', 'show_goals', 'show_cashflow',
-  'show_phi_score', 'show_patterns', 'check_duplicates',
+  // Data + transactions
+  'log_expense', 'undo_expense',
+  // Read-only views
+  'show_money_flow', 'show_summary', 'show_chart', 'show_budget', 'show_goals',
+  'show_cashflow', 'show_phi_score', 'show_patterns', 'check_duplicates', 'afford_check',
+  // Onboarding flow controls (replace canned router handlers)
+  'set_user_name', 'request_document', 'mark_skip_document',
+  // Conversation
   'classify', 'coaching', 'greeting', 'help', 'general_chat', 'none',
 ] as const;
 
@@ -311,6 +317,7 @@ const BRAIN_DECISION_SCHEMA: Record<string, any> = {
         amount: { type: 'number' },
         category: { type: 'string' },
         description: { type: 'string' },
+        name: { type: 'string', description: 'Used by set_user_name — the human name extracted from the user message.' },
       },
     },
     message: {
@@ -359,8 +366,10 @@ function buildSystemInstruction(ctx: BrainContext, event: PhiEvent): string {
   // Cooldown / anti-repeat hints (so the AI knows what NOT to repeat)
   const dontRepeat = (ctx.profile.dont_repeat || []).slice(-5).join(', ') || 'אין';
 
-  // Phase-specific guidance — what to focus on right now
-  const phaseGuidance = getPhaseGuidance((ctx.phase as PersonaPhase) || 'data_collection');
+  // State-specific guidance trumps phase guidance during onboarding sub-states
+  // (waiting_for_name, waiting_for_document). Falls back to phase otherwise.
+  const stateGuidance = getStateGuidance(ctx.state);
+  const phaseGuidance = stateGuidance || getPhaseGuidance((ctx.phase as PersonaPhase) || 'data_collection');
 
   return [
     PHI_IDENTITY,
@@ -921,6 +930,59 @@ export async function phiBrain(
         const monCtx = { userId, phone: ctx.phone, state: 'monitoring' as any, userName: ctx.userName };
         await handleMonitoring(monCtx, 'duplicates', ctx.userName, async (c) => ({ success: true }));
         action.silent = true;
+        break;
+      }
+
+      // ══════════════════════════════════════════════════════════════
+      // ONBOARDING actions — replace canned router handlers
+      // ══════════════════════════════════════════════════════════════
+
+      // ── SET USER NAME — extracts name from natural language and advances state ──
+      case 'set_user_name': {
+        const candidate = (params.name || '').toString().trim();
+        // Sanity: 1-40 chars, no @ or URL, not numbers
+        if (!candidate || candidate.length < 2 || candidate.length > 40 ||
+            /[@<>]|http/i.test(candidate) || /^\d+$/.test(candidate)) {
+          // Fallback: ask again, naturally — let Gemini compose
+          action.sendMessage = decision.message || 'איך קוראים לך?';
+          break;
+        }
+        await supabase.from('users')
+          .update({ name: candidate, full_name: candidate, onboarding_state: 'waiting_for_document' })
+          .eq('id', userId);
+        action.sendMessage = decision.message || `נעים מאוד, ${candidate}! 👋\n\nכדי להתחיל, תוכל לשלוח לי דוח עו״ש מהבנק (PDF או תמונה) של החודשים האחרונים?`;
+        action.updateState = 'waiting_for_document';
+        break;
+      }
+
+      // ── REQUEST DOCUMENT — natural-language doc request, message comes from Gemini ──
+      case 'request_document': {
+        // Gemini composes the message contextually (mentioning what we'll do with it)
+        action.sendMessage = decision.message ||
+          `🏦 כדי שאוכל לעזור לך באמת, אני צריך דוח בנק או אשראי.\n\n` +
+          `שלח לי PDF/תמונה של דוח עו״ש מהחודשים האחרונים — אני אנתח, אסווג, וניתן לך תמונה ברורה. כל שלוקח לי דקה-שתיים 🙂`;
+        break;
+      }
+
+      // ── MARK SKIP DOCUMENT — user said "I don't have one right now" ──
+      case 'mark_skip_document': {
+        // Same logic as the legacy skip path, but with brain-composed message
+        const { count: txCount } = await supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId);
+
+        const newState = (txCount || 0) > 0 ? 'classification' : 'monitoring';
+        const { calculatePhase: calcPhaseSkip } = await import('@/lib/services/PhaseService');
+        const skipPhase = await calcPhaseSkip(userId);
+        await supabase.from('users')
+          .update({ onboarding_state: newState, phase: skipPhase, phase_updated_at: new Date().toISOString() })
+          .eq('id', userId);
+        action.sendMessage = decision.message ||
+          (newState === 'classification'
+            ? `בסדר! 😊 יש כבר תנועות שצריך לסדר. כתוב *"נתחיל"* כשתהיה מוכן.`
+            : `בסדר! 😊 כשיהיה לך דוח — פשוט שלח. בינתיים אפשר לשאול אותי כל שאלה.`);
+        action.updateState = newState;
         break;
       }
 
