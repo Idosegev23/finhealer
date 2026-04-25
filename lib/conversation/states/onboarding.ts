@@ -185,7 +185,31 @@ export async function handleWaitingForDocument(
     }
   }
 
-  // Default - waiting for document, provide clear guidance
+  // Default — fallback. Two cases:
+  // (a) User has existing transactions → maybe they're asking about the data already imported.
+  //     Route to PhiBrain so it can answer with a real summary.
+  // (b) No transactions yet → canned guidance to send a document.
+  const { count: txCount } = await supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', ctx.userId);
+
+  if ((txCount || 0) > 0) {
+    // Hand off to the brain — it has tools to summarize, answer "what's in my data", etc.
+    try {
+      const { phiBrain } = await import('@/lib/ai/phi-brain');
+      const action = await phiBrain(ctx.userId, { type: 'whatsapp_message', message: msg });
+      if (action.silent) {
+        // Brain stayed silent (rare for a direct user message) — fall through to canned reply
+      } else {
+        return { success: true };
+      }
+    } catch (brainErr) {
+      console.error('[Onboarding] Brain fallback failed:', brainErr);
+      // fall through to canned reply
+    }
+  }
+
   await greenAPI.sendMessage({
     phoneNumber: ctx.phone,
     message: `📄 אני מחכה לדוח מהבנק או מחברת האשראי.\n\n` +

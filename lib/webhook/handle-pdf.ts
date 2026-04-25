@@ -368,17 +368,29 @@ export async function handlePdf(
       financialAccountId,
     });
 
-    // Post-processing
-    if (documentId) {
-      await postDocumentProcessing(supabase, userData.id, phoneNumber, {
-        documentId,
-        documentType,
-        batchId: pendingBatchId,
-        allTransactions,
-        ocrData,
-        periodStart,
-        periodEnd,
-      });
+    // Post-processing — runs even if saveDocumentRecord failed.
+    // The document record is best-effort metadata; state advancement and
+    // user-facing notifications must happen as long as transactions saved.
+    // Skipping post-processing when documentId is null was the bug that left
+    // users stuck in 'waiting_for_document' even though tx had imported.
+    if (insertedIds.length > 0) {
+      try {
+        await postDocumentProcessing(supabase, userData.id, phoneNumber, {
+          documentId: documentId || '', // empty string is fine — link queries no-op
+          documentType,
+          batchId: pendingBatchId,
+          allTransactions,
+          ocrData,
+          periodStart,
+          periodEnd,
+        });
+      } catch (postErr) {
+        console.error('❌ postDocumentProcessing failed (non-fatal):', postErr);
+      }
+    }
+
+    if (!documentId) {
+      console.warn(`⚠️ Document record save failed but ${insertedIds.length} transactions DID save. State advanced via post-processing.`);
     }
 
     console.log(`✅ Document processed: ${allTransactions.length} transactions`);
