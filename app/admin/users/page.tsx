@@ -89,11 +89,11 @@ export default function AdminUsersPage() {
   }, [searchInput]);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8" dir="rtl">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">משתמשים</h1>
-          <p className="text-gray-600">{total} משתמשים במערכת</p>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
+      <div className="max-w-7xl mx-auto space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">משתמשים</h1>
+          <p className="text-sm text-gray-500 mt-1">{total} משתמשים במערכת</p>
         </div>
 
         {/* Filters */}

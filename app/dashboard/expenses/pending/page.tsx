@@ -495,26 +495,26 @@ export default function PendingExpensesPage() {
   };
 
   return (
-    <div className="container mx-auto p-8" dir="rtl">
-      {/* 🎯 Header עם הסבר */}
-      <div className="mb-8">
-        <h1 className="text-6xl font-extrabold mb-5 bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent drop-shadow-lg">
-          💳 בדוק ואשר את התנועות שלך
-        </h1>
-        <p className="text-3xl text-gray-800 mb-6 font-bold">
-          {expenses.length === 0
-            ? '✅ אין תנועות ממתינות כרגע'
-            : `📊 ${expenses.length} תנועות ממתינות לבדיקה`}
-        </p>
-        
-        {/* ℹ️ Info Box */}
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
+      <div className="max-w-5xl mx-auto space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">בדוק ואשר את התנועות שלך</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {expenses.length === 0
+              ? 'אין תנועות ממתינות כרגע'
+              : `${expenses.length} תנועות ממתינות לבדיקה`}
+          </p>
+        </div>
+
         {expenses.length > 0 && (
-          <div className="bg-gradient-to-r from-blue-100 to-blue-200 border-4 border-blue-400 rounded-2xl p-6 mb-6 shadow-xl">
-            <div className="flex items-start gap-5">
-              <div className="text-5xl">📊</div>
+          <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-phi-dark/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-phi-dark font-bold">!</span>
+              </div>
               <div className="flex-1">
-                <h3 className="text-2xl font-extrabold text-blue-900 mb-3">למה חשוב לבדוק?</h3>
-                <ul className="text-xl text-blue-900 space-y-2 list-disc mr-6 font-semibold">
+                <h3 className="text-sm font-semibold text-phi-dark mb-1">למה חשוב לבדוק?</h3>
+                <ul className="text-sm text-gray-700 space-y-1 list-disc mr-5">
                   <li>וודא שכל העסקאות נכונות ושייכות לך</li>
                   <li>ודא שהסיווג לקטגוריות מדויק (קבועות/משתנות/מיוחדות)</li>
                   <li>עדכן פרטים לפני אישור סופי</li>
@@ -524,16 +524,15 @@ export default function PendingExpensesPage() {
           </div>
         )}
 
-        {/* ⚠️ Warning Box - אם יש לא מסווגות */}
         {uncategorizedCount > 0 && (
-          <div className="bg-gradient-to-r from-amber-100 to-orange-100 border-4 border-amber-500 rounded-2xl p-6 mb-6 shadow-xl">
-            <div className="flex items-start gap-5">
-              <div className="text-6xl">⚠️</div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 text-phi-gold font-bold">!</div>
               <div className="flex-1">
-                <h3 className="text-3xl font-extrabold text-amber-900 mb-3">
-                  {uncategorizedCount} תנועות ללא קטגוריה!
+                <h3 className="text-sm font-semibold text-amber-900 mb-0.5">
+                  {uncategorizedCount} תנועות ללא קטגוריה
                 </h3>
-                <p className="text-xl font-bold text-amber-900">
+                <p className="text-sm text-amber-900/80">
                   לחץ על &quot;ערוך&quot; כדי לבחור קטגוריה מתאימה. בלי קטגוריה לא ניתן לאשר.
                 </p>
               </div>
@@ -541,35 +540,32 @@ export default function PendingExpensesPage() {
           </div>
         )}
 
-        {/* 📈 סטטיסטיקה */}
         {expenses.length > 0 && (
-          <div className="grid grid-cols-3 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-green-100 to-emerald-200 border-4 border-green-400 rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
-              <div className="text-5xl font-extrabold text-green-800 mb-2">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white rounded-xl border border-gray-100 p-4">
+              <div className="text-2xl font-bold text-phi-mint mb-1 tabular-nums">
                 {expenses.filter(e => e.type === 'income').length}
               </div>
-              <div className="text-xl font-bold text-green-700">💰 הכנסות</div>
+              <div className="text-xs font-medium text-gray-500">הכנסות</div>
             </div>
-            <div className="bg-gradient-to-br from-blue-100 to-indigo-200 border-4 border-blue-400 rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform">
-              <div className="text-5xl font-extrabold text-blue-800 mb-2">
+            <div className="bg-white rounded-xl border border-gray-100 p-4">
+              <div className="text-2xl font-bold text-phi-dark mb-1 tabular-nums">
                 {expenses.filter(e => e.type === 'expense').length}
               </div>
-              <div className="text-xl font-bold text-blue-700">💳 הוצאות</div>
+              <div className="text-xs font-medium text-gray-500">הוצאות</div>
             </div>
-            <div className={`${uncategorizedCount > 0 ? 'bg-gradient-to-br from-amber-100 to-orange-200 border-amber-500' : 'bg-gradient-to-br from-gray-100 to-gray-200 border-gray-400'} border-4 rounded-2xl p-6 shadow-lg hover:scale-105 transition-transform`}>
-              <div className={`text-5xl font-extrabold mb-2 ${uncategorizedCount > 0 ? 'text-amber-800' : 'text-gray-800'}`}>
+            <div className="bg-white rounded-xl border border-gray-100 p-4">
+              <div className={`text-2xl font-bold mb-1 tabular-nums ${uncategorizedCount > 0 ? 'text-phi-coral' : 'text-phi-mint'}`}>
                 {uncategorizedCount}
               </div>
-              <div className={`text-xl font-bold ${uncategorizedCount > 0 ? 'text-amber-700' : 'text-gray-700'}`}>
-                {uncategorizedCount > 0 ? '⚠️ לא מסווג' : '✅ מסווג'}
+              <div className="text-xs font-medium text-gray-500">
+                {uncategorizedCount > 0 ? 'לא מסווג' : 'מסווג'}
               </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* 🎯 Filter Bar */}
-      <Card className="mb-8 border-4 border-blue-400 shadow-2xl">
+      <Card className="border border-gray-100 shadow-sm">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-5">
@@ -987,6 +983,7 @@ export default function PendingExpensesPage() {
           onSave={(updates, shouldApprove) => handleUpdate(editingExpense.id, updates, shouldApprove)}
         />
       )}
+      </div>
     </div>
   );
 }

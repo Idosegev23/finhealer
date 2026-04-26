@@ -20,13 +20,15 @@ interface SavingsAccount {
   target_date: string;
 }
 
+// Brand-only color tokens for account-type icons. Each "color" maps to a
+// phi palette pair (icon background + icon foreground). No raw rainbow.
 const COLOR_CLASSES: Record<string, { bg: string; text: string }> = {
-  blue: { bg: "bg-blue-100", text: "text-blue-600" },
-  green: { bg: "bg-green-100", text: "text-green-600" },
-  purple: { bg: "bg-purple-100", text: "text-purple-600" },
-  red: { bg: "bg-red-100", text: "text-red-600" },
-  orange: { bg: "bg-orange-100", text: "text-orange-600" },
-  gray: { bg: "bg-gray-100", text: "text-gray-600" },
+  blue:   { bg: "bg-sky-50",     text: "text-phi-dark" },
+  green:  { bg: "bg-emerald-50", text: "text-phi-mint" },
+  purple: { bg: "bg-phi-dark/10", text: "text-phi-dark" },
+  red:    { bg: "bg-red-50",     text: "text-phi-coral" },
+  orange: { bg: "bg-amber-50",   text: "text-phi-gold" },
+  gray:   { bg: "bg-gray-50",    text: "text-phi-slate" },
 };
 
 const ACCOUNT_TYPE_LABELS: Record<string, { label: string; icon: any; color: string }> = {
@@ -73,7 +75,7 @@ export default function SavingsPage() {
   }
 
   return (
-    <PageWrapper className="max-w-7xl">
+    <PageWrapper maxWidth="wide">
         {/* Header */}
         <PageHeader
           title="חשבונות חיסכון"
@@ -94,40 +96,40 @@ export default function SavingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
-                <PiggyBank className="w-5 h-5 text-blue-500" />
+                <PiggyBank className="w-5 h-5 text-phi-dark" />
                 <span className="text-sm text-phi-slate">סה&quot;כ חשבונות</span>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-gray-900 tabular-nums">
                 {summary.total_accounts}
               </div>
             </DSCard>
 
             <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
-                <TrendingUp className="w-5 h-5 text-green-500" />
+                <TrendingUp className="w-5 h-5 text-phi-mint" />
                 <span className="text-sm text-phi-slate">יתרה כוללת</span>
               </div>
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-phi-mint tabular-nums">
                 ₪{summary.total_balance?.toLocaleString("he-IL") || 0}
               </div>
             </DSCard>
 
             <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
-                <Calendar className="w-5 h-5 text-purple-500" />
+                <Calendar className="w-5 h-5 text-phi-dark" />
                 <span className="text-sm text-phi-slate">הפקדה חודשית</span>
               </div>
-              <div className="text-2xl font-bold text-purple-600">
+              <div className="text-2xl font-bold text-phi-dark tabular-nums">
                 ₪{summary.total_monthly_deposit?.toLocaleString("he-IL") || 0}
               </div>
             </DSCard>
 
             <DSCard padding="lg">
               <div className="flex items-center gap-3 mb-2">
-                <Target className="w-5 h-5 text-orange-500" />
+                <Target className="w-5 h-5 text-phi-gold" />
                 <span className="text-sm text-phi-slate">התקדמות ליעד</span>
               </div>
-              <div className="text-2xl font-bold text-orange-600">
+              <div className="text-2xl font-bold text-phi-gold">
                 {summary.progress_percentage?.toFixed(1) || 0}%
               </div>
             </DSCard>
@@ -136,23 +138,19 @@ export default function SavingsPage() {
 
         {/* Savings Cards Grid */}
         {savings.length === 0 ? (
-          <DSCard className="text-center py-16 animate-fade-in">
-            <div className="mb-6 relative">
-              <div className="absolute inset-0 bg-green-100 rounded-full blur-3xl opacity-30 animate-pulse"></div>
-              <PiggyBank className="w-20 h-20 text-phi-mint mx-auto relative animate-bounce-slow" />
+          <DSCard className="text-center py-12">
+            <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+              <PiggyBank className="w-8 h-8 text-phi-mint" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-3">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
               בואו נתחיל לחסוך יחד
             </h3>
-            <p className="text-phi-slate mb-2 max-w-md mx-auto leading-relaxed">
-              חיסכון זה לא על לוותר - זה על לתכנן נכון. כל שקל שתחסוך עכשיו עובד בשבילך בעתיד.
-            </p>
-            <p className="text-sm text-phi-slate mb-8 max-w-md mx-auto">
-              הגדר חשבונות חיסכון עם יעדים ברורים ותראה את הכסף גדל
+            <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto leading-relaxed">
+              חיסכון זה לא על לוותר — זה על לתכנן נכון. כל שקל שתחסוך עכשיו עובד בשבילך בעתיד.
             </p>
             <Button
               onClick={() => setShowAddModal(true)}
-              className="bg-phi-mint hover:bg-phi-mint/90 text-white shadow-lg hover:shadow-xl transition-all"
+              className="bg-phi-dark hover:bg-phi-slate text-white"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               פתח חשבון חיסכון ראשון
@@ -199,7 +197,7 @@ export default function SavingsPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">יתרה נוכחית:</span>
-                      <span className="text-lg font-bold text-green-600">
+                      <span className="text-lg font-bold text-phi-mint tabular-nums">
                         ₪{account.current_balance?.toLocaleString("he-IL") || 0}
                       </span>
                     </div>
@@ -216,7 +214,7 @@ export default function SavingsPage() {
                     {account.annual_return > 0 && (
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">תשואה שנתית:</span>
-                        <span className="text-sm font-semibold text-blue-600">
+                        <span className="text-sm font-semibold text-phi-dark tabular-nums">
                           {account.annual_return}%
                         </span>
                       </div>
@@ -233,16 +231,13 @@ export default function SavingsPage() {
                           </div>
                           
                           {/* Progress Bar */}
-                          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                          <div className="w-full bg-gray-100 rounded-full h-2 mb-2 overflow-hidden">
                             <div
-                              className={`h-2 rounded-full ${
-                                progress >= 100
-                                  ? "bg-green-500"
-                                  : progress >= 75
-                                  ? "bg-blue-500"
-                                  : progress >= 50
-                                  ? "bg-yellow-500"
-                                  : "bg-orange-500"
+                              className={`h-full rounded-full transition-all ${
+                                progress >= 100 ? "bg-phi-mint"
+                                  : progress >= 75 ? "bg-phi-mint"
+                                  : progress >= 50 ? "bg-phi-gold"
+                                  : "bg-phi-coral"
                               }`}
                               style={{ width: `${Math.min(progress, 100)}%` }}
                             ></div>
@@ -257,15 +252,15 @@ export default function SavingsPage() {
                         </div>
 
                         {account.goal_name && (
-                          <div className="bg-blue-50 rounded-lg p-3">
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <div className="flex items-center gap-2">
-                              <Target className="w-4 h-4 text-blue-600" />
-                              <span className="text-sm font-medium text-blue-900">
+                              <Target className="w-4 h-4 text-phi-gold" />
+                              <span className="text-sm font-medium text-amber-900">
                                 {account.goal_name}
                               </span>
                             </div>
                             {account.target_date && (
-                              <div className="text-xs text-blue-700 mt-1">
+                              <div className="text-xs text-amber-800/70 mt-1">
                                 יעד: {new Date(account.target_date).toLocaleDateString("he-IL")}
                               </div>
                             )}
@@ -282,45 +277,28 @@ export default function SavingsPage() {
         )}
 
         {/* Info Section */}
-        <DSCard className="mt-8 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 animate-slide-up" padding="lg">
+        <DSCard padding="lg">
           <div className="flex items-start gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-              <span className="text-xl">💡</span>
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+              <PiggyBank className="w-5 h-5 text-phi-mint" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-green-900 mb-1">
-                טיפים לחיסכון חכם ואפקטיבי
-              </h3>
-              <p className="text-sm text-green-700">
-                כי כל שקל היום שווה יותר מחר
-              </p>
+              <h3 className="text-base font-bold text-gray-900 mb-0.5">טיפים לחיסכון חכם</h3>
+              <p className="text-sm text-gray-500">כי כל שקל היום שווה יותר מחר</p>
             </div>
           </div>
-          <ul className="space-y-3 text-sm text-green-800">
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-green-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>קופת חירום קודם כל</strong> - שמרו 3-6 חודשים של הוצאות במזומן נזיל. זה הביטחון שלכם לכל מקרה
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-green-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>הפקדות אוטומטיות</strong> - קבעו העברה אוטומטית ביום השכר. ככה החיסכון קורה ממילא, בלי מאמץ
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-green-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>פיזור סיכונים</strong> - חלקו את הכסף: חלק בחיסכון בטוח, חלק בהשקעות. אל תשימו הכל בסל אחד
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-green-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>ריבית דריבית היא הקסם</strong> - התחלה ב-25? עד 65 תהיו מיליונרים. התחלה ב-35? חצי מיליון. התחילו היום!
-              </span>
-            </li>
+          <ul className="space-y-2 text-sm text-gray-700">
+            {[
+              { title: 'קופת חירום קודם כל', body: 'שמרו 3-6 חודשים של הוצאות במזומן נזיל. זה הביטחון שלכם לכל מקרה' },
+              { title: 'הפקדות אוטומטיות', body: 'קבעו העברה אוטומטית ביום השכר. ככה החיסכון קורה ממילא, בלי מאמץ' },
+              { title: 'פיזור סיכונים', body: 'חלקו את הכסף — חלק בחיסכון בטוח, חלק בהשקעות. אל תשימו הכל בסל אחד' },
+              { title: 'ריבית דריבית היא הקסם', body: 'התחלה ב-25 ועד 65 תהיו מיליונרים. התחלה ב-35? חצי מיליון. התחילו היום' },
+            ].map((tip, i) => (
+              <li key={i} className="flex gap-3 items-start">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-phi-mint/15 text-phi-mint flex items-center justify-center text-xs font-bold mt-0.5">✓</span>
+                <span className="leading-relaxed"><strong className="text-gray-900">{tip.title}</strong> — {tip.body}</span>
+              </li>
+            ))}
           </ul>
         </DSCard>
 

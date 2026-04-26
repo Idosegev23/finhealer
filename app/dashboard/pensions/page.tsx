@@ -6,7 +6,7 @@ import { PlusCircle, Shield, TrendingUp, Briefcase } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { AddPensionModal } from "@/components/pensions/AddPensionModal";
 import { RequestPensionReport } from "@/components/pension/RequestPensionReport";
-import { PageWrapper, Card as DSCard } from '@/components/ui/design-system';
+import { PageWrapper, PageHeader, Card as DSCard } from '@/components/ui/design-system';
 
 interface PensionFund {
   id: string;
@@ -64,31 +64,19 @@ export default function PensionsPage() {
 
   return (
     <PageWrapper>
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <Shield className="w-8 h-8 text-phi-dark" />
-                חיסכון פנסיוני
-                <InfoTooltip
-                  content="כאן תוכל לנהל את כל הקרנות הפנסיוניות שלך - קופות גמל, קרן השתלמות, ביטוח מנהלים ועוד"
-                  type="info"
-                />
-              </h1>
-              <p className="text-phi-slate mt-2">
-                ניהול מרכזי של כל החיסכון הפנסיוני שלך
-              </p>
-            </div>
-            <Button 
+        <PageHeader
+          title="חיסכון פנסיוני"
+          subtitle="קופות גמל, קרן השתלמות, ביטוח מנהלים — מרכז אחד"
+          action={
+            <Button
               onClick={() => setShowAddModal(true)}
-              className="bg-phi-mint hover:bg-phi-mint/90 text-white"
+              className="bg-phi-dark hover:bg-phi-slate text-white"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף קרן חדשה
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Summary Cards */}
         {summary && (
@@ -248,48 +236,30 @@ export default function PensionsPage() {
           )}
         </DSCard>
 
-        {/* Info Section */}
-        <div className="mt-8 bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6 shadow-sm animate-slide-up">
+        <DSCard padding="lg">
           <div className="flex items-start gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
-              <span className="text-xl">💡</span>
+            <div className="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center flex-shrink-0">
+              <Shield className="w-5 h-5 text-phi-dark" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-blue-900 mb-1">
-                טיפים חכמים לניהול חיסכון פנסיוני
-              </h3>
-              <p className="text-sm text-blue-700">
-                כי בגיל 67 תרצו לחיות בכבוד
-              </p>
+              <h3 className="text-base font-bold text-gray-900 mb-0.5">טיפים חכמים לניהול חיסכון פנסיוני</h3>
+              <p className="text-sm text-gray-500">כי בגיל 67 תרצו לחיות בכבוד</p>
             </div>
           </div>
-          <ul className="space-y-3 text-sm text-blue-800">
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-blue-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>הפרישו מינימום 18.5%</strong> - לפחות 17.5% לפנסיה + 6% לקרן השתלמות. זה לא מותרות, זה הכרח
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-blue-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>דמי ניהול חשובים</strong> - כל 0.1% זה אלפי שקלים על 30 שנה. מעל 0.5%? תבדקו אלטרנטיבות זולות יותר
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-blue-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>תשואה ארוכת טווח</strong> - תשואה שנתית ממוצעת של 4-6% לאורך זמן היא מצוינת. אל תרדפו אחרי תשואות גבוהות
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-blue-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>בדקו פערי כיסוי</strong> - קרן פנסיה טובה כוללת גם ביטוח נכות וסיעוד. ודאו שזה קיים!
-              </span>
-            </li>
+          <ul className="space-y-2 text-sm text-gray-700">
+            {[
+              { title: 'הפרשה מינימום 18.5%', body: 'לפחות 17.5% לפנסיה + 6% לקרן השתלמות. זה הכרח' },
+              { title: 'דמי ניהול חשובים', body: 'כל 0.1% זה אלפי שקלים על 30 שנה. מעל 0.5% — בדקו אלטרנטיבות זולות יותר' },
+              { title: 'תשואה ארוכת טווח', body: 'תשואה שנתית ממוצעת של 4-6% לאורך זמן היא מצוינת. אל תרדפו אחרי תשואות גבוהות' },
+              { title: 'בדקו פערי כיסוי', body: 'קרן פנסיה טובה כוללת גם ביטוח נכות וסיעוד. ודאו שזה קיים' },
+            ].map((tip, i) => (
+              <li key={i} className="flex gap-3 items-start">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-phi-dark/10 text-phi-dark flex items-center justify-center text-xs font-bold mt-0.5">✓</span>
+                <span className="leading-relaxed"><strong className="text-gray-900">{tip.title}</strong> — {tip.body}</span>
+              </li>
+            ))}
           </ul>
-        </div>
+        </DSCard>
 
       {/* Add Pension Modal */}
       <AddPensionModal

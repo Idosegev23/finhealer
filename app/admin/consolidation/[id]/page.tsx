@@ -116,22 +116,20 @@ export default function ConsolidationRequestDetailPage() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 p-8" dir="rtl">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-6">
-          <Link
-            href="/admin/consolidation"
-            className="text-phi-gold hover:text-phi-dark text-sm font-medium"
-          >
-            ← חזרה לרשימת בקשות
-          </Link>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
+      <div className="max-w-5xl mx-auto space-y-5">
+        <Link
+          href="/admin/consolidation"
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-phi-dark transition-colors"
+        >
+          ← חזרה לרשימת בקשות
+        </Link>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h1 className="text-2xl font-bold text-gray-900">
             בקשת איחוד הלוואות
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm text-gray-500 mt-1">
             נוצרה ב-{new Date(request.created_at).toLocaleDateString('he-IL', {
               year: 'numeric',
               month: 'long',

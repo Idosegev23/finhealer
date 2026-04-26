@@ -14,7 +14,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PageWrapper } from '@/components/ui/design-system';
+import { PageWrapper, PageHeader, InsightBanner } from '@/components/ui/design-system';
 import { DocumentUploader } from '@/components/shared/DocumentUploader';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
@@ -216,95 +216,41 @@ function ScanCenterContent() {
 
   return (
     <PageWrapper>
-      {/* Header - Hidden Page Notice */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-3xl font-bold text-gray-900">
-            🔍 מרכז סריקה
-          </h1>
-          <Badge className="bg-amber-100 text-amber-700 border-amber-300">
-            🔒 מוסתר - לשימוש עתידי
+      <PageHeader
+        title="מרכז סריקה"
+        subtitle="העלה דוחות בנק ופירוט אשראי — Phi מסווג אוטומטית"
+        action={
+          <Badge className="bg-amber-50 text-phi-gold border-amber-200">
+            לשימוש עתידי
           </Badge>
-        </div>
-        
-        {/* Important Notice */}
-        <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-xl mb-4">
-          <p className="text-blue-900 font-bold text-lg mb-1">
-            📱 הסריקה עוברת דרך WhatsApp!
-          </p>
-          <p className="text-blue-800 text-sm">
-            שלח את הדוחות שלך בוואטסאפ ל-Phi והמערכת תעבד אותם אוטומטית.
-            הדשבורד משקף את הנתונים שנאספו - לצפייה בלבד.
-          </p>
-        </div>
-        
-        <p className="text-gray-600">
-          העלה דוחות בנק ופירוט אשראי - נזהה ונסווג את ההוצאות אוטומטית עם AI
-        </p>
-        <p className="text-sm text-blue-600 mt-2">
-          💡 <strong>טיפ:</strong> אחרי העלאה מוצלחת תישאר כאן - תוכל להעלות מסמכים נוספים ברציפות!
-        </p>
+        }
+      />
 
-        {/* Warning if no bank statement */}
+      <InsightBanner variant="info" title="הסריקה עוברת בעיקר דרך WhatsApp">
+        שלח דוחות לבוט בוואטסאפ והמערכת תעבד אותם אוטומטית. דף זה הוא לצפייה ולהעלאות אד-הוק.
+      </InsightBanner>
+
         {!checkingBankStatement && !hasBankStatement && (
-          <div className="mt-4 p-6 bg-amber-50 border-2 border-amber-300 rounded-xl">
-            <div className="flex items-start gap-4">
-              <div className="bg-amber-100 p-3 rounded-full">
-                <AlertCircle className="w-8 h-8 text-amber-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-extrabold text-amber-900 mb-2">
-                  ⚠️ התחל עם דוח בנק
-                </h3>
-                <p className="text-base text-amber-800 leading-relaxed mb-3">
-                  כדי לקבל תמונה פיננסית מלאה, עליך להתחיל בהעלאת <strong>דוח תנועות בנק</strong>.
-                  לאחר מכן, המערכת תזהה אוטומטית אילו מסמכים נוספים נדרשים (כמו דוחות אשראי, תלושי משכורת וכו&apos;).
-                </p>
-                <p className="text-sm text-amber-700 font-bold">
-                  📋 דוחות אחרים יהיו זמינים רק לאחר העלאת דוח בנק
-                </p>
-              </div>
-            </div>
-          </div>
+          <InsightBanner variant="warning" icon={AlertCircle} title="התחל עם דוח בנק">
+            כדי לקבל תמונה פיננסית מלאה, עליך להתחיל בהעלאת <strong>דוח תנועות בנק</strong>.
+            לאחר מכן המערכת תזהה אוטומטית אילו מסמכים נוספים נדרשים (דוחות אשראי, תלושי משכורת וכו׳).
+          </InsightBanner>
         )}
 
-        {/* Success message if has bank statement */}
         {!checkingBankStatement && hasBankStatement && (
-          <div className="mt-4 p-6 bg-green-50 border-2 border-green-300 rounded-xl">
-            <div className="flex items-start gap-4">
-              <div className="bg-green-100 p-3 rounded-full">
-                <CheckCircle className="w-8 h-8 text-green-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-extrabold text-green-900 mb-2">
-                  ✅ מעולה! דוח הבנק הועלה
-                </h3>
-                <p className="text-base text-green-800 leading-relaxed">
-                  כעת תוכל להעלות מסמכים נוספים. המערכת תקשר אוטומטית בין דוחות האשראי לחיובים בבנק,
-                  ותלושי משכורת להכנסות.
-                </p>
-              </div>
-            </div>
-          </div>
+          <InsightBanner variant="success" icon={CheckCircle} title="מעולה! דוח הבנק הועלה">
+            כעת תוכל להעלות מסמכים נוספים. המערכת תקשר אוטומטית בין דוחות האשראי לחיובים בבנק, ותלושי משכורת להכנסות.
+          </InsightBanner>
         )}
 
-        <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-start gap-3">
-            <div className="text-2xl">💡</div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-blue-900 mb-1">
-                איך זה עובד?
-              </p>
-              <ol className="text-sm text-blue-800 space-y-1 mr-4">
-                <li>1. התחל עם דוח בנק (חובה)</li>
-                <li>2. המערכת תזהה מסמכים חסרים</li>
-                <li>3. העלה את המסמכים הנדרשים</li>
-                <li>4. קבל תמונה פיננסית מלאה ומדויקת</li>
-              </ol>
-            </div>
-          </div>
-        </div>
-      </div>
+        <InsightBanner variant="info" title="איך זה עובד">
+          <ol className="space-y-1 mr-4 list-decimal">
+            <li>התחל עם דוח בנק (חובה)</li>
+            <li>המערכת תזהה מסמכים חסרים</li>
+            <li>העלה את המסמכים הנדרשים</li>
+            <li>קבל תמונה פיננסית מלאה ומדויקת</li>
+          </ol>
+        </InsightBanner>
 
       {/* Document Type Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">

@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, DollarSign } from 'lu
 import Link from 'next/link';
 import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner';
 import TransactionDetailsView from '@/components/dashboard/TransactionDetailsView';
-import { PageWrapper, Card as DSCard } from '@/components/ui/design-system';
+import { PageWrapper, PageHeader, Card as DSCard, EmptyState } from '@/components/ui/design-system';
 
 interface MonthData {
   month: string;
@@ -90,28 +90,26 @@ export default function ExpensesPage() {
     <PageWrapper>
         <WhatsAppBanner message="רוצה לרשום הוצאה חדשה? פשוט תכתוב לבוט! 📝" />
 
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">הוצאות</h1>
-            <p className="text-phi-slate mt-1">מעקב והיסטוריה של כל ההוצאות שלך</p>
-          </div>
-          <Link
-            href="/dashboard/data/expenses"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
-            + הוסף הוצאה
-          </Link>
-        </div>
+        <PageHeader
+          title="הוצאות"
+          subtitle="מעקב והיסטוריה של כל ההוצאות שלך"
+          action={
+            <Link
+              href="/dashboard/data/expenses"
+              className="bg-phi-dark hover:bg-phi-slate text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+            >
+              + הוסף הוצאה
+            </Link>
+          }
+        />
 
-        {/* Mini Dashboard - גרף חודשי */}
+        {/* Monthly trend chart — phi palette only */}
         <DSCard padding="lg">
-          <h2 className="text-xl font-semibold mb-6">מגמת הוצאות חודשית</h2>
-          
+          <h2 className="text-base font-semibold mb-4 text-gray-900">מגמת הוצאות חודשית</h2>
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="monthName" />
                 <YAxis />
                 <Tooltip
@@ -119,27 +117,25 @@ export default function ExpensesPage() {
                   labelStyle={{ textAlign: 'right' }}
                 />
                 <Legend />
-                <Bar dataKey="fixed" name="קבועות" fill="#3b82f6" />
-                <Bar dataKey="variable" name="משתנות" fill="#10b981" />
-                <Bar dataKey="special" name="מיוחדות" fill="#f59e0b" />
+                <Bar dataKey="fixed" name="קבועות" fill="#074259" />
+                <Bar dataKey="variable" name="משתנות" fill="#1C8C63" />
+                <Bar dataKey="special" name="מיוחדות" fill="#F2C166" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="text-center py-12 text-phi-slate">
-              <DollarSign className="mx-auto h-12 w-12 mb-4 text-gray-300" />
-              <p>אין נתונים להצגה</p>
-              <p className="text-sm mt-2">התחל להוסיף הוצאות כדי לראות את הגרף</p>
+            <div className="text-center py-12">
+              <DollarSign className="mx-auto h-10 w-10 mb-3 text-gray-300" />
+              <p className="text-sm text-gray-500">אין נתונים להצגה</p>
+              <p className="text-xs text-gray-400 mt-1">התחל להוסיף הוצאות כדי לראות את הגרף</p>
             </div>
           )}
         </DSCard>
 
-        {/* פירוט חודשי */}
         <div className="space-y-4">
           {sortedMonths.length > 0 ? (
             sortedMonths.map((month) => {
               const data = monthlyDetails[month];
               const isExpanded = expandedMonths.has(month);
-
               return (
                 <MonthCard
                   key={month}
@@ -152,17 +148,12 @@ export default function ExpensesPage() {
               );
             })
           ) : (
-            <DSCard className="text-center" padding="lg">
-              <DollarSign className="mx-auto h-16 w-16 mb-4 text-gray-300" />
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">אין הוצאות עדיין</h3>
-              <p className="text-phi-slate mb-6">התחל להוסיף הוצאות כדי לראות אותן כאן</p>
-              <Link
-                href="/dashboard/data/expenses"
-                className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              >
-                הוסף הוצאה ראשונה
-              </Link>
-            </DSCard>
+            <EmptyState
+              icon={DollarSign}
+              title="אין הוצאות עדיין"
+              description="התחל להוסיף הוצאות כדי לראות אותן כאן"
+              action={{ label: 'הוסף הוצאה ראשונה', href: '/dashboard/data/expenses' }}
+            />
           )}
         </div>
     </PageWrapper>
@@ -291,9 +282,9 @@ interface ExpenseTypeCardProps {
 
 function ExpenseTypeCard({ title, amount, percent, color }: ExpenseTypeCardProps) {
   const colorClasses = {
-    blue: 'bg-blue-50 border-blue-200 text-blue-700',
-    green: 'bg-green-50 border-green-200 text-green-700',
-    yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+    blue:   'bg-sky-50 border-sky-200 text-phi-dark',
+    green:  'bg-emerald-50 border-emerald-200 text-phi-mint',
+    yellow: 'bg-amber-50 border-amber-200 text-phi-coral',
   };
 
   return (

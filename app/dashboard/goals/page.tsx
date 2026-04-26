@@ -25,7 +25,7 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 import type { Goal, GoalAllocationResult } from '@/types/goals';
-import { Card as DSCard, EmptyState, PageWrapper, PageHeader } from '@/components/ui/design-system';
+import { Card as DSCard, EmptyState, PageWrapper, PageHeader, KpiGrid, StatCard } from '@/components/ui/design-system';
 import { GoalModal } from '@/components/goals/GoalModal';
 import { GoalsListCard } from '@/components/goals/GoalsListCard';
 import { GoalsDragList } from '@/components/goals/GoalsDragList';
@@ -238,10 +238,9 @@ export default function GoalsPage() {
   const isSimulationActive = simulationResult !== null;
   
   return (
-    <PageWrapper className="max-w-7xl">
-      {/* כותרת וכפתור יעד חדש */}
+    <PageWrapper maxWidth="wide">
       <PageHeader
-        title="φ היעדים שלך"
+        title="היעדים שלך"
         subtitle={goals.length === 0
           ? 'הגדר יעדים פיננסיים ונתחיל לעבוד לקראתם'
           : `${goals.length} יעדים פעילים`}
@@ -259,69 +258,39 @@ export default function GoalsPage() {
         }
       />
         
-      {/* סיכום כללי */}
+      {/* Allocation summary */}
       {allocationResult && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <DSCard className="bg-gradient-to-br from-phi-mint/20 to-phi-mint/5 border-phi-mint/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                  <p className="text-sm text-phi-slate mb-1">הכנסה חודשית</p>
-                  <p className="text-2xl font-bold text-phi-dark">
-                    {currentIncome.toLocaleString('he-IL')} ₪
-                  </p>
-                  </div>
-                <DollarSign className="w-10 h-10 text-phi-mint" />
-                </div>
-          </DSCard>
-
-          <DSCard className="bg-gradient-to-br from-phi-gold/20 to-phi-gold/5 border-phi-gold/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                  <p className="text-sm text-phi-slate mb-1">זמין ליעדים</p>
-                    <p className="text-2xl font-bold text-phi-dark">
-                    {allocationResult.summary.available_for_goals.toLocaleString('he-IL')} ₪
-                    </p>
-                  </div>
-                <Target className="w-10 h-10 text-phi-gold" />
-                </div>
-          </DSCard>
-
-          <DSCard className="bg-gradient-to-br from-phi-coral/20 to-phi-coral/5 border-phi-coral/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                  <p className="text-sm text-phi-slate mb-1">סה״כ מוקצה</p>
-                  <p className="text-2xl font-bold text-phi-dark">
-                    {allocationResult.summary.total_allocated.toLocaleString('he-IL')} ₪
-                    </p>
-                  </div>
-                <TrendingUp className="w-10 h-10 text-phi-coral" />
-                </div>
-          </DSCard>
-
-          <DSCard className={`bg-gradient-to-br ${
-            allocationResult.safetyCheck.passed
-              ? 'from-green-500/20 to-green-500/5 border-green-500/30'
-              : 'from-red-500/20 to-red-500/5 border-red-500/30'
-          }`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                  <p className="text-sm text-phi-slate mb-1">מצב תקציבי</p>
-                  <p className="text-lg font-bold text-phi-dark">
-                    {allocationResult.safetyCheck.comfort_level === 'excellent' && 'מצוין'}
-                    {allocationResult.safetyCheck.comfort_level === 'comfortable' && 'נוח'}
-                    {allocationResult.safetyCheck.comfort_level === 'tight' && 'צמוד'}
-                    {allocationResult.safetyCheck.comfort_level === 'critical' && 'קריטי'}
-                  </p>
-                  </div>
-                {allocationResult.safetyCheck.passed ? (
-                  <CheckCircle2 className="w-10 h-10 text-green-600" />
-                ) : (
-                  <AlertCircle className="w-10 h-10 text-red-600" />
-                )}
-                </div>
-          </DSCard>
-          </div>
-        )}
+        <KpiGrid cols={4}>
+          <StatCard
+            label="הכנסה חודשית"
+            value={`₪${currentIncome.toLocaleString('he-IL')}`}
+            icon={DollarSign}
+            tone="income"
+          />
+          <StatCard
+            label="זמין ליעדים"
+            value={`₪${allocationResult.summary.available_for_goals.toLocaleString('he-IL')}`}
+            icon={Target}
+            tone="balance"
+          />
+          <StatCard
+            label="סה״כ מוקצה"
+            value={`₪${allocationResult.summary.total_allocated.toLocaleString('he-IL')}`}
+            icon={TrendingUp}
+            tone="neutral"
+          />
+          <StatCard
+            label="מצב תקציבי"
+            value={
+              allocationResult.safetyCheck.comfort_level === 'excellent' ? 'מצוין' :
+              allocationResult.safetyCheck.comfort_level === 'comfortable' ? 'נוח' :
+              allocationResult.safetyCheck.comfort_level === 'tight' ? 'צמוד' : 'קריטי'
+            }
+            icon={allocationResult.safetyCheck.passed ? CheckCircle2 : AlertCircle}
+            tone={allocationResult.safetyCheck.passed ? 'income' : 'expense'}
+          />
+        </KpiGrid>
+      )}
         
       {/* אזהרות */}
       {allocationResult && allocationResult.warnings.length > 0 && (
@@ -563,14 +532,14 @@ export default function GoalsPage() {
               {allocationResult.suggestions.map((suggestion, i) => (
                 <div key={i} className="flex items-start gap-3 p-4 bg-white rounded-lg">
                   <div className={`rounded-full p-2 ${
-                    suggestion.priority === 'high' ? 'bg-red-100' :
-                    suggestion.priority === 'medium' ? 'bg-yellow-100' :
-                    'bg-green-100'
+                    suggestion.priority === 'high' ? 'bg-red-50' :
+                    suggestion.priority === 'medium' ? 'bg-amber-50' :
+                    'bg-emerald-50'
                   }`}>
                     <TrendingUp className={`w-5 h-5 ${
-                      suggestion.priority === 'high' ? 'text-red-600' :
-                      suggestion.priority === 'medium' ? 'text-yellow-600' :
-                      'text-green-600'
+                      suggestion.priority === 'high' ? 'text-phi-coral' :
+                      suggestion.priority === 'medium' ? 'text-phi-gold' :
+                      'text-phi-mint'
                     }`} />
                   </div>
                   <div className="flex-1">

@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { PageWrapper } from '@/components/ui/design-system';
+import { PageWrapper, PageHeader } from '@/components/ui/design-system';
 import { useToast } from '@/components/ui/toaster';
 
 type SimType = 'loan' | 'savings';
@@ -213,14 +213,10 @@ export default function SimulatorPage() {
 
   return (
     <PageWrapper>
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-phi-dark flex items-center gap-3 mb-2">
-            <Calculator className="w-8 h-8 text-phi-gold" />
-            סימולטור פיננסי
-          </h1>
-          <p className="text-phi-slate">חשב הלוואה או חיסכון, ושמור כיעד אוטומטי</p>
-        </div>
+        <PageHeader
+          title="סימולטור פיננסי"
+          subtitle="חשב הלוואה או חיסכון, ושמור כיעד אוטומטי"
+        />
 
         {/* Type Toggle */}
         <div className="flex gap-2 mb-6">
@@ -420,7 +416,7 @@ export default function SimulatorPage() {
               </CardHeader>
               <CardContent>
                 {/* Main result card */}
-                <div className={`rounded-xl p-6 mb-6 ${isLoan ? 'bg-gradient-to-br from-red-50 to-orange-50' : 'bg-gradient-to-br from-green-50 to-emerald-50'}`}>
+                <div className={`rounded-xl p-6 mb-6 border ${isLoan ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
                   <p className="text-sm text-phi-slate mb-1">
                     {isLoan ? 'תשלום חודשי' : 'ערך צפוי בסוף התקופה'}
                   </p>

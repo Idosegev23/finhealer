@@ -86,7 +86,7 @@ export default function IncomePage() {
   };
 
   return (
-    <PageWrapper className="max-w-7xl">
+    <PageWrapper maxWidth="wide">
       <WhatsAppBanner message="רוצה להוסיף מקור הכנסה? לעדכן תלוש משכורת? דבר עם הבוט! 💼" />
 
       {/* Month Selector */}
@@ -122,7 +122,7 @@ export default function IncomePage() {
       
       {/* Header */}
       <PageHeader
-        title="💰 ההכנסות שלי"
+        title="ההכנסות שלי"
         subtitle="נהל את כל מקורות ההכנסה שלך במקום אחד"
         action={
           <div className="flex items-center gap-3">
@@ -176,7 +176,7 @@ export default function IncomePage() {
 
       {loading && incomeSources.length === 0 ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+          <Loader2 className="w-12 h-12 text-phi-gold animate-spin" />
         </div>
       ) : (
         <>
@@ -187,31 +187,27 @@ export default function IncomePage() {
                 label="הכנסה ממקורות קבועים"
                 value={SmartIncomeCalculator.formatAmount(stats.totalMonthlyIncome)}
                 icon={DollarSign}
-                iconColor="text-blue-600"
-                iconBg="bg-blue-50"
+                tone="balance"
               />
               <StatCard
                 label="הכנסה מתנועות החודש"
                 value={`₪${stats.totalMonthlyIncomeFromTransactions?.toLocaleString('he-IL') || '0'}`}
                 subtitle={`${stats.transactionIncomeCount || 0} תנועות`}
                 icon={TrendingUp}
-                iconColor="text-green-600"
-                iconBg="bg-green-50"
+                tone="income"
               />
               <StatCard
                 label="סה״כ הכנסה כוללת"
                 value={`₪${stats.totalCombinedIncome?.toLocaleString('he-IL') || '0'}`}
                 icon={BarChart3}
-                iconColor="text-purple-600"
-                iconBg="bg-purple-50"
+                tone="income"
               />
               <StatCard
                 label="מספר מקורות"
                 value={stats.total.toString()}
                 subtitle="מקורות קבועים"
                 icon={BarChart3}
-                iconColor="text-blue-600"
-                iconBg="bg-blue-50"
+                tone="neutral"
               />
             </div>
           )}
@@ -308,7 +304,7 @@ function EmptyState({ onAddIncome }: { onAddIncome: () => void }) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="text-center py-20 bg-gradient-to-br from-blue-50 via-purple-50 to-green-50 rounded-2xl border-2 border-dashed border-blue-200"
+      className="text-center py-16 bg-white rounded-xl border border-dashed border-phi-gold/40"
     >
       <motion.div 
         className="w-24 h-24 rounded-full bg-white shadow-lg flex items-center justify-center mx-auto mb-6"

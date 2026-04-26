@@ -62,13 +62,12 @@ export default function LoansDataPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl" dir="rtl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">הוסף הלוואה 🏦</h1>
-        <p className="mt-2 text-gray-600">
-          הזן פרטי הלוואה או עבור לסימולטור איחוד
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
+      <div className="max-w-3xl mx-auto space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">הוסף הלוואה</h1>
+          <p className="text-sm text-gray-500 mt-1">הזן פרטי הלוואה או עבור לסימולטור איחוד</p>
+        </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Manual Entry */}
@@ -198,6 +197,7 @@ export default function LoansDataPage() {
 
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

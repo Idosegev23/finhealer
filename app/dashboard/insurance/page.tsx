@@ -6,7 +6,7 @@ import { PlusCircle, Shield, Heart, AlertTriangle } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { AddInsuranceModal } from "@/components/insurance/AddInsuranceModal";
 import { RequestPensionReport } from "@/components/pension/RequestPensionReport";
-import { PageWrapper, Card as DSCard } from '@/components/ui/design-system';
+import { PageWrapper, PageHeader, Card as DSCard, InsightBanner } from '@/components/ui/design-system';
 
 interface Insurance {
   id: string;
@@ -72,34 +72,21 @@ export default function InsurancePage() {
 
   return (
     <PageWrapper>
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <Shield className="w-8 h-8 text-phi-dark" />
-                תיק הביטוח שלי
-                <InfoTooltip
-                  content="כאן תוכל לנהל את כל הביטוחים שלך - חיים, בריאות, מחלות קשות, סיעודי ותאונות אישיות"
-                  type="info"
-                />
-              </h1>
-              <p className="text-phi-slate mt-2">ניהול מרכזי של כל הביטוחים שלך</p>
-            </div>
-            <Button 
+        <PageHeader
+          title="תיק הביטוח שלי"
+          subtitle="ניהול מרכזי של כל הביטוחים — חיים, בריאות, מחלות קשות, סיעודי, תאונות אישיות"
+          action={
+            <Button
               onClick={() => setShowAddModal(true)}
-              className="bg-phi-mint hover:bg-phi-mint/90 text-white"
+              className="bg-phi-dark hover:bg-phi-slate text-white"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף ביטוח
             </Button>
-          </div>
-        </div>
+          }
+        />
 
-        {/* Request Pension Report from Gadi */}
-        <div className="mb-8">
-          <RequestPensionReport />
-        </div>
+        <RequestPensionReport />
 
         {/* Missing Insurances Alert */}
         {missingInsurances.length > 0 && (
@@ -250,54 +237,31 @@ export default function InsurancePage() {
           </div>
         )}
 
-        {/* Info Section */}
-        <div className="mt-8 bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6 shadow-sm animate-slide-up">
+        <DSCard padding="lg">
           <div className="flex items-start gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
-              <span className="text-xl">💡</span>
+            <div className="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center flex-shrink-0">
+              <Shield className="w-5 h-5 text-phi-dark" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-blue-900 mb-1">
-                טיפים חכמים לניהול תיק ביטוח
-              </h3>
-              <p className="text-sm text-blue-700">
-                כי ביטחון זה לא מותרות - זה הכרח
-              </p>
+              <h3 className="text-base font-bold text-gray-900 mb-0.5">טיפים חכמים לניהול תיק ביטוח</h3>
+              <p className="text-sm text-gray-500">כי ביטחון זה לא מותרות — זה הכרח</p>
             </div>
           </div>
-          <ul className="space-y-3 text-sm text-blue-800">
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-blue-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>ביטוח חיים</strong> - מומלץ כיסוי של פי 10 מההכנסה השנתית. זה מגן על המשפחה במקרה הגרוע ביותר
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-blue-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>ביטוח בריאות משלים</strong> - השקעה של 200-300 ₪ בחודש שיכולה לחסוך 50,000-100,000 ₪ בניתוח
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-blue-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>מחלות קשות</strong> - חובה אם יש משפחה או משכנתא. זה הביטחון שהכסף לא יגמר במצב קשה
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-blue-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>ביטוח סיעודי</strong> - ככל שמתחילים צעירים יותר, הפרמיות זולות יותר. אל תחכו!
-              </span>
-            </li>
-            <li className="flex gap-3 items-start bg-white/50 p-3 rounded-lg hover:bg-white/80 transition-colors">
-              <span className="text-blue-500 font-bold">✓</span>
-              <span className="leading-relaxed">
-                <strong>עדכנו בשינויים גדולים</strong> - נישואין, ילד, משכנתא חדשה? זה הזמן לבדוק את הכיסויים
-              </span>
-            </li>
+          <ul className="space-y-2 text-sm text-gray-700">
+            {[
+              { title: 'ביטוח חיים', body: 'מומלץ כיסוי של פי 10 מההכנסה השנתית. זה מגן על המשפחה במקרה הגרוע ביותר' },
+              { title: 'ביטוח בריאות משלים', body: 'השקעה של 200-300 ₪ בחודש שיכולה לחסוך 50,000-100,000 ₪ בניתוח' },
+              { title: 'מחלות קשות', body: 'חובה אם יש משפחה או משכנתא. זה הביטחון שהכסף לא יגמר במצב קשה' },
+              { title: 'ביטוח סיעודי', body: 'ככל שמתחילים צעירים יותר, הפרמיות זולות יותר. אל תחכו' },
+              { title: 'עדכון בשינויים גדולים', body: 'נישואין, ילד, משכנתא חדשה — זה הזמן לבדוק את הכיסויים' },
+            ].map((tip, i) => (
+              <li key={i} className="flex gap-3 items-start">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-phi-dark/10 text-phi-dark flex items-center justify-center text-xs font-bold mt-0.5">✓</span>
+                <span className="leading-relaxed"><strong className="text-gray-900">{tip.title}</strong> — {tip.body}</span>
+              </li>
+            ))}
           </ul>
-        </div>
+        </DSCard>
 
       {/* Add Insurance Modal */}
       <AddInsuranceModal

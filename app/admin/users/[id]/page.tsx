@@ -190,10 +190,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8" dir="rtl">
-      <div className="max-w-4xl mx-auto">
-        {/* Back link */}
-        <Link href="/admin/users" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 mb-6">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
+      <div className="max-w-5xl mx-auto space-y-5">
+        <Link href="/admin/users" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-phi-dark transition-colors">
           <ArrowRight className="w-4 h-4" />
           חזרה לרשימת משתמשים
         </Link>

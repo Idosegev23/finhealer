@@ -6,7 +6,7 @@ import { DashboardWrapper } from '@/components/dashboard/DashboardWrapper';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { CreditCard, TrendingDown, DollarSign, Clock, Plus, ChevronDown, ChevronUp } from 'lucide-react';
-import { Card as DSCard, EmptyState as DSEmptyState, PageHeader } from '@/components/ui/design-system';
+import { Card as DSCard, EmptyState as DSEmptyState, PageHeader, KpiGrid, StatCard, PageWrapper } from '@/components/ui/design-system';
 
 interface Loan {
   id: string;
@@ -96,32 +96,30 @@ export default function LoansPage() {
   if (error) {
     return (
       <DashboardWrapper>
-        <div className="min-h-screen bg-gray-50 p-4 md:p-6 flex items-center justify-center" dir="rtl">
-          <div className="text-center space-y-4">
-            <div className="text-red-500 text-lg font-semibold">{error}</div>
-            <Button onClick={fetchLoans} className="bg-blue-600 hover:bg-blue-700 text-white">
+        <PageWrapper>
+          <div className="text-center py-20 space-y-4">
+            <div className="text-phi-coral text-base font-semibold">{error}</div>
+            <Button onClick={fetchLoans} className="bg-phi-dark hover:bg-phi-slate text-white">
               נסה שוב
             </Button>
           </div>
-        </div>
+        </PageWrapper>
       </DashboardWrapper>
     );
   }
 
   return (
     <DashboardWrapper>
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
-        <div className="max-w-5xl mx-auto space-y-5">
-        {/* Header */}
+      <PageWrapper>
         <PageHeader
           title="הלוואות"
           subtitle="מעקב והיסטוריה של כל ההלוואות שלך"
           action={
             <Button
               onClick={() => window.location.href = '/dashboard/data/loans'}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-phi-dark hover:bg-phi-slate text-white"
             >
-              <Plus className="w-5 h-5 ml-2" />
+              <Plus className="w-4 h-4 ml-2" />
               הוסף הלוואה
             </Button>
           }
@@ -136,44 +134,33 @@ export default function LoansPage() {
           />
           ) : (
             <>
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <DSCard padding="lg" className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-blue-500">
-                  <div className="flex items-center justify-between mb-2">
-                    <CreditCard className="w-8 h-8 opacity-80" />
-                    <span className="text-sm opacity-80">הלוואות פעילות</span>
-                  </div>
-                  <div className="text-3xl font-bold">{loans.filter(l => l.active).length}</div>
-              </DSCard>
-
-              <DSCard padding="lg" className="bg-gradient-to-br from-red-500 to-red-600 text-white border-red-500">
-                  <div className="flex items-center justify-between mb-2">
-                    <TrendingDown className="w-8 h-8 opacity-80" />
-                    <span className="text-sm opacity-80">תשלום חודשי</span>
-                  </div>
-                  <div className="text-3xl font-bold">₪{totalMonthlyPayments.toLocaleString('he-IL')}</div>
-              </DSCard>
-
-              <DSCard padding="lg" className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-orange-500">
-                  <div className="flex items-center justify-between mb-2">
-                    <DollarSign className="w-8 h-8 opacity-80" />
-                    <span className="text-sm opacity-80">סה״כ חוב</span>
-                  </div>
-                  <div className="text-3xl font-bold">
-                    {totalDebt > 0 ? `₪${totalDebt.toLocaleString('he-IL')}` : 'לא ידוע'}
-                  </div>
-              </DSCard>
-
-              <DSCard padding="lg" className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-purple-500">
-                  <div className="flex items-center justify-between mb-2">
-                    <Clock className="w-8 h-8 opacity-80" />
-                    <span className="text-sm opacity-80">ריבית ממוצעת</span>
-                  </div>
-                  <div className="text-3xl font-bold">
-                    {averageInterest > 0 ? `${averageInterest.toFixed(1)}%` : 'לא ידוע'}
-                  </div>
-              </DSCard>
-            </div>
+            {/* Summary KPIs — semantic palette */}
+            <KpiGrid cols={4}>
+              <StatCard
+                label="הלוואות פעילות"
+                value={loans.filter(l => l.active).length}
+                icon={CreditCard}
+                tone="neutral"
+              />
+              <StatCard
+                label="תשלום חודשי"
+                value={`₪${totalMonthlyPayments.toLocaleString('he-IL')}`}
+                icon={TrendingDown}
+                tone="expense"
+              />
+              <StatCard
+                label="סה״כ חוב"
+                value={totalDebt > 0 ? `₪${totalDebt.toLocaleString('he-IL')}` : 'לא ידוע'}
+                icon={DollarSign}
+                tone="expense"
+              />
+              <StatCard
+                label="ריבית ממוצעת"
+                value={averageInterest > 0 ? `${averageInterest.toFixed(1)}%` : 'לא ידוע'}
+                icon={Clock}
+                tone="pending"
+              />
+            </KpiGrid>
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -230,11 +217,11 @@ export default function LoansPage() {
                           <div className="flex items-center gap-3">
                             <h3 className="font-bold text-lg text-gray-900">{loan.lender_name}</h3>
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              loan.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                              loan.active ? 'bg-emerald-50 text-phi-mint border border-emerald-200' : 'bg-gray-50 text-gray-600 border border-gray-200'
                             }`}>
                               {loan.active ? 'פעיל' : 'סגור'}
                             </span>
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                            <span className="px-2 py-1 rounded text-xs font-medium bg-sky-50 text-phi-dark border border-sky-200">
                               {loan.loan_type === 'personal' ? 'אישית' : 
                                loan.loan_type === 'mortgage' ? 'משכנתא' :
                                loan.loan_type === 'car' ? 'רכב' : loan.loan_type}
@@ -267,8 +254,7 @@ export default function LoansPage() {
             </DSCard>
           </>
         )}
-        </div>
-      </div>
+      </PageWrapper>
     </DashboardWrapper>
   );
 }

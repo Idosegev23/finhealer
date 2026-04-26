@@ -177,19 +177,12 @@ export default function ManualInputPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-phi-mint/10 via-white to-phi-coral/10 py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        {/* Header */}
-        <Card className="bg-gradient-to-l from-phi-gold/10 to-phi-coral/10 border-4 border-phi-gold/30 p-8 mb-8">
-          <div className="text-center">
-            <h1 className="text-4xl font-black text-phi-dark mb-4">
-              הזנה ידנית ✍️
-            </h1>
-            <p className="text-xl text-gray-700">
-              מלא את הפרטים הבסיסיים שלך - זה ייקח רק כמה דקות
-            </p>
-          </div>
-        </Card>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
+      <div className="max-w-3xl mx-auto space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">הזנה ידנית</h1>
+          <p className="text-sm text-gray-500 mt-1">מלא את הפרטים הבסיסיים שלך — ייקח כמה דקות</p>
+        </div>
 
         {/* Section 1: Income Sources */}
         <Card className="p-8 mb-8 border-2 border-green-200">
