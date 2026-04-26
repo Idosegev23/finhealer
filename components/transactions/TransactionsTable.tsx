@@ -73,21 +73,38 @@ export default function TransactionsTable({
   const channelRef = useRef<RealtimeChannel | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Real-time: refetch transactions when changes are detected
+  // Real-time: refetch transactions when changes are detected.
+  // Match the same window the parent server-rendered: 30 days, expanding to
+  // 90 / all-time when empty (mirrors app/dashboard/transactions/page.tsx).
+  // Hardcoding 30 days here was the bug — for users with historical-only
+  // data (e.g. October statement loaded in April), every edit triggered a
+  // refetch that returned zero rows and cleared the table.
   const refetchTransactions = useCallback(async () => {
     try {
       const supabase = createClient();
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
 
-      const { data } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', userId)
-        .gte('tx_date', thirtyDaysAgoStr)
-        .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true')
-        .order('tx_date', { ascending: false });
+      const probe = async (cutoffISO: string) => {
+        const { data } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', userId)
+          .gte('tx_date', cutoffISO)
+          .or('has_details.is.null,has_details.eq.false,is_cash_expense.eq.true')
+          .order('tx_date', { ascending: false });
+        return data;
+      };
+
+      const today = new Date();
+      const thirty = new Date(today); thirty.setDate(today.getDate() - 30);
+      let data = await probe(thirty.toISOString().split('T')[0]);
+
+      if (!data || data.length === 0) {
+        const ninety = new Date(today); ninety.setDate(today.getDate() - 90);
+        data = await probe(ninety.toISOString().split('T')[0]);
+      }
+      if (!data || data.length === 0) {
+        data = await probe('1900-01-01');
+      }
 
       if (data) setTransactions(data as any);
     } catch (err) {
