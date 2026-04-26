@@ -459,10 +459,6 @@ export default function BudgetPage() {
                       <span className="font-bold mr-2">{getPhaseLabel(currentPhase)}</span>
                   </div>
                   </div>
-                  <Button size="sm" className="bg-phi-gold hover:bg-phi-coral text-white">
-                    <MessageCircle className="w-4 h-4 ml-2" />
-                    המשך ב-WhatsApp
-                </Button>
                 </div>
               </CardContent>
             </Card>
@@ -1285,7 +1281,7 @@ export default function BudgetPage() {
                         <div className="text-center py-12">
                           <BarChart3 className="w-16 h-16 text-phi-frost mx-auto mb-4" />
                           <p className="text-phi-slate mb-2">אין עדיין נתוני הוצאות</p>
-                          <p className="text-sm text-phi-slate mb-4">שלח דוחות בנק בוואטסאפ כדי שנוכל לנתח את ההוצאות שלך</p>
+                          <p className="text-sm text-phi-slate mb-4">העלה דוחות בנק כדי שנוכל לנתח את ההוצאות שלך</p>
                           <div className="flex gap-3 justify-center">
                             <Button onClick={createSmartBudget} disabled={creating} className="bg-phi-gold text-white">
                               <Sparkles className="w-4 h-4 ml-2" />

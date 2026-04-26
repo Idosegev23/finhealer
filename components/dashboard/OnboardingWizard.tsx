@@ -29,19 +29,19 @@ export function OnboardingWizard({ userName, hasTransactions, phase }: Props) {
         <div className="flex gap-2 mt-3">
           <Link
             href="/dashboard/scan-center"
-            className="flex items-center gap-2 bg-amber-500 text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-amber-600 transition"
+            className="flex items-center gap-2 bg-phi-dark text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-phi-slate transition"
           >
             <Upload className="w-3.5 h-3.5" />
-            העלה מהמחשב
+            העלה במחשב
           </Link>
           <a
             href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ''}?text=היי`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-green-500 text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-green-600 transition"
+            className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-xs font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition"
           >
             <Smartphone className="w-3.5 h-3.5" />
-            שלח בוואטסאפ
+            או בוואטסאפ
           </a>
         </div>
       ),

@@ -14,7 +14,6 @@ import {
   List,
   Grid3x3,
 } from 'lucide-react';
-import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner';
 import ConversationalIncomeWizard from '@/components/income/ConversationalIncomeWizard';
 import IncomeTable from '@/components/income/IncomeTable';
 import { SmartIncomeCalculator } from '@/components/income/SmartIncomeCalculator';
@@ -99,8 +98,6 @@ export default function IncomePage() {
 
   return (
     <PageWrapper maxWidth="wide">
-      <WhatsAppBanner message="רוצה להוסיף מקור הכנסה? לעדכן תלוש משכורת? דבר עם הבוט! 💼" />
-
       {/* Month Selector */}
       <div className="flex flex-col items-center gap-1 mb-4">
         <div className="flex items-center justify-center gap-3">

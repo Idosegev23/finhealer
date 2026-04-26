@@ -273,7 +273,7 @@ export default async function DashboardPage() {
           <EmptyState
             icon={FileText}
             title="אין עדיין תנועות"
-            description="שלח דוח בנק בוואטסאפ או העלה מהדשבורד."
+            description="העלה דוח בנק כדי להתחיל לראות את התמונה הפיננסית שלך."
             action={{ label: 'העלה דוח ראשון', href: '/dashboard/scan-center' }}
           />
         ) : (

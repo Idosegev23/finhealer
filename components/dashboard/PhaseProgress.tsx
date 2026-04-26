@@ -18,9 +18,9 @@ const phases = [
 
 const phaseMessages = {
   data_collection: {
-    title: 'מתחילים! 🚀',
-    description: 'שלח דוחות בנק/אשראי, ואני אסווג ואצור תמונה ברורה',
-    nextStep: 'שלח דוח בוואטסאפ',
+    title: 'מתחילים',
+    description: 'העלה דוחות בנק/אשראי, ואני אסווג ואצור תמונה ברורה',
+    nextStep: 'העלה דוח',
     daysUntil: 0
   },
   behavior: {

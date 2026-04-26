@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import Link from 'next/link';
-import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner';
 import TransactionDetailsView from '@/components/dashboard/TransactionDetailsView';
 import { PageWrapper, PageHeader, Card as DSCard, EmptyState } from '@/components/ui/design-system';
 
@@ -88,8 +87,6 @@ export default function ExpensesPage() {
 
   return (
     <PageWrapper>
-        <WhatsAppBanner message="רוצה לרשום הוצאה חדשה? פשוט תכתוב לבוט! 📝" />
-
         <PageHeader
           title="הוצאות"
           subtitle="מעקב והיסטוריה של כל ההוצאות שלך"

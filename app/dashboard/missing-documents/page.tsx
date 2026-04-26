@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { FileText, CreditCard, FileCheck, Building2, AlertCircle, Upload, X, CheckCircle, Filter, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner';
 
 interface MissingDocument {
   id: string;
@@ -180,8 +179,6 @@ export default function MissingDocumentsPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
       <div className="max-w-5xl mx-auto space-y-5">
-        <WhatsAppBanner message="רוצה להעלות מסמך? שלח אותו דרך WhatsApp! 📄" />
-
         <button
           onClick={() => router.push('/dashboard')}
           className="flex items-center gap-2 text-sm text-gray-600 hover:text-phi-dark font-medium transition-colors"

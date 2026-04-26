@@ -176,20 +176,12 @@ export function PendingTransactions({ userId, whatsappLink }: PendingTransaction
                 )}
               </div>
 
-              {/* CTA */}
-              {whatsappLink && (
-                <a 
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block"
-                >
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white gap-2">
-                    <MessageCircle className="w-4 h-4" />
-                    סווג בוואטסאפ
-                  </Button>
-                </a>
-              )}
+              {/* CTA — direct to web classification */}
+              <a href="/dashboard/expenses/pending" className="block">
+                <Button className="w-full bg-phi-dark hover:bg-phi-slate text-white">
+                  סווג עכשיו
+                </Button>
+              </a>
 
               {/* Last Update */}
               {lastUpdate && (

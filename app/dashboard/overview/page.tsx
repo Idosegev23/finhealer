@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, Wallet, BarChart3,
   Target, PiggyBank, Landmark, Briefcase,
-  ChevronLeft, MessageCircle, type LucideIcon,
+  ChevronLeft, type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
-import WhatsAppBanner from '@/components/dashboard/WhatsAppBanner'
 import { ExpensesPieBudget } from '@/components/dashboard/ExpensesPieBudget'
 import {
   PageWrapper, PageHeader, KpiGrid, StatCard, Section,
@@ -137,8 +136,6 @@ export default async function OverviewPage() {
 
   return (
     <PageWrapper>
-      <WhatsAppBanner message="רוצה לעדכן נתונים? לשאול שאלה? כל זה דרך WhatsApp! 💬" />
-
       <PageHeader
         title="סקירה כללית"
         subtitle={`${monthName} — ${activePeriod.isFallback ? 'החודש האחרון עם דאטה' : 'תמונת מצב פיננסית'}`}
@@ -323,9 +320,8 @@ function ModuleLink({ title, icon: Icon, count, detail, subDetail, href }: {
             <p className="text-xs text-gray-500 mt-1">{count} רשומות</p>
           </>
         ) : (
-          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-            <MessageCircle className="w-3 h-3" />
-            עדכן ב-WhatsApp
+          <p className="text-xs text-gray-500 mt-1">
+            עוד אין נתונים — לחץ להוסיף
           </p>
         )}
       </Card>

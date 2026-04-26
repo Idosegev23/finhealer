@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { PhiSidebar } from '@/components/dashboard/PhiSidebar';
 import { PhiHeader } from '@/components/dashboard/PhiHeader';
 import { DashboardWrapper } from '@/components/dashboard/DashboardWrapper';
-import FloatingWhatsAppButton from '@/components/dashboard/FloatingWhatsAppButton';
 
 export default function DashboardLayout({
   children,
@@ -40,9 +39,6 @@ export default function DashboardLayout({
             {children}
           </main>
         </div>
-
-        {/* Floating WhatsApp Button - Always visible */}
-        <FloatingWhatsAppButton />
       </div>
     </DashboardWrapper>
   );

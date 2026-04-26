@@ -262,9 +262,6 @@ function ScanCenterContent() {
         }
       />
 
-      <InsightBanner variant="info" title="הסריקה עוברת בעיקר דרך WhatsApp">
-        שלח דוחות לבוט בוואטסאפ והמערכת תעבד אותם אוטומטית. דף זה הוא לצפייה ולהעלאות אד-הוק.
-      </InsightBanner>
 
         {!checkingBankStatement && !hasBankStatement && (
           <InsightBanner variant="warning" icon={AlertCircle} title="התחל עם דוח בנק">
