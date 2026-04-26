@@ -1069,10 +1069,12 @@ export async function phiBrain(
         break;
       }
 
-      // ── CLASSIFY ──
+      // ── CLASSIFY — actually delegate to the classification flow ──
       case 'classify': {
-        action.classify = true;
-        action.sendMessage = decision.message || 'מסווג תנועות...';
+        const { startClassification } = await import('@/lib/conversation/states/classification');
+        const ctxForClass = { userId, phone: ctx.phone, state: 'classification' as any, userName: ctx.userName };
+        await startClassification(ctxForClass);
+        action.silent = true; // startClassification sends its own message
         break;
       }
 
