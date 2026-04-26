@@ -549,6 +549,17 @@ export async function chatWithTools(opts: {
         maxOutputTokens: opts.maxOutputTokens || 2000,
         tools,
       };
+      if (opts.enableWebTools) {
+        // Required when mixing built-in tools (google_search/url_context/
+        // code_execution) with custom function declarations. Without this the
+        // API rejects with: "Please enable tool_config.
+        // include_server_side_tool_invocations to use Built-in tools with
+        // Function calling."
+        chatConfig.toolConfig = {
+          ...(chatConfig.toolConfig || {}),
+          includeServerSideToolInvocations: true,
+        };
+      }
       if (opts.responseJsonSchema) {
         chatConfig.responseMimeType = 'application/json';
         chatConfig.responseJsonSchema = opts.responseJsonSchema;
