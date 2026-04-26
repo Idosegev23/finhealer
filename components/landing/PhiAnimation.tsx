@@ -1,7 +1,6 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import Image from 'next/image'
 
 interface PhiAnimationProps {
   className?: string
@@ -38,14 +37,8 @@ export default function PhiAnimation({ className = '' }: PhiAnimationProps) {
             ease: "easeInOut"
           }}
         >
-          <Image
-            src="/logo.png"
-            alt="Phi Logo"
-            width={180}
-            height={180}
-            className="w-[120px] md:w-[180px] h-auto object-contain"
-            priority
-          />
+          {/* Brand mark — the φ glyph in serif gold (no PNG asset). */}
+          <span className="font-serif text-phi-gold text-[120px] md:text-[180px] leading-none">ϕ</span>
         </motion.div>
       </motion.div>
 

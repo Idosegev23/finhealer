@@ -317,11 +317,13 @@ function ProfileTab() {
         return;
       }
 
+      // maybeSingle: profile row may not exist yet for new users (first
+      // time they open settings before saving). single() returned 406.
       const { data: financialProfile } = await supabase
         .from('user_financial_profile')
         .select('birth_date, city, marital_status, children_count')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       const profileData = profile as any;
       const finData = financialProfile as any;

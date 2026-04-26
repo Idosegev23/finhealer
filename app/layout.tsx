@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: '/favicon.ico',
-    apple: '/logo.png',
+    apple: '/favicon.ico',
   },
   viewport: {
     width: 'device-width',
@@ -47,13 +47,13 @@ export const metadata: Metadata = {
     siteName: 'Phi - FinHealer',
     locale: 'he_IL',
     type: 'website',
-    images: [{ url: '/logo.png', width: 512, height: 512, alt: 'Phi Logo' }],
+    images: [{ url: '/favicon.ico', width: 512, height: 512, alt: 'Phi Logo' }],
   },
   twitter: {
     card: 'summary',
     title: 'Phi (ϕ) - היחס הזהב של הכסף שלך',
     description: 'פלטפורמה חכמה לבריאות פיננסית עם ליווי אישי',
-    images: ['/logo.png'],
+    images: ['/favicon.ico'],
   },
 }
 

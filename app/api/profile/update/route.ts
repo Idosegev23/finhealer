@@ -12,23 +12,37 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { 
-      name, 
-      phone, 
-      birth_date, 
-      city, 
-      marital_status, 
-      children_count 
+    const {
+      name,
+      phone,
+      birth_date,
+      city,
+      marital_status,
+      children_count,
     } = body
 
     console.log('📝 Updating profile for user:', user.id, body)
 
-    // עדכון פרופיל בסיסי ב-users
+    // Postgres rejects '' for date / integer columns. Normalize empty
+    // strings to null so the upsert doesn't 500 when the form leaves a
+    // field blank.
+    const cleanStr = (v: any) => (v === '' || v === undefined ? null : v)
+    const cleanInt = (v: any) => {
+      if (v === '' || v === null || v === undefined) return null
+      const n = Number(v)
+      return Number.isFinite(n) ? n : null
+    }
+    const cleanDate = (v: any) => {
+      if (!v || v === '') return null
+      const d = new Date(v)
+      return Number.isNaN(d.getTime()) ? null : v
+    }
+
     const { error: usersUpdateError } = await supabase
       .from('users')
       .update({
-        name,
-        phone,
+        name: cleanStr(name),
+        phone: cleanStr(phone),
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)
@@ -37,21 +51,20 @@ export async function POST(request: Request) {
       console.error('❌ Error updating users table:', usersUpdateError)
     }
 
-    // עדכון פרטים אישיים ב-user_financial_profile
     const { data: updatedUser, error: updateError } = await supabase
       .from('user_financial_profile')
       .upsert({
         user_id: user.id,
-        birth_date,
-        city,
-        marital_status,
-        children_count,
+        birth_date: cleanDate(birth_date),
+        city: cleanStr(city),
+        marital_status: cleanStr(marital_status),
+        children_count: cleanInt(children_count),
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id'
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (updateError) {
       console.error('❌ Error updating profile:', updateError)
