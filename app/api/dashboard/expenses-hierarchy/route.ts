@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
     if (level === '3' && expenseType && expenseCategory) {
       const { data: transactions, error: queryError } = await supabase
         .from('transactions')
-        .select('vendor, amount, date, notes, expense_category, id') // הוספת id
+        .select('vendor, amount, tx_date, notes, expense_category, id')
         .eq('user_id', user.id)
         .eq('type', 'expense')
         .eq('status', 'confirmed')

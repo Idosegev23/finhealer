@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
       // תנועות הכנסה מהתקופה
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
-        .select('amount, vendor, notes, date, category')
+        .select('amount, vendor, notes, tx_date, category')
         .eq('user_id', user.id)
         .eq('type', 'income')
         .eq('status', 'confirmed')

@@ -113,11 +113,11 @@ export default function GoalsPage() {
         
         if (error) throw error;
       } else {
-        // יצירה חדשה
+        // יצירה חדשה — user_id חובה ל-RLS
         const { error } = await supabase
           .from('goals')
-          .insert([{ ...goalData, current_amount: 0 }]);
-        
+          .insert([{ ...goalData, user_id: userId, current_amount: 0 }]);
+
         if (error) throw error;
       }
       

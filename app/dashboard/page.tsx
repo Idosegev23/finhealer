@@ -89,7 +89,7 @@ export default async function DashboardPage() {
       .limit(4),
     supabase
       .from('behavior_insights')
-      .select('title, description, insight_type, priority')
+      .select('title, insight_text, insight_type, priority')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(3),
@@ -257,7 +257,7 @@ export default async function DashboardPage() {
                   insight.priority === 'medium' ? 'warning' : 'info';
                 return (
                   <InsightBanner key={i} variant={variant} title={insight.title}>
-                    {insight.description}
+                    {insight.insight_text}
                   </InsightBanner>
                 );
               })}

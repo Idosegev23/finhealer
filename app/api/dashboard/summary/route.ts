@@ -57,10 +57,10 @@ export async function GET() {
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + Number(t.amount), 0);
 
-    // מעקב תקציב חודשי
+    // מעקב תקציב חודשי — column names per schema
     const { data: budgetTracking } = await supabase
       .from('monthly_budget_tracking')
-      .select('id, category, allocated_amount, spent_amount, month, status')
+      .select('id, category_name, monthly_cap, actual_spent, percentage_used, remaining_amount, month, status')
       .eq('user_id', user.id);
     
     const budgetData = (budgetTracking || []) as any[];
@@ -82,22 +82,22 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    // ציון בריאות פיננסית
+    // ציון בריאות פיננסית — function param is `p_user_id`
     const { data: healthData } = await supabase
-      .rpc('calculate_financial_health', { user_id: user.id } as any);
+      .rpc('calculate_financial_health', { p_user_id: user.id } as any);
 
     const financialHealth = healthData || 0;
 
-    // baselines (אם יש)
+    // baselines — per-category averages computed by the analyzer
     const { data: baselines } = await supabase
       .from('user_baselines')
-      .select('avg_daily_spending, avg_monthly_income, avg_monthly_expenses, month')
+      .select('category, avg_amount, months_back')
       .eq('user_id', user.id);
 
     // behavior insights אחרונים
     const { data: insights } = await supabase
       .from('behavior_insights')
-      .select('id, insight_type, title, description, priority, data, created_at')
+      .select('id, insight_type, title, insight_text, priority, data, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(3);
