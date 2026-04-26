@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
           transactions.push({
             user_id: userId,
-            date: transactionDate.toISOString().split('T')[0],
+            tx_date: transactionDate.toISOString().split('T')[0],
             vendor: expense.name,
             amount: expense.amount,
             type: 'expense',
@@ -114,17 +114,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Save loans
+    // 3. Save loans — schema columns: lender_name, active (bool), original_amount (NOT NULL)
     if (loans && loans.length > 0) {
       const loansData = loans.map((loan: Loan) => ({
         user_id: userId,
         loan_type: loan.loan_type,
-        lender: 'Unknown', // Default
-        original_amount: loan.current_balance, // Fixed: added required original_amount field
+        lender_name: 'Unknown',
+        original_amount: loan.current_balance, // required NOT NULL — best-effort proxy
         current_balance: loan.current_balance,
         monthly_payment: loan.monthly_payment,
         interest_rate: loan.interest_rate,
-        status: 'active', // Fixed: changed from active: true to status: 'active'
+        active: true,
       }));
 
       const { error: loansError } = await supabase
