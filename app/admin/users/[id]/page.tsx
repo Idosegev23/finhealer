@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, Save, MessageSquare, Send, StickyNote, Trash2 } from 'lucide-react';
 
@@ -36,6 +37,7 @@ interface AdvisorNote {
 
 export default function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const [user, setUser] = useState<UserDetail | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,8 +116,13 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
 
   useEffect(() => {
     fetch(`/api/admin/users/${id}`)
-      .then(res => res.json())
+      .then(async res => {
+        if (res.status === 401) { router.push('/login'); return null; }
+        if (res.status === 403) { router.push('/dashboard'); return null; }
+        return res.json();
+      })
       .then(data => {
+        if (!data) return;
         setUser(data.user);
         setStats(data.stats);
         setEditStatus(data.user?.subscription_status || '');
@@ -124,7 +131,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [id]);
+  }, [id, router]);
 
   async function handleSave() {
     setSaving(true);

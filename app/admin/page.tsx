@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, UserCheck, Clock, UserPlus, FileText, MessageSquare, Activity } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Users, UserCheck, Clock, UserPlus, FileText, MessageSquare, Activity, Lock } from 'lucide-react';
 
 interface Stats {
   totalUsers: number;
@@ -14,18 +15,49 @@ interface Stats {
 }
 
 export default function AdminOverviewPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/stats')
-      .then(res => res.json())
-      .then(data => {
+      .then(async res => {
+        if (res.status === 401) {
+          router.push('/login');
+          return;
+        }
+        if (res.status === 403) {
+          setAuthError('אין לך הרשאת אדמין');
+          setLoading(false);
+          return;
+        }
+        const data = await res.json();
         setStats(data);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [router]);
+
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8" dir="rtl">
+        <div className="bg-white rounded-xl shadow-sm p-8 max-w-md text-center">
+          <Lock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">{authError}</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            הדף הזה זמין רק לאדמינים. אם זו טעות, פנה לעידו.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="px-6 py-2 bg-phi-dark text-white rounded-lg text-sm font-medium hover:bg-phi-dark/90"
+          >
+            חזרה לדשבורד
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const cards = stats ? [
     { label: 'סה״כ משתמשים', value: stats.totalUsers, icon: Users, color: 'bg-blue-500' },

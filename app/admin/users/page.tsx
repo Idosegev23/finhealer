@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -41,6 +42,7 @@ const phaseLabels: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -60,6 +62,8 @@ export default function AdminUsersPage() {
 
     try {
       const res = await fetch(`/api/admin/users?${params}`);
+      if (res.status === 401) { router.push('/login'); return; }
+      if (res.status === 403) { router.push('/dashboard'); return; }
       const data = await res.json();
       setUsers(data.users || []);
       setTotalPages(data.totalPages || 1);
@@ -68,7 +72,7 @@ export default function AdminUsersPage() {
       // ignore
     }
     setLoading(false);
-  }, [search, statusFilter, phaseFilter, page]);
+  }, [search, statusFilter, phaseFilter, page, router]);
 
   useEffect(() => {
     fetchUsers();

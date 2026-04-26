@@ -83,11 +83,19 @@ export async function middleware(request: NextRequest) {
     // השלים אונבורדינג = קיים ב-DB + יש טלפון
     const hasCompletedOnboarding = userExistsInDB && !!userData?.phone
 
-    // Admin access — check email allowlist
+    // Admin access — check email allowlist (hardcoded ∪ env var).
+    // Hardcoded list mirrors lib/auth/admin.ts so edits to admin set don't
+    // need both an env redeploy AND a code change.
     if (currentPath.startsWith('/admin')) {
-      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+      const HARDCODED_ADMIN_EMAILS = [
+        'triroars@gmail.com',
+        'gadi@barkai-finance.com',
+        'gadib1206@gmail.com',
+      ]
+      const envEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+      const allAdmins = new Set([...HARDCODED_ADMIN_EMAILS, ...envEmails])
       const userEmail = user.email?.toLowerCase() || ''
-      if (!adminEmails.includes(userEmail)) {
+      if (!allAdmins.has(userEmail)) {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
     }
