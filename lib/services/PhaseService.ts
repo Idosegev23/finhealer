@@ -48,20 +48,23 @@ export interface PhaseInfo {
 // "יעדים לפני תקציב! צריך לדעת את היעדים כדי לבנות תקציב שתומך בהם."
 const PHASE_ORDER: Phase[] = ['data_collection', 'behavior', 'goals', 'budget', 'monitoring'];
 
-// Gating combines BOTH data-gating (enough transactions / statements) AND time-gating
-// (enough calendar time elapsed since signup). A user must satisfy both to advance.
+// Gating is **data-only** — never time-based. An advisor uploading a year
+// of statements on day 1 should advance immediately based on what's in the
+// data, not on how long the user's been signed up.
 //
-// Thresholds tuned for the Mislaka/historical-import flow: when an advisor
-// uploads a year of statements on day 1, we don't want to block them for two
-// weeks just for the "emotional arc". Practical floors:
-//  - behavior: enough signal to detect patterns (≥30 tx, ≥7d data span)
-//  - goals/budget: confirm engagement (3+ days using the system) + ≥50 tx
+//  - behavior:   needs enough tx to detect patterns
+//  - goals:      same, plus user must have classified meaningfully
+//  - budget:     all of the above PLUS at least one active goal
+//  - monitoring: budget + active budget exists
+//
+// minDays / minDaysSinceSignup are kept at 0 (effectively disabled) so we
+// can re-introduce a time gate later without changing the call sites.
 const PHASE_THRESHOLDS: Record<Phase, { minDays: number; minDaysSinceSignup: number; minTx: number }> = {
   data_collection: { minDays: 0, minDaysSinceSignup: 0, minTx: 0 },
-  behavior:        { minDays: 7,  minDaysSinceSignup: 0, minTx: 30 },
-  goals:           { minDays: 14, minDaysSinceSignup: 3, minTx: 50 },
-  budget:          { minDays: 14, minDaysSinceSignup: 3, minTx: 50 },  // gate is "has at least 1 goal" — see calculatePhase
-  monitoring:      { minDays: 14, minDaysSinceSignup: 3, minTx: 50 },  // gate is "has active budget" — see calculatePhase
+  behavior:        { minDays: 0, minDaysSinceSignup: 0, minTx: 30 },
+  goals:           { minDays: 0, minDaysSinceSignup: 0, minTx: 50 },
+  budget:          { minDays: 0, minDaysSinceSignup: 0, minTx: 50 },  // gate is "has at least 1 goal" — see calculatePhase
+  monitoring:      { minDays: 0, minDaysSinceSignup: 0, minTx: 50 },  // gate is "has active budget" — see calculatePhase
 };
 
 const PHASE_NAMES: Record<Phase, string> = {
