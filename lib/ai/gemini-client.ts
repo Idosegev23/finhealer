@@ -249,11 +249,14 @@ export async function chatWithGeminiProVision(
     return await retryWithBackoff(async () => {
       const client = getClient();
 
-      // For large multi-page documents (e.g. 40-page Mislaka reports), the
-      // default Flash setup tends to truncate its analysis after the first
-      // few pages. 'medium' thinking gives the model room to traverse the
-      // entire document before emitting the JSON. Token budget stays at 32k.
-      const isLargePdf = mimeType === 'application/pdf' && base64Image.length > 1_000_000;
+      // Multi-page document attention strategy:
+      //  - >2MB (huge — 30-50 page Mislaka): high thinking, 60k output budget
+      //  - >1MB (large — 10-30 page reports): medium thinking, 32k output
+      //  - else: default
+      // Without this, Flash skims large PDFs and misses the later pages.
+      const sizeMB = mimeType === 'application/pdf' ? base64Image.length / 1_000_000 : 0;
+      const isHuge = sizeMB > 2;
+      const isLarge = sizeMB > 1;
 
       const response = await client.models.generateContent({
         model: FLASH_MODEL,
@@ -272,14 +275,24 @@ export async function chatWithGeminiProVision(
           },
         ],
         config: {
-          maxOutputTokens: 32000,
+          maxOutputTokens: isHuge ? 60000 : 32000,
           responseMimeType: 'application/json',
-          ...(isLargePdf ? { thinkingConfig: { thinkingLevel: 'medium' as any } } : {}),
+          ...(isLarge ? { thinkingConfig: { thinkingLevel: (isHuge ? 'high' : 'medium') as any } } : {}),
         },
       });
 
       const text = response.text || '{}';
-      console.log(`[Gemini Flash Vision] Response length: ${text.length} chars${isLargePdf ? ' (large PDF, medium thinking)' : ''}`);
+      // Flag finish reason — MAX_TOKENS or RECITATION mean we lost data.
+      const finishReason = response.candidates?.[0]?.finishReason;
+      const usage = (response as any).usageMetadata;
+      const tag = isHuge ? 'huge PDF, high thinking' : isLarge ? 'large PDF, medium thinking' : 'default';
+      console.log(
+        `[Gemini Flash Vision] Response: ${text.length} chars | finish=${finishReason || 'STOP'} | ` +
+        `tokens=${usage?.promptTokenCount ?? '?'}+${usage?.candidatesTokenCount ?? '?'} (${tag})`,
+      );
+      if (finishReason && finishReason !== 'STOP') {
+        console.warn(`[Gemini Flash Vision] ⚠️ Non-STOP finish reason: ${finishReason} — output may be truncated`);
+      }
       return text;
     }, 'Gemini Flash Vision');
   } catch (error) {
