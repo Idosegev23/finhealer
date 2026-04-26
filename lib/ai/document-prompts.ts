@@ -1505,17 +1505,23 @@ export function getPensionStatementPrompt(text: string | null): string {
 - וותק - תאריך התחלה (start_date)
 - יתרה נוכחית (current_balance)
 
-**שדות אופציונליים:**
+**שדות אופציונליים — חלץ אם קיים בדוח:**
 - הפקדה חודשית (monthly_deposit)
 - הפקדת עובד (employee_deposit)
 - הפקדת מעסיק (employer_deposit)
 - גיל פרישה (retirement_age)
 - חיסכון לקצבה (pension_savings)
 - חיסכון להון (capital_savings)
-- כיסויים ביטוחיים (insurance_coverage): ביטוח חיים, אובדן כושר עבודה, מחלות קשות וכו'
+- כיסויים ביטוחיים (insurance_coverage): { life_insurance, disability, survivors_pension, critical_illness }
 - תחזית בגיל פרישה (retirement_forecast)
-- מסלול השקעה (investment_track)
-- דמי ניהול (management_fees)
+- מסלול השקעה (investment_track) — שם המסלול הספציפי
+- **דמי ניהול (management_fees)** — אובייקט עם:
+  - \`from_balance\` (ד.ניהול מצבירה / מהיתרה, באחוזים)
+  - \`from_deposit\` (ד.ניהול מהפקדה, באחוזים)
+- **תשואה (annual_return)** — אחוז תשואה שנתית (ממוצע 5 שנים, או השנה האחרונה)
+- **תשואות היסטוריות (returns_history)**: { last_12m, last_24m, last_36m, last_60m, std_36m, std_60m } — אם יש בעמוד "פירוט מסלולי השקעה"
+- **חוב/פיגורים** (debt_status) — אם יש "פיגורים" / "חוב הפקדות" — נציין יש (true/false)
+- **הלוואות בתוכנית** (plan_loans): מערך של { loan_number, original_amount, current_balance, interest_rate, monthly_payment }
 
 ### **3. סיכום כיסויים ביטוחיים (insurance_summary):**
 אם יש כיסויים ביטוחיים, חלץ:

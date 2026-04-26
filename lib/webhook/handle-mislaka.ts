@@ -111,6 +111,27 @@ export async function handleMislakaReport(
     const balance = Number(plan.current_balance || plan.pension_savings || 0) || 0;
     const monthlyDeposit = Number(plan.monthly_deposit || plan.employee_deposit || 0) || 0;
 
+    // management_fees can be either a number ("1.15") or an object
+    // ({ from_balance, from_deposit, from_accumulation }). Extract both.
+    const fees = plan.management_fees;
+    const mgmtFromBalance = typeof fees === 'object' && fees !== null
+      ? parseManagementFee(fees.from_balance ?? fees.from_accumulation)
+      : parseManagementFee(fees);
+    const mgmtFromDeposit = typeof fees === 'object' && fees !== null
+      ? parseManagementFee(fees.from_deposit)
+      : null;
+
+    // annual_return can be a number, an object, or an array of yearly returns
+    const annualReturn = (() => {
+      const r = plan.annual_return;
+      if (typeof r === 'number') return r;
+      if (typeof r === 'string') return parseManagementFee(r);
+      if (typeof r === 'object' && r !== null) {
+        return parseManagementFee(r.average ?? r.annual ?? r.last_year);
+      }
+      return null;
+    })();
+
     const row = {
       user_id: userId,
       fund_name: plan.plan_name || plan.provider || 'לא צוין',
@@ -122,9 +143,9 @@ export async function handleMislakaReport(
       monthly_deposit: monthlyDeposit,
       employer_contribution: Number(plan.employer_deposit || plan.employer_contribution || 0) || 0,
       employee_contribution: Number(plan.employee_deposit || plan.monthly_deposit || 0) || 0,
-      management_fee_percentage: parseManagementFee(plan.management_fees) ?? null,
-      deposit_fee_percentage: null,
-      annual_return: parseManagementFee(plan.annual_return) ?? null,
+      management_fee_percentage: mgmtFromBalance,
+      deposit_fee_percentage: mgmtFromDeposit,
+      annual_return: annualReturn,
       start_date: parseDate(plan.start_date),
       seniority_date: parseDate(plan.seniority_date || plan.start_date),
       active: plan.status !== 'closed' && plan.status !== 'תום תקופה' && plan.status !== 'מוקפא/מסולק/לא פעיל',
@@ -134,6 +155,9 @@ export async function handleMislakaReport(
         retirement_forecast: plan.retirement_forecast,
         investment_track: plan.investment_track,
         insurance_coverage: plan.insurance_coverage,
+        management_fees_raw: plan.management_fees,
+        annual_return_raw: plan.annual_return,
+        returns_history: plan.returns_history || plan.returns,
         document_id: documentId,
         source: 'mislaka',
       }),
