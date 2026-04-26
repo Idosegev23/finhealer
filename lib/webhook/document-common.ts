@@ -391,6 +391,20 @@ export async function postDocumentProcessing(
     }
   }
 
+  // Auto-promote detected patterns into income_sources / recurring_patterns
+  // so the dashboard reflects what the data already shows. Idempotent.
+  let promoteSummary: string | null = null;
+  try {
+    const { autoPromoteFromTransactions, formatPromoteSummary } = await import('@/lib/classification/auto-promote');
+    const promoted = await autoPromoteFromTransactions(userId);
+    if (promoted.incomesCreated > 0 || promoted.recurringCreated > 0) {
+      console.log(`🤖 Auto-promoted: ${promoted.incomesCreated} incomes, ${promoted.recurringCreated} recurring`);
+      promoteSummary = formatPromoteSummary(promoted);
+    }
+  } catch (promoteErr) {
+    console.error('⚠️ Auto-promote error:', promoteErr);
+  }
+
   // Period coverage check
   await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -425,6 +439,15 @@ export async function postDocumentProcessing(
         phoneNumber,
         message: `✅ הדוח התקבל!\n\nכתוב *"נתחיל"* כדי לסדר את ההוצאות וההכנסות.`,
       });
+    } catch { /* best effort */ }
+  }
+
+  // Surface auto-promoted findings as a follow-up message so the user knows
+  // we already filled in their dashboard from the data.
+  if (promoteSummary) {
+    try {
+      const { getGreenAPIClient } = await import('@/lib/greenapi/client');
+      await getGreenAPIClient().sendMessage({ phoneNumber, message: promoteSummary });
     } catch { /* best effort */ }
   }
 

@@ -386,7 +386,7 @@ const BRAIN_ACTIONS = [
   // Data + transactions
   'log_expense', 'undo_expense',
   // Persistence — brain shapes the DB from conversation
-  'create_goal', 'update_goal', 'define_income', 'add_recurring',
+  'create_goal', 'update_goal', 'delete_goal', 'define_income', 'add_recurring', 'pause_recurring',
   // Read-only views
   'show_money_flow', 'show_summary', 'show_chart', 'show_budget', 'show_goals',
   'show_cashflow', 'show_phi_score', 'show_patterns', 'check_duplicates', 'afford_check',
@@ -1263,6 +1263,72 @@ export async function phiBrain(
         const amtStr = amt.toLocaleString('he-IL');
         action.sendMessage = decision.message ||
           `✅ נשמר מנוי: *${vendor}* — ${amtStr}₪${day ? ` ב-${day} לחודש` : ''}.`;
+        break;
+      }
+
+      // ── DELETE GOAL — soft delete by status='archived' ──
+      case 'delete_goal': {
+        const goalName = (params.goal_name || '').trim();
+        if (!goalName) {
+          action.sendMessage = decision.message || 'איזה יעד למחוק?';
+          break;
+        }
+        const { data: existing } = await supabase
+          .from('goals')
+          .select('id, name')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .ilike('name', `%${goalName}%`)
+          .limit(1)
+          .maybeSingle();
+        if (!existing) {
+          action.sendMessage = `לא מצאתי יעד פעיל בשם "${goalName}".`;
+          break;
+        }
+        const { error: delErr } = await supabase
+          .from('goals')
+          .update({ status: 'archived', updated_at: new Date().toISOString() })
+          .eq('id', (existing as any).id);
+        if (delErr) {
+          console.error('[delete_goal]', delErr);
+          action.sendMessage = 'נתקלתי בבעיה. ננסה שוב?';
+          break;
+        }
+        cache.invalidate(userId);
+        action.sendMessage = decision.message || `🗑️ הוצאתי את היעד *${(existing as any).name}* מהרשימה הפעילה.`;
+        break;
+      }
+
+      // ── PAUSE / CANCEL RECURRING — find by vendor match ──
+      case 'pause_recurring': {
+        const vendor = (params.vendor || params.goal_name || '').trim();
+        if (!vendor) {
+          action.sendMessage = decision.message || 'איזה מנוי להפסיק?';
+          break;
+        }
+        const { data: existing } = await supabase
+          .from('recurring_patterns')
+          .select('id, vendor')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .ilike('vendor', `%${vendor}%`)
+          .limit(1)
+          .maybeSingle();
+        if (!existing) {
+          action.sendMessage = `לא מצאתי מנוי פעיל "${vendor}".`;
+          break;
+        }
+        const { error: pauseErr } = await supabase
+          .from('recurring_patterns')
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+          .eq('id', (existing as any).id);
+        if (pauseErr) {
+          console.error('[pause_recurring]', pauseErr);
+          action.sendMessage = 'נתקלתי בבעיה. ננסה שוב?';
+          break;
+        }
+        cache.invalidate(userId);
+        action.sendMessage = decision.message || `✅ סימנתי את *${(existing as any).vendor}* כבוטל. אם תראה אותו שוב — תספר לי.`;
         break;
       }
 
