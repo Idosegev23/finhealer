@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { inferLoansFromProfile } from '@/lib/utils/inferLoansFromProfile'
 
 export async function POST(request: Request) {
   try {
@@ -83,6 +84,58 @@ export async function POST(request: Request) {
         { error: 'Failed to update profile', details: updateError.message },
         { status: 500 }
       )
+    }
+
+    // Mortgage sync: when the user owns their home and entered a monthly
+    // payment, ensure a `loans` row of type 'mortgage' exists so the
+    // amount shows in fixed expenses, the loans page, and debt reports —
+    // not just as a raw number on user_financial_profile. Renters get
+    // their amount reflected via profile consumption alone (no loan).
+    const ownsHomeBool = cleanBool(owns_home)
+    const rentMortgageNum = cleanInt(rent_mortgage)
+    if (ownsHomeBool === true && rentMortgageNum && rentMortgageNum > 0) {
+      const { data: existingMortgage } = await supabase
+        .from('loans')
+        .select('id, monthly_payment')
+        .eq('user_id', user.id)
+        .eq('loan_type', 'mortgage')
+        .eq('active', true)
+        .maybeSingle()
+
+      if (!existingMortgage) {
+        const [inferred] = inferLoansFromProfile({ rent_mortgage: rentMortgageNum })
+        if (inferred) {
+          const { error: loanInsertError } = await supabase
+            .from('loans')
+            .insert({
+              user_id: user.id,
+              lender_name: inferred.lender_name,
+              loan_type: inferred.loan_type,
+              monthly_payment: inferred.monthly_payment,
+              current_balance: inferred.current_balance,
+              original_amount: inferred.current_balance,
+              interest_rate: inferred.interest_rate,
+              remaining_payments: inferred.remaining_payments,
+              notes: inferred.notes,
+              active: true,
+            })
+          if (loanInsertError) {
+            console.error('❌ Error creating mortgage loan:', loanInsertError)
+          } else {
+            console.log('✅ Mortgage loan auto-created from profile')
+          }
+        }
+      } else if (Number(existingMortgage.monthly_payment) !== rentMortgageNum) {
+        const { error: loanUpdateError } = await supabase
+          .from('loans')
+          .update({ monthly_payment: rentMortgageNum })
+          .eq('id', existingMortgage.id)
+        if (loanUpdateError) {
+          console.error('❌ Error updating mortgage payment:', loanUpdateError)
+        } else {
+          console.log('✅ Mortgage payment synced')
+        }
+      }
     }
 
     console.log('✅ Profile updated successfully')
