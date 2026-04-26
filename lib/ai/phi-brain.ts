@@ -24,6 +24,7 @@ import {
   PHI_ANTI_PATTERNS,
   PHI_FEW_SHOT_EXAMPLES,
   PHI_USE_CONTEXT_RULE,
+  PHI_TOOL_USE_RULE,
   getPhaseGuidance,
   getStateGuidance,
   type Phase as PersonaPhase,
@@ -446,6 +447,8 @@ function buildSystemInstruction(ctx: BrainContext, event: PhiEvent): string {
     '',
     PHI_USE_CONTEXT_RULE,
     '',
+    PHI_TOOL_USE_RULE,
+    '',
     PHI_FEW_SHOT_EXAMPLES,
     '',
     phaseGuidance,
@@ -519,23 +522,17 @@ function buildBrainTriggerMessage(event: PhiEvent, ctx: BrainContext): string {
 // ============================================================================
 
 const EXPENSE_PATTERN = /^(.+?)\s+(\d[\d,.]*)\s*$|^(\d[\d,.]*)\s+(.+?)$/;
+// Fast-path is now reserved for actions where the LLM offers no value:
+// classification kickoff, undo, and help menu. Everything else (סיכום, יעדים,
+// תקציב, etc.) goes through the brain so it can call tools and compose a
+// natural answer based on actual data.
 const COMMAND_MAP: Record<string, string> = {
-  'סיכום': 'show_summary', 'מצב': 'show_money_flow', 'סטטוס': 'show_money_flow',
-  'גרף': 'show_chart', 'תרשים': 'show_chart',
-  'תקציב': 'show_budget', 'כמה נשאר': 'show_money_flow',
-  'יעדים': 'show_goals', 'מטרות': 'show_goals',
-  'תזרים': 'show_cashflow', 'תחזית': 'show_cashflow',
-  'ציון': 'show_phi_score', 'דירוג': 'show_phi_score',
-  // ניתוח = real pattern/insights analysis (User Guide promise: "ניתוח דפוסי הוצאות — איפה אפשר לחסוך")
-  'ניתוח': 'show_patterns', 'דפוסים': 'show_patterns', 'תובנות': 'show_patterns',
-  // כפילויות = User Guide promise: "בדיקת חשד לכפל תשלום"
-  'כפילויות': 'check_duplicates', 'כפל': 'check_duplicates', 'כפל תשלום': 'check_duplicates',
-  // Classification triggers — direct route, no LLM needed
+  // Classification triggers — direct route to start the flow
   'נתחיל': 'classify', 'נמשיך': 'classify', 'סווג': 'classify', 'בוא נתחיל': 'classify',
+  // Undo last expense — deterministic, no need for LLM
   'בטל': 'undo_expense',
+  // Help menu — static
   'עזרה': 'help', 'תפריט': 'help',
-  'כמה יש לי': 'show_money_flow', 'כמה חופשי': 'show_money_flow',
-  'יומי': 'show_money_flow', 'שבועי': 'show_money_flow',
 };
 
 function tryFastPath(message: string, ctx: BrainContext): any | null {
@@ -755,38 +752,21 @@ export async function phiBrain(
     }
 
     try {
-      // Tools are only useful when the user already has data to ground answers in.
-      // For new users (no transactions), the brain should respond directly — adding
-      // tools causes degenerate "call → no data → call another → ..." loops where
-      // the model exhausts maxToolHops without producing text.
-      const userHasData = ctx.monthlyExpenses > 0 || ctx.monthlyIncome > 0 || ctx.pendingCount > 0;
-
-      let raw: string;
-      if (userHasData) {
-        const { chatWithTools } = await import('@/lib/ai/gemini-client');
-        raw = await chatWithTools({
-          systemInstruction,
-          history,
-          userMessage: triggerMessage,
-          tools: BRAIN_TOOL_DECLARATIONS as any,
-          executeTool: (name, args) => executeBrainTool(userId, name, args),
-          thinkingLevel: 'low',
-          maxOutputTokens: 2000,
-          maxToolHops: 4,
-          responseJsonSchema: BRAIN_DECISION_SCHEMA,
-        });
-      } else {
-        // No data → no tools. Plain memory chat with strict schema.
-        const { chatWithMemory } = await import('@/lib/ai/gemini-client');
-        raw = await chatWithMemory({
-          systemInstruction,
-          history,
-          userMessage: triggerMessage,
-          thinkingLevel: 'low',
-          maxOutputTokens: 1500,
-          responseJsonSchema: BRAIN_DECISION_SCHEMA,
-        });
-      }
+      // Tools are ALWAYS available — even for new users, get_data_status is useful
+      // ("anything in my account?"), and the persona explicitly tells the model
+      // when not to call them (e.g. simple greetings).
+      const { chatWithTools } = await import('@/lib/ai/gemini-client');
+      const raw = await chatWithTools({
+        systemInstruction,
+        history,
+        userMessage: triggerMessage,
+        tools: BRAIN_TOOL_DECLARATIONS as any,
+        executeTool: (name, args) => executeBrainTool(userId, name, args),
+        thinkingLevel: 'low',
+        maxOutputTokens: 2500,
+        maxToolHops: 5,
+        responseJsonSchema: BRAIN_DECISION_SCHEMA,
+      });
       decision = parseBrainResponse(raw, event);
     } catch (err) {
       console.error('[PhiBrain] Gemini error:', err);

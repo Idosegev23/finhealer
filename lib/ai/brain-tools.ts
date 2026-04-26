@@ -82,6 +82,67 @@ export const BRAIN_TOOL_DECLARATIONS = [
       properties: {},
     },
   },
+  {
+    name: 'get_monthly_summary',
+    description: 'Returns income/expenses/balance for a given month, plus top categories. If month is omitted, returns the latest month that has data (smart default — beats "0/0/0 for current month" when user has historical statements). Use when the user asks "סיכום", "פירוט", "כמה הוצאתי", "איך אני עומד".',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        month: { type: Type.STRING, description: 'YYYY-MM. Omit to auto-pick the latest month with data.' },
+      },
+    },
+  },
+  {
+    name: 'get_top_expenses',
+    description: 'Returns the top expense categories/vendors for a month, sorted by amount. Use when the user asks "על מה הוצאתי הכי הרבה" or you want to ground a coaching reply.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        month: { type: Type.STRING, description: 'YYYY-MM. Omit to use the latest month with data.' },
+        limit: { type: Type.INTEGER, description: 'How many top items to return. Default 5.' },
+      },
+    },
+  },
+  {
+    name: 'get_budget_status',
+    description: 'Returns current budget — total budget, total spent, remaining, status, and per-category breakdown. Use for "תקציב", "כמה נשאר", "איך אני עומד מול התקציב".',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
+  {
+    name: 'get_goals_progress',
+    description: 'Returns active goals with progress (current/target, % done, target date). Use for "יעדים", "מטרות", "כמה חסכתי".',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
+  {
+    name: 'get_cashflow_projection',
+    description: 'Returns a 3-month cash flow forecast (projected income/expenses/balance per month). Use for "תזרים", "תחזית", "מה צפוי בחודשים הבאים".',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
+  {
+    name: 'get_data_status',
+    description: 'Returns a quick overview of what data the user has — total transactions, months covered, statements uploaded, has_budget, has_goals. Call this FIRST when you\'re unsure if the user has any data to discuss.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
+  {
+    name: 'start_classification',
+    description: 'Triggers the classification flow — auto-classifies pending transactions, then prompts user about ambiguous ones. Use when the user says "נתחיל" / "סווג" / wants to organize transactions. Returns a status object you can use to compose your reply.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
 ] as const;
 
 // ============================================================================
@@ -324,6 +385,226 @@ export async function executeBrainTool(
           vendor: g[0].vendor,
         })),
       };
+    }
+
+    case 'get_monthly_summary': {
+      // Smart month: if requested month is empty, use latest month with data
+      let targetMonth: string | undefined = args.month;
+      let isAutoSelected = false;
+      if (!targetMonth) {
+        const { data: latest } = await supabase
+          .from('transactions')
+          .select('tx_date')
+          .eq('user_id', userId)
+          .eq('status', 'confirmed')
+          .order('tx_date', { ascending: false })
+          .limit(1);
+        if (latest?.[0]?.tx_date) {
+          targetMonth = latest[0].tx_date.slice(0, 7);
+          isAutoSelected = true;
+        } else {
+          return { found: false, message: 'אין עדיין תנועות מאומתות. שלח דוח כדי שאתחיל לעקוב.' };
+        }
+      }
+      const [y, m] = (targetMonth as string).split('-');
+      const start = `${targetMonth}-01`;
+      const end = new Date(Number(y), Number(m), 1).toISOString().slice(0, 10);
+
+      const { data: tx } = await supabase
+        .from('transactions')
+        .select('amount, type, expense_category, category, vendor')
+        .eq('user_id', userId)
+        .eq('status', 'confirmed')
+        .or('is_summary.is.null,is_summary.eq.false')
+        .gte('tx_date', start)
+        .lt('tx_date', end);
+
+      const list = tx || [];
+      const income = list.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(Number(t.amount) || 0), 0);
+      const expenses = list.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(Number(t.amount) || 0), 0);
+
+      const catTotals = new Map<string, number>();
+      for (const t of list) {
+        if (t.type !== 'expense') continue;
+        const cat = t.expense_category || t.category || 'אחר';
+        catTotals.set(cat, (catTotals.get(cat) || 0) + Math.abs(Number(t.amount) || 0));
+      }
+      const topCategories = Array.from(catTotals.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([category, amount]) => ({ category, amount: Math.round(amount) }));
+
+      return {
+        found: true,
+        month: targetMonth,
+        is_auto_selected: isAutoSelected,
+        income: Math.round(income),
+        expenses: Math.round(expenses),
+        balance: Math.round(income - expenses),
+        transaction_count: list.length,
+        top_categories: topCategories,
+      };
+    }
+
+    case 'get_top_expenses': {
+      let targetMonth: string | undefined = args.month;
+      const limit = Math.max(1, Math.min(20, Number(args.limit) || 5));
+      if (!targetMonth) {
+        const { data: latest } = await supabase
+          .from('transactions')
+          .select('tx_date').eq('user_id', userId).eq('status', 'confirmed')
+          .order('tx_date', { ascending: false }).limit(1);
+        if (!latest?.[0]?.tx_date) return { found: false };
+        targetMonth = latest[0].tx_date.slice(0, 7);
+      }
+      const [y, m] = (targetMonth as string).split('-');
+      const start = `${targetMonth}-01`;
+      const end = new Date(Number(y), Number(m), 1).toISOString().slice(0, 10);
+
+      const { data: tx } = await supabase
+        .from('transactions')
+        .select('amount, vendor, expense_category, category, tx_date')
+        .eq('user_id', userId).eq('status', 'confirmed').eq('type', 'expense')
+        .or('is_summary.is.null,is_summary.eq.false')
+        .gte('tx_date', start).lt('tx_date', end)
+        .order('amount', { ascending: false });
+
+      const items = (tx || []).slice(0, limit).map(t => ({
+        vendor: t.vendor || t.expense_category || t.category || 'הוצאה',
+        amount: Math.abs(Number(t.amount) || 0),
+        category: t.expense_category || t.category || 'אחר',
+        date: t.tx_date,
+      }));
+      return { found: true, month: targetMonth, top_expenses: items };
+    }
+
+    case 'get_budget_status': {
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const { data: budget } = await supabase
+        .from('budgets')
+        .select('id, month, total_budget, total_spent, savings_goal, status')
+        .eq('user_id', userId).eq('month', currentMonth)
+        .in('status', ['active', 'warning', 'exceeded'])
+        .limit(1).maybeSingle();
+
+      if (!budget) return { has_budget: false, month: currentMonth };
+
+      const { data: cats } = await supabase
+        .from('budget_categories')
+        .select('category_name, allocated_amount, spent_amount, percentage_used, status')
+        .eq('budget_id', budget.id)
+        .order('percentage_used', { ascending: false });
+
+      return {
+        has_budget: true,
+        month: budget.month,
+        total_budget: Number(budget.total_budget) || 0,
+        total_spent: Number(budget.total_spent) || 0,
+        remaining: (Number(budget.total_budget) || 0) - (Number(budget.total_spent) || 0),
+        savings_goal: Number(budget.savings_goal) || 0,
+        status: budget.status,
+        categories: (cats || []).map(c => ({
+          name: c.category_name,
+          allocated: Number(c.allocated_amount) || 0,
+          spent: Number(c.spent_amount) || 0,
+          pct_used: Math.round(Number(c.percentage_used) || 0),
+          status: c.status,
+        })),
+      };
+    }
+
+    case 'get_goals_progress': {
+      const { data: goals } = await supabase
+        .from('goals')
+        .select('id, name, target_amount, current_amount, deadline, priority, status, goal_type')
+        .eq('user_id', userId).eq('status', 'active')
+        .order('priority', { ascending: true });
+
+      if (!goals || goals.length === 0) return { has_goals: false, goals: [] };
+
+      return {
+        has_goals: true,
+        goals: goals.map(g => {
+          const target = Number(g.target_amount) || 0;
+          const current = Number(g.current_amount) || 0;
+          const progress = target > 0 ? Math.round((current / target) * 100) : 0;
+          const daysToDeadline = g.deadline
+            ? Math.max(0, Math.floor((new Date(g.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+            : null;
+          return {
+            id: g.id, name: g.name, type: g.goal_type,
+            target, current, progress_pct: progress,
+            deadline: g.deadline, days_to_deadline: daysToDeadline,
+            priority: g.priority,
+          };
+        }),
+      };
+    }
+
+    case 'get_cashflow_projection': {
+      try {
+        const { projectCashFlow } = await import('@/lib/finance/cash-flow-projector');
+        const analysis = await projectCashFlow(userId, 3);
+        return {
+          months: analysis.projections.map(p => ({
+            month: p.month_name,
+            projected_income: Math.round(p.projected_income),
+            projected_expenses: Math.round(p.projected_expenses),
+            net: Math.round(p.net_cash_flow),
+            balance: Math.round(p.projected_balance),
+            warning_level: p.warning_level,
+          })),
+          warnings: analysis.warnings,
+          recommendations: analysis.recommendations,
+        };
+      } catch (err: any) {
+        return { error: err.message || 'cashflow projection failed' };
+      }
+    }
+
+    case 'get_data_status': {
+      const [{ count: txTotal }, { count: txConfirmed }, { count: txPending }, { count: docs }, { count: budgetCount }, { count: goalCount }, { data: latestTx }] = await Promise.all([
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'confirmed'),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'pending'),
+        supabase.from('uploaded_statements').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('processed', true),
+        supabase.from('budgets').select('id', { count: 'exact', head: true }).eq('user_id', userId).in('status', ['active', 'warning', 'exceeded']),
+        supabase.from('goals').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'active'),
+        supabase.from('transactions').select('tx_date').eq('user_id', userId).eq('status', 'confirmed').order('tx_date', { ascending: false }).limit(1),
+      ]);
+
+      const { data: months } = await supabase.from('transactions')
+        .select('tx_date').eq('user_id', userId).eq('status', 'confirmed');
+      const distinctMonths = new Set((months || []).map((t: any) => (t.tx_date || '').slice(0, 7))).size;
+
+      return {
+        total_transactions: txTotal || 0,
+        confirmed_transactions: txConfirmed || 0,
+        pending_transactions: txPending || 0,
+        documents_uploaded: docs || 0,
+        months_covered: distinctMonths,
+        latest_transaction_date: latestTx?.[0]?.tx_date || null,
+        has_budget: (budgetCount || 0) > 0,
+        has_goals: (goalCount || 0) > 0,
+      };
+    }
+
+    case 'start_classification': {
+      try {
+        const { startClassification } = await import('@/lib/conversation/states/classification');
+        // Get phone from user record
+        const { data: u } = await supabase.from('users').select('phone, name').eq('id', userId).single();
+        if (!u?.phone) return { started: false, error: 'no phone on user' };
+        const ctx = { userId, phone: u.phone, state: 'classification' as any, userName: u.name || '' };
+        const result = await startClassification(ctx);
+        return {
+          started: true,
+          new_state: result.newState || null,
+          success: result.success,
+        };
+      } catch (err: any) {
+        return { started: false, error: err.message || 'classification failed to start' };
+      }
     }
 
     default:
