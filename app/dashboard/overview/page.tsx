@@ -12,6 +12,7 @@ import {
   PageWrapper, PageHeader, KpiGrid, StatCard, Section,
   ProgressBar, Card,
 } from '@/components/ui/design-system'
+import { getActivePeriod } from '@/lib/finance/active-period'
 
 export const revalidate = 30;
 
@@ -27,14 +28,17 @@ export default async function OverviewPage() {
     .single()
   if (!userData) redirect('/login')
 
-  // Current month
-  const now = new Date()
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const today = now.toISOString().split('T')[0]
+  // Active period — latest month with data (or current month if data exists)
+  const activePeriod = await getActivePeriod(supabase, user.id)
+  const firstOfMonth = activePeriod.start
+  const today = activePeriod.end
 
-  // Previous month
-  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
-  const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
+  // Previous month relative to active period
+  const [aYear, aMonth] = activePeriod.month.split('-').map(Number)
+  const prevDate = new Date(aYear, aMonth - 2, 1)
+  const prevMonthStart = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-01`
+  const prevLastDay = new Date(prevDate.getFullYear(), prevDate.getMonth() + 1, 0).getDate()
+  const prevMonthEnd = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevLastDay).padStart(2, '0')}`
 
   const [
     { data: currentTx },
@@ -129,13 +133,16 @@ export default async function OverviewPage() {
   const totalSavings = (savings || []).reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0)
   const totalIncomeFixed = (income || []).reduce((s: number, i: any) => s + Number(i.actual_bank_amount || 0), 0)
 
-  const monthName = now.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })
+  const monthName = activePeriod.label
 
   return (
     <PageWrapper>
       <WhatsAppBanner message="רוצה לעדכן נתונים? לשאול שאלה? כל זה דרך WhatsApp! 💬" />
 
-      <PageHeader title="סקירה כללית" subtitle={`${monthName} — תמונת מצב פיננסית`} />
+      <PageHeader
+        title="סקירה כללית"
+        subtitle={`${monthName} — ${activePeriod.isFallback ? 'החודש האחרון עם דאטה' : 'תמונת מצב פיננסית'}`}
+      />
 
       {/* KPI cards — semantic palette */}
       <KpiGrid cols={4}>

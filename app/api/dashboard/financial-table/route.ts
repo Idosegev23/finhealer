@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getActiveRange } from '@/lib/finance/active-period';
 
 /**
  * GET /api/dashboard/financial-table
@@ -24,10 +25,19 @@ export async function GET(request: NextRequest) {
     const fromParam = searchParams.get('from');
     const toParam = searchParams.get('to');
 
-    // Date range
-    const now = new Date();
-    const fromDate = fromParam || new Date(now.getFullYear(), now.getMonth() - months, 1).toISOString().split('T')[0];
-    const toDate = toParam || now.toISOString().split('T')[0];
+    // Date range — use active period (latest with data) when caller didn't pin it
+    let fromDate: string;
+    let toDate: string;
+    let isFallback = false;
+    if (fromParam && toParam) {
+      fromDate = fromParam;
+      toDate = toParam;
+    } else {
+      const range = await getActiveRange(supabase, user.id, months);
+      fromDate = range.start;
+      toDate = range.end;
+      isFallback = range.isFallback;
+    }
 
     // Fetch all confirmed transactions (exclude summaries/double-counting)
     const { data: transactions, error } = await supabase
@@ -72,7 +82,7 @@ export async function GET(request: NextRequest) {
     const monthCount = Math.max(1, months);
 
     return NextResponse.json({
-      period: { from: fromDate, to: toDate, months },
+      period: { from: fromDate, to: toDate, months, isFallback },
       totals: {
         income: Math.round(totalIncome),
         expenses: Math.round(totalExpenses),

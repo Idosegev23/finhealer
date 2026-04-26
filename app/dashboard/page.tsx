@@ -19,6 +19,7 @@ import { DedupAlert } from '@/components/dashboard/DedupAlert'
 import { QuickAddFAB } from '@/components/dashboard/QuickAddFAB'
 import { OnboardingWizard } from '@/components/dashboard/OnboardingWizard'
 import { KpiGrid, StatCard, Section, InsightBanner, EmptyState, ProgressBar } from '@/components/ui/design-system'
+import { getActivePeriod } from '@/lib/finance/active-period'
 
 export const revalidate = 30
 
@@ -45,10 +46,12 @@ export default async function DashboardPage() {
     redirect('/onboarding')
   }
 
-  // Current month range
+  // Active period — falls back to latest month with data when current month
+  // is empty (common for users who upload historical statements).
   const now = new Date()
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const today = now.toISOString().split('T')[0]
+  const activePeriod = await getActivePeriod(supabase, user.id)
+  const firstOfMonth = activePeriod.start
+  const today = activePeriod.end
 
   // Parallel server-side fetches
   const [
@@ -170,7 +173,7 @@ export default async function DashboardPage() {
         <div>
           <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" />
-            {now.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })} — חודש נוכחי
+            {activePeriod.label}{activePeriod.isFallback ? ' — חודש אחרון עם דאטה' : ' — חודש נוכחי'}
           </p>
           <KpiGrid cols={4}>
             <StatCard

@@ -63,12 +63,17 @@ export async function GET(request: NextRequest) {
 
     // ✨ שליפת הכנסות מתנועות (דוחות סרוקים)
     const monthParam = searchParams.get('month');
-    const targetMonth = monthParam || new Date().toISOString().slice(0, 7); // YYYY-MM
-    // Real last-day-of-month — '-31' breaks Postgres for Feb / 30-day months
-    const [yStr, mStr] = targetMonth.split('-');
-    const lastDay = new Date(parseInt(yStr), parseInt(mStr), 0).getDate();
-    const monthEnd = `${targetMonth}-${String(lastDay).padStart(2, '0')}`;
-    const { data: transactionIncome, error: txError } = await (supabase as any)
+    let targetMonth = monthParam || new Date().toISOString().slice(0, 7); // YYYY-MM
+    let isFallbackMonth = false;
+
+    const monthEndOf = (yyyyMm: string) => {
+      const [yStr, mStr] = yyyyMm.split('-');
+      const last = new Date(parseInt(yStr), parseInt(mStr), 0).getDate();
+      return `${yyyyMm}-${String(last).padStart(2, '0')}`;
+    };
+
+    let monthEnd = monthEndOf(targetMonth);
+    let { data: transactionIncome, error: txError } = await (supabase as any)
       .from('transactions')
       .select('*')
       .eq('user_id', user.id)
@@ -77,6 +82,36 @@ export async function GET(request: NextRequest) {
       .or('is_summary.is.null,is_summary.eq.false')
       .gte('tx_date', `${targetMonth}-01`)
       .lte('tx_date', monthEnd);
+
+    // Fallback — if requested month empty AND user didn't specify, find latest month with income
+    if ((!transactionIncome || transactionIncome.length === 0) && !monthParam) {
+      const { data: latest } = await (supabase as any)
+        .from('transactions')
+        .select('tx_date')
+        .eq('user_id', user.id)
+        .eq('type', 'income')
+        .eq('status', 'confirmed')
+        .or('is_summary.is.null,is_summary.eq.false')
+        .order('tx_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latest?.tx_date) {
+        targetMonth = latest.tx_date.slice(0, 7);
+        monthEnd = monthEndOf(targetMonth);
+        isFallbackMonth = true;
+        const result = await (supabase as any)
+          .from('transactions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('type', 'income')
+          .eq('status', 'confirmed')
+          .or('is_summary.is.null,is_summary.eq.false')
+          .gte('tx_date', `${targetMonth}-01`)
+          .lte('tx_date', monthEnd);
+        transactionIncome = result.data;
+        txError = result.error;
+      }
+    }
 
     const monthlyIncomeFromTransactions = (transactionIncome || [])
       .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
@@ -106,6 +141,8 @@ export async function GET(request: NextRequest) {
       transactionIncome: transactionIncome || [],
       stats,
       count: incomeSources.length,
+      activeMonth: targetMonth,
+      isFallbackMonth,
     });
   } catch (error) {
     console.error('[/api/income/list] Error:', error);

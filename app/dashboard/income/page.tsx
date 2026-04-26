@@ -62,6 +62,8 @@ export default function IncomePage() {
   const [editingIncome, setEditingIncome] = useState<IncomeSource | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [isFallbackMonth, setIsFallbackMonth] = useState(false);
+  const [hasUserPickedMonth, setHasUserPickedMonth] = useState(false);
 
   useEffect(() => {
     loadIncome();
@@ -70,13 +72,23 @@ export default function IncomePage() {
   const loadIncome = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/income/list?active=true&month=${selectedMonth}`);
+      // Only pass month explicitly if user manually picked one — otherwise let
+      // the API fall back to the latest month with data.
+      const url = hasUserPickedMonth
+        ? `/api/income/list?active=true&month=${selectedMonth}`
+        : `/api/income/list?active=true`;
+      const response = await fetch(url);
       const data = await response.json();
 
       if (data.success) {
         setIncomeSources(data.incomeSources || []);
         setTransactionIncome(data.transactionIncome || []);
         setStats(data.stats || null);
+        // Sync month picker with what the API actually used
+        if (data.activeMonth && data.activeMonth !== selectedMonth) {
+          setSelectedMonth(data.activeMonth);
+        }
+        setIsFallbackMonth(!!data.isFallbackMonth);
       }
     } catch (error) {
       console.error('Error loading income:', error);
@@ -90,34 +102,41 @@ export default function IncomePage() {
       <WhatsAppBanner message="רוצה להוסיף מקור הכנסה? לעדכן תלוש משכורת? דבר עם הבוט! 💼" />
 
       {/* Month Selector */}
-      <div className="flex items-center justify-center gap-3 mb-4">
-        <button
-          onClick={() => {
-            const d = new Date(selectedMonth + '-01');
-            d.setMonth(d.getMonth() - 1);
-            setSelectedMonth(d.toISOString().substring(0, 7));
-          }}
-          className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600"
-        >
-          ←
-        </button>
-        <span className="text-lg font-semibold text-gray-800 min-w-[140px] text-center">
-          {new Date(selectedMonth + '-01').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })}
-        </span>
-        <button
-          onClick={() => {
-            const d = new Date(selectedMonth + '-01');
-            d.setMonth(d.getMonth() + 1);
-            const next = d.toISOString().substring(0, 7);
-            if (next <= new Date().toISOString().substring(0, 7)) {
-              setSelectedMonth(next);
-            }
-          }}
-          className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600"
-          disabled={selectedMonth >= new Date().toISOString().substring(0, 7)}
-        >
-          →
-        </button>
+      <div className="flex flex-col items-center gap-1 mb-4">
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={() => {
+              const d = new Date(selectedMonth + '-01');
+              d.setMonth(d.getMonth() - 1);
+              setSelectedMonth(d.toISOString().substring(0, 7));
+              setHasUserPickedMonth(true);
+            }}
+            className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600"
+          >
+            ←
+          </button>
+          <span className="text-lg font-semibold text-gray-800 min-w-[140px] text-center">
+            {new Date(selectedMonth + '-01').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })}
+          </span>
+          <button
+            onClick={() => {
+              const d = new Date(selectedMonth + '-01');
+              d.setMonth(d.getMonth() + 1);
+              const next = d.toISOString().substring(0, 7);
+              if (next <= new Date().toISOString().substring(0, 7)) {
+                setSelectedMonth(next);
+                setHasUserPickedMonth(true);
+              }
+            }}
+            className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600"
+            disabled={selectedMonth >= new Date().toISOString().substring(0, 7)}
+          >
+            →
+          </button>
+        </div>
+        {isFallbackMonth && (
+          <p className="text-xs text-gray-500">החודש הנוכחי ריק — מציג את החודש האחרון עם דאטה</p>
+        )}
       </div>
       
       {/* Header */}
