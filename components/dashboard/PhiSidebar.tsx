@@ -21,6 +21,7 @@ import {
   Sparkles,
   Shield,
   Briefcase,
+  ScanLine,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -82,7 +83,8 @@ const navSections: NavSection[] = [
   {
     label: 'שונות',
     items: [
-      { href: '/dashboard/missing-documents', label: 'מסמכים', icon: FileText },
+      { href: '/dashboard/scan-center', label: 'העלאת מסמכים', icon: ScanLine },
+      { href: '/dashboard/missing-documents', label: 'מסמכים חסרים', icon: FileText },
       { href: '/dashboard/settings', label: 'הגדרות', icon: Settings },
     ],
   },
