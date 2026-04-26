@@ -249,6 +249,12 @@ export async function chatWithGeminiProVision(
     return await retryWithBackoff(async () => {
       const client = getClient();
 
+      // For large multi-page documents (e.g. 40-page Mislaka reports), the
+      // default Flash setup tends to truncate its analysis after the first
+      // few pages. 'medium' thinking gives the model room to traverse the
+      // entire document before emitting the JSON. Token budget stays at 32k.
+      const isLargePdf = mimeType === 'application/pdf' && base64Image.length > 1_000_000;
+
       const response = await client.models.generateContent({
         model: FLASH_MODEL,
         contents: [
@@ -268,11 +274,12 @@ export async function chatWithGeminiProVision(
         config: {
           maxOutputTokens: 32000,
           responseMimeType: 'application/json',
+          ...(isLargePdf ? { thinkingConfig: { thinkingLevel: 'medium' as any } } : {}),
         },
       });
 
       const text = response.text || '{}';
-      console.log(`[Gemini Flash Vision] Response length: ${text.length} chars`);
+      console.log(`[Gemini Flash Vision] Response length: ${text.length} chars${isLargePdf ? ' (large PDF, medium thinking)' : ''}`);
       return text;
     }, 'Gemini Flash Vision');
   } catch (error) {

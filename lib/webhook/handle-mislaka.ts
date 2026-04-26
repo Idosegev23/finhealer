@@ -179,6 +179,7 @@ export async function handleMislakaReport(
     if (!policy.policy_number && !policy.provider) continue;
 
     const isActive = policy.status !== 'closed' && policy.status !== 'cancelled' && policy.status !== 'inactive';
+    // annual_premium is a GENERATED column (monthly_premium * 12) — never insert it.
     const insRow = {
       user_id: userId,
       insurance_type: mapInsuranceType(policy.policy_type, policy.plan_name),
@@ -187,7 +188,6 @@ export async function handleMislakaReport(
       status: isActive ? 'active' : 'inactive',  // CHECK: active|inactive|cancelled
       coverage_amount: Number(policy.coverage_amount || 0) || 0,
       monthly_premium: Number(policy.monthly_premium || policy.premium_amount || 0) || 0,
-      annual_premium: Number(policy.annual_premium || 0) || 0,
       start_date: parseDate(policy.start_date),
       end_date: parseDate(policy.end_date),
       active: isActive,
