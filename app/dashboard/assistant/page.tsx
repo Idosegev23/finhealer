@@ -84,12 +84,12 @@ export default function AssistantPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-full bg-phi-dark flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-phi-gold" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900">φ — מאמן פיננסי</h1>
-            <p className="text-xs text-gray-500">אותו בוט שבוואטסאפ. כל פעולה מסונכרנת.</p>
+            <p className="text-xs text-gray-500">המשך השיחה מהוואטסאפ — אותה היסטוריה, אותו זיכרון.</p>
           </div>
         </div>
       </div>
@@ -99,15 +99,15 @@ export default function AssistantPage() {
         <div className="max-w-3xl mx-auto space-y-4">
           {loadingHistory && (
             <div className="text-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-amber-500 mx-auto" />
+              <Loader2 className="w-6 h-6 animate-spin text-phi-gold mx-auto" />
               <p className="text-sm text-gray-500 mt-2">טוען היסטוריה...</p>
             </div>
           )}
 
           {!loadingHistory && messages.length === 0 && (
             <div className="text-center py-12">
-              <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="w-8 h-8 text-amber-500" />
+              <div className="w-16 h-16 rounded-full bg-phi-dark/10 flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-8 h-8 text-phi-gold" />
               </div>
               <p className="text-gray-700 font-medium mb-1">היי! אני φ.</p>
               <p className="text-sm text-gray-500 mb-6">שאל אותי כל שאלה על הכסף שלך.</p>
@@ -138,7 +138,7 @@ export default function AssistantPage() {
               <div
                 className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
                   m.role === 'user'
-                    ? 'bg-amber-500 text-white rounded-tr-sm'
+                    ? 'bg-phi-dark text-white rounded-tr-sm'
                     : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm'
                 }`}
               >
@@ -171,12 +171,12 @@ export default function AssistantPage() {
             placeholder="הקלד הודעה... (Enter לשליחה, Shift+Enter לשורה חדשה)"
             rows={1}
             disabled={sending}
-            className="flex-1 px-4 py-2.5 border border-gray-200 rounded-2xl text-sm resize-none max-h-32 focus:outline-none focus:ring-2 focus:ring-amber-500/30 disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 border border-gray-200 rounded-2xl text-sm resize-none max-h-32 focus:outline-none focus:ring-2 focus:ring-phi-gold/40 disabled:opacity-50"
           />
           <button
             onClick={send}
             disabled={sending || !input.trim()}
-            className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center disabled:opacity-50 hover:bg-amber-600"
+            className="w-10 h-10 rounded-full bg-phi-dark text-white flex items-center justify-center disabled:opacity-50 hover:bg-phi-slate"
             aria-label="שלח"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

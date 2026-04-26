@@ -59,6 +59,7 @@ const navSections: NavSection[] = [
   {
     label: 'כספים',
     items: [
+      { href: '/dashboard/financial-table', label: 'טבלה פיננסית', icon: TableProperties },
       { href: '/dashboard/budget', label: 'תקציב', icon: Wallet },
       { href: '/dashboard/expenses', label: 'הוצאות', icon: TrendingDown },
       { href: '/dashboard/income', label: 'הכנסות', icon: TrendingUp },
@@ -82,7 +83,6 @@ const navSections: NavSection[] = [
     label: 'שונות',
     items: [
       { href: '/dashboard/missing-documents', label: 'מסמכים', icon: FileText },
-      { href: '/dashboard/financial-table', label: 'טבלה פיננסית', icon: TableProperties },
       { href: '/dashboard/settings', label: 'הגדרות', icon: Settings },
     ],
   },

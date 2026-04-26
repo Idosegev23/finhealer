@@ -63,23 +63,30 @@ export async function loadConversationHistory(
 }
 
 /**
- * Extract text content from wa_messages payload JSON
- * The payload structure varies by message type
+ * Extract text content from wa_messages payload JSON.
+ * Outgoing messages: { body: "..." } (set by GreenAPI client + web chat route).
+ * Incoming WhatsApp: raw GreenAPI shape under messageData.
+ * Incoming web: { body: "...", source: "web" }.
  */
 function extractTextFromPayload(payload: any): string | null {
   if (!payload) return null;
 
-  // Direct text field (outgoing messages often have this)
+  // Both outgoing and web-incoming use `body`
+  if (typeof payload.body === 'string' && payload.body) {
+    return payload.body;
+  }
+
+  // Older outgoing shape (some legacy paths used `text`)
   if (typeof payload.text === 'string' && payload.text) {
     return payload.text;
   }
 
-  // Incoming text message format from GreenAPI
+  // Incoming GreenAPI text
   if (payload.messageData?.textMessageData?.textMessage) {
     return payload.messageData.textMessageData.textMessage;
   }
 
-  // Extended text message (with link preview etc.)
+  // Extended text (link preview etc.)
   if (payload.messageData?.extendedTextMessageData?.text) {
     return payload.messageData.extendedTextMessageData.text;
   }
@@ -89,41 +96,10 @@ function extractTextFromPayload(payload: any): string | null {
     return payload.messageData.interactiveButtonsResponse.selectedButtonText;
   }
 
-  // Fallback: try message field
+  // Fallback
   if (typeof payload.message === 'string' && payload.message) {
     return payload.message;
   }
 
   return null;
-}
-
-/**
- * Load chat_messages history (for dashboard chat, not WhatsApp)
- */
-export async function loadChatHistory(
-  userId: string,
-  limit: number = 10
-): Promise<ConversationMessage[]> {
-  try {
-    const supabase = createServiceClient();
-
-    const { data: messages, error } = await supabase
-      .from('chat_messages')
-      .select('role, content')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error || !messages) return [];
-
-    return messages
-      .reverse()
-      .map((msg) => ({
-        role: msg.role === 'user' ? 'user' as const : 'model' as const,
-        content: msg.content,
-      }));
-  } catch (error) {
-    console.error('[HistoryLoader] Chat history error:', error);
-    return [];
-  }
 }
