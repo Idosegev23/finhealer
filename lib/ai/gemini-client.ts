@@ -640,11 +640,24 @@ export async function chatWithTools(opts: {
       if (hops >= maxHops) {
         console.warn(`[chatWithTools] Hit ${hops} tool hops with no text — sending final nudge`);
         try {
+          // Strong nudge: explicit no-tools, give Gemini the exact JSON shape
+          // and a working example so it has nothing to do but emit text.
           const nudge = await chat.sendMessage({
-            message: 'תפסיק לקרוא ל-tools. החזר עכשיו את ה-JSON הסופי לפי הסכמה. רק JSON, בלי טקסט מסביב.',
+            message:
+              'מספיק tools. עכשיו תחזיר רק JSON אחד לפי הסכמה. אל תקרא ל-tools נוספים.\n' +
+              'דוגמה: {"message":"לפי מה שראיתי, יש לך X תנועות. רוצה סיכום חודשי?","action":"coaching","should_respond":true}\n' +
+              'תכתוב את התשובה האמיתית למשתמש על בסיס מה שכבר אספת.',
           });
           const nudgeText = nudge.text || '';
           if (nudgeText.trim().length > 0) return nudgeText;
+          // Also try to pull text from candidates (function-call mode sometimes hides it)
+          const nudgeCandidates = nudge.candidates || [];
+          const nudgePartsText = nudgeCandidates
+            .flatMap((c: any) => c?.content?.parts || [])
+            .map((p: any) => p?.text || '')
+            .filter((t: string) => t.length > 0)
+            .join('\n');
+          if (nudgePartsText.length > 0) return nudgePartsText;
         } catch (nudgeErr) {
           console.warn(`[chatWithTools] Nudge failed:`, nudgeErr);
         }

@@ -301,13 +301,15 @@ function wasRecentlyNudged(ctx: BrainContext, marker: string): boolean {
 function parseBrainResponse(raw: string, event: PhiEvent): any {
   const trimmed = (raw || '').trim();
   if (!trimmed) {
-    // Empty response → silence on scheduled checks; gentle fallback on user message
+    // Empty response → on user message, fall back to a deterministic money-flow
+    // summary instead of a useless "processing..." reply. The brain got stuck
+    // in a tool-call loop; the user still deserves real content.
     if (event.type === 'whatsapp_message') {
       return {
-        action: 'general_chat',
+        action: 'show_money_flow',
         should_respond: true,
-        message: 'רגע, מעבד את מה שאמרת… 😊',
-        internal_reasoning: 'empty_model_output_fallback',
+        message: '',
+        internal_reasoning: 'empty_model_output_fallback_to_money_flow',
       };
     }
     return { action: 'none', should_respond: false, internal_reasoning: 'empty_model_output' };
