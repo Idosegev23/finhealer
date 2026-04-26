@@ -5,8 +5,9 @@ import { DashboardWrapper } from '@/components/dashboard/DashboardWrapper';
 
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { CreditCard, TrendingDown, DollarSign, Clock, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { CreditCard, TrendingDown, DollarSign, Clock, Plus, ChevronDown, ChevronUp, Sparkles, Upload } from 'lucide-react';
 import { Card as DSCard, EmptyState as DSEmptyState, PageHeader, KpiGrid, StatCard, PageWrapper } from '@/components/ui/design-system';
+import Link from 'next/link';
 
 interface Loan {
   id: string;
@@ -20,7 +21,10 @@ interface Loan {
   remaining_payments: number | null;
   active: boolean;
   created_at: string;
+  notes: string | null;
 }
+
+const isInferred = (loan: Loan) => !!loan.notes?.includes('הוסק אוטומטית');
 
 const COLORS = ['#074259', '#F6A623', '#7ED957', '#E74C3C', '#9B59B6', '#1ABC9C'];
 
@@ -214,7 +218,7 @@ export default function LoansPage() {
                         onClick={() => setExpandedLoan(expandedLoan === loan.id ? null : loan.id)}
                       >
                         <div className="flex-1">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-wrap">
                             <h3 className="font-bold text-lg text-gray-900">{loan.lender_name}</h3>
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
                               loan.active ? 'bg-emerald-50 text-phi-mint border border-emerald-200' : 'bg-gray-50 text-gray-600 border border-gray-200'
@@ -222,10 +226,16 @@ export default function LoansPage() {
                               {loan.active ? 'פעיל' : 'סגור'}
                             </span>
                             <span className="px-2 py-1 rounded text-xs font-medium bg-sky-50 text-phi-dark border border-sky-200">
-                              {loan.loan_type === 'personal' ? 'אישית' : 
+                              {loan.loan_type === 'personal' ? 'אישית' :
                                loan.loan_type === 'mortgage' ? 'משכנתא' :
                                loan.loan_type === 'car' ? 'רכב' : loan.loan_type}
-                          </span>
+                            </span>
+                            {isInferred(loan) && (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-amber-50 text-phi-coral border border-amber-200 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                הוסק אוטומטית
+                              </span>
+                            )}
                         </div>
                           <div className="mt-2 flex gap-6 text-sm text-gray-600">
                             <span>תשלום חודשי: <strong className="text-gray-900">₪{loan.monthly_payment.toLocaleString('he-IL')}</strong></span>
@@ -242,6 +252,24 @@ export default function LoansPage() {
 
                       {expandedLoan === loan.id && (
                         <div className="px-4 pb-4 pt-2 border-t border-gray-200 bg-gray-50 space-y-2 text-sm">
+                          {isInferred(loan) && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
+                              <div className="flex items-start gap-2">
+                                <Sparkles className="w-4 h-4 text-phi-coral flex-shrink-0 mt-0.5" />
+                                <div className="flex-1 space-y-2">
+                                  <p className="text-phi-coral font-medium">הוסק אוטומטית מהפרופיל</p>
+                                  <p className="text-gray-700 text-xs leading-relaxed">{loan.notes}</p>
+                                  <Link
+                                    href="/dashboard/scan-center"
+                                    className="inline-flex items-center gap-1 text-xs font-medium text-phi-dark hover:underline"
+                                  >
+                                    <Upload className="w-3 h-3" />
+                                    העלאת דוח {loan.loan_type === 'mortgage' ? 'משכנתא' : 'הלוואה'} לדיוק הפרטים
+                                  </Link>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           {loan.start_date && <div><strong>תאריך התחלה:</strong> {new Date(loan.start_date).toLocaleDateString('he-IL')}</div>}
                           {loan.end_date && <div><strong>תאריך סיום:</strong> {new Date(loan.end_date).toLocaleDateString('he-IL')}</div>}
                           {loan.remaining_payments && <div><strong>תשלומים נותרים:</strong> {loan.remaining_payments}</div>}

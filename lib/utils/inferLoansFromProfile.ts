@@ -41,7 +41,7 @@ export function inferLoansFromProfile(profile: ProfileData): InferredLoan[] {
       interest_rate: 3.5,
       remaining_payments: 240,
       source: 'inferred_from_profile',
-      notes: 'הוסק אוטומטית מהפרופיל הפיננסי. עדכן את השם והפרטים המדויקים של ההלוואה.',
+      notes: 'הוסק אוטומטית מהפרופיל הפיננסי — היתרה, הריבית והתקופה הם הערכה. יש להעלות דוח משכנתא בשביל לדייק את הפרטים.',
     });
   }
 
@@ -59,7 +59,7 @@ export function inferLoansFromProfile(profile: ProfileData): InferredLoan[] {
       interest_rate: 8,
       remaining_payments: 60,
       source: 'inferred_from_profile',
-      notes: 'הוסק אוטומטית מהפרופיל הפיננסי. עדכן את שם הבנק והפרטים המדויקים.',
+      notes: 'הוסק אוטומטית מהפרופיל הפיננסי — היתרה, הריבית והתקופה הם הערכה. יש להעלות דוח הלוואה בשביל לדייק את הפרטים.',
     });
   }
 
@@ -77,7 +77,7 @@ export function inferLoansFromProfile(profile: ProfileData): InferredLoan[] {
       interest_rate: 5,
       remaining_payments: 36,
       source: 'inferred_from_profile',
-      notes: 'הוסק אוטומטית מהפרופיל הפיננסי. עדכן את דגם הרכב והפרטים המדויקים.',
+      notes: 'הוסק אוטומטית מהפרופיל הפיננסי — היתרה, הריבית והתקופה הם הערכה. יש להעלות דוח ליסינג בשביל לדייק את הפרטים.',
     });
   }
 
@@ -95,7 +95,7 @@ export function inferLoansFromProfile(profile: ProfileData): InferredLoan[] {
       interest_rate: 10,
       remaining_payments: 36,
       source: 'inferred_from_profile',
-      notes: 'הוסק אוטומטית מהפרופיל הפיננסי. עדכן את סוג החוב והפרטים המדויקים.',
+      notes: 'הוסק אוטומטית מהפרופיל הפיננסי — היתרה, הריבית והתקופה הם הערכה. יש להעלות דוח הלוואה בשביל לדייק את הפרטים.',
     });
   }
 
