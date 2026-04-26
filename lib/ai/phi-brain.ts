@@ -1097,24 +1097,49 @@ export async function phiBrain(
         break;
       }
 
-      // ── MARK SKIP DOCUMENT — user said "I don't have one right now" ──
+      // ── MARK SKIP DOCUMENT — user wants to move forward with what they have ──
+      // Two scenarios:
+      //  A) Brand new user with 0 transactions → "I don't have a doc right now"
+      //     → state=monitoring so they can chat / log expenses manually
+      //  B) Existing user with data, asked for more docs, says "מספיק / תמשיך"
+      //     → skip the data_collection time-gate and advance phase MANUALLY.
+      //     calculatePhase has time gates (14 days since signup) that block
+      //     fresh users. Manual advance bypasses them: with ≥20 confirmed
+      //     transactions we have enough signal to start coaching.
       case 'mark_skip_document': {
-        // Same logic as the legacy skip path, but with brain-composed message
         const { count: txCount } = await supabase
           .from('transactions')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId);
+          .eq('user_id', userId)
+          .eq('status', 'confirmed');
+        const confirmedCount = txCount || 0;
 
-        const newState = (txCount || 0) > 0 ? 'classification' : 'monitoring';
-        const { calculatePhase: calcPhaseSkip } = await import('@/lib/services/PhaseService');
-        const skipPhase = await calcPhaseSkip(userId);
+        let newState: string;
+        let newPhase: string;
+        if (confirmedCount >= 20) {
+          // Manual advance — skip the time gate
+          newPhase = 'behavior';
+          newState = 'monitoring';
+        } else if (confirmedCount > 0) {
+          // Has some data but not enough — still classify what's there
+          newState = 'classification';
+          const { calculatePhase: calcPhaseSkip } = await import('@/lib/services/PhaseService');
+          newPhase = await calcPhaseSkip(userId);
+        } else {
+          newState = 'monitoring';
+          newPhase = 'data_collection';
+        }
+
         await supabase.from('users')
-          .update({ onboarding_state: newState, phase: skipPhase, phase_updated_at: new Date().toISOString() })
+          .update({ onboarding_state: newState, phase: newPhase, phase_updated_at: new Date().toISOString() })
           .eq('id', userId);
+
         action.sendMessage = decision.message ||
-          (newState === 'classification'
-            ? `בסדר! 😊 יש כבר תנועות שצריך לסדר. כתוב *"נתחיל"* כשתהיה מוכן.`
-            : `בסדר! 😊 כשיהיה לך דוח — פשוט שלח. בינתיים אפשר לשאול אותי כל שאלה.`);
+          (confirmedCount >= 20
+            ? `מעולה. ${confirmedCount} תנועות מספיקות לי כדי להתחיל. בוא נסתכל יחד — כתוב *"סיכום"* או שאל אותי כל שאלה על הכסף שלך.`
+            : confirmedCount > 0
+              ? `בסדר! 😊 יש כבר תנועות שצריך לסדר. כתוב *"נתחיל"* כשתהיה מוכן.`
+              : `בסדר! 😊 כשיהיה לך דוח — פשוט שלח. בינתיים אפשר לשאול אותי כל שאלה.`);
         action.updateState = newState;
         break;
       }
