@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Shield, TrendingUp, Briefcase } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
@@ -186,47 +187,57 @@ export default function PensionsPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {pensions.map((pension) => (
-                    <tr key={pension.id} className="hover:bg-gray-50">
+                    <tr
+                      key={pension.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => window.location.href = `/dashboard/pensions/${pension.id}`}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-phi-dark hover:underline">
                           {pension.fund_name}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                        <span className="px-2 py-1 text-xs rounded-full bg-phi-dark/10 text-phi-dark">
                           {FUND_TYPE_LABELS[pension.fund_type] || pension.fund_type}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {pension.provider}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-phi-mint tabular-nums">
                         ₪{pension.current_balance?.toLocaleString("he-IL") || 0}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 tabular-nums">
                         ₪{pension.monthly_deposit?.toLocaleString("he-IL") || 0}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {pension.management_fee_percentage}%
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 tabular-nums">
+                        {pension.management_fee_percentage != null ? `${Number(pension.management_fee_percentage).toFixed(2)}%` : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`text-sm font-semibold ${
-                            pension.annual_return >= 5
-                              ? "text-green-600"
-                              : pension.annual_return >= 0
-                              ? "text-yellow-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {pension.annual_return >= 0 ? "+" : ""}
-                          {pension.annual_return}%
-                        </span>
+                        {pension.annual_return != null ? (
+                          <span
+                            className={`text-sm font-semibold tabular-nums ${
+                              pension.annual_return >= 5 ? "text-phi-mint"
+                                : pension.annual_return >= 0 ? "text-phi-gold"
+                                : "text-phi-coral"
+                            }`}
+                          >
+                            {pension.annual_return >= 0 ? "+" : ""}
+                            {Number(pension.annual_return).toFixed(2)}%
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400">אין נתון</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <Button variant="ghost" size="sm">
-                          ערוך
-                        </Button>
+                        <Link
+                          href={`/dashboard/pensions/${pension.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-phi-gold hover:underline text-sm"
+                        >
+                          פתח →
+                        </Link>
                       </td>
                     </tr>
                   ))}
