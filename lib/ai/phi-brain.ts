@@ -385,6 +385,8 @@ function parseBrainResponse(raw: string, event: PhiEvent): any {
 const BRAIN_ACTIONS = [
   // Data + transactions
   'log_expense', 'undo_expense',
+  // Persistence — brain shapes the DB from conversation
+  'create_goal', 'update_goal', 'define_income', 'add_recurring',
   // Read-only views
   'show_money_flow', 'show_summary', 'show_chart', 'show_budget', 'show_goals',
   'show_cashflow', 'show_phi_score', 'show_patterns', 'check_duplicates', 'afford_check',
@@ -413,11 +415,29 @@ const BRAIN_DECISION_SCHEMA: Record<string, any> = {
     action_params: {
       type: 'object',
       properties: {
+        // log_expense
         vendor: { type: 'string' },
         amount: { type: 'number' },
         category: { type: 'string' },
         description: { type: 'string' },
-        name: { type: 'string', description: 'Used by set_user_name — the human name extracted from the user message.' },
+        // set_user_name
+        name: { type: 'string', description: 'Human name — used only by set_user_name.' },
+        // create_goal / update_goal
+        goal_name: { type: 'string', description: 'Hebrew goal name e.g. "רכב", "דירה", "חופש".' },
+        target_amount: { type: 'number', description: 'Goal target in ₪.' },
+        deadline: { type: 'string', description: 'ISO date (YYYY-MM-DD) for goal deadline.' },
+        monthly_allocation: { type: 'number', description: 'Monthly contribution toward the goal in ₪.' },
+        priority: { type: 'number', description: 'Goal priority 1-10 (1=highest).' },
+        // define_income
+        source_name: { type: 'string', description: 'Hebrew label for the income source e.g. "משכורת", "פרילנס".' },
+        employment_type: { type: 'string', description: 'salary | freelance | business | passive | other.' },
+        net_amount: { type: 'number', description: 'Net monthly income in ₪.' },
+        gross_amount: { type: 'number', description: 'Gross monthly income in ₪.' },
+        employer_name: { type: 'string' },
+        is_primary: { type: 'boolean', description: 'True if this is the main income source.' },
+        // add_recurring
+        expected_day: { type: 'number', description: 'Day-of-month the recurring charge hits (1-31).' },
+        frequency: { type: 'string', description: 'monthly | yearly | weekly.' },
       },
     },
     new_state: {
@@ -1094,6 +1114,155 @@ export async function phiBrain(
             ? `בסדר! 😊 יש כבר תנועות שצריך לסדר. כתוב *"נתחיל"* כשתהיה מוכן.`
             : `בסדר! 😊 כשיהיה לך דוח — פשוט שלח. בינתיים אפשר לשאול אותי כל שאלה.`);
         action.updateState = newState;
+        break;
+      }
+
+      // ── CREATE GOAL — persist user-stated goal to DB ──
+      case 'create_goal': {
+        const goalName = (params.goal_name || '').trim();
+        const target = Number(params.target_amount);
+        if (!goalName || !Number.isFinite(target) || target <= 0) {
+          action.sendMessage = decision.message || 'לא הצלחתי להבין את היעד. תכתוב שוב — שם וסכום.';
+          break;
+        }
+        const insertData: any = {
+          user_id: userId,
+          name: goalName,
+          target_amount: target,
+          status: 'active',
+          priority: Number.isFinite(params.priority) ? Math.max(1, Math.min(10, Number(params.priority))) : 5,
+        };
+        if (params.deadline) insertData.deadline = params.deadline;
+        if (Number.isFinite(params.monthly_allocation) && params.monthly_allocation > 0) {
+          insertData.monthly_allocation = Number(params.monthly_allocation);
+        }
+        if (params.description) insertData.description = params.description;
+        const { error: goalErr } = await supabase.from('goals').insert(insertData);
+        if (goalErr) {
+          console.error('[create_goal]', goalErr);
+          action.sendMessage = 'נתקלתי בבעיה בשמירת היעד. אפשר לנסות שוב?';
+          break;
+        }
+        cache.invalidate(userId);
+        const targetStr = target.toLocaleString('he-IL');
+        const deadlineStr = params.deadline
+          ? new Date(params.deadline).toLocaleDateString('he-IL', { year: 'numeric', month: 'long' })
+          : null;
+        action.sendMessage = decision.message ||
+          `✅ יעד נשמר: *${goalName}* — ${targetStr}₪${deadlineStr ? ` עד ${deadlineStr}` : ''}.`;
+        break;
+      }
+
+      // ── UPDATE GOAL — find by name match, update fields ──
+      case 'update_goal': {
+        const goalName = (params.goal_name || '').trim();
+        if (!goalName) {
+          action.sendMessage = decision.message || 'איזה יעד לעדכן?';
+          break;
+        }
+        const { data: existing } = await supabase
+          .from('goals')
+          .select('id, name')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .ilike('name', `%${goalName}%`)
+          .order('priority', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (!existing) {
+          action.sendMessage = `לא מצאתי יעד פעיל בשם "${goalName}". להוסיף יעד חדש?`;
+          break;
+        }
+        const update: any = { updated_at: new Date().toISOString() };
+        if (Number.isFinite(params.target_amount) && params.target_amount > 0) update.target_amount = Number(params.target_amount);
+        if (params.deadline) update.deadline = params.deadline;
+        if (Number.isFinite(params.monthly_allocation)) update.monthly_allocation = Number(params.monthly_allocation);
+        if (Number.isFinite(params.priority)) update.priority = Math.max(1, Math.min(10, Number(params.priority)));
+        if (Object.keys(update).length === 1) {
+          // only updated_at — nothing real to change
+          action.sendMessage = decision.message || 'מה לעדכן ביעד?';
+          break;
+        }
+        const { error: updErr } = await supabase.from('goals').update(update).eq('id', existing.id);
+        if (updErr) {
+          console.error('[update_goal]', updErr);
+          action.sendMessage = 'נתקלתי בבעיה בעדכון. ננסה שוב?';
+          break;
+        }
+        cache.invalidate(userId);
+        action.sendMessage = decision.message || `✅ עדכנתי את יעד *${(existing as any).name}*.`;
+        break;
+      }
+
+      // ── DEFINE INCOME — persist a recurring income source ──
+      case 'define_income': {
+        const sourceName = (params.source_name || params.name || '').trim() || 'משכורת';
+        const empType = (params.employment_type || 'salary').trim();
+        const net = Number(params.net_amount);
+        const gross = Number.isFinite(params.gross_amount) ? Number(params.gross_amount) : null;
+        if (!Number.isFinite(net) || net <= 0) {
+          action.sendMessage = decision.message || 'מה הסכום נטו?';
+          break;
+        }
+        const insertData: any = {
+          user_id: userId,
+          source_name: sourceName,
+          employment_type: empType,
+          net_amount: net,
+          payment_frequency: 'monthly',
+          active: true,
+          is_primary: params.is_primary !== false,
+        };
+        if (gross && gross > 0) insertData.gross_amount = gross;
+        if (params.employer_name) insertData.employer_name = String(params.employer_name).trim();
+        const { error: incErr } = await supabase.from('income_sources').insert(insertData);
+        if (incErr) {
+          console.error('[define_income]', incErr);
+          action.sendMessage = 'לא הצלחתי לשמור את ההכנסה. ננסה שוב?';
+          break;
+        }
+        cache.invalidate(userId);
+        const netStr = net.toLocaleString('he-IL');
+        action.sendMessage = decision.message ||
+          `✅ הכנסה נשמרה: *${sourceName}* — ${netStr}₪ נטו לחודש.`;
+        break;
+      }
+
+      // ── ADD RECURRING — subscription / fixed monthly charge ──
+      case 'add_recurring': {
+        const vendor = (params.vendor || '').trim();
+        const amt = Number(params.amount || params.expected_amount);
+        if (!vendor || !Number.isFinite(amt) || amt <= 0) {
+          action.sendMessage = decision.message || 'איזה מנוי? מה הסכום?';
+          break;
+        }
+        const day = Number.isFinite(params.expected_day) ? Math.max(1, Math.min(31, Number(params.expected_day))) : null;
+        const freq = (params.frequency || 'monthly').trim();
+        // Compute next_expected: same day next month (or first occurrence if day given)
+        const today = new Date();
+        const nextExpected = new Date(today.getFullYear(), today.getMonth() + 1, day ?? today.getDate());
+        const insertData: any = {
+          user_id: userId,
+          vendor,
+          expected_amount: amt,
+          frequency: freq,
+          next_expected: nextExpected.toISOString().split('T')[0],
+          status: 'active',
+          is_auto_detected: false,
+          confidence: 1.0,
+        };
+        if (day) insertData.expected_day = day;
+        if (params.category) insertData.category = String(params.category).trim();
+        const { error: recErr } = await supabase.from('recurring_patterns').insert(insertData);
+        if (recErr) {
+          console.error('[add_recurring]', recErr);
+          action.sendMessage = 'לא הצלחתי לשמור את המנוי. ננסה שוב?';
+          break;
+        }
+        cache.invalidate(userId);
+        const amtStr = amt.toLocaleString('he-IL');
+        action.sendMessage = decision.message ||
+          `✅ נשמר מנוי: *${vendor}* — ${amtStr}₪${day ? ` ב-${day} לחודש` : ''}.`;
         break;
       }
 
