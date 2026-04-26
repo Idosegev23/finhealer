@@ -144,31 +144,27 @@ export default function MissingDocumentsPage() {
 
   if (missingDocs.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
-        <div className="max-w-6xl mx-auto">
-          {/* Back Button */}
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
+        <div className="max-w-3xl mx-auto space-y-5">
           <button
             onClick={() => router.push('/dashboard')}
-            className="mb-6 flex items-center gap-3 text-gray-600 hover:text-gray-900 font-bold text-xl transition-all hover:scale-105"
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-phi-dark font-medium transition-colors"
           >
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className="w-4 h-4" />
             חזרה לדשבורד
           </button>
 
-          {/* Success Message */}
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-3xl shadow-2xl p-12 border-4 border-green-200 text-center">
-            <div className="bg-green-100 p-8 rounded-full w-32 h-32 mx-auto mb-8 flex items-center justify-center">
-              <CheckCircle className="w-20 h-20 text-green-600" />
+          <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-100 text-center">
+            <div className="bg-emerald-50 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-phi-mint" />
             </div>
-            <h1 className="text-5xl font-extrabold text-green-900 mb-4">
-              🎉 כל המסמכים הועלו!
-            </h1>
-            <p className="text-2xl text-green-700 mb-8">
-              אין מסמכים חסרים כרגע. התמונה הפיננסית שלך מלאה!
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">כל המסמכים הועלו</h1>
+            <p className="text-sm text-gray-600 mb-6">
+              אין מסמכים חסרים כרגע. התמונה הפיננסית שלך מלאה.
             </p>
             <button
               onClick={() => router.push('/dashboard')}
-              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-10 py-5 rounded-2xl font-extrabold text-2xl shadow-2xl hover:shadow-3xl transition-all hover:scale-110"
+              className="bg-phi-dark hover:bg-phi-slate text-white px-6 py-2.5 rounded-lg font-medium text-sm transition-colors"
             >
               חזרה לדשבורד
             </button>
@@ -182,44 +178,41 @@ export default function MissingDocumentsPage() {
   const totalCount = missingDocs.length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir="rtl">
+      <div className="max-w-5xl mx-auto space-y-5">
         <WhatsAppBanner message="רוצה להעלות מסמך? שלח אותו דרך WhatsApp! 📄" />
-        
-        {/* Back Button */}
+
         <button
           onClick={() => router.push('/dashboard')}
-          className="mb-6 flex items-center gap-3 text-gray-600 hover:text-gray-900 font-bold text-xl transition-all hover:scale-105"
+          className="flex items-center gap-2 text-sm text-gray-600 hover:text-phi-dark font-medium transition-colors"
         >
-          <ArrowLeft className="w-6 h-6" />
+          <ArrowLeft className="w-4 h-4" />
           חזרה לדשבורד
         </button>
 
         {/* Header */}
-        <div className="bg-white rounded-3xl shadow-2xl p-10 border-4 border-amber-300 mb-8">
-          <div className="flex items-center gap-6 mb-6">
-            <div className="bg-amber-100 p-6 rounded-full">
-              <AlertCircle className="w-16 h-16 text-amber-600" />
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-6 h-6 text-phi-gold" />
             </div>
-            <div>
-              <h1 className="text-5xl font-extrabold text-gray-900 mb-2">
-                📋 מסמכים חסרים
-              </h1>
-              <p className="text-2xl text-gray-600">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900">מסמכים חסרים</h1>
+              <p className="text-sm text-gray-500 mt-0.5">
                 {totalCount} מסמכים ממתינים להעלאה לתמונה פיננסית מלאה
               </p>
             </div>
           </div>
 
           {/* Progress Bar */}
-          <div className="mb-6">
-            <div className="flex justify-between text-lg text-gray-600 mb-3 font-bold">
+          <div>
+            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
               <span>התקדמות: {uploadedCount}/{totalCount}</span>
-              <span>{Math.round((uploadedCount / totalCount) * 100)}%</span>
+              <span className="font-medium tabular-nums">{Math.round((uploadedCount / totalCount) * 100)}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden shadow-inner">
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-500 shadow-lg"
+                className="bg-phi-gold h-full rounded-full transition-all duration-500"
                 style={{ width: `${(uploadedCount / totalCount) * 100}%` }}
               />
             </div>

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { PageWrapper } from '@/components/ui/design-system';
+import { PageWrapper, PageHeader, KpiGrid, StatCard } from '@/components/ui/design-system';
 
 interface RecurringItem {
   vendor: string;
@@ -75,67 +75,40 @@ export default function RecurringPage() {
 
   return (
     <PageWrapper>
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-4xl font-bold text-phi-dark mb-2 flex items-center gap-3">
-                <span className="text-phi-gold font-serif text-5xl">φ</span>
-                מנויים והוצאות חוזרות
-              </h1>
-              <p className="text-phi-slate">
-                {recurring.length} הוצאות/הכנסות חוזרות זוהו אוטומטית
-              </p>
-            </div>
+        <PageHeader
+          title="מנויים והוצאות חוזרות"
+          subtitle={`${recurring.length} פריטים זוהו אוטומטית מהתנועות`}
+          action={
             <Button onClick={loadData} variant="outline" className="border-phi-gold text-phi-gold">
               <RefreshCw className="w-4 h-4 ml-2" />
               רענן
             </Button>
-          </div>
-        </motion.div>
+          }
+        />
 
-        {/* Summary Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
-        >
-          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <TrendingDown className="w-10 h-10 opacity-80" />
-                <Badge className="bg-white/20 text-white border-0">{expenses.length} פריטים</Badge>
-              </div>
-              <p className="text-red-100 text-sm mb-1">הוצאות חוזרות / חודש</p>
-              <p className="text-3xl font-bold">₪{(data?.totalMonthlyExpenses || 0).toLocaleString('he-IL')}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <TrendingUp className="w-10 h-10 opacity-80" />
-                <Badge className="bg-white/20 text-white border-0">{incomes.length} פריטים</Badge>
-              </div>
-              <p className="text-green-100 text-sm mb-1">הכנסות חוזרות / חודש</p>
-              <p className="text-3xl font-bold">₪{(data?.totalMonthlyIncome || 0).toLocaleString('he-IL')}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-phi-dark to-phi-slate text-white border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <DollarSign className="w-10 h-10 opacity-80" />
-                <Badge className="bg-white/20 text-white border-0">נטו</Badge>
-              </div>
-              <p className="text-white/70 text-sm mb-1">יתרה חוזרת / חודש</p>
-              <p className="text-3xl font-bold">
-                ₪{((data?.totalMonthlyIncome || 0) - (data?.totalMonthlyExpenses || 0)).toLocaleString('he-IL')}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {/* Summary KPIs — semantic phi palette */}
+        <KpiGrid cols={3}>
+          <StatCard
+            label="הוצאות חוזרות / חודש"
+            value={`₪${(data?.totalMonthlyExpenses || 0).toLocaleString('he-IL')}`}
+            icon={TrendingDown}
+            tone="expense"
+            subtitle={`${expenses.length} פריטים`}
+          />
+          <StatCard
+            label="הכנסות חוזרות / חודש"
+            value={`₪${(data?.totalMonthlyIncome || 0).toLocaleString('he-IL')}`}
+            icon={TrendingUp}
+            tone="income"
+            subtitle={`${incomes.length} פריטים`}
+          />
+          <StatCard
+            label="יתרה חוזרת / חודש"
+            value={`₪${((data?.totalMonthlyIncome || 0) - (data?.totalMonthlyExpenses || 0)).toLocaleString('he-IL')}`}
+            icon={DollarSign}
+            tone="balance"
+          />
+        </KpiGrid>
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-6 items-center">

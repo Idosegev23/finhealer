@@ -45,10 +45,29 @@ export function Card({ children, className = '', padding = 'md', hover = false }
 // STAT CARD — for KPIs and metrics
 // ============================================================================
 
+/**
+ * Semantic stat tones — single source of truth for KPI coloring.
+ * `income` = positive money in (mint), `expense` = money out (coral),
+ * `balance` = net position (gold or red depending on sign — caller decides),
+ * `neutral` = informational stat (slate). Don't mix red/blue/yellow ad-hoc.
+ */
+export type StatTone = 'income' | 'expense' | 'balance' | 'pending' | 'neutral';
+
+const STAT_TONE_STYLES: Record<StatTone, { iconBg: string; iconColor: string; valueColor: string }> = {
+  income:  { iconBg: 'bg-emerald-50', iconColor: 'text-phi-mint', valueColor: 'text-phi-mint' },
+  expense: { iconBg: 'bg-amber-50',   iconColor: 'text-phi-coral', valueColor: 'text-phi-coral' },
+  balance: { iconBg: 'bg-sky-50',     iconColor: 'text-phi-dark',  valueColor: 'text-phi-dark' },
+  pending: { iconBg: 'bg-amber-50',   iconColor: 'text-phi-gold',  valueColor: 'text-phi-gold' },
+  neutral: { iconBg: 'bg-gray-50',    iconColor: 'text-phi-slate', valueColor: 'text-phi-dark' },
+};
+
 interface StatCardProps {
   label: string;
   value: string | number;
   icon?: LucideIcon;
+  /** Preferred — semantic tone ties color to meaning. */
+  tone?: StatTone;
+  /** Legacy escape hatches — use only when tone doesn't fit. */
   iconColor?: string;
   iconBg?: string;
   trend?: 'up' | 'down' | 'neutral';
@@ -56,22 +75,124 @@ interface StatCardProps {
   className?: string;
 }
 
-export function StatCard({ label, value, icon: Icon, iconColor = 'text-phi-dark', iconBg = 'bg-gray-50', trend, subtitle, className = '' }: StatCardProps) {
-  const trendColor = trend === 'up' ? 'text-phi-mint' : trend === 'down' ? 'text-red-500' : 'text-gray-600';
+export function StatCard({ label, value, icon: Icon, tone, iconColor, iconBg, trend, subtitle, className = '' }: StatCardProps) {
+  // Resolve colors: tone wins, then explicit iconColor/iconBg, then neutral default.
+  const toneStyles = tone ? STAT_TONE_STYLES[tone] : STAT_TONE_STYLES.neutral;
+  const resolvedIconBg = iconBg || toneStyles.iconBg;
+  const resolvedIconColor = iconColor || toneStyles.iconColor;
+  const resolvedValueColor = trend === 'up'
+    ? 'text-phi-mint'
+    : trend === 'down'
+    ? 'text-phi-coral'
+    : tone
+    ? toneStyles.valueColor
+    : 'text-phi-dark';
 
   return (
     <Card className={className}>
       <div className="flex items-center gap-2 mb-2">
         {Icon && (
-          <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center`}>
-            <Icon className={`w-4 h-4 ${iconColor}`} />
+          <div className={`w-8 h-8 rounded-lg ${resolvedIconBg} flex items-center justify-center`}>
+            <Icon className={`w-4 h-4 ${resolvedIconColor}`} />
           </div>
         )}
-        <span className="text-xs font-medium text-gray-400">{label}</span>
+        <span className="text-xs font-medium text-gray-500">{label}</span>
       </div>
-      <p className={`text-xl font-bold ${trendColor}`}>{value}</p>
+      <p className={`text-xl font-bold ${resolvedValueColor}`}>{value}</p>
       {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
     </Card>
+  );
+}
+
+// ============================================================================
+// KPI GRID — consistent 2-up on mobile, 4-up on desktop
+// ============================================================================
+
+interface KpiGridProps {
+  children: React.ReactNode;
+  /** Number of columns on large screens. 2 | 3 | 4 (default 4) */
+  cols?: 2 | 3 | 4;
+  className?: string;
+}
+
+export function KpiGrid({ children, cols = 4, className = '' }: KpiGridProps) {
+  const lgCols = cols === 2 ? 'lg:grid-cols-2' : cols === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4';
+  return (
+    <div className={`grid grid-cols-2 ${lgCols} gap-3 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+// ============================================================================
+// SECTION — labeled section block (replaces inline bg-white rounded-xl ...)
+// ============================================================================
+
+interface SectionProps {
+  /** Optional title row */
+  title?: React.ReactNode;
+  titleIcon?: LucideIcon;
+  titleIconColor?: string;
+  /** Right-side action element (link, button) */
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  /** Card padding */
+  padding?: 'sm' | 'md' | 'lg';
+  className?: string;
+}
+
+export function Section({ title, titleIcon: Icon, titleIconColor = 'text-phi-gold', action, children, padding = 'md', className = '' }: SectionProps) {
+  return (
+    <Card padding={padding} className={className}>
+      {(title || action) && (
+        <div className="flex items-center justify-between mb-3">
+          {title && (
+            <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+              {Icon && <Icon className={`w-4 h-4 ${titleIconColor}`} />}
+              {title}
+            </h3>
+          )}
+          {action}
+        </div>
+      )}
+      {children}
+    </Card>
+  );
+}
+
+// ============================================================================
+// INSIGHT BANNER — for tips, warnings, and contextual notes
+// ============================================================================
+
+interface InsightBannerProps {
+  variant: 'info' | 'success' | 'warning' | 'danger';
+  icon?: LucideIcon;
+  title?: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+  className?: string;
+}
+
+const INSIGHT_BANNER_STYLES: Record<InsightBannerProps['variant'], { bg: string; border: string; iconColor: string; titleColor: string }> = {
+  info:    { bg: 'bg-sky-50',     border: 'border-sky-200',     iconColor: 'text-phi-dark',  titleColor: 'text-phi-dark' },
+  success: { bg: 'bg-emerald-50', border: 'border-emerald-200', iconColor: 'text-phi-mint',  titleColor: 'text-phi-mint' },
+  warning: { bg: 'bg-amber-50',   border: 'border-amber-200',   iconColor: 'text-phi-gold',  titleColor: 'text-amber-900' },
+  danger:  { bg: 'bg-red-50',     border: 'border-red-200',     iconColor: 'text-red-600',   titleColor: 'text-red-800' },
+};
+
+export function InsightBanner({ variant, icon: Icon, title, children, action, className = '' }: InsightBannerProps) {
+  const s = INSIGHT_BANNER_STYLES[variant];
+  return (
+    <div className={`${s.bg} border ${s.border} rounded-xl p-4 ${className}`}>
+      <div className="flex items-start gap-3">
+        {Icon && <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${s.iconColor}`} />}
+        <div className="flex-1 min-w-0">
+          {title && <p className={`text-sm font-semibold mb-1 ${s.titleColor}`}>{title}</p>}
+          <div className="text-sm text-gray-700">{children}</div>
+          {action && <div className="mt-2">{action}</div>}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -315,13 +436,21 @@ export function PageHeader({ title, subtitle, action, className = '' }: PageHead
 
 interface PageWrapperProps {
   children: React.ReactNode;
+  /** Inner content max-width. Use 'wide' for data-heavy tables. Default 'default' = max-w-5xl. */
+  maxWidth?: 'default' | 'wide' | 'narrow';
   className?: string;
 }
 
-export function PageWrapper({ children, className = '' }: PageWrapperProps) {
+const MAX_WIDTHS = {
+  narrow: 'max-w-3xl',
+  default: 'max-w-5xl',
+  wide: 'max-w-7xl',
+};
+
+export function PageWrapper({ children, maxWidth = 'default', className = '' }: PageWrapperProps) {
   return (
     <div className={`min-h-screen bg-gray-50 p-4 md:p-6 ${className}`} dir="rtl">
-      <div className="max-w-5xl mx-auto space-y-5">
+      <div className={`${MAX_WIDTHS[maxWidth]} mx-auto space-y-5`}>
         {children}
       </div>
     </div>

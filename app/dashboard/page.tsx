@@ -18,6 +18,7 @@ import InstallPWA from '@/components/dashboard/InstallPWA'
 import { DedupAlert } from '@/components/dashboard/DedupAlert'
 import { QuickAddFAB } from '@/components/dashboard/QuickAddFAB'
 import { OnboardingWizard } from '@/components/dashboard/OnboardingWizard'
+import { KpiGrid, StatCard, Section, InsightBanner, EmptyState, ProgressBar } from '@/components/ui/design-system'
 
 export const revalidate = 30
 
@@ -127,16 +128,6 @@ export default async function DashboardPage() {
     data_collection: 'איסוף נתונים',
   }
 
-  const insightColors: Record<string, string> = {
-    high: 'bg-red-50 border-red-400',
-    medium: 'bg-yellow-50 border-yellow-400',
-    low: 'bg-blue-50 border-blue-400',
-  }
-
-  const insightEmoji: Record<string, string> = {
-    warning: '⚠️', success: '✅', spending: '📊', saving: '💰', info: '💡',
-  }
-
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl" role="main" aria-label="דשבורד ראשי">
       <div className="container mx-auto px-4 py-6 max-w-5xl space-y-5">
@@ -175,84 +166,61 @@ export default async function DashboardPage() {
           <PhaseJourney currentPhase={currentPhase} />
         </div>
 
-        {/* Monthly KPIs */}
+        {/* Monthly KPIs — semantic colors per metric type */}
         <div>
-          <p className="text-xs font-medium text-gray-400 mb-2 flex items-center gap-1">
+          <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" />
             {now.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })} — חודש נוכחי
           </p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" role="region" aria-label="מדדים חודשיים">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">
-                  <TrendingUp className="w-3.5 h-3.5 text-green-600" />
-                </div>
-                <span className="text-xs text-gray-400">הכנסות</span>
-              </div>
-              <p className="text-xl font-bold text-green-600">₪{monthlyIncome.toLocaleString('he-IL')}</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
-                  <TrendingDown className="w-3.5 h-3.5 text-red-600" />
-                </div>
-                <span className="text-xs text-gray-400">הוצאות</span>
-              </div>
-              <p className="text-xl font-bold text-red-600">₪{monthlyExpenses.toLocaleString('he-IL')}</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <Wallet className="w-3.5 h-3.5 text-blue-600" />
-                </div>
-                <span className="text-xs text-gray-400">יתרה</span>
-              </div>
-              <p className={`text-xl font-bold ${monthlyBalance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                {monthlyBalance >= 0 ? '+' : ''}₪{monthlyBalance.toLocaleString('he-IL')}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-lg bg-yellow-50 flex items-center justify-center">
-                  <Clock className="w-3.5 h-3.5 text-yellow-600" />
-                </div>
-                <span className="text-xs text-gray-400">ממתינות</span>
-              </div>
-              <p className="text-xl font-bold text-yellow-600">{pendingCount ?? 0}</p>
-            </div>
-          </div>
+          <KpiGrid cols={4}>
+            <StatCard
+              label="הכנסות"
+              value={`₪${monthlyIncome.toLocaleString('he-IL')}`}
+              icon={TrendingUp}
+              tone="income"
+            />
+            <StatCard
+              label="הוצאות"
+              value={`₪${monthlyExpenses.toLocaleString('he-IL')}`}
+              icon={TrendingDown}
+              tone="expense"
+            />
+            <StatCard
+              label="יתרה"
+              value={`${monthlyBalance >= 0 ? '+' : ''}₪${monthlyBalance.toLocaleString('he-IL')}`}
+              icon={Wallet}
+              tone={monthlyBalance >= 0 ? 'balance' : 'expense'}
+            />
+            <StatCard
+              label="ממתינות"
+              value={pendingCount ?? 0}
+              icon={Clock}
+              tone="pending"
+            />
+          </KpiGrid>
         </div>
 
         {/* Expenses pie chart + budget recommendations */}
         <ExpensesPieBudget />
 
         {/* Budget tracking */}
-        {(!budgetTracking || budgetTracking.length === 0) && (
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2 mb-2">
-              <Target className="w-4 h-4 text-amber-500" />
-              מעקב תקציב
-            </h3>
-            <p className="text-xs text-gray-400">עדיין לא הוגדר תקציב.</p>
-            <Link href="/dashboard/budget" className="inline-block mt-2 text-xs text-amber-600 font-medium hover:underline">
+        {(!budgetTracking || budgetTracking.length === 0) ? (
+          <Section title="מעקב תקציב" titleIcon={Target}>
+            <p className="text-xs text-gray-500">עדיין לא הוגדר תקציב.</p>
+            <Link href="/dashboard/budget" className="inline-block mt-2 text-xs text-phi-gold font-medium hover:underline">
               צור תקציב חכם
             </Link>
-          </div>
-        )}
-        {budgetTracking && budgetTracking.length > 0 && (
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
-                <Target className="w-4 h-4 text-amber-500" />
-                מעקב תקציב
-              </h3>
-              <Link href="/dashboard/budget" className="text-xs text-amber-600 hover:underline flex items-center gap-0.5">
+          </Section>
+        ) : (
+          <Section
+            title="מעקב תקציב"
+            titleIcon={Target}
+            action={
+              <Link href="/dashboard/budget" className="text-xs text-phi-gold hover:underline flex items-center gap-0.5">
                 הכל <ChevronLeft className="w-3 h-3" />
               </Link>
-            </div>
+            }
+          >
             <div className="space-y-3">
               {(budgetTracking as any[]).map((item, i) => {
                 const pct = Math.min(100, Math.round(item.percentage_used || 0))
@@ -261,21 +229,16 @@ export default async function DashboardPage() {
                   <div key={i}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-gray-700">{item.category_name}</span>
-                      <span className={over ? 'text-red-600 font-medium' : 'text-gray-400'}>
+                      <span className={over ? 'text-phi-coral font-medium' : 'text-gray-500'}>
                         ₪{Math.round(item.actual_spent || 0).toLocaleString('he-IL')} / ₪{Math.round(item.monthly_cap || 0).toLocaleString('he-IL')} ({pct}%)
                       </span>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${over ? 'bg-red-500' : pct > 70 ? 'bg-yellow-400' : 'bg-green-500'}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
+                    <ProgressBar value={pct} />
                   </div>
                 )
               })}
             </div>
-          </div>
+          </Section>
         )}
 
         {/* Goals + Loans */}
@@ -286,73 +249,68 @@ export default async function DashboardPage() {
 
         {/* Smart insights from DB */}
         {insights && insights.length > 0 && (
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2 mb-3">
-              <Lightbulb className="w-4 h-4 text-yellow-500" />
-              תובנות חכמות
-            </h3>
+          <Section title="תובנות חכמות" titleIcon={Lightbulb}>
             <div className="space-y-2">
-              {(insights as any[]).map((insight, i) => (
-                <div
-                  key={i}
-                  className={`p-3 rounded-lg text-xs border-r-4 ${insightColors[insight.priority] || insightColors.low}`}
-                >
-                  <p className="font-medium text-gray-900 mb-0.5">
-                    {insightEmoji[insight.insight_type] || '💡'} {insight.title}
-                  </p>
-                  <p className="text-gray-500">{insight.description}</p>
-                </div>
-              ))}
+              {(insights as any[]).map((insight, i) => {
+                const variant: 'danger' | 'warning' | 'info' =
+                  insight.priority === 'high' ? 'danger' :
+                  insight.priority === 'medium' ? 'warning' : 'info';
+                return (
+                  <InsightBanner key={i} variant={variant} title={insight.title}>
+                    {insight.description}
+                  </InsightBanner>
+                );
+              })}
             </div>
-          </div>
+          </Section>
         )}
 
         {/* Recent Transactions */}
-        {(!recentTx || recentTx.length === 0) && (
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <h3 className="font-semibold text-gray-900 text-sm mb-2">תנועות אחרונות</h3>
-            <p className="text-xs text-gray-400">אין עדיין תנועות. שלח דוח בנק בוואטסאפ או העלה מהדשבורד.</p>
-            <Link href="/dashboard/scan-center" className="inline-block mt-2 text-xs text-amber-600 font-medium hover:underline">
-              העלה דוח ראשון
-            </Link>
-          </div>
-        )}
-        {recentTx && recentTx.length > 0 && (
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900 text-sm">תנועות אחרונות</h3>
-              <Link href="/dashboard/overview" className="text-xs text-amber-600 hover:underline flex items-center gap-0.5">
+        {(!recentTx || recentTx.length === 0) ? (
+          <EmptyState
+            icon={FileText}
+            title="אין עדיין תנועות"
+            description="שלח דוח בנק בוואטסאפ או העלה מהדשבורד."
+            action={{ label: 'העלה דוח ראשון', href: '/dashboard/scan-center' }}
+          />
+        ) : (
+          <Section
+            title="תנועות אחרונות"
+            action={
+              <Link href="/dashboard/overview" className="text-xs text-phi-gold hover:underline flex items-center gap-0.5">
                 הכל <ChevronLeft className="w-3 h-3" />
               </Link>
-            </div>
-            <div className="divide-y divide-gray-50">
-              {(recentTx as any[]).map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between py-2.5">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      tx.type === 'income' ? 'bg-green-50' : 'bg-red-50'
-                    }`}>
-                      {tx.type === 'income'
-                        ? <TrendingUp className="w-3.5 h-3.5 text-green-600" />
-                        : <TrendingDown className="w-3.5 h-3.5 text-red-600" />}
+            }
+          >
+            <div className="divide-y divide-gray-100">
+              {(recentTx as any[]).map((tx) => {
+                const isIncome = tx.type === 'income';
+                return (
+                  <div key={tx.id} className="flex items-center justify-between py-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${isIncome ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+                        {isIncome
+                          ? <TrendingUp className="w-3.5 h-3.5 text-phi-mint" />
+                          : <TrendingDown className="w-3.5 h-3.5 text-phi-coral" />}
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-900 leading-tight">{tx.vendor || tx.category || 'תנועה'}</p>
+                        <p className="text-xs text-gray-500">{tx.tx_date || ''}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-900 leading-tight">{tx.vendor || tx.category || 'תנועה'}</p>
-                      <p className="text-xs text-gray-400">{tx.tx_date || ''}</p>
+                    <div className="text-end flex items-center gap-2">
+                      {tx.status === 'pending' && (
+                        <span className="text-xs bg-amber-50 text-phi-gold border border-amber-200 px-1.5 py-0.5 rounded-full">ממתין</span>
+                      )}
+                      <p className={`font-semibold text-sm tabular-nums ${isIncome ? 'text-phi-mint' : 'text-phi-coral'}`}>
+                        {isIncome ? '+' : '-'}₪{Number(tx.amount).toLocaleString('he-IL')}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-end flex items-center gap-2">
-                    {tx.status === 'pending' && (
-                      <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">ממתין</span>
-                    )}
-                    <p className={`font-semibold text-sm ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                      {tx.type === 'income' ? '+' : '-'}₪{Number(tx.amount).toLocaleString('he-IL')}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </div>
+          </Section>
         )}
 
         {/* Benchmark + Referral */}
@@ -361,41 +319,40 @@ export default async function DashboardPage() {
           <ReferralCard />
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-          <h3 className="font-semibold text-gray-900 text-sm mb-3">פעולות מהירות</h3>
+        {/* Quick Actions — unified phi palette, no rainbow */}
+        <Section title="פעולות מהירות">
           <div className="grid grid-cols-3 gap-3">
             <Link
               href="/dashboard/missing-documents"
-              className="flex flex-col items-center p-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-100 hover:border-amber-200 transition-colors"
+              className="flex flex-col items-center p-3 rounded-xl border border-gray-100 hover:border-phi-gold/40 hover:bg-amber-50/50 transition-all group"
             >
-              <div className="w-9 h-9 rounded-lg bg-amber-400 flex items-center justify-center mb-2">
-                <FileText className="w-4 h-4 text-white" />
+              <div className="w-9 h-9 rounded-lg bg-phi-dark flex items-center justify-center mb-2 group-hover:bg-phi-slate transition-colors">
+                <FileText className="w-4 h-4 text-phi-gold" />
               </div>
               <span className="text-xs text-gray-700 text-center font-medium">העלה דוח</span>
             </Link>
 
             <Link
               href="/dashboard/overview"
-              className="flex flex-col items-center p-3 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-100 hover:border-teal-200 transition-colors"
+              className="flex flex-col items-center p-3 rounded-xl border border-gray-100 hover:border-phi-gold/40 hover:bg-amber-50/50 transition-all group"
             >
-              <div className="w-9 h-9 rounded-lg bg-teal-500 flex items-center justify-center mb-2">
-                <BarChart3 className="w-4 h-4 text-white" />
+              <div className="w-9 h-9 rounded-lg bg-phi-dark flex items-center justify-center mb-2 group-hover:bg-phi-slate transition-colors">
+                <BarChart3 className="w-4 h-4 text-phi-gold" />
               </div>
               <span className="text-xs text-gray-700 text-center font-medium">גרפים</span>
             </Link>
 
             <Link
               href="/dashboard/goals"
-              className="flex flex-col items-center p-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-100 hover:border-purple-200 transition-colors"
+              className="flex flex-col items-center p-3 rounded-xl border border-gray-100 hover:border-phi-gold/40 hover:bg-amber-50/50 transition-all group"
             >
-              <div className="w-9 h-9 rounded-lg bg-purple-500 flex items-center justify-center mb-2">
-                <Target className="w-4 h-4 text-white" />
+              <div className="w-9 h-9 rounded-lg bg-phi-dark flex items-center justify-center mb-2 group-hover:bg-phi-slate transition-colors">
+                <Target className="w-4 h-4 text-phi-gold" />
               </div>
               <span className="text-xs text-gray-700 text-center font-medium">יעדים</span>
             </Link>
           </div>
-        </div>
+        </Section>
 
         {/* Phase footer */}
         <p className="text-center text-xs text-gray-400 pb-2">

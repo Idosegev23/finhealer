@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import TransactionsTable from '@/components/transactions/TransactionsTable';
+import { PageWrapper, PageHeader } from '@/components/ui/design-system';
 
 export const revalidate = 30;
 
@@ -62,20 +63,14 @@ export default async function TransactionsPage() {
     .map((name, i) => ({ id: `cat-${i}`, name }));
 
   return (
-    <div className="min-h-screen bg-gray-50" dir="rtl">
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">תנועות</h1>
-          <p className="text-sm text-gray-500">ניהול הכנסות והוצאות</p>
-        </div>
-
-        <TransactionsTable
-          initialTransactions={transactions || []}
-          categories={categories || []}
-          goals={goals || []}
-          userId={user.id}
-        />
-      </div>
-    </div>
+    <PageWrapper>
+      <PageHeader title="תנועות" subtitle="ניהול הכנסות והוצאות — 30 יום אחרונים" />
+      <TransactionsTable
+        initialTransactions={transactions || []}
+        categories={categories || []}
+        goals={goals || []}
+        userId={user.id}
+      />
+    </PageWrapper>
   );
 }

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { CheckCircle2, Target, TrendingUp, PiggyBank, Eye, BarChart3 } from 'lucide-react'
 import Link from 'next/link'
+import { PageWrapper, PageHeader, InsightBanner, Card, PhiButton } from '@/components/ui/design-system'
 
 export default async function PhasesPage() {
   const supabase = await createClient()
@@ -121,101 +122,64 @@ export default async function PhasesPage() {
     },
   ];
 
+  const currentPhaseData = phases.find(p => p.id === currentPhase)
+
   return (
-    <div className="min-h-screen bg-dashboard">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-theme-primary mb-2">
-            מסלול ההבראה הפיננסית 🎯
-          </h1>
-          <p className="text-theme-secondary">
-            5 שלבים להשגת בריאות פיננסית מלאה - אתה נמצא בשלב: <span className="font-bold text-blue-600 dark:text-blue-400">{phases.find(p => p.id === currentPhase)?.name}</span>
-          </p>
-        </div>
+    <PageWrapper>
+      <PageHeader
+        title="מסלול ההבראה הפיננסית"
+        subtitle={`5 שלבים — כרגע אתה ב: ${currentPhaseData?.name || ''}`}
+      />
 
-        {/* Current Phase Indicator */}
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-5 mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="font-bold text-blue-900 dark:text-blue-100">
-                {phases.find(p => p.id === currentPhase)?.name}
-              </h3>
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                זה השלב שבו אתה נמצא כרגע
-              </p>
-            </div>
-          </div>
-        </div>
+      <InsightBanner variant="info" icon={CheckCircle2} title={currentPhaseData?.name}>
+        זה השלב שבו אתה נמצא כרגע. ההתקדמות לשלב הבא קורית באופן הדרגתי לפי הדאטה ושימוש במערכת.
+      </InsightBanner>
 
-        {/* Phases List */}
-        <div className="space-y-6">
-          {phases.map((phase, index) => {
-            const Icon = phase.icon;
-            const isCurrentPhase = phase.id === currentPhase;
-            const isPastPhase = phases.findIndex(p => p.id === currentPhase) > index;
+      {/* Phases List */}
+      <div className="space-y-4">
+        {phases.map((phase, index) => {
+          const Icon = phase.icon;
+          const isCurrentPhase = phase.id === currentPhase;
+          const isPastPhase = phases.findIndex(p => p.id === currentPhase) > index;
 
-            return (
-              <div 
-                key={phase.id}
-                className={`bg-card-dark border rounded-2xl p-6 shadow-lg transition-all ${
-                  isCurrentPhase 
-                    ? 'border-blue-500 dark:border-blue-600 ring-2 ring-blue-200 dark:ring-blue-900' 
-                    : 'border-theme'
-                }`}
-              >
-                <div className="flex items-start gap-4 mb-4">
-                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
-                    phase.color === 'blue' ? 'bg-blue-100 dark:bg-blue-900/30' :
-                    phase.color === 'green' ? 'bg-green-100 dark:bg-green-900/30' :
-                    phase.color === 'purple' ? 'bg-purple-100 dark:bg-purple-900/30' :
-                    phase.color === 'orange' ? 'bg-orange-100 dark:bg-orange-900/30' :
-                    'bg-red-100 dark:bg-red-900/30'
-                  }`}>
-                    <Icon className={`w-7 h-7 ${
-                      phase.color === 'blue' ? 'text-blue-600 dark:text-blue-400' :
-                      phase.color === 'green' ? 'text-green-600 dark:text-green-400' :
-                      phase.color === 'purple' ? 'text-purple-600 dark:text-purple-400' :
-                      phase.color === 'orange' ? 'text-orange-600 dark:text-orange-400' :
-                      'text-red-600 dark:text-red-400'
-                    }`} />
-                  </div>
-                  
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-2xl font-bold text-theme-primary">{phase.name}</h2>
-                      {isCurrentPhase && (
-                        <span className="px-3 py-1 bg-blue-500 text-white text-sm font-bold rounded-full">
-                          שלב נוכחי
-                        </span>
-                      )}
-                      {isPastPhase && (
-                        <CheckCircle2 className="w-6 h-6 text-green-500 dark:text-green-400" />
-                      )}
-                    </div>
-                    <p className="text-lg text-theme-secondary mb-4">{phase.description}</p>
-                    <div className="inline-flex items-center gap-2 text-sm text-theme-tertiary">
-                      <span>⏱️ משך: {phase.duration}</span>
-                    </div>
-                  </div>
+          return (
+            <Card
+              key={phase.id}
+              className={isCurrentPhase ? 'ring-2 ring-phi-gold/40 border-phi-gold/30' : ''}
+              padding="lg"
+            >
+              <div className="flex items-start gap-4 mb-4">
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${isPastPhase ? 'bg-emerald-50' : isCurrentPhase ? 'bg-phi-gold/15' : 'bg-gray-50'}`}>
+                  <Icon className={`w-7 h-7 ${isPastPhase ? 'text-phi-mint' : isCurrentPhase ? 'text-phi-gold' : 'text-gray-400'}`} />
                 </div>
 
-                {/* Why */}
-                <div className="mb-4">
-                  <h3 className="text-lg font-bold text-theme-primary mb-2">💡 למה זה חשוב?</h3>
-                  <p className="text-theme-secondary">{phase.why}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
+                    <h2 className="text-xl font-bold text-gray-900">{phase.name}</h2>
+                    {isCurrentPhase && (
+                      <span className="px-2.5 py-0.5 bg-phi-gold text-white text-xs font-bold rounded-full">
+                        שלב נוכחי
+                      </span>
+                    )}
+                    {isPastPhase && <CheckCircle2 className="w-5 h-5 text-phi-mint" />}
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">{phase.description}</p>
+                  <p className="text-xs text-gray-400">משך משוער: {phase.duration}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm">
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">למה זה חשוב</h3>
+                  <p className="text-gray-700 leading-relaxed">{phase.why}</p>
                 </div>
 
-                {/* How */}
-                <div className="mb-4">
-                  <h3 className="text-lg font-bold text-theme-primary mb-2">🎯 איך עושים את זה?</h3>
-                  <ul className="space-y-2">
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">איך עושים את זה</h3>
+                  <ul className="space-y-1.5">
                     {phase.how.map((step, i) => (
-                      <li key={i} className="flex items-start gap-2 text-theme-secondary">
-                        <span className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-sm font-bold">
+                      <li key={i} className="flex items-start gap-2 text-gray-700">
+                        <span className="flex-shrink-0 w-5 h-5 bg-phi-dark text-phi-gold rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
                           {i + 1}
                         </span>
                         <span>{step}</span>
@@ -224,37 +188,27 @@ export default async function PhasesPage() {
                   </ul>
                 </div>
 
-                {/* Example */}
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
-                  <h3 className="text-lg font-bold text-green-900 dark:text-green-100 mb-2">
-                    📝 דוגמה
-                  </h3>
-                  <p className="text-green-800 dark:text-green-200">{phase.example}</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-amber-900 mb-1">דוגמה</p>
+                  <p className="text-sm text-amber-900/80">{phase.example}</p>
                 </div>
 
-                {/* Output */}
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-2">
-                    ✅ תוצאה
-                  </h3>
-                  <p className="text-blue-800 dark:text-blue-200">{phase.output}</p>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-phi-mint mb-1">תוצאה</p>
+                  <p className="text-sm text-gray-700">{phase.output}</p>
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        {/* Back to Dashboard */}
-        <div className="mt-8 text-center">
-          <Link 
-            href="/dashboard"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
-          >
-            ← חזרה לדשבורד
-          </Link>
-        </div>
+            </Card>
+          );
+        })}
       </div>
-    </div>
+
+      <div className="text-center pt-2">
+        <Link href="/dashboard">
+          <PhiButton variant="primary">חזרה לדשבורד</PhiButton>
+        </Link>
+      </div>
+    </PageWrapper>
   );
 }
 
