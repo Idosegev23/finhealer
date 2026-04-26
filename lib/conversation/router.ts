@@ -381,15 +381,11 @@ export async function routeMessage(
     }
   }
 
-  // Frustration / Tiredness - offer a break
-  if (!isBrainManaged && mood === 'tired' && state !== 'waiting_for_name') {
-    console.log(`[Router] UNIVERSAL: user seems tired/frustrated in state=${state}`);
-    await greenAPI.sendMessage({
-      phoneNumber: phone,
-      message: `אני כאן כשתרצה להמשיך 😊\n\nכתוב הודעה כשתהיה מוכן, ונמשיך מאיפה שעצרנו.`,
-    });
-    return { success: true };
-  }
+  // (Removed: hardcoded "tired" canned reply.)
+  // The brain handles tone, frustration, and pacing in its persona — see
+  // PHI_OPERATING_PRINCIPLES + dont_repeat. Hardcoding "אני כאן כשתרצה להמשיך"
+  // was misfiring on coherent goal statements like "אני רוצה להגדיר יעד" and
+  // making the bot feel deaf. Better to let the brain read context and decide.
 
   // ══════════════════════════════════════════════════════════════════════════
   // CROSS-STATE ROUTING (intent-based state transitions)
@@ -494,28 +490,50 @@ export async function routeMessage(
     'monitoring',
   ];
 
-  // Wizard states — these have their own multi-step flows, PhiBrain can't handle them
-  if (state === 'behavior') {
-    console.log(`[Router] DISPATCH: state=behavior → handleBehaviorPhase()`);
-    return await handleBehaviorPhase(ctx, msg);
-  }
-  if (state === 'goals_setup') {
-    console.log(`[Router] DISPATCH: state=goals_setup → handleGoalsSetup()`);
-    return await handleGoalsSetup(ctx, msg);
-  }
-  if (state === 'goals') {
-    console.log(`[Router] DISPATCH: state=goals → handleGoalsPhase()`);
-    return await handleGoalsPhase(ctx, msg);
-  }
-  if (state === 'budget') {
-    console.log(`[Router] DISPATCH: state=budget → handleBudgetPhase()`);
-    return await handleBudgetPhase(ctx, msg);
-  }
-  if (state === 'loan_consolidation_offer') {
-    return await handleLoanConsolidationOffer(ctx, msg);
-  }
-  if (state === 'waiting_for_loan_docs') {
-    return await handleWaitingForLoanDocs(ctx, msg);
+  // Wizard states — buttons go to wizard handlers, free text goes to brain.
+  // The brain has tools + persona that let it engage naturally with goal-/budget-/
+  // behavior-talk; the canned wizard texts (which were derailing real
+  // conversations like "אני רוצה להגדיר יעד" → "אני כאן כשתרצה להמשיך") only
+  // make sense for actual button-click events.
+  const wizardStates = ['behavior', 'goals_setup', 'goals', 'budget', 'loan_consolidation_offer', 'waiting_for_loan_docs'];
+  const wizardHandlers: Record<string, (...args: any[]) => Promise<RouterResult>> = {
+    behavior: (c: RouterContext, m: string) => handleBehaviorPhase(c, m),
+    goals_setup: (c: RouterContext, m: string) => handleGoalsSetup(c, m),
+    goals: (c: RouterContext, m: string) => handleGoalsPhase(c, m),
+    budget: (c: RouterContext, m: string) => handleBudgetPhase(c, m),
+    loan_consolidation_offer: (c: RouterContext, m: string) => handleLoanConsolidationOffer(c, m),
+    waiting_for_loan_docs: (c: RouterContext, m: string) => handleWaitingForLoanDocs(c, m),
+  };
+
+  if (wizardStates.includes(state)) {
+    const trimmed = msg.trim();
+    const isButton =
+      // common WhatsApp button IDs
+      /^(auto_budget|manual_budget|skip_budget|confirm_budget|new_goal|edit_goal|delete_goal|to_goals|to_budget|simulate|approve_consolidation|reject_consolidation)$/.test(trimmed) ||
+      // common Hebrew button labels
+      ['בנה לי תקציב 🚀', 'אגדיר בעצמי ✏️', 'דלג לשלב הבא ⏭️', 'מתאים לי ✅', 'אשנה בעצמי ✏️',
+       'יעד חדש', 'עריכה', 'מחק יעד', 'סיימתי ✅', 'דלג ⏭️'].includes(trimmed) ||
+      // category:amount manual budget pattern
+      /^.+?:\s*\d+$/.test(trimmed);
+
+    if (isButton) {
+      console.log(`[Router] DISPATCH: state=${state} → ${state} wizard (button)`);
+      return await wizardHandlers[state](ctx, msg);
+    }
+
+    // Free text in a wizard state — let the brain hold a real conversation.
+    console.log(`[Router] DISPATCH: state=${state} → PhiBrain (natural conversation)`);
+    try {
+      const action = await phiBrain(userId, { type: 'whatsapp_message', message: msg });
+      if (action.silent && !action.sendMessage) {
+        // Brain decided not to respond — fall back to wizard
+        return await wizardHandlers[state](ctx, msg);
+      }
+      return { success: true, newState: action.updateState as any };
+    } catch (brainErr) {
+      console.error(`[Router] PhiBrain error in wizard state ${state}, falling back:`, brainErr);
+      return await wizardHandlers[state](ctx, msg);
+    }
   }
 
   if (brainStates.includes(state)) {
