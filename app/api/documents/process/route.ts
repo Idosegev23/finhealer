@@ -2100,12 +2100,21 @@ async function saveLoans(supabase: any, result: any, userId: string, documentId:
       return parts.length ? parts.join(' · ') : null
     }
 
+    // Lender fallback: report_info often misses bank_name but includes
+    // branch — use it so users see "בנק (סניף אשקלון)" instead of an
+    // anonymous "לא צוין" placeholder. Still better when the model
+    // returns a real bank_name.
+    const reportBank: string | null = result.report_info?.bank_name || null
+    const reportBranch: string | null = result.report_info?.branch || null
+    const fallbackLender = reportBank
+      || (reportBranch ? `בנק (סניף ${reportBranch})` : 'בנק')
+
     if (result.tracks && Array.isArray(result.tracks)) {
       // Mortgage: multiple tracks → multiple loans
       loansToInsert = result.tracks.map((track: any) => ({
         user_id: userId,
         loan_type: 'mortgage',
-        lender_name: result.report_info?.bank_name || 'בנק',
+        lender_name: fallbackLender,
         loan_number: track.track_number || track.loan_number || null,
         original_amount: parseFloat(track.original_amount) || 0,
         current_balance: parseFloat(track.current_balance) || 0,
@@ -2125,7 +2134,7 @@ async function saveLoans(supabase: any, result: any, userId: string, documentId:
       loansToInsert = result.loans.map((loan: any) => ({
         user_id: userId,
         loan_type: isMortgage ? 'mortgage' : 'personal',
-        lender_name: result.report_info?.bank_name || loan.loan_provider || 'לא צוין',
+        lender_name: reportBank || loan.loan_provider || fallbackLender,
         loan_number: loan.loan_number || null,
         original_amount: parseFloat(loan.original_amount) || 0,
         current_balance: parseFloat(loan.current_balance) || 0,
@@ -2166,16 +2175,33 @@ async function saveLoans(supabase: any, result: any, userId: string, documentId:
       }
     }
 
-    const { error } = await supabase
-      .from('loans')
-      .insert(loansToInsert);
+    // Split by whether we have a stable identity (loan_number) or not.
+    // Numbered loans upsert idempotently — re-uploading the same report
+    // updates balances/payments instead of creating duplicates. Loans
+    // without a number can only be inserted blind.
+    const numbered = loansToInsert.filter((l) => l.loan_number);
+    const unnumbered = loansToInsert.filter((l) => !l.loan_number);
 
-    if (error) {
-      console.error('Failed to insert loans:', error);
-      throw error;
+    if (numbered.length > 0) {
+      const { error: upsertError } = await supabase
+        .from('loans')
+        .upsert(numbered, { onConflict: 'user_id,loan_number' });
+      if (upsertError) {
+        console.error('Failed to upsert numbered loans:', upsertError);
+        throw upsertError;
+      }
+    }
+    if (unnumbered.length > 0) {
+      const { error: insertError } = await supabase
+        .from('loans')
+        .insert(unnumbered);
+      if (insertError) {
+        console.error('Failed to insert unnumbered loans:', insertError);
+        throw insertError;
+      }
     }
 
-    console.log(`💾 Saved ${loansToInsert.length} loans`);
+    console.log(`💾 Saved ${loansToInsert.length} loans (${numbered.length} upsert, ${unnumbered.length} insert)`);
     return loansToInsert.length;
   } catch (error) {
     console.error('Error in saveLoans:', error);
