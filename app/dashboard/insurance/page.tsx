@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Shield, Heart, AlertTriangle } from "lucide-react";
+import {
+  PlusCircle, Shield, Heart, AlertTriangle,
+  HeartPulse, Stethoscope, Accessibility, Ambulance,
+  Home, Car, Plane, PawPrint, FileText,
+  type LucideIcon,
+} from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { AddInsuranceModal } from "@/components/insurance/AddInsuranceModal";
 import { RequestPensionReport } from "@/components/pension/RequestPensionReport";
@@ -19,17 +24,17 @@ interface Insurance {
   annual_premium: number;
 }
 
-const INSURANCE_TYPE_LABELS: Record<string, { label: string; icon: string }> = {
-  life: { label: "ביטוח חיים", icon: "❤️" },
-  health: { label: "ביטוח בריאות", icon: "🏥" },
-  critical_illness: { label: "מחלות קשות", icon: "⚕️" },
-  disability: { label: "ביטוח סיעודי", icon: "🦽" },
-  accident: { label: "תאונות אישיות", icon: "🚑" },
-  home: { label: "ביטוח דירה", icon: "🏠" },
-  car: { label: "ביטוח רכב", icon: "🚗" },
-  travel: { label: "ביטוח נסיעות", icon: "✈️" },
-  pet: { label: "ביטוח חיות מחמד", icon: "🐾" },
-  other: { label: "אחר", icon: "📋" },
+const INSURANCE_TYPE_LABELS: Record<string, { label: string; icon: LucideIcon }> = {
+  life:             { label: "ביטוח חיים",         icon: HeartPulse },
+  health:           { label: "ביטוח בריאות",       icon: Stethoscope },
+  critical_illness: { label: "מחלות קשות",         icon: Heart },
+  disability:       { label: "ביטוח סיעודי",       icon: Accessibility },
+  accident:         { label: "תאונות אישיות",      icon: Ambulance },
+  home:             { label: "ביטוח דירה",         icon: Home },
+  car:              { label: "ביטוח רכב",          icon: Car },
+  travel:           { label: "ביטוח נסיעות",       icon: Plane },
+  pet:              { label: "ביטוח חיות מחמד",    icon: PawPrint },
+  other:            { label: "אחר",                icon: FileText },
 };
 
 export default function InsurancePage() {
@@ -101,15 +106,19 @@ export default function InsurancePage() {
                   זוהו פערי כיסוי בתיק הביטוח שלך:
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {missingInsurances.map((type) => (
-                    <span
-                      key={type}
-                      className="px-3 py-1 bg-yellow-100 text-yellow-900 rounded-full text-sm"
-                    >
-                      {INSURANCE_TYPE_LABELS[type].icon}{" "}
-                      {INSURANCE_TYPE_LABELS[type].label}
-                    </span>
-                  ))}
+                  {missingInsurances.map((type) => {
+                    const typeInfo = INSURANCE_TYPE_LABELS[type];
+                    const TypeIcon = typeInfo?.icon || FileText;
+                    return (
+                      <span
+                        key={type}
+                        className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-full text-sm inline-flex items-center gap-1.5"
+                      >
+                        <TypeIcon className="w-3.5 h-3.5" />
+                        {typeInfo?.label || type}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -179,6 +188,7 @@ export default function InsurancePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {insurances.map((insurance) => {
               const typeInfo = INSURANCE_TYPE_LABELS[insurance.insurance_type];
+              const TypeIcon = typeInfo?.icon || FileText;
               return (
                 <DSCard
                   key={insurance.id}
@@ -187,7 +197,9 @@ export default function InsurancePage() {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="text-3xl">{typeInfo?.icon}</div>
+                      <div className="w-10 h-10 rounded-lg bg-phi-dark/10 flex items-center justify-center flex-shrink-0">
+                        <TypeIcon className="w-5 h-5 text-phi-dark" />
+                      </div>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
                           {typeInfo?.label || insurance.insurance_type}
