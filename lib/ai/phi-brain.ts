@@ -755,7 +755,11 @@ export async function phiBrain(
       // Tools are ALWAYS available — even for new users, get_data_status is useful
       // ("anything in my account?"), and the persona explicitly tells the model
       // when not to call them (e.g. simple greetings).
+      // enableWebTools=true gives the brain Google Search, URL Context, and
+      // Code Execution — turning φ from a sandboxed coach into a fully-grounded
+      // advisor that can pull current rates, read news, and run amortization math.
       const { chatWithTools } = await import('@/lib/ai/gemini-client');
+      let groundingMeta: { citations: Array<{ title?: string; uri: string }>; webSearchQueries: string[] } | null = null;
       const raw = await chatWithTools({
         systemInstruction,
         history,
@@ -766,8 +770,19 @@ export async function phiBrain(
         maxOutputTokens: 2500,
         maxToolHops: 5,
         responseJsonSchema: BRAIN_DECISION_SCHEMA,
+        enableWebTools: true,
+        onGroundingMetadata: (meta) => { groundingMeta = meta; },
       });
       decision = parseBrainResponse(raw, event);
+
+      // Append citations to the user-visible message when Google Search was used.
+      if (groundingMeta && decision.message && (groundingMeta as any).citations?.length > 0) {
+        const cites = (groundingMeta as any).citations.slice(0, 3);
+        const citeBlock = cites
+          .map((c: any, i: number) => `${i + 1}. ${c.title || c.uri}`)
+          .join('\n');
+        decision.message = `${decision.message}\n\n📎 *מקורות:*\n${citeBlock}`;
+      }
     } catch (err) {
       console.error('[PhiBrain] Gemini error:', err);
       if (event.type === 'whatsapp_message') {

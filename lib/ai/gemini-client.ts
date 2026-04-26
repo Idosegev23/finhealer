@@ -492,6 +492,13 @@ export interface ToolDeclaration {
  *
  * Used for grounding φ's free-form coaching answers in real DB facts.
  */
+export interface GroundingMetadata {
+  /** URLs/sources the model cited from Google Search grounding. */
+  citations: Array<{ title?: string; uri: string }>;
+  /** Search queries Gemini ran on the user's behalf. */
+  webSearchQueries: string[];
+}
+
 export async function chatWithTools(opts: {
   systemInstruction: string;
   history: ChatTurn[];
@@ -509,6 +516,18 @@ export async function chatWithTools(opts: {
    * as the final text part.
    */
   responseJsonSchema?: Record<string, any>;
+  /**
+   * Enable Gemini's built-in Google tools alongside our custom function
+   * declarations:
+   *  - google_search   — live web grounding (current rates, news, prices)
+   *  - url_context     — read URLs the user (or model) references
+   *  - code_execution  — run Python for complex math (amortization, NPV…)
+   * Adds cost per grounded request, so only enable when fresh-data answers
+   * outweigh the latency/cost.
+   */
+  enableWebTools?: boolean;
+  /** Optional callback that receives grounding metadata (search citations etc) once response lands. */
+  onGroundingMetadata?: (meta: GroundingMetadata) => void;
 }): Promise<string> {
   const { geminiLimiter } = await import('@/lib/utils/rate-limiter');
   return geminiLimiter.execute(async () => {
@@ -516,11 +535,19 @@ export async function chatWithTools(opts: {
       const client = getClient();
       const maxHops = opts.maxToolHops ?? 4;
 
+      const tools: any[] = [];
+      if (opts.enableWebTools) {
+        tools.push({ googleSearch: {} });
+        tools.push({ urlContext: {} });
+        tools.push({ codeExecution: {} });
+      }
+      tools.push({ functionDeclarations: opts.tools as any });
+
       const chatConfig: any = {
         systemInstruction: opts.systemInstruction,
         thinkingConfig: { thinkingLevel: (opts.thinkingLevel || 'low') as any },
         maxOutputTokens: opts.maxOutputTokens || 2000,
-        tools: [{ functionDeclarations: opts.tools as any }],
+        tools,
       };
       if (opts.responseJsonSchema) {
         chatConfig.responseMimeType = 'application/json';
@@ -563,6 +590,23 @@ export async function chatWithTools(opts: {
         }
 
         response = await chat.sendMessage({ message: fnResponses as any });
+      }
+
+      // Extract grounding metadata (Google Search citations, URL contexts, etc.)
+      // before consuming the response, so callers can render citations.
+      if (opts.onGroundingMetadata) {
+        try {
+          const candidate = response.candidates?.[0];
+          const grounding = candidate?.groundingMetadata;
+          if (grounding) {
+            const chunks = grounding.groundingChunks || [];
+            const citations = chunks
+              .map((c: any) => c?.web ? { title: c.web.title, uri: c.web.uri } : null)
+              .filter(Boolean) as Array<{ title?: string; uri: string }>;
+            const queries = grounding.webSearchQueries || [];
+            opts.onGroundingMetadata({ citations, webSearchQueries: queries });
+          }
+        } catch { /* metadata is best-effort */ }
       }
 
       // Final response — should be schema-compliant JSON if responseJsonSchema was set.
