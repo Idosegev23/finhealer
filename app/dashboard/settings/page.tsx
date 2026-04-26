@@ -135,6 +135,8 @@ function ProfileTab() {
     city: '',
     marital_status: '',
     children_count: 0,
+    owns_home: null as boolean | null,
+    rent_mortgage: 0,
   });
 
   const [children, setChildren] = useState<Child[]>([]);
@@ -321,7 +323,7 @@ function ProfileTab() {
       // time they open settings before saving). single() returned 406.
       const { data: financialProfile } = await supabase
         .from('user_financial_profile')
-        .select('birth_date, city, marital_status, children_count')
+        .select('birth_date, city, marital_status, children_count, owns_home, rent_mortgage')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -336,6 +338,8 @@ function ProfileTab() {
         city: finData?.city || '',
         marital_status: finData?.marital_status || '',
         children_count: finData?.children_count || 0,
+        owns_home: finData?.owns_home ?? null,
+        rent_mortgage: finData?.rent_mortgage || 0,
       });
       setLoading(false);
     } catch (err) {
@@ -480,6 +484,47 @@ function ProfileTab() {
             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
             placeholder="0"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-2">מגורים</label>
+          <select
+            value={formData.owns_home === null ? '' : formData.owns_home ? 'owned' : 'rented'}
+            onChange={(e) => {
+              const v = e.target.value;
+              setFormData({
+                ...formData,
+                owns_home: v === '' ? null : v === 'owned',
+                rent_mortgage: v === 'owned' ? formData.rent_mortgage : formData.rent_mortgage,
+              });
+            }}
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
+          >
+            <option value="">בחר סוג מגורים</option>
+            <option value="owned">דירה בבעלות (משכנתא או ללא)</option>
+            <option value="rented">שכירות / אחר</option>
+          </select>
+          <p className="text-xs text-phi-slate mt-1">
+            משמש לחישוב התקציב — כך נדע אם ההוצאה החודשית היא משכנתא או שכירות.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-2">
+            {formData.owns_home === true ? 'משכנתא חודשית (₪)' : formData.owns_home === false ? 'שכר דירה חודשי (₪)' : 'משכנתא / שכר דירה חודשי (₪)'}
+          </label>
+          <input
+            type="number"
+            value={formData.rent_mortgage === 0 ? '' : formData.rent_mortgage}
+            onChange={(e) => setFormData({ ...formData, rent_mortgage: parseInt(e.target.value) || 0 })}
+            min="0"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#3A7BD5] focus:border-transparent"
+            placeholder="0"
+            dir="ltr"
+          />
+          <p className="text-xs text-phi-slate mt-1">
+            השאר ריק או 0 אם אין משכנתא ואינך משלם שכירות.
+          </p>
         </div>
 
         <button

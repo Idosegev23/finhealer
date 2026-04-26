@@ -19,6 +19,8 @@ export async function POST(request: Request) {
       city,
       marital_status,
       children_count,
+      owns_home,
+      rent_mortgage,
     } = body
 
     console.log('📝 Updating profile for user:', user.id, body)
@@ -36,6 +38,13 @@ export async function POST(request: Request) {
       if (!v || v === '') return null
       const d = new Date(v)
       return Number.isNaN(d.getTime()) ? null : v
+    }
+    const cleanBool = (v: any) => {
+      if (v === null || v === undefined || v === '') return null
+      if (typeof v === 'boolean') return v
+      if (v === 'true') return true
+      if (v === 'false') return false
+      return null
     }
 
     const { error: usersUpdateError } = await supabase
@@ -59,6 +68,8 @@ export async function POST(request: Request) {
         city: cleanStr(city),
         marital_status: cleanStr(marital_status),
         children_count: cleanInt(children_count),
+        owns_home: cleanBool(owns_home),
+        rent_mortgage: cleanInt(rent_mortgage),
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id'
