@@ -143,6 +143,12 @@ export function cleanAiJson(content: string): any {
     jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
     jsonStr = jsonStr.replace(/"null"/g, 'null');
 
+    // Hebrew gershayim fix: Gemini sometimes emits ASCII " for U+05F4 (״),
+    // breaking JSON when it lands between Hebrew letters (e.g. "מיטב ד"ש ג").
+    // Safe: JSON syntax never has letter"letter — replace with the real
+    // gershayim character so the surrounding string parses cleanly.
+    jsonStr = jsonStr.replace(/([֐-׿])"(?= ?[֐-׿])/g, '$1״');
+
     return JSON.parse(jsonStr);
   } catch (parseError) {
     console.error('❌ JSON parse error:', parseError);
@@ -153,6 +159,8 @@ export function cleanAiJson(content: string): any {
     try {
       let jsonStr = content.match(/\{[\s\S]*/)?.[0] || content;
       jsonStr = jsonStr.replace(/,\s*\{[^}]*$/s, '');
+      // Apply Hebrew gershayim fix on recovery path too
+      jsonStr = jsonStr.replace(/([֐-׿])"(?= ?[֐-׿])/g, '$1״');
       const openBraces = (jsonStr.match(/\{/g) || []).length;
       const closeBraces = (jsonStr.match(/\}/g) || []).length;
       const openBrackets = (jsonStr.match(/\[/g) || []).length;
