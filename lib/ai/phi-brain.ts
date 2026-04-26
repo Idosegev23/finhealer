@@ -800,7 +800,7 @@ export async function phiBrain(
         tools: BRAIN_TOOL_DECLARATIONS as any,
         executeTool: (name, args) => executeBrainTool(userId, name, args),
         thinkingLevel: 'low',
-        maxOutputTokens: 4000,
+        maxOutputTokens: 16000,
         maxToolHops: 5,
         responseJsonSchema: BRAIN_DECISION_SCHEMA,
         enableWebTools: true,

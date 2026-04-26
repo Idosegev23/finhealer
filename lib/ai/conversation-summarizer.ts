@@ -82,7 +82,7 @@ export async function summarizeAndStore(
         'אם השיחה קצרה או לא ברורה, תן confidence נמוך.',
       ].join('\n'),
       schema as any,
-      { thinkingLevel: 'low', maxOutputTokens: 1200 }
+      { thinkingLevel: 'low', maxOutputTokens: 4000 }
     );
 
     // Validate via Zod (guards against schema drift even if API claimed success)

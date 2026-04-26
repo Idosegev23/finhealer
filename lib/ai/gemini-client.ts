@@ -122,7 +122,7 @@ async function _chatWithGeminiFlashImpl(
         config: {
           systemInstruction,
           thinkingConfig: { thinkingLevel: 'low' as any },
-          maxOutputTokens: 300,
+          maxOutputTokens: 8000,
         },
       });
 
@@ -162,7 +162,7 @@ async function _chatWithGeminiFlashMinimalImpl(
         config: {
           systemInstruction: systemPrompt,
           thinkingConfig: { thinkingLevel: 'minimal' as any },
-          maxOutputTokens: 500,
+          maxOutputTokens: 4000,
         },
       });
 
@@ -216,7 +216,7 @@ export async function chatWithGeminiPro(
         contents,
         config: {
           systemInstruction,
-          maxOutputTokens: 2000,
+          maxOutputTokens: 16000,
         },
       });
 
@@ -397,7 +397,7 @@ export async function chatStructured<T = unknown>(
         config: {
           systemInstruction: systemPrompt,
           thinkingConfig: { thinkingLevel: (opts.thinkingLevel || 'low') as any },
-          maxOutputTokens: opts.maxOutputTokens || 1500,
+          maxOutputTokens: opts.maxOutputTokens || 8000,
           responseMimeType: 'application/json',
           responseJsonSchema: jsonSchema as any,
         } as any,
@@ -449,7 +449,7 @@ export async function chatWithMemory(opts: {
       const chatConfig: any = {
         systemInstruction: opts.systemInstruction,
         thinkingConfig: { thinkingLevel: (opts.thinkingLevel || 'low') as any },
-        maxOutputTokens: opts.maxOutputTokens || 800,
+        maxOutputTokens: opts.maxOutputTokens || 8000,
       };
       if (opts.responseJsonSchema) {
         chatConfig.responseMimeType = 'application/json';
@@ -546,7 +546,7 @@ export async function chatWithTools(opts: {
       const chatConfig: any = {
         systemInstruction: opts.systemInstruction,
         thinkingConfig: { thinkingLevel: (opts.thinkingLevel || 'low') as any },
-        maxOutputTokens: opts.maxOutputTokens || 2000,
+        maxOutputTokens: opts.maxOutputTokens || 16000,
         tools,
       };
       if (opts.enableWebTools) {
