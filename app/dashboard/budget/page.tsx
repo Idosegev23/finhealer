@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import SmartCategoryPicker from '@/components/transactions/SmartCategoryPicker';
-import { PageWrapper } from '@/components/ui/design-system';
+import { PageWrapper, PageHeader, KpiGrid, StatCard } from '@/components/ui/design-system';
 import { useToast } from '@/components/ui/toaster';
 
 interface MissingDataItem {
@@ -417,12 +417,9 @@ export default function BudgetPage() {
           className="mb-8"
         >
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-4xl font-bold text-phi-dark mb-2 flex items-center gap-3">
-                <span className="text-phi-gold font-serif text-5xl">φ</span>
-                תקציב חכם
-              </h1>
-              <p className="text-phi-slate">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900 truncate">תקציב חכם</h1>
+              <p className="text-sm text-gray-500 mt-1">
                 מבוסס על {summary?.monthsAnalyzed || 0} חודשים • {summary?.transactionsCount || 0} תנועות
               </p>
             </div>
@@ -727,40 +724,29 @@ export default function BudgetPage() {
             transition={{ delay: 0.2 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
           >
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <DollarSign className="w-10 h-10 opacity-80" />
-                <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
-              </div>
-              <p className="text-green-100 text-sm mb-1">הכנסות</p>
-              <p className="text-3xl font-bold">₪{(summary?.avgMonthlyIncome || 0).toLocaleString('he-IL')}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <CreditCard className="w-10 h-10 opacity-80" />
-                <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
-              </div>
-              <p className="text-red-100 text-sm mb-1">הוצאות</p>
-              <p className="text-3xl font-bold">₪{(summary?.avgMonthlyExpenses || 0).toLocaleString('he-IL')}</p>
-            </CardContent>
-          </Card>
-
-          <Card className={`border-0 ${(summary?.avgMonthlySavings || 0) >= 0 
-            ? 'bg-gradient-to-br from-phi-mint to-teal-500 text-white' 
-            : 'bg-gradient-to-br from-orange-500 to-red-500 text-white'}`}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                <Wallet className="w-10 h-10 opacity-80" />
-                <Badge className="bg-white/20 text-white border-0">ממוצע חודשי</Badge>
-                </div>
-              <p className="text-white/80 text-sm mb-1">יתרה</p>
-              <p className="text-3xl font-bold">₪{(summary?.avgMonthlySavings || 0).toLocaleString('he-IL')}</p>
-              </CardContent>
-            </Card>
+          <KpiGrid cols={3}>
+            <StatCard
+              label="הכנסות / חודש"
+              value={`₪${(summary?.avgMonthlyIncome || 0).toLocaleString('he-IL')}`}
+              icon={DollarSign}
+              tone="income"
+              subtitle="ממוצע חודשי"
+            />
+            <StatCard
+              label="הוצאות / חודש"
+              value={`₪${(summary?.avgMonthlyExpenses || 0).toLocaleString('he-IL')}`}
+              icon={CreditCard}
+              tone="expense"
+              subtitle="ממוצע חודשי"
+            />
+            <StatCard
+              label="יתרה / חודש"
+              value={`₪${(summary?.avgMonthlySavings || 0).toLocaleString('he-IL')}`}
+              icon={Wallet}
+              tone={(summary?.avgMonthlySavings || 0) >= 0 ? 'balance' : 'expense'}
+              subtitle="ממוצע חודשי"
+            />
+          </KpiGrid>
           </motion.div>
 
         {/* Tabs */}
