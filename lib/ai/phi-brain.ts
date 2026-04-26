@@ -334,16 +334,42 @@ function parseBrainResponse(raw: string, event: PhiEvent): any {
     } catch { /* fall through */ }
   }
 
-  // Last resort: treat the raw text as a coaching message. This is what
-  // makes the bot graceful — instead of dying on a JSON parse, we send
-  // whatever the model said. Better imperfect than silent.
-  if (event.type === 'whatsapp_message' && cleaned.length > 0) {
-    console.warn('[PhiBrain] Falling back to raw text as coaching message:', cleaned.substring(0, 200));
+  // Try harder: if it looks like a truncated JSON object (starts with `{`),
+  // attempt to recover the `message` field via regex. This rescues the case
+  // where the model wrote a long internal_reasoning and got cut off.
+  if (cleaned.startsWith('{')) {
+    const messageMatch = cleaned.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (messageMatch && messageMatch[1]) {
+      const recovered = messageMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      console.warn('[PhiBrain] Recovered message from truncated JSON');
+      return {
+        action: 'coaching',
+        should_respond: true,
+        message: recovered,
+        internal_reasoning: 'recovered_from_truncated_json',
+      };
+    }
+    // JSON-shaped but no extractable message → don't dump it on user.
+    console.error('[PhiBrain] Truncated JSON, no recoverable message:', cleaned.substring(0, 300));
+    if (event.type === 'whatsapp_message') {
+      return {
+        action: 'coaching',
+        should_respond: true,
+        message: 'רגע, אני מתבלבל קצת — תוכל לחזור על השאלה? 😅',
+        internal_reasoning: 'truncated_json_no_message',
+      };
+    }
+    return { action: 'none', should_respond: false, internal_reasoning: 'truncated_json_no_message' };
+  }
+
+  // Plain prose (rare) — treat as a coaching message.
+  if (event.type === 'whatsapp_message' && cleaned.length > 0 && cleaned.length < 1500) {
+    console.warn('[PhiBrain] Plain prose response, treating as coaching:', cleaned.substring(0, 100));
     return {
       action: 'coaching',
       should_respond: true,
-      message: cleaned.substring(0, 1500),
-      internal_reasoning: 'raw_text_fallback',
+      message: cleaned,
+      internal_reasoning: 'prose_fallback',
     };
   }
 
@@ -368,17 +394,22 @@ const BRAIN_ACTIONS = [
   'classify', 'coaching', 'greeting', 'help', 'general_chat', 'none',
 ] as const;
 
-// Simplified schema — no nullable types, no `null` in enums (those don't play nice
-// with structured-output mode). Optional fields are just absent rather than null.
+// Schema order matters: Gemini emits properties in schema order. We put `message`
+// FIRST so it's always serialized before the model burns its token budget on
+// internal_reasoning. Critical when output is truncated mid-stream.
 const BRAIN_DECISION_SCHEMA: Record<string, any> = {
   type: 'object',
   properties: {
-    should_respond: { type: 'boolean', description: 'Whether to send the user a message right now.' },
+    message: {
+      type: 'string',
+      description: 'Hebrew text shown to the user. ALWAYS write something — even for view actions, the handler may still surface it. Empty string only if action=none.',
+    },
     action: {
       type: 'string',
       enum: [...BRAIN_ACTIONS],
-      description: 'The handler to invoke. Use "none" for silence on scheduled checks.',
+      description: 'The handler to invoke. Default to "coaching" for natural conversation. Use "none" only for scheduled checks with nothing to say.',
     },
+    should_respond: { type: 'boolean', description: 'Whether to send the user a message right now.' },
     action_params: {
       type: 'object',
       properties: {
@@ -389,15 +420,17 @@ const BRAIN_DECISION_SCHEMA: Record<string, any> = {
         name: { type: 'string', description: 'Used by set_user_name — the human name extracted from the user message.' },
       },
     },
-    message: { type: 'string', description: 'Hebrew message to send. Required for coaching/greeting/general_chat/help/set_user_name/request_document/mark_skip_document. Empty string for view actions where the handler generates the message.' },
     new_state: {
       type: 'string',
       enum: ['monitoring', 'behavior', 'budget', 'goals', 'classification', ''],
       description: 'Optional — leave empty string if no state change needed.',
     },
-    internal_reasoning: { type: 'string', description: 'Why this choice (for logs, not shown to user).' },
+    internal_reasoning: {
+      type: 'string',
+      description: 'KEEP UNDER 100 CHARACTERS. One short reason. Long reasoning blows the token budget and truncates the actual message.',
+    },
   },
-  required: ['action', 'should_respond'],
+  required: ['message', 'action', 'should_respond'],
 };
 
 // ============================================================================
@@ -767,7 +800,7 @@ export async function phiBrain(
         tools: BRAIN_TOOL_DECLARATIONS as any,
         executeTool: (name, args) => executeBrainTool(userId, name, args),
         thinkingLevel: 'low',
-        maxOutputTokens: 2500,
+        maxOutputTokens: 4000,
         maxToolHops: 5,
         responseJsonSchema: BRAIN_DECISION_SCHEMA,
         enableWebTools: true,
