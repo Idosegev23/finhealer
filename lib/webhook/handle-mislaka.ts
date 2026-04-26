@@ -60,16 +60,19 @@ interface MislakaResult {
 }
 
 // Map plan_type from OCR to fund_type column on pension_insurance.
+// DB CHECK constraint allows: pension_fund | provident_fund |
+// advanced_study_fund | managers_insurance | investment_provident.
 const FUND_TYPE_MAP: Record<string, string> = {
   pension_fund: 'pension_fund',
   provident_fund: 'provident_fund',
-  study_fund: 'study_fund',
-  insurance_policy: 'insurance',
-  life_combined_savings: 'insurance',
+  study_fund: 'advanced_study_fund',
+  insurance_policy: 'managers_insurance',          // ביטוח מנהלים / פוליסה משולבת חיסכון
+  life_combined_savings: 'managers_insurance',
+  investment_provident: 'investment_provident',
   // legacy aliases
   pension: 'pension_fund',
   provident: 'provident_fund',
-  study: 'study_fund',
+  study: 'advanced_study_fund',
 };
 
 export async function handleMislakaReport(
@@ -142,16 +145,16 @@ export async function handleMislakaReport(
     if (existingId) {
       const { error } = await supabase.from('pension_insurance').update(row).eq('id', existingId);
       if (!error) result.pensionsUpserted += 1;
-      else console.error('[mislaka] update pension failed:', error);
+      else console.error('[mislaka] update pension failed:', { policy: row.policy_number, error });
     } else {
       const { error } = await supabase.from('pension_insurance').insert(row);
       if (!error) result.pensionsUpserted += 1;
-      else console.error('[mislaka] insert pension failed:', error);
+      else console.error('[mislaka] insert pension failed:', { policy: row.policy_number, plan_type: plan.plan_type, fund_type: fundType, error });
     }
 
-    // Counters by type
+    // Counters by type — match the actual DB enum values
     if (fundType === 'pension_fund') result.summary.pensionFunds += 1;
-    else if (fundType === 'study_fund') result.summary.studyFunds += 1;
+    else if (fundType === 'advanced_study_fund') result.summary.studyFunds += 1;
     else if (fundType === 'provident_fund') result.summary.providentFunds += 1;
     else result.summary.insurancePolicies += 1;
     result.totalBalance += balance;
@@ -175,17 +178,19 @@ export async function handleMislakaReport(
   for (const policy of policies) {
     if (!policy.policy_number && !policy.provider) continue;
 
+    const isActive = policy.status !== 'closed' && policy.status !== 'cancelled' && policy.status !== 'inactive';
     const insRow = {
       user_id: userId,
       insurance_type: mapInsuranceType(policy.policy_type, policy.plan_name),
       provider: policy.provider || 'לא צוין',
       policy_number: policy.policy_number || null,
+      status: isActive ? 'active' : 'inactive',  // CHECK: active|inactive|cancelled
       coverage_amount: Number(policy.coverage_amount || 0) || 0,
       monthly_premium: Number(policy.monthly_premium || policy.premium_amount || 0) || 0,
       annual_premium: Number(policy.annual_premium || 0) || 0,
       start_date: parseDate(policy.start_date),
       end_date: parseDate(policy.end_date),
-      active: policy.status !== 'closed' && policy.status !== 'cancelled',
+      active: isActive,
       notes: JSON.stringify({
         plan_name: policy.plan_name,
         document_id: documentId,
@@ -199,9 +204,11 @@ export async function handleMislakaReport(
     if (existingId) {
       const { error } = await supabase.from('insurance').update(insRow).eq('id', existingId);
       if (!error) result.insurancesUpserted += 1;
+      else console.error('[mislaka] update insurance failed:', { policy: insRow.policy_number, error });
     } else {
       const { error } = await supabase.from('insurance').insert(insRow);
       if (!error) result.insurancesUpserted += 1;
+      else console.error('[mislaka] insert insurance failed:', { policy: insRow.policy_number, type: insRow.insurance_type, error });
     }
     result.summary.purerisk += 1;
   }

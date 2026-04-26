@@ -145,6 +145,8 @@ interface ScannedDocument {
   transactions_extracted: number;
   transactions_created: number;
   error_message?: string;
+  progress_percent?: number | null;
+  processing_stage?: string | null;
 }
 
 function ScanCenterContent() {
@@ -163,7 +165,34 @@ function ScanCenterContent() {
     loadScannedHistory();
     checkForBankStatement();
   }, []);
-  
+
+  // Live updates — when status changes (pending → processing → completed/failed),
+  // refresh the history so the user sees progress without clicking refresh.
+  useEffect(() => {
+    let channel: any = null;
+    let userId: string | null = null;
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      userId = user.id;
+      channel = supabase
+        .channel(`uploaded_statements:${userId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'uploaded_statements', filter: `user_id=eq.${userId}` },
+          () => loadScannedHistory(),
+        )
+        .subscribe();
+    })();
+    return () => {
+      if (channel) {
+        const supabase = createClient();
+        supabase.removeChannel(channel);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (preselectedType) {
       setActiveType(preselectedType);
@@ -551,7 +580,24 @@ function DocumentHistoryCard({ document }: DocumentHistoryCardProps) {
                   </span>
                 </>
               )}
+
+              {(document.status === 'processing' || document.status === 'pending') && document.processing_stage && (
+                <>
+                  <span className="w-1 h-1 bg-gray-400 rounded-full" />
+                  <span className="text-phi-dark">{document.processing_stage}</span>
+                </>
+              )}
             </div>
+
+            {/* Progress bar while processing */}
+            {(document.status === 'processing' || document.status === 'pending') && (
+              <div className="mt-2 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="h-full bg-phi-gold rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(15, Math.min(95, document.progress_percent ?? 25))}%` }}
+                />
+              </div>
+            )}
 
             {document.error_message && (
               <p className="mt-2 text-sm text-red-600">
