@@ -27,6 +27,52 @@ interface MissingDataItem {
   importance: 'critical' | 'important' | 'nice_to_have';
 }
 
+// Map each missing field → route + tooltip explaining WHY we need it.
+// When the user clicks an item they go straight to the right form, not
+// to a generic 'fill your profile' button.
+const FIELD_ACTIONS: Record<string, { href: string; cta: string; why: string }> = {
+  profile: {
+    href: '/dashboard/settings',
+    cta: 'מלא פרופיל',
+    why: 'בלי פרופיל בסיסי (גיל, מצב משפחתי, מגורים) אין לי איך להתאים תקציב לחיים שלך — חתך ל-3 ילדים שונה לחלוטין מחתך לרווק.',
+  },
+  marital_status: {
+    href: '/dashboard/settings',
+    cta: 'בחר מצב משפחתי',
+    why: 'נשוי? פנוי? חי בזוג? התקציב משתנה דרמטית — הוצאות משותפות, ביטוחי חיים זוגיים, תכנון לטווח ארוך.',
+  },
+  children_count: {
+    href: '/dashboard/settings',
+    cta: 'הוסף ילדים',
+    why: 'כל ילד מוסיף בממוצע ₪2,500-4,000 לחודש (חינוך, חוגים, ביגוד). בלי המספר הזה התקציב יהיה אופטימי מדי.',
+  },
+  owns_home: {
+    href: '/dashboard/settings',
+    cta: 'בחר סוג מגורים',
+    why: 'משכנתא או שכירות? זה ההוצאה הקבועה הכי גדולה של רוב המשפחות. התקציב מתחיל מההוצאה הזו.',
+  },
+  total_monthly_income: {
+    href: '/dashboard/income',
+    cta: 'הוסף הכנסה',
+    why: 'אי אפשר לבנות תקציב בלי לדעת כמה נכנס. תוסיף את המשכורת/הכנסות העצמאי שלך כדי שאדע מאיפה להתחיל.',
+  },
+  rent_mortgage: {
+    href: '/dashboard/data/loans',
+    cta: 'הוסף משכנתא/שכירות',
+    why: 'ההוצאה הקבועה החשובה ביותר. בדרך כלל 25-35% מההכנסה. בלי הנתון הזה אי אפשר לדעת אם התקציב בריא.',
+  },
+  total_fixed_expenses: {
+    href: '/dashboard/expenses',
+    cta: 'סקור הוצאות קבועות',
+    why: 'כל ההוצאות שחוזרות כל חודש (ביטוחים, מנויים, ארנונה). אלו ה"עוגנים" של התקציב — מה שלא ניתן לזוז ממנו.',
+  },
+  documents: {
+    href: '/dashboard/scan-center',
+    cta: 'העלה דוחות',
+    why: 'דוח בנק או אשראי = תמונה אמיתית של ההוצאות שלך. בלי הם אני בונה תקציב על ניחוש.',
+  },
+};
+
 interface BudgetData {
   budget: any;
   categories: any[];
@@ -314,40 +360,53 @@ export default function BudgetPage() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-6"
           >
-            <Card className="bg-gradient-to-r from-red-50 to-orange-50 border-red-200">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-                    <AlertTriangle className="w-6 h-6 text-red-600" />
-            </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-red-800 mb-2">נתונים חסרים לבניית תקציב</h3>
-                    <p className="text-red-700 text-sm mb-4">
-                      כדי לבנות תקציב מדויק, צריך להשלים את המידע הבא:
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-                      {criticalMissing.map((item, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm text-red-700">
-                          <XCircle className="w-4 h-4 text-red-500" />
-                          {item.label}
-                        </div>
-                      ))}
-                      {importantMissing.slice(0, 4).map((item, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm text-orange-700">
-                          <AlertCircle className="w-4 h-4 text-orange-500" />
-                          {item.label}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      {missingData?.some(m => m.field === 'documents') && (
-                        <Button variant="outline" className="border-red-300 text-red-700">
-                          <MessageCircle className="w-4 h-4 ml-2" />
-                          שלח מסמכים ב-WhatsApp
-                        </Button>
-                      )}
-                    </div>
+            <Card className="bg-amber-50 border-amber-200">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-phi-gold" />
                   </div>
+                  <div className="flex-1">
+                    <h3 className="text-base font-bold text-amber-900">נתונים חסרים לבניית תקציב</h3>
+                    <p className="text-sm text-amber-900/70 mt-0.5">
+                      לחץ על כל פריט כדי למלא אותו. ריחוף מעל הפריט יראה לך למה הוא חשוב.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {[...criticalMissing, ...importantMissing.slice(0, 4)].map((item, i) => {
+                    const action = FIELD_ACTIONS[item.field];
+                    const isCritical = item.importance === 'critical';
+                    return (
+                      <Link
+                        key={i}
+                        href={action?.href || '/dashboard/settings'}
+                        title={action?.why || ''}
+                        className={`group flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                          isCritical
+                            ? 'bg-white border-red-200 hover:border-phi-coral hover:bg-red-50'
+                            : 'bg-white border-amber-200 hover:border-phi-gold hover:bg-amber-50'
+                        }`}
+                      >
+                        {isCritical
+                          ? <XCircle className="w-4 h-4 text-phi-coral flex-shrink-0" />
+                          : <AlertCircle className="w-4 h-4 text-phi-gold flex-shrink-0" />}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900">{item.label}</div>
+                          {action?.why && (
+                            <div className="text-xs text-gray-500 mt-0.5 line-clamp-2 group-hover:line-clamp-none">
+                              {action.why}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs font-medium text-phi-gold flex items-center gap-0.5 flex-shrink-0">
+                          {action?.cta || 'מלא'}
+                          <ArrowRight className="w-3 h-3" />
+                        </span>
+                      </Link>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

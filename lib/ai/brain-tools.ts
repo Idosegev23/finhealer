@@ -135,6 +135,14 @@ export const BRAIN_TOOL_DECLARATIONS = [
       properties: {},
     },
   },
+  {
+    name: 'get_budget_readiness',
+    description: 'Comprehensive snapshot of what is needed to build a budget. Returns: profile completeness (marital_status, owns_home, children_count, rent_mortgage), classified vs unclassified transactions, fixed/variable expense totals, income sources, active goals with deadlines, missing items list. ALWAYS call this before discussing budget creation — prevents asking the user for data they already provided.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
 ] as const;
 
 // ============================================================================
@@ -578,6 +586,68 @@ export async function executeBrainTool(
         latest_transaction_date: latestTx?.[0]?.tx_date || null,
         has_budget: (budgetCount || 0) > 0,
         has_goals: (goalCount || 0) > 0,
+      };
+    }
+
+    case 'get_budget_readiness': {
+      const [
+        { data: profile },
+        { count: confirmedTx },
+        { count: unclassifiedTx },
+        { data: fixedTx },
+        { data: variableTx },
+        { data: incomeSources },
+        { data: incomeTx },
+        { data: goals },
+        { count: budgetCount },
+      ] = await Promise.all([
+        supabase.from('user_financial_profile').select('marital_status, children_count, owns_home, rent_mortgage, total_monthly_income, total_fixed_expenses, why_here, short_term_goal').eq('user_id', userId).maybeSingle(),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'confirmed'),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'confirmed').or('expense_category.is.null,expense_category.eq.אחר'),
+        supabase.from('transactions').select('amount, expense_category, vendor').eq('user_id', userId).eq('type', 'expense').eq('status', 'confirmed').eq('expense_type', 'fixed').limit(50),
+        supabase.from('transactions').select('amount, expense_category').eq('user_id', userId).eq('type', 'expense').eq('status', 'confirmed').eq('expense_type', 'variable').limit(100),
+        supabase.from('income_sources').select('source_name, net_amount, employment_type').eq('user_id', userId).eq('active', true),
+        supabase.from('transactions').select('amount').eq('user_id', userId).eq('type', 'income').eq('status', 'confirmed').limit(100),
+        supabase.from('goals').select('name, target_amount, deadline, monthly_allocation').eq('user_id', userId).eq('status', 'active'),
+        supabase.from('budgets').select('id', { count: 'exact', head: true }).eq('user_id', userId).in('status', ['active', 'warning', 'exceeded']),
+      ]);
+
+      const p = (profile as any) || {};
+
+      // What's missing — same logic as the budget page so brain & UI agree
+      const missing: string[] = [];
+      if (!profile) missing.push('שאלון שיקוף בסיסי');
+      if (!p.marital_status) missing.push('מצב משפחתי');
+      if (p.children_count == null) missing.push('מספר ילדים');
+      if (p.owns_home == null) missing.push('סוג מגורים (בעלות/שכירות)');
+      if (!p.rent_mortgage) missing.push('שכירות/משכנתא');
+      if ((incomeSources?.length || 0) === 0 && (incomeTx?.length || 0) === 0) missing.push('הכנסה חודשית');
+      if ((confirmedTx || 0) < 30) missing.push('תנועות מסווגות (פחות מ-30)');
+      if ((goals?.length || 0) > 0 && !(goals as any[]).some((g: any) => g.deadline)) missing.push('דדליין ליעדים פעילים');
+
+      const fixedTotal = (fixedTx as any[] || []).reduce((s, t) => s + Number(t.amount || 0), 0);
+      const variableTotal = (variableTx as any[] || []).reduce((s, t) => s + Number(t.amount || 0), 0);
+      const incomeTotal = (incomeSources as any[] || []).reduce((s, i) => s + Number(i.net_amount || 0), 0);
+      const incomeFromTx = (incomeTx as any[] || []).reduce((s, t) => s + Number(t.amount || 0), 0);
+
+      return {
+        ready_to_build_budget: missing.length === 0,
+        has_budget: (budgetCount || 0) > 0,
+        missing_items: missing,
+        profile: p,
+        confirmed_transactions: confirmedTx || 0,
+        unclassified_transactions: unclassifiedTx || 0,
+        fixed_expenses_sample: (fixedTx as any[] || []).slice(0, 10).map((t: any) => ({ vendor: t.vendor, amount: t.amount, category: t.expense_category })),
+        fixed_total_estimate: Math.round(fixedTotal),
+        variable_total_estimate: Math.round(variableTotal),
+        income_sources_count: incomeSources?.length || 0,
+        income_total_monthly: Math.round(incomeTotal || incomeFromTx),
+        active_goals: (goals as any[] || []).map((g: any) => ({
+          name: g.name,
+          target: g.target_amount,
+          deadline: g.deadline,
+          monthly_allocation: g.monthly_allocation,
+        })),
       };
     }
 
