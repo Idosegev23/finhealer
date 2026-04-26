@@ -59,14 +59,16 @@ export default function AdminOverviewPage() {
     );
   }
 
+  // Brand palette — phi-dark for primary stats, phi-gold for "needs attention",
+  // phi-mint for positive engagement metrics. No rainbow.
   const cards = stats ? [
-    { label: 'סה״כ משתמשים', value: stats.totalUsers, icon: Users, color: 'bg-blue-500' },
-    { label: 'מנויים פעילים', value: stats.activeUsers, icon: UserCheck, color: 'bg-green-500' },
-    { label: 'תקופת נסיון', value: stats.trialUsers, icon: Clock, color: 'bg-yellow-500' },
-    { label: 'חדשים השבוע', value: stats.newThisWeek, icon: UserPlus, color: 'bg-purple-500' },
-    { label: 'פעילים היום', value: stats.activeToday, icon: Activity, color: 'bg-cyan-500' },
-    { label: 'מסמכים שעובדו', value: stats.docsProcessed, icon: FileText, color: 'bg-indigo-500' },
-    { label: 'הודעות היום', value: stats.messagesToday, icon: MessageSquare, color: 'bg-pink-500' },
+    { label: 'סה״כ משתמשים', value: stats.totalUsers, icon: Users, color: 'bg-phi-dark' },
+    { label: 'מנויים פעילים', value: stats.activeUsers, icon: UserCheck, color: 'bg-phi-mint' },
+    { label: 'תקופת נסיון', value: stats.trialUsers, icon: Clock, color: 'bg-phi-gold' },
+    { label: 'חדשים השבוע', value: stats.newThisWeek, icon: UserPlus, color: 'bg-phi-dark' },
+    { label: 'פעילים היום', value: stats.activeToday, icon: Activity, color: 'bg-phi-mint' },
+    { label: 'מסמכים שעובדו', value: stats.docsProcessed, icon: FileText, color: 'bg-phi-slate' },
+    { label: 'הודעות היום', value: stats.messagesToday, icon: MessageSquare, color: 'bg-phi-slate' },
   ] : [];
 
   return (

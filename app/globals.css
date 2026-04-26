@@ -101,35 +101,34 @@
 
 @layer base {
   :root {
-    /* Light mode only */
+    /* shadcn tokens — mapped to φ palette so Card/Button/Alert/etc. inherit brand */
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --foreground: 211 41% 18%;        /* phi-dark text */
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 211 41% 18%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --popover-foreground: 211 41% 18%;
+    --primary: 196 86% 19%;           /* #074259 phi-dark */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 13% 91%;          /* phi-frost */
+    --secondary-foreground: 196 86% 19%;
+    --muted: 220 13% 95%;
+    --muted-foreground: 220 13% 35%;   /* phi-slate */
+    --accent: 38 81% 67%;              /* #F2C166 phi-gold */
+    --accent-foreground: 196 86% 19%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 89%;
+    --input: 220 13% 89%;
+    --ring: 38 81% 67%;                /* phi-gold focus ring */
+    --radius: 0.75rem;                 /* 12px = our card rounded-xl */
+    --chart-1: 196 86% 19%;            /* phi-dark */
+    --chart-2: 158 67% 33%;            /* phi-mint */
+    --chart-3: 38 81% 67%;             /* phi-gold */
+    --chart-4: 30 65% 40%;             /* phi-coral */
+    --chart-5: 220 13% 35%;            /* phi-slate */
   }
 
-  /* הגדלת גופן בסיסית */
   html {
     font-size: 16px;
   }
@@ -139,34 +138,9 @@
     line-height: 1.6;
   }
 
-  /* הגדלת טקסט בכרטיסים */
-  p {
-    font-size: 1.05rem;
-  }
-
-  /* שיפור קריאות בכותרות */
-  h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    line-height: 1.2;
-  }
-
-  h2 {
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.3;
-  }
-
-  h3 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    line-height: 1.4;
-  }
-
-  h4 {
-    font-size: 1.25rem;
-    font-weight: 600;
-  }
+  /* Typography baseline — kept minimal. Page-level headings should use the
+     <PageHeader> component, not bare <h1>. The base rules below only apply
+     to truly bare elements (rare). They no longer fight Tailwind utilities. */
 
   /* שיפור labels */
   label {
@@ -174,17 +148,8 @@
     font-weight: 500;
   }
 
-  /* שיפור inputs */
-  input, select, textarea {
-    font-size: 1.05rem;
-  }
-
-  /* שיפור buttons */
-  button {
-    font-size: 1.05rem;
-    font-weight: 500;
-  }
-
+  /* Form elements — match Tailwind base (16px). Don't override 1.05rem,
+     it makes inputs bigger than surrounding sm/base text and breaks alignment. */
 }
 
 @layer base {

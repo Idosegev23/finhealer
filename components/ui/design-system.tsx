@@ -14,7 +14,7 @@
  */
 
 import React from 'react';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, Loader2, AlertCircle } from 'lucide-react';
 
 // ============================================================================
 // CARD — unified card component
@@ -95,6 +95,64 @@ export function SectionTitle({ icon: Icon, iconColor = 'text-phi-gold', children
         {children}
       </h3>
       {action}
+    </div>
+  );
+}
+
+// ============================================================================
+// PAGE LOADER — single loading look across the app
+// ============================================================================
+
+interface PageLoaderProps {
+  /** Optional Hebrew label shown beneath the spinner. */
+  label?: string;
+  /** When true, fills the whole viewport. Default false (inline). */
+  fullscreen?: boolean;
+}
+
+export function PageLoader({ label, fullscreen = false }: PageLoaderProps) {
+  const wrapper = fullscreen
+    ? 'min-h-screen flex flex-col items-center justify-center bg-phi-bg'
+    : 'flex flex-col items-center justify-center py-12';
+  return (
+    <div className={wrapper} role="status" aria-live="polite">
+      <Loader2 className="w-8 h-8 text-phi-gold animate-spin" />
+      {label && <p className="text-sm text-gray-500 mt-3">{label}</p>}
+      <span className="sr-only">{label || 'טוען...'}</span>
+    </div>
+  );
+}
+
+// ============================================================================
+// ERROR BANNER — single error look across the app
+// ============================================================================
+
+interface ErrorBannerProps {
+  /** What broke (in Hebrew, user-friendly). */
+  message: string;
+  /** Optional retry callback. */
+  onRetry?: () => void;
+  className?: string;
+}
+
+export function ErrorBanner({ message, onRetry, className = '' }: ErrorBannerProps) {
+  return (
+    <div
+      className={`bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 ${className}`}
+      role="alert"
+    >
+      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-red-800">{message}</p>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="text-xs font-medium text-red-700 hover:text-red-900 hover:underline mt-1"
+          >
+            נסה שוב
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -239,12 +297,14 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, action, className = '' }: PageHeaderProps) {
   return (
-    <div className={`flex items-start justify-between mb-5 ${className}`}>
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">{title}</h1>
-        {subtitle && <p className="text-sm text-gray-400 mt-0.5">{subtitle}</p>}
+    <div className={`flex items-start justify-between gap-4 mb-6 ${className}`}>
+      <div className="min-w-0">
+        {/* Canonical h1 size for the entire app — text-2xl (24px). All page
+            titles flow through here so headings stay coherent across the dashboard. */}
+        <h1 className="text-2xl font-bold text-gray-900 truncate">{title}</h1>
+        {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
       </div>
-      {action}
+      {action && <div className="flex-shrink-0">{action}</div>}
     </div>
   );
 }

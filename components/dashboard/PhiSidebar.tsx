@@ -16,9 +16,11 @@ import {
   Landmark,
   PiggyBank,
   Repeat,
-  Gift,
   Calculator,
   TableProperties,
+  Sparkles,
+  Shield,
+  Briefcase,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -30,7 +32,11 @@ interface NavItem {
   href: string;
   label: string;
   icon: any;
-  separator?: boolean;
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
 }
 
 interface PhiSidebarProps {
@@ -38,24 +44,48 @@ interface PhiSidebarProps {
   closeMobileMenu: () => void;
 }
 
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "ראשי", icon: Home },
-  { href: "/dashboard/overview", label: "סקירה כללית", icon: BarChart3 },
-
-  { href: "/dashboard/budget", label: "תקציב", icon: Wallet, separator: true },
-  { href: "/dashboard/expenses", label: "הוצאות", icon: TrendingDown },
-  { href: "/dashboard/income", label: "הכנסות", icon: TrendingUp },
-  { href: "/dashboard/transactions", label: "תנועות", icon: Receipt },
-  { href: "/dashboard/financial-table", label: "טבלה פיננסית", icon: TableProperties },
-  { href: "/dashboard/recurring", label: "מנויים וחוזרות", icon: Repeat },
-
-  { href: "/dashboard/goals", label: "יעדים", icon: Target, separator: true },
-  { href: "/dashboard/loans", label: "הלוואות", icon: Landmark },
-  { href: "/dashboard/savings", label: "חסכונות", icon: PiggyBank },
-  { href: "/dashboard/simulator", label: "סימולטור", icon: Calculator },
-
-  { href: "/dashboard/missing-documents", label: "מסמכים", icon: FileText, separator: true },
-  { href: "/dashboard/settings", label: "הגדרות", icon: Settings },
+// Sidebar grouped into clear sections — each labeled. Replaces the flat 14-item
+// list that left users disoriented. Orphan pages (assistant, insurance,
+// investments, pensions) are now reachable.
+const navSections: NavSection[] = [
+  {
+    label: 'ראשי',
+    items: [
+      { href: '/dashboard', label: 'דף הבית', icon: Home },
+      { href: '/dashboard/assistant', label: 'שיחה עם φ', icon: Sparkles },
+      { href: '/dashboard/overview', label: 'סקירה כללית', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'כספים',
+    items: [
+      { href: '/dashboard/budget', label: 'תקציב', icon: Wallet },
+      { href: '/dashboard/expenses', label: 'הוצאות', icon: TrendingDown },
+      { href: '/dashboard/income', label: 'הכנסות', icon: TrendingUp },
+      { href: '/dashboard/transactions', label: 'תנועות', icon: Receipt },
+      { href: '/dashboard/recurring', label: 'מנויים וחוזרות', icon: Repeat },
+    ],
+  },
+  {
+    label: 'תכנון',
+    items: [
+      { href: '/dashboard/goals', label: 'יעדים', icon: Target },
+      { href: '/dashboard/loans', label: 'הלוואות', icon: Landmark },
+      { href: '/dashboard/savings', label: 'חסכונות', icon: PiggyBank },
+      { href: '/dashboard/investments', label: 'השקעות', icon: Briefcase },
+      { href: '/dashboard/insurance', label: 'ביטוחים', icon: Shield },
+      { href: '/dashboard/pensions', label: 'פנסיה', icon: PiggyBank },
+      { href: '/dashboard/simulator', label: 'סימולטור', icon: Calculator },
+    ],
+  },
+  {
+    label: 'שונות',
+    items: [
+      { href: '/dashboard/missing-documents', label: 'מסמכים', icon: FileText },
+      { href: '/dashboard/financial-table', label: 'טבלה פיננסית', icon: TableProperties },
+      { href: '/dashboard/settings', label: 'הגדרות', icon: Settings },
+    ],
+  },
 ];
 
 export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProps) {
@@ -94,34 +124,39 @@ export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProp
         </Link>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto" role="navigation" aria-label="תפריט ראשי">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+      {/* Navigation — grouped sections with labels */}
+      <nav className="flex-1 p-3 overflow-y-auto" role="navigation" aria-label="תפריט ראשי">
+        {navSections.map((section, sectionIdx) => (
+          <div key={section.label} className={sectionIdx > 0 ? 'mt-4' : ''}>
+            <h3 className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 px-3 pb-1.5">
+              {section.label}
+            </h3>
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href ||
+                  (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
-          return (
-            <div key={item.href}>
-              {item.separator && (
-                <div className="border-t border-phi-slate/15 my-2" />
-              )}
-              <Link
-                href={item.href}
-                onClick={onLinkClick}
-                aria-current={isActive ? "page" : undefined}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all group ${
-                  isActive
-                    ? "bg-phi-gold/20 text-phi-gold"
-                    : "text-gray-400 hover:bg-phi-slate/30 hover:text-white"
-                }`}
-              >
-                <Icon className={`w-4.5 h-4.5 ${isActive ? 'text-phi-gold' : ''}`} />
-                <span className="text-sm font-medium">{item.label}</span>
-              </Link>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onLinkClick}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all group ${
+                      isActive
+                        ? "bg-phi-gold/20 text-phi-gold"
+                        : "text-gray-400 hover:bg-phi-slate/30 hover:text-white"
+                    }`}
+                  >
+                    <Icon className={`w-4.5 h-4.5 ${isActive ? 'text-phi-gold' : ''}`} />
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </Link>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </nav>
 
       {/* User */}
