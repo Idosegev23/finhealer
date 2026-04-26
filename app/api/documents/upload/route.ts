@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const validTypes = ['bank', 'credit', 'payslip', 'pension', 'insurance', 'loan', 'investment', 'savings', 'receipt', 'mortgage', 'bank_statement', 'credit_statement'];
+    const validTypes = ['bank', 'credit', 'payslip', 'pension', 'pension_clearing', 'insurance', 'loan', 'investment', 'savings', 'receipt', 'mortgage', 'bank_statement', 'credit_statement'];
     if (!validTypes.includes(documentType)) {
       console.error('Invalid document type:', documentType);
       return NextResponse.json({ error: `Invalid document type: ${documentType}` }, { status: 400 });
@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
       'credit': 'credit_statement',
       'payslip': 'salary_slip',
       'pension': 'pension_report',
+      'pension_clearing': 'pension_report',
       'insurance': 'insurance_report',
       'loan': 'loan_statement',
       'investment': 'investment_report',

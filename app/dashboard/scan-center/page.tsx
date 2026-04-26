@@ -258,11 +258,14 @@ function ScanCenterContent() {
           const Icon = docType.icon;
           const isActive = activeType === docType.type;
           
-          // Enable bank always, others only if bank statement exists OR if coming from required doc
-          const isEnabled = docType.type === 'bank' || 
-                           hasBankStatement || 
+          // Enable bank + pension (Mislaka) unconditionally — Mislaka reports
+          // are standalone aggregations that don't require a bank statement.
+          // Other types still require a bank statement first.
+          const standaloneTypes: DocumentType[] = ['bank', 'pension', 'insurance'];
+          const isEnabled = standaloneTypes.includes(docType.type) ||
+                           hasBankStatement ||
                            (requiredDocId && preselectedType === docType.type);
-          
+
           const isLocked = !isEnabled && docType.type !== 'bank';
 
           return (

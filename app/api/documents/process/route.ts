@@ -262,9 +262,18 @@ export async function POST(request: NextRequest) {
     } else if (docType.includes('insurance')) {
       // Insurance statements → insurance table
       itemsProcessed = await saveInsurance(supabase, result, stmt.user_id, statementId as string);
-    } else if (docType.includes('pension') || docType.includes('פנסיה') || docType.includes('מסלקה')) {
-      // Pension statements → pension_insurance table + link to payslip and transactions
-      itemsProcessed = await savePensions(supabase, result, stmt.user_id, statementId as string, stmt.statement_month);
+    } else if (docType.includes('pension') || docType.includes('פנסיה') || docType.includes('מסלקה') || docType.includes('clearing')) {
+      // Mislaka / pension report — uses unified handler with idempotent upsert
+      // by (provider|policy_number) and also splits pure-risk insurance.
+      try {
+        const { handleMislakaReport } = await import('@/lib/webhook/handle-mislaka');
+        const m = await handleMislakaReport(supabase, stmt.user_id, result, statementId as string);
+        itemsProcessed = m.pensionsUpserted + m.insurancesUpserted;
+        console.log(`🏦 Mislaka via web: ${m.pensionsUpserted} pensions + ${m.insurancesUpserted} insurances`);
+      } catch (mislakaErr) {
+        console.error('Mislaka handler error, falling back to legacy savePensions:', mislakaErr);
+        itemsProcessed = await savePensions(supabase, result, stmt.user_id, statementId as string, stmt.statement_month);
+      }
     } else {
       console.warn(`Unknown document type: ${docType}, defaulting to transactions`);
       itemsProcessed = await saveTransactions(supabase, result, stmt.user_id, statementId as string, docType, stmt.statement_month);
