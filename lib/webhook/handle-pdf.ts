@@ -177,6 +177,35 @@ export async function handlePdf(
     console.log('🎯 PDF OCR Result:', content);
 
     const ocrData = cleanAiJson(content);
+
+    // ──────────────── Mislaka / pension-clearing fast path ────────────────
+    // These reports return pension_plans + insurance_policies, NOT transactions.
+    // Skip the transaction pipeline entirely and route to the dedicated handler.
+    const isMislaka = documentType === 'pension_clearing' ||
+      (Array.isArray((ocrData as any)?.pension_plans) && (ocrData as any).pension_plans.length > 0);
+    if (isMislaka) {
+      progressUpdater.stop();
+      try {
+        const { handleMislakaReport, formatMislakaSummary } = await import('./handle-mislaka');
+        const result = await handleMislakaReport(supabase, userData.id, ocrData, null);
+        console.log(`🏦 Mislaka processed: ${result.pensionsUpserted} pensions + ${result.insurancesUpserted} insurances`);
+
+        const customerName = (ocrData as any)?.report_info?.customer_name;
+        await greenAPI.sendMessage({
+          phoneNumber,
+          message: formatMislakaSummary(result, customerName),
+        });
+        return NextResponse.json({ status: 'success', mislaka: result });
+      } catch (mislakaErr: any) {
+        console.error('❌ Mislaka handler failed:', mislakaErr);
+        await greenAPI.sendMessage({
+          phoneNumber,
+          message: 'התקבל דוח מסלקה אבל הייתה בעיה בעיבוד. נסה שוב או שלח לי את ה-PDF המקורי.',
+        });
+        return NextResponse.json({ status: 'mislaka_failed' });
+      }
+    }
+
     const allTransactions = normalizeTransactions(ocrData);
 
     const incomeCount = allTransactions.filter(tx => tx.type === 'income').length;

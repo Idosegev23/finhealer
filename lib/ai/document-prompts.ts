@@ -1547,6 +1547,28 @@ export function getPensionStatementPrompt(text: string | null): string {
       }
     }
   ],
+  "insurance_policies": [
+    {
+      "provider": "איילון",
+      "plan_name": "מגן לחיים",
+      "policy_number": "851231976",
+      "policy_type": "life",
+      "coverage_amount": 590419,
+      "monthly_premium": 72,
+      "start_date": "27/12/2016",
+      "status": "active"
+    },
+    {
+      "provider": "מנורה",
+      "plan_name": "ריסק משכנתא",
+      "policy_number": "342904018",
+      "policy_type": "mortgage_life",
+      "coverage_amount": 311980,
+      "monthly_premium": 188,
+      "start_date": "01/01/2015",
+      "status": "active"
+    }
+  ],
   "insurance_summary": {
     "life_insurance": 398.00,
     "survivors_pension": 0,
@@ -1569,10 +1591,20 @@ export function getPensionStatementPrompt(text: string | null): string {
   }
 }
 
+## חשוב — דוחות מסלקה:
+דוח מסלקה פנסיונית מכיל גם **פוליסות סיכון טהור** (ריסק חיים, ביטוח משכנתא, אכ"ע) — אלו לא תוכניות פנסיוניות, אלא ביטוחים. חלץ אותן לתוך \`insurance_policies\` (לא לתוך \`pension_plans\`).
+
+**זיהוי**:
+- כותרות "פוליסות סיכון טהור (ריסק מוות ו/או פוליסת אכ"ע)" → insurance_policies
+- כותרות "ביטוחי חיים ומשכנתא" → insurance_policies (policy_type: "mortgage_life")
+- כותרות "פוליסות ביטוח חיים משולבות חיסכון" → pension_plans (plan_type: "insurance_policy")
+- כותרות "קרנות פנסיה" → pension_plans (plan_type: "pension_fund")
+- כותרות "קרנות השתלמות" → pension_plans (plan_type: "study_fund")
+
 **הדוח:**
 ${text}
 
-**חלץ את כל התוכניות - גם קפואות וגם פעילות!**`;
+**חלץ את כל התוכניות והפוליסות - גם קפואות וגם פעילות!**`;
 }
 
 // ============================================================================
