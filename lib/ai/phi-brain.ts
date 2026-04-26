@@ -301,15 +301,23 @@ function wasRecentlyNudged(ctx: BrainContext, marker: string): boolean {
 function parseBrainResponse(raw: string, event: PhiEvent): any {
   const trimmed = (raw || '').trim();
   if (!trimmed) {
-    // Empty response → on user message, fall back to a deterministic money-flow
-    // summary instead of a useless "processing..." reply. The brain got stuck
-    // in a tool-call loop; the user still deserves real content.
+    // Empty response → pick a deterministic handler that matches what the user
+    // actually asked. The brain got stuck in a tool-call loop, but we can still
+    // give a useful answer based on keywords.
     if (event.type === 'whatsapp_message') {
+      const msg = (event.message || '').toLowerCase();
+      let fallbackAction = 'show_money_flow';
+      if (/יעד|יעדים|מטרה|מטרות/.test(msg)) fallbackAction = 'show_goals';
+      else if (/תקציב/.test(msg)) fallbackAction = 'show_budget';
+      else if (/ציון|phi|פאי/.test(msg)) fallbackAction = 'show_phi_score';
+      else if (/תזרים|cashflow/.test(msg)) fallbackAction = 'show_cashflow';
+      else if (/דפוסים|ניתוח|patterns/.test(msg)) fallbackAction = 'show_patterns';
+      else if (/הלוואות|הלוואה/.test(msg)) fallbackAction = 'show_money_flow'; // no dedicated handler — use flow
       return {
-        action: 'show_money_flow',
+        action: fallbackAction,
         should_respond: true,
         message: '',
-        internal_reasoning: 'empty_model_output_fallback_to_money_flow',
+        internal_reasoning: `empty_model_output_smart_fallback_to_${fallbackAction}`,
       };
     }
     return { action: 'none', should_respond: false, internal_reasoning: 'empty_model_output' };
@@ -624,12 +632,38 @@ function tryFastPath(message: string, ctx: BrainContext): any | null {
   }
 
   // 3. Expense pattern: "סופר 450" or "450 סופר"
+  // Strict guardrails to avoid false positives — paragraphs about goals/plans
+  // ending in a number ("...בתחילת 2027") were being mis-parsed as expenses.
   const match = trimmed.match(EXPENSE_PATTERN);
   if (match) {
     const vendor = (match[1] || match[4] || '').trim();
     const amountStr = (match[2] || match[3] || '').replace(/,/g, '');
     const amount = parseFloat(amountStr);
-    if (amount > 0 && amount < 100000 && vendor.length >= 2) {
+
+    // Words that strongly signal "this is a sentence about plans/goals/questions",
+    // not a transaction record. If any appear, send to the brain instead.
+    const PLAN_OR_GOAL_WORDS = [
+      'רוצה', 'מטרה', 'יעד', 'לחסוך', 'תוכנית', 'לתכנן', 'תכנן', 'מתכנן',
+      'אוטו', 'רכב', 'דירה', 'חופשה', 'חופש', 'טיול', 'נסיעה',
+      'אבל', 'אם', 'כדי', 'אולי', 'בערך', 'בסביבות',
+      'להגדיר', 'תגדיר', 'נתחיל', 'נציג', 'בוא', 'תוכל',
+      'שנה', 'שנים', 'חודש', 'חודשים', 'שבוע', 'שבועות',
+      'תחילת', 'סוף', 'אמצע', 'תחילה',
+      'מה', 'מתי', 'איך', 'למה', 'איפה', 'כמה',
+    ];
+    const lowerVendor = vendor.toLowerCase();
+    const looksLikePlan = PLAN_OR_GOAL_WORDS.some(w => lowerVendor.includes(w));
+    // 4-digit number in year range looks like a year, not an amount
+    const looksLikeYear = /^(19|20)\d{2}$/.test(amountStr);
+
+    if (
+      amount > 0 &&
+      amount < 100000 &&
+      vendor.length >= 2 &&
+      vendor.length <= 25 && // real vendors are short
+      !looksLikePlan &&
+      !looksLikeYear
+    ) {
       return {
         should_respond: true,
         action: 'log_expense',

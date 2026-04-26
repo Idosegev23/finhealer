@@ -112,7 +112,36 @@ export async function calculateMoneyFlow(userId: string, month?: string): Promis
 async function _calculateMoneyFlowImpl(userId: string, month?: string): Promise<MoneyFlowResult> {
   const supabase = createServiceClient();
   const now = new Date();
-  const targetMonth = month || now.toISOString().substring(0, 7);
+  let targetMonth = month || now.toISOString().substring(0, 7);
+
+  // If caller didn't pin a month and the current month has no data yet
+  // (common for new users uploading historical statements), fall back to the
+  // latest month that actually has transactions. Otherwise the user sees
+  // ₪0/0/0 even though they have plenty of data.
+  if (!month) {
+    const monthStartProbe = `${targetMonth}-01`;
+    const { count: currentMonthCount } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'confirmed')
+      .or('is_summary.is.null,is_summary.eq.false')
+      .gte('tx_date', monthStartProbe);
+    if (!currentMonthCount || currentMonthCount === 0) {
+      const { data: latest } = await supabase
+        .from('transactions')
+        .select('tx_date')
+        .eq('user_id', userId)
+        .eq('status', 'confirmed')
+        .or('is_summary.is.null,is_summary.eq.false')
+        .order('tx_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const latestDate = (latest as any)?.tx_date as string | undefined;
+      if (latestDate) targetMonth = latestDate.substring(0, 7);
+    }
+  }
+
   const monthStart = `${targetMonth}-01`;
   const lastDay = new Date(parseInt(targetMonth.split('-')[0]), parseInt(targetMonth.split('-')[1]), 0).getDate();
   const monthEnd = `${targetMonth}-${lastDay}`;
