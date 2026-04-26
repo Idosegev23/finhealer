@@ -135,14 +135,6 @@ export const BRAIN_TOOL_DECLARATIONS = [
       properties: {},
     },
   },
-  {
-    name: 'start_classification',
-    description: 'Triggers the classification flow — auto-classifies pending transactions, then prompts user about ambiguous ones. Use when the user says "נתחיל" / "סווג" / wants to organize transactions. Returns a status object you can use to compose your reply.',
-    parameters: {
-      type: Type.OBJECT,
-      properties: {},
-    },
-  },
 ] as const;
 
 // ============================================================================
@@ -587,24 +579,6 @@ export async function executeBrainTool(
         has_budget: (budgetCount || 0) > 0,
         has_goals: (goalCount || 0) > 0,
       };
-    }
-
-    case 'start_classification': {
-      try {
-        const { startClassification } = await import('@/lib/conversation/states/classification');
-        // Get phone from user record
-        const { data: u } = await supabase.from('users').select('phone, name').eq('id', userId).single();
-        if (!u?.phone) return { started: false, error: 'no phone on user' };
-        const ctx = { userId, phone: u.phone, state: 'classification' as any, userName: u.name || '' };
-        const result = await startClassification(ctx);
-        return {
-          started: true,
-          new_state: result.newState || null,
-          success: result.success,
-        };
-      } catch (err: any) {
-        return { started: false, error: err.message || 'classification failed to start' };
-      }
     }
 
     default:
