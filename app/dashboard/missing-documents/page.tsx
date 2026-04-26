@@ -318,20 +318,20 @@ export default function MissingDocumentsPage() {
                     </div>
                   )}
 
-                  {/* Actions */}
-                  <div className="flex gap-4">
+                  {/* Actions — direct upload (web), no need for WhatsApp */}
+                  <div className="flex gap-3">
                     <button
                       onClick={() => handleUpload(doc)}
-                      className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-5 rounded-2xl font-extrabold text-2xl shadow-2xl hover:shadow-3xl transition-all hover:scale-105 flex items-center justify-center gap-3"
+                      className="flex-1 bg-phi-dark hover:bg-phi-slate text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
                     >
-                      <Upload className="w-7 h-7" />
-                      העלה דוח
+                      <Upload className="w-4 h-4" />
+                      העלה {getDocumentTypeLabel(doc.document_type)}
                     </button>
                     <button
                       onClick={() => handleSkip(doc.id)}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-5 rounded-2xl font-bold text-2xl transition-all hover:scale-105 flex items-center justify-center gap-3"
+                      className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
                     >
-                      <X className="w-7 h-7" />
+                      <X className="w-4 h-4" />
                       דלג
                     </button>
                   </div>

@@ -196,6 +196,13 @@ function ScanCenterContent() {
   useEffect(() => {
     if (preselectedType) {
       setActiveType(preselectedType);
+      // Auto-scroll to the uploader so the user lands directly on the action.
+      // Without this, deep-linking from /missing-documents drops them at the
+      // top of the page and they think nothing happened.
+      setTimeout(() => {
+        const uploader = window.document.getElementById('document-uploader');
+        uploader?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
     }
   }, [preselectedType]);
 
@@ -371,7 +378,7 @@ function ScanCenterContent() {
 
       {/* Document Uploader */}
       {activeType && (
-        <Card className="border-2 border-blue-500">
+        <Card id="document-uploader" className="border-2 border-phi-gold">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
