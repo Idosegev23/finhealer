@@ -844,7 +844,41 @@ export async function showMonitoringSummary(
   const supabase = createServiceClient();
   const greenAPI = getGreenAPIClient();
 
-  const targetMonth = month || new Date().toISOString().substring(0, 7);
+  // If caller didn't pin a month, find the most recent month that has data.
+  // Without this, requesting "summary" right after uploading a 2025 statement
+  // returns 0/0/0 because the current month (today's month) has no tx.
+  let targetMonth = month;
+  let isAutoSelected = false;
+  if (!targetMonth) {
+    const { data: latest } = await supabase
+      .from('transactions')
+      .select('tx_date')
+      .eq('user_id', ctx.userId)
+      .eq('status', 'confirmed')
+      .order('tx_date', { ascending: false })
+      .limit(1);
+    const latestDate = latest?.[0]?.tx_date;
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    if (latestDate) {
+      const latestMonth = latestDate.substring(0, 7);
+      // If current month has data, prefer it. Otherwise, use the latest month
+      // that has any data (so user always sees real numbers).
+      const { count: currentCount } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', ctx.userId)
+        .eq('status', 'confirmed')
+        .gte('tx_date', `${currentMonth}-01`);
+      if (currentCount && currentCount > 0) {
+        targetMonth = currentMonth;
+      } else {
+        targetMonth = latestMonth;
+        isAutoSelected = true;
+      }
+    } else {
+      targetMonth = currentMonth;
+    }
+  }
   const [year, mon] = targetMonth.split('-');
   const monthStart = `${targetMonth}-01`;
   const nextMonth = new Date(Number(year), Number(mon), 1);
@@ -913,7 +947,9 @@ export async function showMonitoringSummary(
   ];
   const monthLabel = `${monthNames[Number(mon) - 1]} ${year}`;
 
-  let message = `📊 *סיכום ${monthLabel}*\n\n`;
+  let message = isAutoSelected
+    ? `📊 *סיכום ${monthLabel}* _(החודש האחרון עם נתונים)_\n\n`
+    : `📊 *סיכום ${monthLabel}*\n\n`;
   message += `💚 הכנסות: ₪${totalIncome.toLocaleString('he-IL')}\n`;
   message += `💸 הוצאות: ₪${totalExpenses.toLocaleString('he-IL')}\n`;
   message += `${balance >= 0 ? '✨' : '📉'} יתרה: ₪${balance.toLocaleString('he-IL')}\n\n`;

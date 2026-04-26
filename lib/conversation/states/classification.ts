@@ -203,22 +203,38 @@ export async function startClassification(ctx: RouterContext): Promise<RouterRes
         .update({ onboarding_state: nextState, phase: nextPhase })
         .eq('id', ctx.userId);
 
+      // Build a contextual message that mentions WHAT we have, not just "done"
+      const { count: confirmedCount } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', ctx.userId)
+        .eq('status', 'confirmed');
+      const { data: txDates } = await supabase
+        .from('transactions')
+        .select('tx_date')
+        .eq('user_id', ctx.userId)
+        .eq('status', 'confirmed')
+        .order('tx_date', { ascending: true });
+      const monthsCovered = new Set((txDates || []).map((t: any) => (t.tx_date || '').slice(0, 7))).size;
+      const txCountText = `${confirmedCount || 0} תנועות`;
+      const periodText = monthsCovered > 0 ? ` מ-${monthsCovered} חודש${monthsCovered === 1 ? '' : 'ים'}` : '';
+
       if (nextPhase === 'goals' || nextPhase === 'monitoring') {
         await greenAPI.sendMessage({
           phoneNumber: ctx.phone,
           message:
-            `✅ *מעולה, סידרנו הכל!*\n\nכל ההוצאות וההכנסות מסודרות 🎉\n\n` +
-            `עכשיו בוא נגדיר מטרות — למשל, לחסוך לחופשה או לשלם חוב! 🎯\n` +
-            `כתוב *"יעדים"* כדי להתחיל.`,
+            `✅ *סיווגתי ${txCountText}${periodText}* — הכל מסודר 🎉\n\n` +
+            `כתוב *"סיכום"* לראות את התמונה הפיננסית, או *"יעדים"* כדי להגדיר מטרות 🎯`,
         });
       } else {
         await greenAPI.sendMessage({
           phoneNumber: ctx.phone,
           message:
-            `✅ *מעולה, סידרנו הכל!*\n\nכל ההוצאות וההכנסות מסודרות 🎉\n\n` +
+            `✅ *סיווגתי ${txCountText}${periodText}* — הכל מסודר 🎉\n\n` +
             (nextPhase === 'data_collection'
-              ? `📄 כדי שאוכל לעזור לך יותר, שלח עוד דוחות מהבנק (הכי טוב 3 חודשים אחרונים).`
-              : `📊 עכשיו אבדוק איך הכסף שלך מתנהל ואתן לך טיפים.\n\nכתוב *"ניתוח"* כדי להתחיל.`),
+              ? `📄 כדי לקבל תמונה מלאה, שלח עוד דוחות מהבנק (3 חודשים זה אידיאלי).\n\n` +
+                `אפשר גם לכתוב *"סיכום"* כדי לראות את מה שיש לי עד עכשיו.`
+              : `📊 בוא נבחן איך הכסף שלך מתנהל. כתוב *"ניתוח"* או *"סיכום"* כדי להתחיל.`),
         });
       }
     }
