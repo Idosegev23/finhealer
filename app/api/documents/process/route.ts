@@ -2083,66 +2083,87 @@ async function saveLoans(supabase: any, result: any, userId: string, documentId:
   try {
     let loansToInsert: any[] = [];
     
-    // Check if it's a mortgage statement (with tracks) or regular loan statement
+    // Israeli mortgage tracks always declare an index_type ("צמוד למדד" /
+     // "לא צמוד"). Classifiers sometimes route a multi-track mortgage
+     // report through the generic 'loan_statement' branch, so detect it
+     // from the data instead of trusting the document_type alone.
+    const looksLikeMortgageTracks = (items: any[]) =>
+      items.length > 0 &&
+      items.every((it) => typeof it?.index_type === 'string' && it.index_type.length > 0)
+
+    const buildNotes = (extra: Record<string, any>) => {
+      const parts: string[] = []
+      if (extra.loan_name) parts.push(`מסלול: ${extra.loan_name}`)
+      if (extra.index_type) parts.push(`הצמדה: ${extra.index_type}`)
+      if (extra.next_payment_date) parts.push(`תשלום הבא: ${extra.next_payment_date}`)
+      if (extra.paid_payments != null) parts.push(`שולמו: ${extra.paid_payments}`)
+      return parts.length ? parts.join(' · ') : null
+    }
+
     if (result.tracks && Array.isArray(result.tracks)) {
       // Mortgage: multiple tracks → multiple loans
-      loansToInsert = result.tracks.map((track: any) => {
-        // Parse next_payment_date
-        const nextPaymentDate = track.next_payment_date ? parseDateToISO(track.next_payment_date) : null;
-        
-        return {
-          user_id: userId,
-          loan_type: 'mortgage',
-          lender: result.report_info?.bank_name || 'בנק',
-          original_amount: parseFloat(track.original_amount) || 0,
-          current_balance: parseFloat(track.current_balance) || 0,
-          interest_rate: parseFloat(track.interest_rate) || 0,
-          monthly_payment: parseFloat(track.monthly_payment) || 0,
-          remaining_payments: parseInt(track.remaining_payments) || null,
-          next_payment_date: nextPaymentDate,
-          status: 'active',
-          metadata: {
-            track_number: track.track_number,
-            track_type: track.track_type,
-            index_type: track.index_type,
-            paid_payments: parseInt(track.paid_payments) || null,
-            document_id: documentId,
-            report_info: result.report_info,
-          },
-        };
-      });
+      loansToInsert = result.tracks.map((track: any) => ({
+        user_id: userId,
+        loan_type: 'mortgage',
+        lender_name: result.report_info?.bank_name || 'בנק',
+        loan_number: track.track_number || track.loan_number || null,
+        original_amount: parseFloat(track.original_amount) || 0,
+        current_balance: parseFloat(track.current_balance) || 0,
+        interest_rate: parseFloat(track.interest_rate) || 0,
+        monthly_payment: parseFloat(track.monthly_payment) || 0,
+        remaining_payments: parseInt(track.remaining_payments) || null,
+        active: true,
+        notes: buildNotes({
+          loan_name: track.track_type,
+          index_type: track.index_type,
+          next_payment_date: track.next_payment_date,
+          paid_payments: track.paid_payments,
+        }),
+      }));
     } else if (result.loans && Array.isArray(result.loans)) {
-      // Regular loan statement
-      loansToInsert = result.loans.map((loan: any) => {
-        // Parse next_payment_date
-        const nextPaymentDate = loan.next_payment_date ? parseDateToISO(loan.next_payment_date) : null;
-        
-        return {
-          user_id: userId,
-          loan_type: 'personal',
-          lender: result.report_info?.bank_name || loan.loan_provider || 'לא צוין',
-          original_amount: parseFloat(loan.original_amount) || 0,
-          current_balance: parseFloat(loan.current_balance) || 0,
-          interest_rate: parseFloat(loan.interest_rate) || 0,
-          monthly_payment: parseFloat(loan.monthly_payment) || 0,
-          remaining_payments: parseInt(loan.remaining_payments) || null,
-          next_payment_date: nextPaymentDate,
-          status: 'active',
-          metadata: {
-            loan_number: loan.loan_number,
-            loan_name: loan.loan_name,
-            index_type: loan.index_type,
-            paid_payments: parseInt(loan.paid_payments) || null,
-            document_id: documentId,
-            report_info: result.report_info,
-          },
-        };
-      });
+      const isMortgage = looksLikeMortgageTracks(result.loans);
+      loansToInsert = result.loans.map((loan: any) => ({
+        user_id: userId,
+        loan_type: isMortgage ? 'mortgage' : 'personal',
+        lender_name: result.report_info?.bank_name || loan.loan_provider || 'לא צוין',
+        loan_number: loan.loan_number || null,
+        original_amount: parseFloat(loan.original_amount) || 0,
+        current_balance: parseFloat(loan.current_balance) || 0,
+        interest_rate: parseFloat(loan.interest_rate) || 0,
+        monthly_payment: parseFloat(loan.monthly_payment) || 0,
+        remaining_payments: parseInt(loan.remaining_payments) || null,
+        active: true,
+        notes: buildNotes({
+          loan_name: loan.loan_name,
+          index_type: loan.index_type,
+          next_payment_date: loan.next_payment_date,
+          paid_payments: loan.paid_payments,
+        }),
+      }));
     }
 
     if (loansToInsert.length === 0) {
       console.log('No loans to save');
       return 0;
+    }
+
+    // Real loan/mortgage data supersedes profile-inferred placeholders.
+    // Remove the auto-created stand-ins of the same type so the user
+    // doesn't see "משכנתא 3,500₪ הוסק אוטומטית" alongside the 6 real
+    // tracks just extracted from the report.
+    const realLoanTypes = Array.from(new Set(loansToInsert.map((l) => l.loan_type)));
+    if (realLoanTypes.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from('loans')
+        .delete()
+        .eq('user_id', userId)
+        .in('loan_type', realLoanTypes)
+        .like('notes', '%הוסק אוטומטית%');
+      if (cleanupError) {
+        console.warn('Could not remove inferred-loan placeholders:', cleanupError.message);
+      } else {
+        console.log(`🧹 Cleared inferred placeholders for: ${realLoanTypes.join(', ')}`);
+      }
     }
 
     const { error } = await supabase
