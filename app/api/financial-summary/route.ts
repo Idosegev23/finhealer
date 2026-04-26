@@ -15,7 +15,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Get current month for transactions
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const now = new Date();
+    const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
+    // Last day of current month (Feb has 28/29, not 31)
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const monthEnd = `${currentMonth}-${String(lastDay).padStart(2, '0')}`;
 
     // Fetch all financial data in parallel
     const [
@@ -36,7 +40,7 @@ export async function GET(request: NextRequest) {
         .eq('status', 'confirmed')
         .or('is_summary.is.null,is_summary.eq.false')
         .gte('tx_date', `${currentMonth}-01`)
-        .lte('tx_date', `${currentMonth}-31`),
+        .lte('tx_date', monthEnd),
       supabase.from("bank_accounts").select("*").eq("user_id", user.id).eq("is_current", true).single(),
     ]);
 

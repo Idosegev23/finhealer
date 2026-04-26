@@ -64,6 +64,10 @@ export async function GET(request: NextRequest) {
     // ✨ שליפת הכנסות מתנועות (דוחות סרוקים)
     const monthParam = searchParams.get('month');
     const targetMonth = monthParam || new Date().toISOString().slice(0, 7); // YYYY-MM
+    // Real last-day-of-month — '-31' breaks Postgres for Feb / 30-day months
+    const [yStr, mStr] = targetMonth.split('-');
+    const lastDay = new Date(parseInt(yStr), parseInt(mStr), 0).getDate();
+    const monthEnd = `${targetMonth}-${String(lastDay).padStart(2, '0')}`;
     const { data: transactionIncome, error: txError } = await (supabase as any)
       .from('transactions')
       .select('*')
@@ -72,7 +76,7 @@ export async function GET(request: NextRequest) {
       .eq('status', 'confirmed')
       .or('is_summary.is.null,is_summary.eq.false')
       .gte('tx_date', `${targetMonth}-01`)
-      .lte('tx_date', `${targetMonth}-31`);
+      .lte('tx_date', monthEnd);
 
     const monthlyIncomeFromTransactions = (transactionIncome || [])
       .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
