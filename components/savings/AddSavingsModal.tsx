@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { Loader2, Wallet } from "lucide-react";
+import { Loader2, Target, Wallet } from "lucide-react";
 
 interface AddSavingsModalProps {
   open: boolean;
@@ -21,32 +21,49 @@ interface AddSavingsModalProps {
   onSuccess: () => void;
 }
 
+interface GoalOption {
+  id: string;
+  goal_name: string;
+  target_amount: number;
+  current_amount: number;
+}
+
+// Must match the DB CHECK on savings_accounts.account_type:
+// savings | deposit | investment | emergency_fund | goal_based | other.
+// Pension/provident/study funds belong in pension_insurance, not here.
 const ACCOUNT_TYPES = [
   { value: "savings", label: "חיסכון רגיל" },
   { value: "deposit", label: "פיקדון" },
-  { value: "investment", label: "קרן השתלמות" },
-  { value: "pension_savings", label: "קרן פנסיה לתגמולים" },
-  { value: "provident_fund", label: "קופת גמל" },
-  { value: "provident_investment", label: "קופת גמל להשקעה" },
-  { value: "education_fund", label: "קרן השתלמות לילדים" },
-  { value: "stocks", label: "מניות / תיק השקעות" },
-  { value: "crypto", label: "קריפטו" },
+  { value: "investment", label: "השקעה / מניות" },
+  { value: "emergency_fund", label: "קרן חירום" },
+  { value: "goal_based", label: "חיסכון מיועד ליעד" },
   { value: "other", label: "אחר" },
 ];
 
 export function AddSavingsModal({ open, onOpenChange, onSuccess }: AddSavingsModalProps) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [goals, setGoals] = useState<GoalOption[]>([]);
   const [formData, setFormData] = useState({
     account_name: "",
     account_type: "",
-    institution_name: "",
+    bank_name: "",
     current_balance: "",
     monthly_deposit: "",
-    interest_rate: "",
-    maturity_date: "",
+    annual_return: "",
+    target_date: "",
+    target_amount: "",
+    goal_id: "",
     notes: "",
   });
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/goals")
+      .then((r) => r.json())
+      .then((d) => setGoals(Array.isArray(d?.goals) ? d.goals : Array.isArray(d) ? d : []))
+      .catch(() => setGoals([]));
+  }, [open]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -66,8 +83,8 @@ export function AddSavingsModal({ open, onOpenChange, onSuccess }: AddSavingsMod
       newErrors.account_type = "סוג החשבון הוא שדה חובה";
     }
 
-    if (!formData.institution_name.trim()) {
-      newErrors.institution_name = "שם המוסד הוא שדה חובה";
+    if (!formData.bank_name.trim()) {
+      newErrors.bank_name = "שם המוסד הוא שדה חובה";
     }
 
     if (!formData.current_balance || Number(formData.current_balance) < 0) {
@@ -75,11 +92,11 @@ export function AddSavingsModal({ open, onOpenChange, onSuccess }: AddSavingsMod
     }
 
     if (formData.monthly_deposit && Number(formData.monthly_deposit) < 0) {
-      newErrors.monthly_deposit = "הפיקדון החודשי לא יכול להיות שלילי";
+      newErrors.monthly_deposit = "ההפקדה החודשית לא יכולה להיות שלילית";
     }
 
-    if (formData.interest_rate && Number(formData.interest_rate) < 0) {
-      newErrors.interest_rate = "הריבית לא יכולה להיות שלילית";
+    if (formData.annual_return && Number(formData.annual_return) < 0) {
+      newErrors.annual_return = "התשואה לא יכולה להיות שלילית";
     }
 
     setErrors(newErrors);
@@ -97,11 +114,13 @@ export function AddSavingsModal({ open, onOpenChange, onSuccess }: AddSavingsMod
       const payload = {
         account_name: formData.account_name.trim(),
         account_type: formData.account_type,
-        institution_name: formData.institution_name.trim(),
+        bank_name: formData.bank_name.trim(),
         current_balance: Number(formData.current_balance),
-        monthly_deposit: formData.monthly_deposit ? Number(formData.monthly_deposit) : null,
-        interest_rate: formData.interest_rate ? Number(formData.interest_rate) : null,
-        maturity_date: formData.maturity_date || null,
+        monthly_deposit: formData.monthly_deposit ? Number(formData.monthly_deposit) : 0,
+        annual_return: formData.annual_return ? Number(formData.annual_return) : null,
+        target_amount: formData.target_amount ? Number(formData.target_amount) : null,
+        target_date: formData.target_date || null,
+        goal_id: formData.goal_id || null,
         notes: formData.notes.trim() || null,
         active: true,
       };
@@ -121,11 +140,13 @@ export function AddSavingsModal({ open, onOpenChange, onSuccess }: AddSavingsMod
       setFormData({
         account_name: "",
         account_type: "",
-        institution_name: "",
+        bank_name: "",
         current_balance: "",
         monthly_deposit: "",
-        interest_rate: "",
-        maturity_date: "",
+        annual_return: "",
+        target_date: "",
+        target_amount: "",
+        goal_id: "",
         notes: "",
       });
 
@@ -199,19 +220,19 @@ export function AddSavingsModal({ open, onOpenChange, onSuccess }: AddSavingsMod
             </div>
 
             <div>
-              <Label htmlFor="institution_name" className="flex items-center gap-2">
+              <Label htmlFor="bank_name" className="flex items-center gap-2">
                 מוסד / בנק
                 <InfoTooltip content="שם הבנק או החברה שבה החשבון" />
                 <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="institution_name"
+                id="bank_name"
                 placeholder="לדוגמה: בנק הפועלים"
-                value={formData.institution_name}
-                onChange={(e) => handleChange("institution_name", e.target.value)}
-                className={errors.institution_name ? "border-red-500" : ""}
+                value={formData.bank_name}
+                onChange={(e) => handleChange("bank_name", e.target.value)}
+                className={errors.bank_name ? "border-red-500" : ""}
               />
-              {errors.institution_name && <p className="text-sm text-red-500 mt-1">{errors.institution_name}</p>}
+              {errors.bank_name && <p className="text-sm text-red-500 mt-1">{errors.bank_name}</p>}
             </div>
           </div>
 
@@ -254,32 +275,73 @@ export function AddSavingsModal({ open, onOpenChange, onSuccess }: AddSavingsMod
                 </div>
 
                 <div>
-                  <Label htmlFor="interest_rate" className="flex items-center gap-2">
-                    ריבית שנתית (%)
+                  <Label htmlFor="annual_return" className="flex items-center gap-2">
+                    תשואה / ריבית שנתית (%)
                     <InfoTooltip content="אחוז התשואה / ריבית השנתית" />
                   </Label>
                   <Input
-                    id="interest_rate"
+                    id="annual_return"
                     type="number"
                     step="0.01"
                     placeholder="3.5"
-                    value={formData.interest_rate}
-                    onChange={(e) => handleChange("interest_rate", e.target.value)}
+                    value={formData.annual_return}
+                    onChange={(e) => handleChange("annual_return", e.target.value)}
+                    className={errors.annual_return ? "border-red-500" : ""}
+                  />
+                  {errors.annual_return && <p className="text-sm text-red-500 mt-1">{errors.annual_return}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="target_amount" className="flex items-center gap-2">
+                    סכום יעד (₪)
+                    <InfoTooltip content="לאיזה סכום אתה שואף להגיע" />
+                  </Label>
+                  <Input
+                    id="target_amount"
+                    type="number"
+                    placeholder="100000"
+                    value={formData.target_amount}
+                    onChange={(e) => handleChange("target_amount", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="target_date" className="flex items-center gap-2">
+                    תאריך יעד
+                    <InfoTooltip content="מתי אתה רוצה להגיע לסכום היעד / מתי הפדיון" />
+                  </Label>
+                  <Input
+                    id="target_date"
+                    type="date"
+                    value={formData.target_date}
+                    onChange={(e) => handleChange("target_date", e.target.value)}
                   />
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="maturity_date" className="flex items-center gap-2">
-                  תאריך פדיון
-                  <InfoTooltip content="מתי אפשר למשוך את הכסף ללא קנס (אם רלוונטי)" />
+                <Label htmlFor="goal_id" className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-phi-mint" />
+                  קישור ליעד פיננסי
+                  <InfoTooltip content="קשר את החיסכון ליעד שהגדרת — הצבירה תספר אוטומטית להתקדמות היעד" />
                 </Label>
-                <Input
-                  id="maturity_date"
-                  type="date"
-                  value={formData.maturity_date}
-                  onChange={(e) => handleChange("maturity_date", e.target.value)}
-                />
+                <Select
+                  value={formData.goal_id || "_none"}
+                  onValueChange={(val) => handleChange("goal_id", val === "_none" ? "" : val)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={goals.length ? "בחר יעד (אופציונלי)" : "אין יעדים פעילים"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">ללא קישור ליעד</SelectItem>
+                    {goals.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.goal_name} · ₪{Number(g.target_amount || 0).toLocaleString("he-IL")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>

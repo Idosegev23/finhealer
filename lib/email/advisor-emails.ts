@@ -11,6 +11,11 @@ function getResendClient() {
   return new Resend(process.env.RESEND_API_KEY || 'dummy-key-for-build');
 }
 
+function isResendConfigured() {
+  const key = process.env.RESEND_API_KEY;
+  return !!key && key !== 'dummy-key-for-build' && !key.startsWith('your-');
+}
+
 const ADVISOR_EMAIL = process.env.ADVISOR_EMAIL || 'advisor@finhealer.com';
 const FROM_ADDRESS = 'Phi System <phi@finhealer.com>';
 
@@ -166,6 +171,9 @@ export async function sendLoansLeadEmail(user: UserLite, loans: LoanRow[]) {
   if (loans.length === 0) {
     return { sent: false, reason: 'no_loans' as const };
   }
+  if (!isResendConfigured()) {
+    return { sent: false, reason: 'not_configured' as const };
+  }
   const resend = getResendClient();
   const { error } = await resend.emails.send({
     from: FROM_ADDRESS,
@@ -284,6 +292,9 @@ export async function sendPensionsLeadEmail(
 ) {
   if (plans.length === 0) {
     return { sent: false, reason: 'no_plans' as const };
+  }
+  if (!isResendConfigured()) {
+    return { sent: false, reason: 'not_configured' as const };
   }
   const resend = getResendClient();
   const flaggedCount = insights.filter((i) => i.severity === 'critical' || i.severity === 'warning').length;

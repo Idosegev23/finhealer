@@ -39,6 +39,12 @@ export async function POST() {
     );
 
     if (!result.sent) {
+      if (result.reason === 'not_configured') {
+        return NextResponse.json(
+          { error: 'שליחת המייל ליועץ לא הוגדרה עדיין במערכת. נסה שוב לאחר שהוגדר חשבון השליחה.' },
+          { status: 503 },
+        );
+      }
       return NextResponse.json({ error: 'שליחת המייל נכשלה', reason: result.reason }, { status: 500 });
     }
 

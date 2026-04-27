@@ -18,6 +18,8 @@ interface SavingsAccount {
   target_amount: number;
   goal_name: string;
   target_date: string;
+  goal_id?: string | null;
+  goal?: { id: string; goal_name: string; target_amount: number } | null;
 }
 
 // Brand-only color tokens for account-type icons. Each "color" maps to a
@@ -251,13 +253,18 @@ export default function SavingsPage() {
                           </div>
                         </div>
 
-                        {account.goal_name && (
+                        {(account.goal?.goal_name || account.goal_name) && (
                           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <div className="flex items-center gap-2">
                               <Target className="w-4 h-4 text-phi-gold" />
                               <span className="text-sm font-medium text-amber-900">
-                                {account.goal_name}
+                                {account.goal?.goal_name || account.goal_name}
                               </span>
+                              {account.goal?.goal_name && (
+                                <span className="text-[10px] bg-phi-gold/20 text-phi-coral px-2 py-0.5 rounded">
+                                  מקושר ליעד
+                                </span>
+                              )}
                             </div>
                             {account.target_date && (
                               <div className="text-xs text-amber-800/70 mt-1">

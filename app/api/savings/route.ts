@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from("savings_accounts")
-      .select("*")
+      .select("*, goal:goals(id, goal_name, target_amount)")
       .eq("user_id", user.id)
       .eq("active", true)
       .order("created_at", { ascending: false });
@@ -106,14 +106,15 @@ export async function POST(request: NextRequest) {
           user_id: user.id,
           account_name: body.account_name,
           account_type: body.account_type,
-          bank_name: body.bank_name,
+          bank_name: body.bank_name || null,
           current_balance: body.current_balance || 0,
           monthly_deposit: body.monthly_deposit || 0,
-          annual_return: body.annual_return,
-          target_amount: body.target_amount,
-          goal_name: body.goal_name,
-          target_date: body.target_date,
-          notes: body.notes,
+          annual_return: body.annual_return ?? null,
+          target_amount: body.target_amount ?? null,
+          goal_name: body.goal_name ?? null,
+          target_date: body.target_date || null,
+          goal_id: body.goal_id || null,
+          notes: body.notes || null,
           active: true,
         },
       ])
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Error creating savings account:", error);
-      return NextResponse.json({ error: 'שגיאה פנימית' }, { status: 500 });
+      return NextResponse.json({ error: error.message || 'שגיאה פנימית' }, { status: 500 });
     }
 
     return NextResponse.json({ data }, { status: 201 });
