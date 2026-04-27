@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Shield, TrendingUp, Briefcase } from "lucide-react";
+import { PlusCircle, Shield, TrendingUp, Briefcase, Mail, Loader2, AlertTriangle } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { AddPensionModal } from "@/components/pensions/AddPensionModal";
 import { RequestPensionReport } from "@/components/pension/RequestPensionReport";
 import { PageWrapper, PageHeader, Card as DSCard } from '@/components/ui/design-system';
+import { analyzePensionPlan, analyzePortfolio } from '@/lib/finance/pension-insights';
+import { useToast } from '@/components/ui/toaster';
 
 interface PensionFund {
   id: string;
@@ -17,8 +19,10 @@ interface PensionFund {
   current_balance: number;
   monthly_deposit: number;
   management_fee_percentage: number;
+  deposit_fee_percentage?: number;
   annual_return: number;
   employee_type: string;
+  active?: boolean | null;
 }
 
 const FUND_TYPE_LABELS: Record<string, string> = {
@@ -30,10 +34,38 @@ const FUND_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function PensionsPage() {
+  const { addToast } = useToast();
   const [pensions, setPensions] = useState<PensionFund[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<any>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [sendingLead, setSendingLead] = useState(false);
+
+  const flaggedInsights = useMemo(() => {
+    if (!pensions.length) return [];
+    const perPlan = pensions.flatMap((p) => analyzePensionPlan(p as any));
+    const portfolio = analyzePortfolio(pensions as any);
+    return [...portfolio, ...perPlan].filter(
+      (i) => i.severity === 'critical' || i.severity === 'warning',
+    );
+  }, [pensions]);
+
+  const handleSendToAdvisor = async () => {
+    setSendingLead(true);
+    try {
+      const res = await fetch('/api/leads/pensions', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast({ title: data.error || 'שליחה נכשלה', type: 'error' });
+      } else {
+        addToast({ title: 'הפרטים נשלחו לסוכן במייל', type: 'success' });
+      }
+    } catch (e: any) {
+      addToast({ title: 'שגיאה בשליחה', type: 'error' });
+    } finally {
+      setSendingLead(false);
+    }
+  };
 
   useEffect(() => {
     fetchPensions();
@@ -128,6 +160,49 @@ export default function PensionsPage() {
         <div className="mb-8">
           <RequestPensionReport />
         </div>
+
+        {/* Advisor consultation CTA — only when concrete issues are detected */}
+        {flaggedInsights.length > 0 && (
+          <DSCard padding="lg" className="mb-8 border-2 border-amber-200 bg-amber-50">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-phi-coral" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-gray-900 mb-1">
+                  זוהו {flaggedInsights.length} סימני אזהרה בתיק שלך
+                </h3>
+                <p className="text-sm text-gray-700 mb-3 leading-relaxed">
+                  נמצאו דמי ניהול גבוהים, תשואות נמוכות, יתרות קטנות או הזדמנות לאיחוד קופות. שווה
+                  להתייעץ עם סוכן פנסיוני — חיסכון של 0.3% בדמי ניהול שווה אלפי שקלים בעשור.
+                </p>
+                <ul className="text-xs text-gray-600 mb-4 space-y-1">
+                  {flaggedInsights.slice(0, 3).map((ins, idx) => (
+                    <li key={idx} className="flex gap-2">
+                      <span className="text-phi-coral">•</span>
+                      <span><strong>{ins.title}</strong></span>
+                    </li>
+                  ))}
+                  {flaggedInsights.length > 3 && (
+                    <li className="text-gray-500 pr-3">ועוד {flaggedInsights.length - 3} נושאים נוספים…</li>
+                  )}
+                </ul>
+                <Button
+                  onClick={handleSendToAdvisor}
+                  disabled={sendingLead}
+                  className="bg-phi-coral hover:bg-phi-coral/90 text-white"
+                >
+                  {sendingLead ? (
+                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                  ) : (
+                    <Mail className="w-4 h-4 ml-2" />
+                  )}
+                  שלח פרטים לסוכן לקבלת ייעוץ
+                </Button>
+              </div>
+            </div>
+          </DSCard>
+        )}
 
         {/* Pensions Table */}
         <DSCard padding="sm" className="overflow-hidden">

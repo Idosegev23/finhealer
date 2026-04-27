@@ -5,9 +5,10 @@ import { DashboardWrapper } from '@/components/dashboard/DashboardWrapper';
 
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { CreditCard, TrendingDown, DollarSign, Clock, Plus, ChevronDown, ChevronUp, Sparkles, Upload } from 'lucide-react';
+import { CreditCard, TrendingDown, DollarSign, Clock, Plus, ChevronDown, ChevronUp, Sparkles, Upload, Mail, Loader2 } from 'lucide-react';
 import { Card as DSCard, EmptyState as DSEmptyState, PageHeader, KpiGrid, StatCard, PageWrapper } from '@/components/ui/design-system';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/toaster';
 
 interface Loan {
   id: string;
@@ -29,10 +30,29 @@ const isInferred = (loan: Loan) => !!loan.notes?.includes('הוסק אוטומט
 const COLORS = ['#074259', '#F6A623', '#7ED957', '#E74C3C', '#9B59B6', '#1ABC9C'];
 
 export default function LoansPage() {
+  const { addToast } = useToast();
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedLoan, setExpandedLoan] = useState<string | null>(null);
+  const [sendingLead, setSendingLead] = useState(false);
+
+  const handleSendToAdvisor = async () => {
+    setSendingLead(true);
+    try {
+      const res = await fetch('/api/leads/loans', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast({ title: data.error || 'שליחה נכשלה', type: 'error' });
+      } else {
+        addToast({ title: 'הפרטים נשלחו ליועץ במייל', type: 'success' });
+      }
+    } catch (e: any) {
+      addToast({ title: 'שגיאה בשליחה', type: 'error' });
+    } finally {
+      setSendingLead(false);
+    }
+  };
 
   useEffect(() => {
     fetchLoans();
@@ -119,13 +139,30 @@ export default function LoansPage() {
           title="הלוואות"
           subtitle="מעקב והיסטוריה של כל ההלוואות שלך"
           action={
-            <Button
-              onClick={() => window.location.href = '/dashboard/data/loans'}
-              className="bg-phi-dark hover:bg-phi-slate text-white"
-            >
-              <Plus className="w-4 h-4 ml-2" />
-              הוסף הלוואה
-            </Button>
+            <div className="flex items-center gap-2">
+              {loans.filter((l) => l.active).length > 0 && (
+                <Button
+                  onClick={handleSendToAdvisor}
+                  disabled={sendingLead}
+                  variant="outline"
+                  className="border-phi-gold text-phi-coral hover:bg-amber-50"
+                >
+                  {sendingLead ? (
+                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                  ) : (
+                    <Mail className="w-4 h-4 ml-2" />
+                  )}
+                  שלח פרטים ליועץ
+                </Button>
+              )}
+              <Button
+                onClick={() => window.location.href = '/dashboard/data/loans'}
+                className="bg-phi-dark hover:bg-phi-slate text-white"
+              >
+                <Plus className="w-4 h-4 ml-2" />
+                הוסף הלוואה
+              </Button>
+            </div>
           }
         />
 
