@@ -469,8 +469,18 @@ async function validateAndNormalizeCategories(
       }
       
       // Try exact match (case-insensitive)
-      const match = categoryMap.get(expenseCategory.toLowerCase());
-      
+      let match = categoryMap.get(expenseCategory.toLowerCase());
+
+      // Gemini sometimes appends the group in parens — e.g. "ביגוד (אישי)"
+      // for category "ביגוד" in group "אישי". Strip a trailing parenthesized
+      // suffix before giving up so we don't lose the classification.
+      if (!match) {
+        const stripped = expenseCategory.replace(/\s*\([^)]*\)\s*$/, '').trim();
+        if (stripped && stripped !== expenseCategory) {
+          match = categoryMap.get(stripped.toLowerCase());
+        }
+      }
+
       if (match) {
         // Found exact match - use data from DB
         return {
@@ -480,7 +490,7 @@ async function validateAndNormalizeCategories(
           category_group: (match as any).category_group
         };
       }
-      
+
       // No match found - keep null, let user categorize manually
       console.warn(`⚠️ Unknown category: "${expenseCategory}" → keeping null for manual categorization`);
       return {

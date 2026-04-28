@@ -636,18 +636,29 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
 
   const { data: latestDoc } = await supabase
     .from('uploaded_statements')
-    .select('period_start, period_end, document_type, transactions_extracted')
+    .select('id, period_start, period_end, document_type, transactions_extracted')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
 
-  // Count pending transactions
-  const { data: transactions } = await supabase
+  // Count transactions for the just-processed document. The auto-classifier
+  // runs at import time so rows land as `status=confirmed` immediately —
+  // an old query that filtered on `status=pending` always returned 0 here
+  // and made the WhatsApp confirmation say "no transactions" even when
+  // dozens were saved. Trust document_id instead.
+  const docIdToCount = documentId || (latestDoc as any)?.id;
+  let txQuery = supabase
     .from('transactions')
     .select('id, type, amount')
-    .eq('user_id', userId)
-    .eq('status', 'pending');
+    .eq('user_id', userId);
+  if (docIdToCount) {
+    txQuery = txQuery.eq('document_id', docIdToCount);
+  } else {
+    // Fallback: very recent rows (last 5 min) when neither id is available
+    txQuery = txQuery.gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
+  }
+  const { data: transactions } = await txQuery;
 
   const incomeCount = transactions?.filter(t => t.type === 'income').length || 0;
   const expenseCount = transactions?.filter(t => t.type === 'expense').length || 0;
