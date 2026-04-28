@@ -26,7 +26,8 @@ type UploadResult = {
 
 const VALID_DOC_TYPES = [
   'bank', 'credit', 'payslip', 'pension', 'pension_clearing',
-  'insurance', 'loan', 'investment', 'savings', 'receipt', 'mortgage',
+  'insurance', 'insurance_clearing', // 'הר הביטוח' (CMA full portfolio)
+  'loan', 'investment', 'savings', 'receipt', 'mortgage',
   'bank_statement', 'credit_statement',
 ];
 
@@ -42,6 +43,11 @@ function detectDocumentType(fileName: string): string {
   if (/\b(max|visa|mastercard|isracard|cal|leumicard|amex|american[\s_-]?express)\b/.test(f)
       || /(ויזה|מאסטר|מסטר|כא"?ל|כאל|ישראכרט|אמריקן|לאומי\s*קארד)/.test(fileName)) {
     return 'credit';
+  }
+  // הר הביטוח — CMA insurance authority full portfolio dump.
+  // Detect BEFORE generic 'insurance' so this lands in the right branch.
+  if (/(הר[\s_]?הביטוח|harb|cma\.gov\.il|הר_הביטוח|insurance[\s_]?mountain)/.test(fileName)) {
+    return 'insurance_clearing';
   }
   // Mislaka / pension clearing
   if (/(mislaka|מסלקה|פנסיוני|harari|kupot|מ_מסלקה)/.test(fileName) || /\bpension\b/.test(f)) {
@@ -83,6 +89,7 @@ const FILE_TYPE_MAP: Record<string, string> = {
   pension: 'pension_report',
   pension_clearing: 'pension_report',
   insurance: 'insurance_report',
+  insurance_clearing: 'insurance_report',
   loan: 'loan_statement',
   investment: 'investment_report',
   savings: 'savings_statement',

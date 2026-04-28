@@ -259,6 +259,20 @@ export async function POST(request: NextRequest) {
     } else if (docType.includes('loan') || docType.includes('mortgage')) {
       // Loan/Mortgage statements → loans table
       itemsProcessed = await saveLoans(supabase, result, stmt.user_id, statementId as string);
+    } else if (docType.includes('harb') || docType.includes('הר') || docType.includes('insurance_clearing') || docType.includes('cma_insurance')) {
+      // הר הביטוח (CMA insurance authority) — full insurance portfolio
+      // snapshot. Different from a single policy doc: it lists every
+      // policy with carrier, period, premium, riders. Idempotent upsert
+      // by (user_id, policy_number).
+      try {
+        const { handleHarBitachReport } = await import('@/lib/webhook/handle-harb');
+        const h = await handleHarBitachReport(supabase, stmt.user_id, result, statementId as string);
+        itemsProcessed = h.inserted + h.updated;
+        console.log(`🛡️ Har Habituach via web: ${h.inserted} new, ${h.updated} updated, ${h.skipped} skipped (total ${h.total} policies)`);
+      } catch (harbErr) {
+        console.error('Har Habituach handler error:', harbErr);
+        itemsProcessed = await saveInsurance(supabase, result, stmt.user_id, statementId as string);
+      }
     } else if (docType.includes('insurance')) {
       // Insurance statements → insurance table
       itemsProcessed = await saveInsurance(supabase, result, stmt.user_id, statementId as string);

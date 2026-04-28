@@ -5,7 +5,7 @@ import { Upload, File, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
-type DocType = 'bank' | 'credit' | 'payslip' | 'pension' | 'pension_clearing' | 'insurance' | 'loan' | 'investment' | 'savings' | 'receipt' | 'mortgage' | 'auto';
+type DocType = 'bank' | 'credit' | 'payslip' | 'pension' | 'pension_clearing' | 'insurance' | 'insurance_clearing' | 'loan' | 'investment' | 'savings' | 'receipt' | 'mortgage' | 'auto';
 
 interface DocumentUploaderProps {
   /**
@@ -45,6 +45,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   pension: 'דוח פנסיה',
   pension_clearing: 'מסלקה פנסיונית',
   insurance: 'פוליסת ביטוח',
+  insurance_clearing: 'הר הביטוח (CMA)',
   loan: 'דוח הלוואה',
   investment: 'דוח השקעות',
   savings: 'דוח חיסכון',
@@ -53,7 +54,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
 };
 
 const SELECTABLE_DOC_TYPES: DocType[] = [
-  'auto', 'bank', 'credit', 'pension_clearing', 'pension', 'insurance',
+  'auto', 'bank', 'credit', 'pension_clearing', 'pension', 'insurance_clearing', 'insurance',
   'mortgage', 'loan', 'payslip', 'investment', 'savings', 'receipt',
 ];
 
@@ -63,6 +64,8 @@ function detectDocTypeFromName(name: string): DocType {
   const f = name.toLowerCase();
   if (/\b(max|visa|mastercard|isracard|cal|leumicard|amex)\b/.test(f)
       || /(ויזה|מאסטר|מסטר|כא"?ל|כאל|ישראכרט|אמריקן|לאומי\s*קארד)/.test(name)) return 'credit';
+  // Check 'הר הביטוח' BEFORE generic insurance — it's a different report.
+  if (/(הר[\s_]?הביטוח|harb|cma\.gov\.il|הר_הביטוח)/.test(name)) return 'insurance_clearing';
   if (/(mislaka|מסלקה|harari)/.test(name) || /\bpension\b/.test(f)) return 'pension_clearing';
   if (/(פנסיה|קופת.?גמל|השתלמות|ביטוח.?מנהלים)/.test(name)) return 'pension';
   if (/(ביטוח|פוליסה|policy|insurance)/.test(name) && !/(ביטוח.?מנהלים|חיסכון)/.test(name)) return 'insurance';
