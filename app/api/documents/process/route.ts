@@ -1413,119 +1413,141 @@ async function autoDetectCreditCardCharges(
   insertedTransactions: any[]
 ): Promise<number> {
   try {
-    // Filter transactions with "חיוב כרטיס אשראי" category
-    const creditCardCharges = insertedTransactions.filter((tx: any) => 
-      tx.expense_category === 'חיוב כרטיס אשראי' || 
-      (tx.needs_details === true && tx.payment_method === 'credit_card')
+    // Filter transactions that look like credit-card aggregate charges.
+    // The bank statement reports ONE 'חיוב כרטיס אשראי' line per card per
+    // statement period — e.g. four cards × three months = 12 lines, not
+    // 58. Earlier we accidentally also matched every per-row purchase
+    // tagged 'needs_details + credit_card', which inflated the count.
+    const creditCardCharges = insertedTransactions.filter((tx: any) =>
+      tx.expense_category === 'חיוב כרטיס אשראי'
     );
 
     if (creditCardCharges.length === 0) {
-      console.log('ℹ️  No credit card charges detected');
+      console.log('ℹ️  No credit card aggregate charges detected');
       return 0;
     }
 
-    console.log(`💳 Found ${creditCardCharges.length} credit card charge(s) - creating missing document requests`);
-
-    const missingDocsToInsert = [];
+    // Group by (card_last_4, statement period) — one missing_documents
+    // row per unique CC statement, with summed amount + count + most
+    // recent date.
+    interface Bucket {
+      card_last_4: string;
+      period_start: string | null;
+      period_end: string | null;
+      total_amount: number;
+      tx_count: number;
+      latest_date: string | null;
+      latest_tx_id: string | null;
+    }
+    const buckets = new Map<string, Bucket>();
+    let chargesWithoutCard = 0;
 
     for (const charge of creditCardCharges) {
-      // Extract card last 4 digits from vendor or notes
-      let cardLast4 = charge.card_number_last4;
+      // Extract card last 4 from explicit field, vendor, or notes.
+      let cardLast4: string | null = charge.card_number_last4 || null;
       if (!cardLast4) {
         const cardMatch = (charge.vendor || charge.notes || '').match(/(\d{4})/);
-        if (cardMatch) {
-          cardLast4 = cardMatch[1];
+        if (cardMatch) cardLast4 = cardMatch[1];
+      }
+      // Without a card identifier we don't know which statement to ask
+      // for — skip silently. The user can still upload the statement
+      // and reconciliation will match by amount.
+      if (!cardLast4) {
+        chargesWithoutCard += 1;
+        continue;
+      }
+
+      // Statement period is usually the month BEFORE the charge.
+      const chargeDate = charge.date ? new Date(charge.date) : null;
+      const periodStart = chargeDate
+        ? new Date(chargeDate.getFullYear(), chargeDate.getMonth() - 1, 1).toISOString().split('T')[0]
+        : null;
+      const periodEnd = chargeDate
+        ? new Date(chargeDate.getFullYear(), chargeDate.getMonth(), 0).toISOString().split('T')[0]
+        : null;
+
+      const key = `${cardLast4}|${periodStart || 'unknown'}`;
+      const existing = buckets.get(key);
+      const amount = Number(charge.amount) || 0;
+      if (existing) {
+        existing.total_amount += amount;
+        existing.tx_count += 1;
+        if (charge.date && (!existing.latest_date || charge.date > existing.latest_date)) {
+          existing.latest_date = charge.date;
+          existing.latest_tx_id = charge.id;
         }
+      } else {
+        buckets.set(key, {
+          card_last_4: cardLast4,
+          period_start: periodStart,
+          period_end: periodEnd,
+          total_amount: amount,
+          tx_count: 1,
+          latest_date: charge.date || null,
+          latest_tx_id: charge.id || null,
+        });
       }
+    }
 
-      // Calculate statement period (credit statement is usually for previous month)
-      let periodStart = null;
-      let periodEnd = null;
-      if (charge.date) {
-        const chargeDate = new Date(charge.date);
-        // Credit statement period is usually the month BEFORE the charge
-        const statementMonth = new Date(chargeDate.getFullYear(), chargeDate.getMonth() - 1, 1);
-        const statementEndMonth = new Date(chargeDate.getFullYear(), chargeDate.getMonth(), 0);
-        
-        periodStart = statementMonth.toISOString().split('T')[0];
-        periodEnd = statementEndMonth.toISOString().split('T')[0];
-      }
+    if (chargesWithoutCard > 0) {
+      console.log(`ℹ️  Skipped ${chargesWithoutCard} CC charge(s) without identifiable card number`);
+    }
 
-      // Build description
-      let description = `דוח אשראי`;
-      if (cardLast4) {
-        description += ` כרטיס ****${cardLast4}`;
-      }
-      description += ` - ${charge.amount} ₪`;
-      if (charge.date) {
-        const chargeDate = new Date(charge.date);
-        description += ` (חיוב ${chargeDate.toLocaleDateString('he-IL')})`;
-      }
+    if (buckets.size === 0) {
+      console.log('ℹ️  No card-identified CC charges to track');
+      return 0;
+    }
 
-      // Check if already exists
-      const { data: existing } = await supabase
+    console.log(`💳 ${creditCardCharges.length} CC charges → ${buckets.size} unique (card × period) bucket(s)`);
+
+    // Skip buckets that already have a pending request for this period.
+    const today = new Date().toISOString().split('T')[0];
+    let inserted = 0;
+
+    for (const bucket of Array.from(buckets.values())) {
+      const { data: existingPending } = await supabase
         .from('missing_documents')
         .select('id')
         .eq('user_id', userId)
         .eq('document_type', 'credit')
-        .eq('status', 'pending');
+        .eq('card_last_4', bucket.card_last_4)
+        .eq('period_start', bucket.period_start)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (existingPending) continue;
 
-      if (cardLast4) {
-        const { data: existingCard } = await supabase
-          .from('missing_documents')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('document_type', 'credit')
-          .eq('card_last_4', cardLast4)
-          .eq('period_start', periodStart)
-          .eq('status', 'pending')
-          .single();
-        
-        if (existingCard) {
-          console.log(`ℹ️  Missing document already exists for card ${cardLast4} period ${periodStart}`);
-          continue;
-        }
-      }
+      const description = `דוח אשראי כרטיס ****${bucket.card_last_4} — ₪${bucket.total_amount.toLocaleString('he-IL', { maximumFractionDigits: 2 })} (${bucket.tx_count} ${bucket.tx_count === 1 ? 'חיוב' : 'חיובים'})`;
+      const instructions = `העלה את דוח האשראי של כרטיס ****${bucket.card_last_4} לתקופה ${bucket.period_start ? new Date(bucket.period_start).toLocaleDateString('he-IL') : '?'} - ${bucket.period_end ? new Date(bucket.period_end).toLocaleDateString('he-IL') : '?'}. הפירוט יסייע לסווג את ההוצאות בכרטיס לקטגוריות.`;
 
-      // Calculate priority based on date (more recent = higher priority)
+      // Priority by recency
       let priority = 1000;
-      if (charge.date) {
-        const daysSinceCharge = Math.floor((Date.now() - new Date(charge.date).getTime()) / (1000 * 60 * 60 * 24));
-        priority = Math.max(500, 1000 - daysSinceCharge);
+      if (bucket.latest_date) {
+        const days = Math.floor((Date.now() - new Date(bucket.latest_date).getTime()) / (1000 * 60 * 60 * 24));
+        priority = Math.max(500, 1000 - days);
       }
 
-      missingDocsToInsert.push({
+      const { error } = await supabase.from('missing_documents').insert({
         user_id: userId,
         document_type: 'credit',
         status: 'pending',
-        period_start: periodStart,
-        period_end: periodEnd,
-        card_last_4: cardLast4,
-        related_transaction_id: charge.id,
-        expected_amount: charge.amount,
-        priority: priority,
-        description: description,
-        instructions: `העלה את דוח האשראי לתקופה ${periodStart ? new Date(periodStart).toLocaleDateString('he-IL') : ''} - ${periodEnd ? new Date(periodEnd).toLocaleDateString('he-IL') : ''}. זה יעזור לנו לפרט את כל ההוצאות שביצעת באשראי החודש.`,
+        period_start: bucket.period_start,
+        period_end: bucket.period_end,
+        card_last_4: bucket.card_last_4,
+        related_transaction_id: bucket.latest_tx_id,
+        expected_amount: bucket.total_amount,
+        priority,
+        description,
+        instructions,
       });
+      if (error) {
+        console.warn(`[CC-detect] insert failed for card ${bucket.card_last_4}:`, error.message);
+      } else {
+        inserted += 1;
+      }
     }
 
-    if (missingDocsToInsert.length === 0) {
-      return 0;
-    }
-
-    // Insert missing documents
-    const { error } = await supabase
-      .from('missing_documents')
-      .insert(missingDocsToInsert);
-
-    if (error) {
-      console.error('Failed to insert credit card missing documents:', error);
-      // Don't throw - this is not critical
-      return 0;
-    }
-
-    console.log(`✅ Created ${missingDocsToInsert.length} missing credit statement request(s)`);
-    return missingDocsToInsert.length;
+    console.log(`✅ Created ${inserted} missing credit-statement request(s)`);
+    return inserted;
   } catch (error) {
     console.error('Error in autoDetectCreditCardCharges:', error);
     return 0;

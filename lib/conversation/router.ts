@@ -734,12 +734,37 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
       .order('priority', { ascending: false });
 
     if (pendingCreditDocs && pendingCreditDocs.length > 0) {
+      // Group by unique card_last_4 — historic data has one row per
+      // transaction (legacy bug) and many with null card. Show one line
+      // per real card with the SUM across periods, skip the nulls.
+      const byCard = new Map<string, { total: number; count: number }>();
+      let nullCardTotal = 0;
+      let nullCardCount = 0;
+      for (const doc of pendingCreditDocs as any[]) {
+        const card = doc.card_last_4 ? String(doc.card_last_4) : null;
+        const amt = Number(doc.expected_amount) || 0;
+        if (!card) {
+          nullCardTotal += amt;
+          nullCardCount += 1;
+          continue;
+        }
+        const cur = byCard.get(card) || { total: 0, count: 0 };
+        cur.total += amt;
+        cur.count += 1;
+        byCard.set(card, cur);
+      }
+
       let creditMsg = `📄 *הדוח התקבל!*\n\n`;
-      creditMsg += `🔍 זיהיתי ${pendingCreditDocs.length} כרטיסי אשראי:\n`;
-      pendingCreditDocs.forEach(doc => {
-        creditMsg += `• כרטיס ${doc.card_last_4}: ₪${doc.expected_amount?.toLocaleString('he-IL') || '?'}\n`;
-      });
-      creditMsg += `\n📤 שלח את דוחות האשראי לפירוט מלא.`;
+      const cards = Array.from(byCard.entries()).sort((a, b) => b[1].total - a[1].total);
+      if (cards.length > 0) {
+        creditMsg += `🔍 זיהיתי ${cards.length} ${cards.length === 1 ? 'כרטיס אשראי' : 'כרטיסי אשראי'}:\n`;
+        for (const [card, info] of cards) {
+          creditMsg += `• כרטיס ****${card}: ₪${info.total.toLocaleString('he-IL', { maximumFractionDigits: 2 })}\n`;
+        }
+      } else if (nullCardCount > 0) {
+        creditMsg += `🔍 זוהו ${nullCardCount} חיובי אשראי בסך ₪${nullCardTotal.toLocaleString('he-IL', { maximumFractionDigits: 2 })} ללא מזהה כרטיס.\n`;
+      }
+      creditMsg += `\n📤 שלח/י את דוחות האשראי לפירוט מלא.`;
 
       await greenAPI.sendMessage({ phoneNumber: phone, message: creditMsg });
       return;
