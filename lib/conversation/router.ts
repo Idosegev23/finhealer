@@ -634,28 +634,66 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
 
   const wasWaitingForDocument = userData?.onboarding_state === 'waiting_for_document';
 
-  const { data: latestDoc } = await supabase
-    .from('uploaded_statements')
-    .select('id, period_start, period_end, document_type, transactions_extracted')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  // Resolve THIS document and check whether it's part of a multi-file
+  // batch. Per-doc notifications are suppressed while siblings are still
+  // processing — we send one summary when the whole batch finishes
+  // instead of N pings.
+  const { data: thisDoc } = documentId
+    ? await supabase
+        .from('uploaded_statements')
+        .select('id, period_start, period_end, document_type, transactions_extracted, batch_id, file_name')
+        .eq('id', documentId)
+        .maybeSingle()
+    : { data: null as any };
 
-  // Count transactions for the just-processed document. The auto-classifier
-  // runs at import time so rows land as `status=confirmed` immediately —
-  // an old query that filtered on `status=pending` always returned 0 here
-  // and made the WhatsApp confirmation say "no transactions" even when
-  // dozens were saved. Trust document_id instead.
-  const docIdToCount = documentId || (latestDoc as any)?.id;
+  const { data: latestDoc } = thisDoc
+    ? { data: thisDoc as any }
+    : await supabase
+        .from('uploaded_statements')
+        .select('id, period_start, period_end, document_type, transactions_extracted, batch_id, file_name')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+  const batchId = (latestDoc as any)?.batch_id as string | null | undefined;
+  if (batchId) {
+    const { count: pendingInBatch } = await supabase
+      .from('uploaded_statements')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('batch_id', batchId)
+      .neq('status', 'completed')
+      .neq('status', 'failed');
+    if ((pendingInBatch || 0) > 0) {
+      console.log(`[Router] DOC_PROCESSED: batch ${batchId.substring(0,8)} still has ${pendingInBatch} docs processing — holding notification`);
+      return;
+    }
+  }
+
+  // Count transactions for THIS event. With a batch we aggregate across
+  // all docs in the batch (so the summary reflects the whole upload set);
+  // without a batch we count by single document_id; otherwise fall back
+  // to last-5-minutes for legacy WhatsApp callers that don't pass an id.
+  let docIdsToCount: string[] | null = null;
+  if (batchId) {
+    const { data: batchDocs } = await supabase
+      .from('uploaded_statements')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('batch_id', batchId);
+    docIdsToCount = (batchDocs || []).map((d: any) => d.id);
+  } else if (documentId || (latestDoc as any)?.id) {
+    docIdsToCount = [documentId || (latestDoc as any).id];
+  }
+
   let txQuery = supabase
     .from('transactions')
     .select('id, type, amount')
     .eq('user_id', userId);
-  if (docIdToCount) {
-    txQuery = txQuery.eq('document_id', docIdToCount);
+  if (docIdsToCount && docIdsToCount.length > 0) {
+    txQuery = txQuery.in('document_id', docIdsToCount);
   } else {
-    // Fallback: very recent rows (last 5 min) when neither id is available
     txQuery = txQuery.gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
   }
   const { data: transactions } = await txQuery;
@@ -708,16 +746,28 @@ export async function onDocumentProcessed(userId: string, phone: string, documen
     }
   }
 
-  // Default: send confirmation
+  // Default: send confirmation. For multi-file batches show aggregate
+  // numbers and mention how many docs landed.
   const txCount = (incomeCount + expenseCount);
   const docType = latestDoc?.document_type === 'credit' ? 'אשראי' : 'בנק';
 
-  let confirmMsg = `✅ *דוח ${docType} התקבל!*\n\n`;
-  if (txCount > 0) {
-    confirmMsg += `📝 ${txCount} הוצאות/הכנסות חדשות נוספו.\n`;
-    confirmMsg += `כתוב *"נתחיל"* כדי לסדר אותן.`;
+  let confirmMsg: string;
+  if (batchId && docIdsToCount && docIdsToCount.length > 1) {
+    confirmMsg = `✅ *${docIdsToCount.length} מסמכים התקבלו!*\n\n`;
+    if (txCount > 0) {
+      confirmMsg += `📝 סה״כ ${txCount} תנועות חדשות נוספו (${incomeCount} הכנסות, ${expenseCount} הוצאות).\n`;
+      confirmMsg += `כתוב *"נתחיל"* כדי לסדר אותן.`;
+    } else {
+      confirmMsg += `לא נמצאו תנועות חדשות.`;
+    }
   } else {
-    confirmMsg += `לא נמצאו הוצאות או הכנסות חדשות בדוח.`;
+    confirmMsg = `✅ *דוח ${docType} התקבל!*\n\n`;
+    if (txCount > 0) {
+      confirmMsg += `📝 ${txCount} הוצאות/הכנסות חדשות נוספו.\n`;
+      confirmMsg += `כתוב *"נתחיל"* כדי לסדר אותן.`;
+    } else {
+      confirmMsg += `לא נמצאו הוצאות או הכנסות חדשות בדוח.`;
+    }
   }
 
   await greenAPI.sendMessage({ phoneNumber: phone, message: confirmMsg });

@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Upload, File, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useRouter } from 'next/navigation';
 
 interface DocumentUploaderProps {
   documentType: 'bank' | 'credit' | 'payslip' | 'pension' | 'insurance' | 'loan' | 'investment' | 'savings' | 'receipt' | 'mortgage';
@@ -15,287 +14,304 @@ interface DocumentUploaderProps {
   showPreview?: boolean;
 }
 
-/**
- * DocumentUploader - קומפוננט מאוחד להעלאת מסמכים פיננסיים
- * 
- * @example
- * ```tsx
- * <DocumentUploader 
- *   documentType="bank"
- *   onSuccess={(data) => console.log('Uploaded!', data)}
- * />
- * ```
- */
+interface PendingFile {
+  file: File;
+  // YYYY-MM. Optional per-file override; falls back to a shared default.
+  month: string;
+  error?: string;
+}
+
+interface BatchResult {
+  fileName: string;
+  status: 'processing' | 'duplicate' | 'error';
+  message?: string;
+  error?: string;
+}
+
+const DOCUMENT_TYPE_LABELS = {
+  bank: 'דוח בנק',
+  credit: 'דוח אשראי',
+  payslip: 'תלוש משכורת',
+  pension: 'דוח פנסיה',
+  insurance: 'פוליסת ביטוח',
+  loan: 'דוח הלוואה',
+  investment: 'דוח השקעות',
+  savings: 'דוח חיסכון',
+  receipt: 'קבלה',
+  mortgage: 'דוח משכנתא',
+} as const;
+
 export function DocumentUploader({
   documentType,
   onSuccess,
   onError,
   acceptedFormats = '.pdf,.jpg,.jpeg,.png,.xlsx,.xls',
   maxSizeMB = 50,
-  showPreview = true,
 }: DocumentUploaderProps) {
-  const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>(''); // ⭐ אין ערך ברירת מחדל - המשתמש חייב לבחור
-  const [uploading, setUploading] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'success' | 'error'>('idle');
-  const [progress, setProgress] = useState(0);
+  const [pending, setPending] = useState<PendingFile[]>([]);
+  const [defaultMonth, setDefaultMonth] = useState<string>('');
+  const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [results, setResults] = useState<BatchResult[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
-  const [statementId, setStatementId] = useState<string | null>(null);
 
-  const handleFileSelect = useCallback((selectedFile: File | null) => {
-    if (!selectedFile) return;
+  const addFiles = useCallback((files: FileList | File[] | null) => {
+    if (!files || files.length === 0) return;
 
-    // Validate file size
-    const fileSizeMB = selectedFile.size / 1024 / 1024;
-    if (fileSizeMB > maxSizeMB) {
-      setErrorMessage(`הקובץ גדול מדי (${fileSizeMB.toFixed(1)} MB). מקסימום: ${maxSizeMB} MB`);
-      setStatus('error');
-      onError?.(`File too large: ${fileSizeMB.toFixed(1)} MB`);
-      return;
+    const list = Array.from(files);
+    const accepted: PendingFile[] = [];
+    let rejectedReason = '';
+
+    for (const file of list) {
+      const sizeMB = file.size / 1024 / 1024;
+      if (sizeMB > maxSizeMB) {
+        rejectedReason = `${file.name}: גדול מ-${maxSizeMB}MB`;
+        continue;
+      }
+      accepted.push({ file, month: '' });
     }
 
-    setFile(selectedFile);
-    setStatus('idle');
-    setErrorMessage('');
+    if (rejectedReason) {
+      setErrorMessage(rejectedReason);
+      onError?.(rejectedReason);
+    }
+
+    if (accepted.length > 0) {
+      setPending((prev) => [...prev, ...accepted]);
+      setStatus('idle');
+    }
   }, [maxSizeMB, onError]);
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const removeFile = (index: number) => {
+    setPending((prev) => prev.filter((_, i) => i !== index));
+  };
 
-    // ✅ Validation: חובה לבחור חודש לכל המסמכים
-    if (!selectedMonth) {
-      setErrorMessage('חובה לבחור את חודש המסמך! 📅');
-      setStatus('error');
-      onError?.('חובה לבחור חודש המסמך');
+  const setFileMonth = (index: number, month: string) => {
+    setPending((prev) => prev.map((p, i) => (i === index ? { ...p, month } : p)));
+  };
+
+  const allMonthsSet = pending.length > 0 && pending.every((p) => p.month || defaultMonth);
+
+  const handleUpload = async () => {
+    if (pending.length === 0 || !allMonthsSet) {
+      const msg = pending.length === 0
+        ? 'בחר לפחות קובץ אחד'
+        : 'בחר חודש לכל קובץ (או חודש ברירת-מחדל)';
+      setErrorMessage(msg);
+      onError?.(msg);
       return;
     }
 
-    setUploading(true);
     setStatus('uploading');
-    setProgress(0);
+    setErrorMessage('');
+    setResults([]);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('documentType', documentType);
-      formData.append('statementMonth', selectedMonth); // ⭐ חודש הדוח
-
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => Math.min(prev + 10, 90));
-      }, 200);
-
-      const response = await fetch('/api/documents/upload', {
-        method: 'POST',
-        body: formData,
+      const fd = new FormData();
+      pending.forEach((p) => {
+        fd.append('files', p.file);
+        fd.append('statementMonths', p.month || defaultMonth);
       });
+      fd.append('documentType', documentType);
 
-      clearInterval(progressInterval);
-      setProgress(100);
+      const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+      const data = await res.json();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'שגיאה בהעלאת הקובץ');
+      if (!res.ok) {
+        throw new Error(data.error || 'שגיאה בהעלאה');
       }
 
-      const data = await response.json();
-      setStatementId(data.statementId || data.id);
-      setStatus('success');
+      setResults(data.results || []);
+      setStatus(data.summary?.errors > 0 ? 'error' : 'success');
       onSuccess?.(data);
 
-      // Stay in scan center - user can upload more documents
-      // Processing continues in background, user gets WhatsApp notification when done
-    } catch (error) {
-      console.error('Upload error:', error);
-      const message = error instanceof Error ? error.message : 'שגיאה בהעלאת הקובץ';
-      setErrorMessage(message);
+      // Clear successful files; keep failed ones so the user can fix them.
+      const failedNames = new Set(
+        (data.results || [])
+          .filter((r: BatchResult) => r.status === 'error')
+          .map((r: BatchResult) => r.fileName),
+      );
+      setPending((prev) => prev.filter((p) => failedNames.has(p.file.name)));
+    } catch (err: any) {
+      const msg = err?.message || 'שגיאה בהעלאה';
+      setErrorMessage(msg);
       setStatus('error');
-      onError?.(message);
-    } finally {
-      setUploading(false);
+      onError?.(msg);
     }
   };
 
-  const handleReset = () => {
-    setFile(null);
+  const handleClear = () => {
+    setPending([]);
+    setResults([]);
     setStatus('idle');
-    setProgress(0);
     setErrorMessage('');
-    setStatementId(null);
-  };
-
-  const documentTypeLabels: Record<typeof documentType, string> = {
-    bank: 'דוח בנק',
-    credit: 'דוח אשראי',
-    payslip: 'תלוש משכורת',
-    pension: 'דוח פנסיה',
-    insurance: 'פוליסת ביטוח',
-    loan: 'דוח הלוואה',
-    investment: 'דוח השקעות',
-    savings: 'דוח חיסכון',
-    receipt: 'קבלה',
-    mortgage: 'דוח משכנתא',
   };
 
   return (
     <Card>
-      <CardContent className="p-6">
-        {/* Idle State - File Selection */}
-        {status === 'idle' && !file && (
+      <CardContent className="p-6 space-y-4">
+        {/* Drop zone */}
+        {pending.length === 0 && status !== 'success' && (
           <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors"
+            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-phi-gold transition-colors"
             onDrop={(e) => {
               e.preventDefault();
-              const droppedFile = e.dataTransfer.files[0];
-              handleFileSelect(droppedFile);
+              addFiles(e.dataTransfer.files);
             }}
             onDragOver={(e) => e.preventDefault()}
-            onClick={() => document.getElementById('file-input')?.click()}
+            onClick={() => document.getElementById(`uploader-input-${documentType}`)?.click()}
           >
             <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-sm text-gray-600 mb-2">
-              גרור קובץ לכאן או לחץ לבחירה
-            </p>
-            <p className="text-xs text-gray-500 mb-4">
-              {documentTypeLabels[documentType]} - {acceptedFormats.replace(/\./g, '').toUpperCase()} (עד {maxSizeMB} MB)
+            <p className="text-sm text-gray-700 mb-1">גרור קבצים לכאן או לחץ לבחירה</p>
+            <p className="text-xs text-gray-500">
+              {DOCUMENT_TYPE_LABELS[documentType]} · אפשר לבחור מספר קבצים יחד · עד {maxSizeMB}MB לקובץ
             </p>
             <input
-              id="file-input"
+              id={`uploader-input-${documentType}`}
               type="file"
+              multiple
               accept={acceptedFormats}
-              onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+              onChange={(e) => addFiles(e.target.files)}
               className="hidden"
             />
           </div>
         )}
 
-        {/* File Selected */}
-        {file && status === 'idle' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <File className="h-8 w-8 text-blue-600" />
-                <div>
-                  <p className="font-medium text-gray-900">{file.name}</p>
-                  <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                </div>
-              </div>
-              <button
-                onClick={handleReset}
-                className="p-2 hover:bg-blue-100 rounded-full transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
-
-            {/* ⭐ Month selector - REQUIRED for all documents */}
-            <div className="space-y-3 p-4 bg-amber-50 border-2 border-amber-300 rounded-xl">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                <label htmlFor="statement-month" className="block text-sm font-bold text-gray-900">
-                  חודש המסמך 📅 <span className="text-red-600">*חובה</span>
-                </label>
-              </div>
+        {/* File list with per-file month */}
+        {pending.length > 0 && status !== 'uploading' && (
+          <div className="space-y-3">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <label className="text-sm font-medium text-gray-900 block mb-2">
+                חודש ברירת-מחדל לכל הקבצים
+              </label>
               <input
-                id="statement-month"
                 type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                required
-                className="w-full px-4 py-3 border-2 border-amber-400 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white text-lg font-semibold"
-                max={new Date().toISOString().slice(0, 7)} // לא מאפשר חודשים עתידיים
+                value={defaultMonth}
+                onChange={(e) => setDefaultMonth(e.target.value)}
+                max={new Date().toISOString().slice(0, 7)}
+                className="w-full px-3 py-2 border border-amber-300 rounded-lg bg-white text-sm"
               />
-              <div className="bg-white p-3 rounded-lg border border-amber-200">
-                <p className="text-sm text-gray-700 font-medium mb-1">
-                  ℹ️ למה זה חשוב?
-                </p>
-                <p className="text-xs text-gray-600">
-                  בחירת החודש הנכון מאפשרת לנו לסווג נכון את ההוצאות שלך, להתאים בין מסמכים שונים ולעקוב אחרי התקציב החודשי.
-                </p>
+              <p className="text-xs text-gray-600 mt-2">
+                ניתן לעקוף עבור קובץ ספציפי ברשימה למטה. אם לא נבחר — נשתמש בערך זה.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {pending.map((p, idx) => (
+                <div key={`${p.file.name}-${idx}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <File className="h-6 w-6 text-phi-dark flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-gray-900 truncate">{p.file.name}</p>
+                    <p className="text-xs text-gray-500">{(p.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                  <input
+                    type="month"
+                    value={p.month}
+                    onChange={(e) => setFileMonth(idx, e.target.value)}
+                    max={new Date().toISOString().slice(0, 7)}
+                    placeholder={defaultMonth}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                    title="חודש המסמך (אופציונלי — נופל לחודש ברירת-מחדל)"
+                  />
+                  <button
+                    onClick={() => removeFile(idx)}
+                    className="p-1 hover:bg-gray-200 rounded transition-colors"
+                    aria-label="הסר"
+                  >
+                    <X className="h-4 w-4 text-gray-600" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={() => document.getElementById(`uploader-input-${documentType}`)?.click()}
+                className="text-sm text-phi-dark hover:underline"
+              >
+                + הוסף עוד קבצים
+              </button>
+              <input
+                id={`uploader-input-${documentType}`}
+                type="file"
+                multiple
+                accept={acceptedFormats}
+                onChange={(e) => addFiles(e.target.files)}
+                className="hidden"
+              />
+              <div className="flex gap-2">
+                <Button onClick={handleClear} variant="outline">
+                  נקה
+                </Button>
+                <Button
+                  onClick={handleUpload}
+                  disabled={!allMonthsSet}
+                  className="bg-phi-dark hover:bg-phi-slate text-white"
+                >
+                  <Upload className="h-4 w-4 ml-2" />
+                  העלה {pending.length} {pending.length === 1 ? 'קובץ' : 'קבצים'}
+                </Button>
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleUpload} 
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-lg py-6"
-                disabled={!file || !selectedMonth}
-              >
-                <Upload className="h-5 w-5 mr-2" />
-                {!selectedMonth 
-                  ? 'בחר חודש כדי להמשיך ⬆️' 
-                  : 'העלה ועבד את המסמך ✨'}
-              </Button>
-              <Button onClick={handleReset} variant="outline" className="px-6">
-                בטל
-              </Button>
-            </div>
+            {!allMonthsSet && (
+              <p className="text-xs text-amber-700 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                בחר חודש ברירת-מחדל או חודש פרטני לכל קובץ
+              </p>
+            )}
           </div>
         )}
 
         {/* Uploading */}
         {status === 'uploading' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-12 w-12 text-blue-600 animate-spin" />
-            </div>
-            
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">מעלה...</span>
-                <span className="font-medium">{progress}%</span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-600 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
+          <div className="py-8 text-center space-y-3">
+            <Loader2 className="h-10 w-10 text-phi-dark animate-spin mx-auto" />
+            <p className="text-sm text-gray-600">מעלה {pending.length} קבצים...</p>
+          </div>
+        )}
 
-            <p className="text-sm text-gray-600 text-center">
-              מעלה את הקובץ לשרת...
+        {/* Success / partial */}
+        {(status === 'success' || (status === 'error' && results.length > 0)) && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle className="h-5 w-5 text-phi-mint" />
+              <p className="font-semibold text-gray-900">
+                {results.filter((r) => r.status === 'processing').length} מסמכים בעיבוד
+                {results.some((r) => r.status === 'duplicate') && `, ${results.filter((r) => r.status === 'duplicate').length} כבר היו במערכת`}
+                {results.some((r) => r.status === 'error') && `, ${results.filter((r) => r.status === 'error').length} נכשלו`}
+              </p>
+            </div>
+            <ul className="space-y-1 text-xs">
+              {results.map((r, i) => (
+                <li
+                  key={`${r.fileName}-${i}`}
+                  className={`px-3 py-2 rounded ${
+                    r.status === 'processing' ? 'bg-emerald-50 text-phi-mint' :
+                    r.status === 'duplicate' ? 'bg-amber-50 text-phi-coral' :
+                    'bg-red-50 text-red-700'
+                  }`}
+                >
+                  <strong>{r.fileName}</strong>
+                  {r.message && <span className="opacity-75"> — {r.message}</span>}
+                  {r.error && <span className="opacity-75"> — {r.error}</span>}
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-gray-500 text-center">
+              העיבוד ממשיך ברקע. תקבל הודעת WhatsApp אחת עם סיכום כשהקבוצה תסיים.
             </p>
+            <Button onClick={handleClear} variant="outline" className="w-full">
+              העלה קבוצה נוספת
+            </Button>
           </div>
         )}
 
-        {/* Success */}
-        {status === 'success' && (
-          <div className="py-8 text-center space-y-4">
-            <CheckCircle className="h-16 w-16 text-green-600 mx-auto" />
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                הקובץ הועלה בהצלחה! ✅
-              </h3>
-              <p className="text-sm text-gray-600">
-                העיבוד מתבצע ברקע. נודיע לך כשיסתיים 🔔
-              </p>
-            </div>
-            <div className="space-y-3">
-              <p className="text-sm text-gray-500">
-                📱 תקבל הודעת WhatsApp כשהעיבוד יסתיים
-              </p>
-              <Button onClick={handleReset} variant="outline" className="w-full">
-                📄 העלה מסמך נוסף
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Error */}
-        {status === 'error' && (
-          <div className="py-8 text-center space-y-4">
-            <AlertCircle className="h-16 w-16 text-red-600 mx-auto" />
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                שגיאה ❌
-              </h3>
-              <p className="text-sm text-red-600">
-                {errorMessage}
-              </p>
-            </div>
-            <Button onClick={handleReset}>
+        {/* Plain error */}
+        {status === 'error' && results.length === 0 && errorMessage && (
+          <div className="py-6 text-center space-y-3">
+            <AlertCircle className="h-10 w-10 text-phi-coral mx-auto" />
+            <p className="text-sm text-phi-coral">{errorMessage}</p>
+            <Button onClick={handleClear} variant="outline">
               נסה שוב
             </Button>
           </div>
@@ -304,4 +320,3 @@ export function DocumentUploader({
     </Card>
   );
 }
-
