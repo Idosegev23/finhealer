@@ -367,6 +367,22 @@ export async function POST(request: NextRequest) {
       .then(({ syncBudgetSpending }) => syncBudgetSpending(stmt.user_id))
       .catch(err => console.warn('[BudgetSync] post-document error:', err));
 
+    // 9b. Infer insurance records from bank/credit transactions tagged
+    // ביטוחים. Without this, a Magdal premium debit shows up as a tx but
+    // never as a policy, so the insurance dashboard stays empty even
+    // though the user is paying every month. Idempotent — re-running
+    // updates the inferred row's premium and never overwrites a real
+    // user-entered policy.
+    try {
+      const { inferInsuranceFromTransactions } = await import('@/lib/finance/infer-insurance');
+      const insRes = await inferInsuranceFromTransactions(supabase, stmt.user_id);
+      if (insRes.inserted + insRes.updated > 0) {
+        console.log(`🛡️ Inferred insurance: +${insRes.inserted} new, ~${insRes.updated} updated, ${insRes.skipped} skipped (real policy exists)`);
+      }
+    } catch (err) {
+      console.warn('[inferInsurance] post-document error:', err);
+    }
+
     // 10. Try to advance the lifecycle phase based on the new data —
     // a freshly uploaded statement that crosses 30/50 tx threshold should
     // bump the user from data_collection→behavior or behavior→goals

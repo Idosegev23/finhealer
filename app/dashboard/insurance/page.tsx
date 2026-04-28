@@ -12,6 +12,8 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { AddInsuranceModal } from "@/components/insurance/AddInsuranceModal";
 import { RequestPensionReport } from "@/components/pension/RequestPensionReport";
 import { PageWrapper, PageHeader, Card as DSCard, InsightBanner } from '@/components/ui/design-system';
+import Link from "next/link";
+import { Sparkles, Upload } from "lucide-react";
 
 interface Insurance {
   id: string;
@@ -22,7 +24,11 @@ interface Insurance {
   coverage_amount: number;
   monthly_premium: number;
   annual_premium: number;
+  notes?: string | null;
 }
+
+const isInferredInsurance = (ins: Insurance) =>
+  !!ins.notes && ins.notes.includes('הוסק אוטומטית מתנועה בנקאית');
 
 const INSURANCE_TYPE_LABELS: Record<string, { label: string; icon: LucideIcon }> = {
   life:             { label: "ביטוח חיים",         icon: HeartPulse },
@@ -209,16 +215,39 @@ export default function InsurancePage() {
                         </p>
                       </div>
                     </div>
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        insurance.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {insurance.status === "active" ? "פעיל" : "לא פעיל"}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          insurance.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {insurance.status === "active" ? "פעיל" : "לא פעיל"}
+                      </span>
+                      {isInferredInsurance(insurance) && (
+                        <span className="px-2 py-1 text-[10px] font-medium rounded-full bg-amber-50 text-phi-coral border border-amber-200 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" />
+                          הוסק אוטומטית
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {isInferredInsurance(insurance) && (
+                    <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs leading-relaxed">
+                      <p className="text-gray-700">
+                        זוהה אוטומטית מחיובי בנק. הסכום ומס׳ הפוליסה הם הערכה.
+                      </p>
+                      <Link
+                        href="/dashboard/scan-center"
+                        className="mt-2 inline-flex items-center gap-1 font-medium text-phi-dark hover:underline"
+                      >
+                        <Upload className="w-3 h-3" />
+                        העלאת פירוט פוליסה לדיוק הפרטים
+                      </Link>
+                    </div>
+                  )}
 
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
