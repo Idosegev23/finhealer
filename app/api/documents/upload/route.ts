@@ -30,6 +30,52 @@ const VALID_DOC_TYPES = [
   'bank_statement', 'credit_statement',
 ];
 
+/**
+ * Filename-based heuristic to guess document type when the user mixes
+ * statement kinds in one upload (bank + CC + Mislaka + insurance, etc.).
+ * Hits the common Israeli issuer/product names. Falls back to 'bank' so
+ * the OCR pipeline can correct it if the content doesn't match.
+ */
+function detectDocumentType(fileName: string): string {
+  const f = fileName.toLowerCase();
+  // Credit cards (English + Hebrew brand names)
+  if (/\b(max|visa|mastercard|isracard|cal|leumicard|amex|american[\s_-]?express)\b/.test(f)
+      || /(ויזה|מאסטר|מסטר|כא"?ל|כאל|ישראכרט|אמריקן|לאומי\s*קארד)/.test(fileName)) {
+    return 'credit';
+  }
+  // Mislaka / pension clearing
+  if (/(mislaka|מסלקה|פנסיוני|harari|kupot|מ_מסלקה)/.test(fileName) || /\bpension\b/.test(f)) {
+    return 'pension_clearing';
+  }
+  // Pension / provident / study fund (single fund report)
+  if (/(פנסיה|קופת.?גמל|השתלמות|ביטוח.?מנהלים)/.test(fileName)) {
+    return 'pension';
+  }
+  // Insurance
+  if (/(ביטוח|פוליסה|policy|insurance)/.test(fileName)
+      && !/(ביטוח.?מנהלים|חיסכון)/.test(fileName)) {
+    return 'insurance';
+  }
+  // Loan / mortgage
+  if (/(משכנתא|mortgage|הלוואה|loan)/.test(fileName)) {
+    return 'mortgage';
+  }
+  // Payslip
+  if (/(תלוש|payslip|salary|משכורת)/.test(fileName)) {
+    return 'payslip';
+  }
+  // Investment
+  if (/(השקעות|תיק|portfolio|investment|מניות|stocks)/.test(fileName)) {
+    return 'investment';
+  }
+  // Savings
+  if (/(חיסכון|savings|פיקדון|deposit)/.test(fileName)) {
+    return 'savings';
+  }
+  // Default — most uploads are bank statements
+  return 'bank';
+}
+
 const FILE_TYPE_MAP: Record<string, string> = {
   bank: 'bank_statement',
   credit: 'credit_statement',
@@ -181,7 +227,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'לא נשלחו קבצים' }, { status: 400 });
     }
 
-    const documentType = (formData.get('documentType') as string) || 'bank';
+    // documentType: single value applied to all (back-compat) OR
+    // documentTypes[] per file. If neither, auto-detect from filename so
+    // a mixed upload (bank + credit + Mislaka + insurance) lands each
+    // file in the right pipeline branch.
+    const docTypeSingle = (formData.get('documentType') as string) || '';
+    const docTypesRaw = formData.getAll('documentTypes');
+    const docTypesPerFile: (string | null)[] = docTypesRaw.length > 0
+      ? docTypesRaw.map((d) => (typeof d === 'string' && d ? d : null))
+      : files.map(() => (docTypeSingle === 'auto' || !docTypeSingle ? null : docTypeSingle));
 
     // Per-file months OR a single month for all
     const monthsRaw = formData.getAll('statementMonths');
@@ -191,17 +245,23 @@ export async function POST(request: NextRequest) {
 
     const batchId = crypto.randomUUID();
 
-    console.log(`📤 Upload batch ${batchId.substring(0, 8)}: ${files.length} files (${documentType})`);
+    console.log(`📤 Upload batch ${batchId.substring(0, 8)}: ${files.length} files`);
 
     // Upload sequentially — Supabase storage prefers steady throughput
     // over parallel small uploads, and we don't want to spike the DB.
     const results: UploadResult[] = [];
     for (let i = 0; i < files.length; i += 1) {
+      const file = files[i];
+      const explicitType = docTypesPerFile[i];
+      const docType = explicitType && explicitType !== 'auto'
+        ? explicitType
+        : detectDocumentType(file.name);
+      console.log(`  · ${file.name} → ${docType}${!explicitType ? ' (auto)' : ''}`);
       const result = await uploadOne(
         supabase,
         user.id,
-        files[i],
-        documentType,
+        file,
+        docType,
         months[i] || null,
         batchId,
       );

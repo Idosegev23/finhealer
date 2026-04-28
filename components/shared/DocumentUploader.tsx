@@ -5,8 +5,15 @@ import { Upload, File, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
+type DocType = 'bank' | 'credit' | 'payslip' | 'pension' | 'pension_clearing' | 'insurance' | 'loan' | 'investment' | 'savings' | 'receipt' | 'mortgage' | 'auto';
+
 interface DocumentUploaderProps {
-  documentType: 'bank' | 'credit' | 'payslip' | 'pension' | 'insurance' | 'loan' | 'investment' | 'savings' | 'receipt' | 'mortgage';
+  /**
+   * Initial type for all files. Pass 'auto' (or leave undefined) to let
+   * the server auto-detect each file by its name — useful when the user
+   * dumps mixed PDFs (bank + credit + Mislaka + insurance) into one go.
+   */
+  documentType?: DocType;
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
   acceptedFormats?: string;
@@ -18,6 +25,8 @@ interface PendingFile {
   file: File;
   // YYYY-MM. Optional per-file override; falls back to a shared default.
   month: string;
+  // Per-file document type override; '' or 'auto' = server detects from filename.
+  docType: DocType | '';
   error?: string;
 }
 
@@ -28,21 +37,44 @@ interface BatchResult {
   error?: string;
 }
 
-const DOCUMENT_TYPE_LABELS = {
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  auto: 'זיהוי אוטומטי',
   bank: 'דוח בנק',
   credit: 'דוח אשראי',
   payslip: 'תלוש משכורת',
   pension: 'דוח פנסיה',
+  pension_clearing: 'מסלקה פנסיונית',
   insurance: 'פוליסת ביטוח',
   loan: 'דוח הלוואה',
   investment: 'דוח השקעות',
   savings: 'דוח חיסכון',
   receipt: 'קבלה',
   mortgage: 'דוח משכנתא',
-} as const;
+};
+
+const SELECTABLE_DOC_TYPES: DocType[] = [
+  'auto', 'bank', 'credit', 'pension_clearing', 'pension', 'insurance',
+  'mortgage', 'loan', 'payslip', 'investment', 'savings', 'receipt',
+];
+
+// Same heuristic as the server route — duplicated to give the UI a
+// preview before upload so the user can correct mis-detections.
+function detectDocTypeFromName(name: string): DocType {
+  const f = name.toLowerCase();
+  if (/\b(max|visa|mastercard|isracard|cal|leumicard|amex)\b/.test(f)
+      || /(ויזה|מאסטר|מסטר|כא"?ל|כאל|ישראכרט|אמריקן|לאומי\s*קארד)/.test(name)) return 'credit';
+  if (/(mislaka|מסלקה|harari)/.test(name) || /\bpension\b/.test(f)) return 'pension_clearing';
+  if (/(פנסיה|קופת.?גמל|השתלמות|ביטוח.?מנהלים)/.test(name)) return 'pension';
+  if (/(ביטוח|פוליסה|policy|insurance)/.test(name) && !/(ביטוח.?מנהלים|חיסכון)/.test(name)) return 'insurance';
+  if (/(משכנתא|mortgage|הלוואה|loan)/.test(name)) return 'mortgage';
+  if (/(תלוש|payslip|salary|משכורת)/.test(name)) return 'payslip';
+  if (/(השקעות|portfolio|investment|מניות|stocks)/.test(name)) return 'investment';
+  if (/(חיסכון|savings|פיקדון|deposit)/.test(name)) return 'savings';
+  return 'bank';
+}
 
 export function DocumentUploader({
-  documentType,
+  documentType = 'auto',
   onSuccess,
   onError,
   acceptedFormats = '.pdf,.jpg,.jpeg,.png,.xlsx,.xls',
@@ -67,7 +99,13 @@ export function DocumentUploader({
         rejectedReason = `${file.name}: גדול מ-${maxSizeMB}MB`;
         continue;
       }
-      accepted.push({ file, month: '' });
+      // Per-file type defaults: when caller pinned a specific type
+      // (legacy single-type uploaders), use that. Otherwise auto-detect
+      // from filename so the user can correct it inline.
+      const seedType: DocType | '' = documentType === 'auto'
+        ? detectDocTypeFromName(file.name)
+        : documentType;
+      accepted.push({ file, month: '', docType: seedType });
     }
 
     if (rejectedReason) {
@@ -79,7 +117,7 @@ export function DocumentUploader({
       setPending((prev) => [...prev, ...accepted]);
       setStatus('idle');
     }
-  }, [maxSizeMB, onError]);
+  }, [documentType, maxSizeMB, onError]);
 
   const removeFile = (index: number) => {
     setPending((prev) => prev.filter((_, i) => i !== index));
@@ -87,6 +125,10 @@ export function DocumentUploader({
 
   const setFileMonth = (index: number, month: string) => {
     setPending((prev) => prev.map((p, i) => (i === index ? { ...p, month } : p)));
+  };
+
+  const setFileDocType = (index: number, docType: DocType | '') => {
+    setPending((prev) => prev.map((p, i) => (i === index ? { ...p, docType } : p)));
   };
 
   const allMonthsSet = pending.length > 0 && pending.every((p) => p.month || defaultMonth);
@@ -110,7 +152,9 @@ export function DocumentUploader({
       pending.forEach((p) => {
         fd.append('files', p.file);
         fd.append('statementMonths', p.month || defaultMonth);
+        fd.append('documentTypes', p.docType || 'auto');
       });
+      // Caller-level default; the per-file documentTypes[] takes precedence.
       fd.append('documentType', documentType);
 
       const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
@@ -197,12 +241,22 @@ export function DocumentUploader({
 
             <div className="space-y-2">
               {pending.map((p, idx) => (
-                <div key={`${p.file.name}-${idx}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <div key={`${p.file.name}-${idx}`} className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 rounded-lg">
                   <File className="h-6 w-6 text-phi-dark flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-[180px]">
                     <p className="font-medium text-sm text-gray-900 truncate">{p.file.name}</p>
                     <p className="text-xs text-gray-500">{(p.file.size / 1024 / 1024).toFixed(2)} MB</p>
                   </div>
+                  <select
+                    value={p.docType || 'auto'}
+                    onChange={(e) => setFileDocType(idx, e.target.value as DocType)}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm bg-white"
+                    title="סוג המסמך"
+                  >
+                    {SELECTABLE_DOC_TYPES.map((t) => (
+                      <option key={t} value={t}>{DOCUMENT_TYPE_LABELS[t] || t}</option>
+                    ))}
+                  </select>
                   <input
                     type="month"
                     value={p.month}

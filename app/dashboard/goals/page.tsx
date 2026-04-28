@@ -28,6 +28,7 @@ import type { Goal, GoalAllocationResult } from '@/types/goals';
 import { Card as DSCard, EmptyState, PageWrapper, PageHeader, KpiGrid, StatCard } from '@/components/ui/design-system';
 import { GoalModal } from '@/components/goals/GoalModal';
 import { GoalsListCard } from '@/components/goals/GoalsListCard';
+import { DepositAllocationCard } from '@/components/goals/DepositAllocationCard';
 import { GoalsDragList } from '@/components/goals/GoalsDragList';
 import { GoalsTimeline } from '@/components/goals/GoalsTimeline';
 import GoalDepositModal from '@/components/goals/GoalDepositModal';
@@ -257,7 +258,11 @@ export default function GoalsPage() {
           </div>
         }
       />
-        
+
+      {/* Single-deposit allocator: one number per month, distributed
+         across active goals by priority + deadline urgency. */}
+      <DepositAllocationCard />
+
       {/* Allocation summary */}
       {allocationResult && (
         <KpiGrid cols={4}>
