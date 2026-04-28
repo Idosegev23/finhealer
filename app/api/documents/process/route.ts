@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
     } else if (stmt.mime_type?.includes('image')) {
       console.log('🤖 Analyzing image with GPT-4o Vision...');
       result = await analyzeImageWithAI(buffer, stmt.mime_type, stmt.file_type);
-    } else if (stmt.mime_type?.includes('spreadsheet') || stmt.mime_type?.includes('excel') || stmt.file_name?.match(/\.(xlsx|xls)$/i)) {
+    } else if (stmt.mime_type?.includes('spreadsheet') || stmt.mime_type?.includes('excel') || stmt.mime_type?.includes('csv') || stmt.file_name?.match(/\.(xlsx|xls|csv)$/i)) {
       console.log('📊 Analyzing Excel...');
       result = await analyzeExcelWithAI(buffer, stmt.file_type, stmt.file_name);
     }

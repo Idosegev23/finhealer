@@ -195,10 +195,10 @@ function ScanCenterContent() {
 
   useEffect(() => {
     if (preselectedType) {
-      setActiveType(preselectedType);
-      // Auto-scroll to the uploader so the user lands directly on the action.
-      // Without this, deep-linking from /missing-documents drops them at the
-      // top of the page and they think nothing happened.
+      // Deep-link from /missing-documents — scroll to the uploader so the
+      // user lands directly on the action. Selection of the type is no
+      // longer required (auto-detect handles it), but we keep the scroll
+      // so the entry experience is consistent.
       setTimeout(() => {
         const uploader = window.document.getElementById('document-uploader');
         uploader?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -250,175 +250,87 @@ function ScanCenterContent() {
     }
   };
 
+  const [showCatalog, setShowCatalog] = useState(false);
+
   return (
     <PageWrapper>
       <PageHeader
         title="מרכז סריקה"
-        subtitle="העלה דוחות בנק ופירוט אשראי — Phi מסווג אוטומטית"
-        action={
-          <Badge className="bg-amber-50 text-phi-gold border-amber-200">
-            לשימוש עתידי
-          </Badge>
-        }
+        subtitle="גרור כל מסמך פיננסי — Phi מזהה את הסוג, את החודש, ומסווג אוטומטית"
       />
 
+      {/* Hero uploader — single big drop zone, no type selection required.
+          Per-file editing inside the component handles type override + month. */}
+      <Card id="document-uploader" className="border-2 border-phi-gold mb-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-phi-gold" />
+            העלאת מסמכים
+          </CardTitle>
+          <CardDescription>
+            PDF / JPG / PNG / Excel / CSV · ניתן להעלות מספר קבצים יחד · עד 50MB לקובץ
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DocumentUploader
+            documentType="auto"
+            onSuccess={(data) => {
+              console.log('✅ Documents uploaded:', data);
+              loadScannedHistory();
+            }}
+            onError={(error) => {
+              addToast({ title: error, type: 'error' });
+            }}
+            acceptedFormats=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv"
+            maxSizeMB={50}
+          />
+        </CardContent>
+      </Card>
 
-        {!checkingBankStatement && !hasBankStatement && (
-          <InsightBanner variant="warning" icon={AlertCircle} title="התחל עם דוח בנק">
-            כדי לקבל תמונה פיננסית מלאה, עליך להתחיל בהעלאת <strong>דוח תנועות בנק</strong>.
-            לאחר מכן המערכת תזהה אוטומטית אילו מסמכים נוספים נדרשים (דוחות אשראי, תלושי משכורת וכו׳).
-          </InsightBanner>
-        )}
-
-        {!checkingBankStatement && hasBankStatement && (
-          <InsightBanner variant="success" icon={CheckCircle} title="מעולה! דוח הבנק הועלה">
-            כעת תוכל להעלות מסמכים נוספים. המערכת תקשר אוטומטית בין דוחות האשראי לחיובים בבנק, ותלושי משכורת להכנסות.
-          </InsightBanner>
-        )}
-
-        <InsightBanner variant="info" title="איך זה עובד">
-          <ol className="space-y-1 mr-4 list-decimal">
-            <li>התחל עם דוח בנק (חובה)</li>
-            <li>המערכת תזהה מסמכים חסרים</li>
-            <li>העלה את המסמכים הנדרשים</li>
-            <li>קבל תמונה פיננסית מלאה ומדויקת</li>
-          </ol>
+      {/* Quick guidance — only when there's no bank statement yet */}
+      {!checkingBankStatement && !hasBankStatement && (
+        <InsightBanner variant="info" icon={AlertCircle} title="התחל מדוח הבנק">
+          הדרך המהירה לתמונה פיננסית מלאה: העלה דוח תנועות בנק. ה-Phi יזהה אוטומטית אילו דוחות
+          נוספים חסרים (אשראי, מסלקה, ביטוח, תלושי שכר) ויבקש אותם לפי הצורך.
         </InsightBanner>
-
-      {/* Document Type Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {documentTypes.map((docType) => {
-          const Icon = docType.icon;
-          const isActive = activeType === docType.type;
-          
-          // Enable bank + pension (Mislaka) unconditionally — Mislaka reports
-          // are standalone aggregations that don't require a bank statement.
-          // Other types still require a bank statement first.
-          const standaloneTypes: DocumentType[] = ['bank', 'pension', 'insurance'];
-          const isEnabled = standaloneTypes.includes(docType.type) ||
-                           hasBankStatement ||
-                           (requiredDocId && preselectedType === docType.type);
-
-          const isLocked = !isEnabled && docType.type !== 'bank';
-
-          return (
-            <Card
-              key={docType.type}
-              className={`transition-all ${
-                isEnabled 
-                  ? `cursor-pointer hover:shadow-lg ${isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''}` 
-                  : 'cursor-not-allowed opacity-50'
-              }`}
-              onClick={() => {
-                if (isEnabled) {
-                  setActiveType(docType.type);
-                }
-              }}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`p-3 rounded-lg ${docType.color} flex-shrink-0 relative`}
-                  >
-                    <Icon className="w-6 h-6" />
-                    {isLocked && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-lg">
-                        <Lock className="w-5 h-5 text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <CardTitle className="text-lg">
-                        {docType.title}
-                      </CardTitle>
-                      {isEnabled && !isLocked && (
-                        <Badge className="bg-green-100 text-green-700 text-xs">✓ פעיל</Badge>
-                      )}
-                      {isLocked && (
-                        <Badge className="bg-amber-100 text-amber-700 text-xs flex items-center gap-1">
-                          <Lock className="w-3 h-3" />
-                          נעול
-                        </Badge>
-                      )}
-                    </div>
-                    <CardDescription className="text-sm">
-                      {docType.description}
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-phi-slate mb-2">
-                  📊 נתונים שנחלץ:
-                </div>
-                <div className="text-sm text-gray-700">
-                  {docType.dataExtracted}
-                </div>
-                {isLocked && (
-                  <div className="mt-4 text-xs text-amber-600 font-medium flex items-center gap-2">
-                    <Lock className="w-4 h-4" />
-                    יפתח לאחר העלאת דוח בנק
-                  </div>
-                )}
-                {isActive && isEnabled && !isLocked && (
-                  <div className="mt-4 text-xs text-blue-600 font-medium flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    נבחר - העלה את הדוח למטה
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Document Uploader */}
-      {activeType && (
-        <Card id="document-uploader" className="border-2 border-phi-gold">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              העלאת {documentTypes.find((d) => d.type === activeType)?.title}
-            </CardTitle>
-            <CardDescription>
-              העלה את הקובץ והמערכת תעבד אותו אוטומטית ברקע
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DocumentUploader
-              documentType={activeType}
-              onSuccess={(data) => {
-                console.log('✅ Document uploaded:', data);
-                // Refresh history to show new document
-                loadScannedHistory();
-                // Keep selection active so user can upload more documents
-                // Don't reset activeType - let user continue scanning
-              }}
-              onError={(error) => {
-                addToast({ title: error, type: 'error' });
-              }}
-              acceptedFormats=".pdf,.jpg,.jpeg,.png,.xlsx,.xls"
-              maxSizeMB={50}
-            />
-          </CardContent>
-        </Card>
       )}
 
-      {/* Empty State */}
-      {!activeType && (
-        <Card className="bg-gray-50 border-dashed">
-          <CardContent className="py-12 text-center">
-            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">
-              בחר סוג דוח להעלאה
-            </h3>
-            <p className="text-phi-slate text-sm">
-              לחץ על אחד הכרטיסים למעלה כדי להתחיל
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Catalog of supported types — collapsed by default, available as
+          reference for users who want to know exactly what we extract. */}
+      <Card className="mb-6">
+        <button
+          type="button"
+          onClick={() => setShowCatalog((v) => !v)}
+          className="w-full flex items-center justify-between p-4 text-right hover:bg-gray-50 transition-colors"
+        >
+          <div>
+            <h3 className="font-semibold text-gray-900">מה Phi יודע לעבד?</h3>
+            <p className="text-xs text-phi-slate mt-0.5">{documentTypes.length} סוגי דוחות נתמכים</p>
+          </div>
+          <div className="text-phi-slate text-sm">
+            {showCatalog ? '▼ הסתר' : '▶ הצג רשימה'}
+          </div>
+        </button>
+        {showCatalog && (
+          <div className="border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 bg-gray-50">
+            {documentTypes.map((docType) => {
+              const Icon = docType.icon;
+              return (
+                <div key={docType.type} className="flex items-start gap-3 bg-white rounded-lg p-3">
+                  <div className={`p-2 rounded-lg ${docType.color} flex-shrink-0`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-gray-900">{docType.title}</p>
+                    <p className="text-xs text-gray-600 truncate">{docType.description}</p>
+                    <p className="text-[11px] text-phi-slate mt-1">📊 {docType.dataExtracted}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
 
       {/* Scanned Documents History */}
       <div className="mt-12">
