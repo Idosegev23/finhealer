@@ -88,6 +88,7 @@ export function DocumentUploader({
   const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [results, setResults] = useState<BatchResult[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
+  const [progressIndex, setProgressIndex] = useState<{ current: number; total: number } | null>(null);
 
   const addFiles = useCallback((files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
@@ -150,40 +151,87 @@ export function DocumentUploader({
     setErrorMessage('');
     setResults([]);
 
-    try {
-      const fd = new FormData();
-      pending.forEach((p) => {
+    // Vercel caps a single request body at ~4.5MB, but a batch of 8
+    // PDFs can easily exceed 30MB. Send each file in its own request,
+    // sharing one client-generated batch_id so the server still groups
+    // them (notification suppression + summary still work).
+    const batchId = (typeof crypto !== 'undefined' && (crypto as any).randomUUID)
+      ? (crypto as any).randomUUID()
+      : `batch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    const aggregated: BatchResult[] = [];
+    for (let i = 0; i < pending.length; i += 1) {
+      const p = pending[i];
+      setProgressIndex({ current: i + 1, total: pending.length });
+      try {
+        const fd = new FormData();
         fd.append('files', p.file);
         fd.append('statementMonths', p.month || defaultMonth);
         fd.append('documentTypes', p.docType || 'auto');
-      });
-      // Caller-level default; the per-file documentTypes[] takes precedence.
-      fd.append('documentType', documentType);
+        fd.append('documentType', documentType);
+        fd.append('batchId', batchId);
 
-      const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
-      const data = await res.json();
+        const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
 
-      if (!res.ok) {
-        throw new Error(data.error || 'שגיאה בהעלאה');
+        // Server may return non-JSON when Vercel rejects the request
+        // (Request Entity Too Large = HTML/text). Read as text first,
+        // try to parse as JSON, fall back to a friendly error.
+        const raw = await res.text();
+        let data: any = null;
+        try { data = raw ? JSON.parse(raw) : null; } catch {
+          data = null;
+        }
+
+        if (!res.ok) {
+          let msg = (data && data.error) || raw || 'שגיאה בהעלאה';
+          if (res.status === 413 || /entity too large/i.test(raw)) {
+            msg = `הקובץ "${p.file.name}" גדול מדי (${(p.file.size / 1024 / 1024).toFixed(1)}MB). נסה קובץ קטן יותר.`;
+          }
+          aggregated.push({ fileName: p.file.name, status: 'error', error: msg });
+          continue;
+        }
+
+        const fileResults: BatchResult[] = (data?.results || []).map((r: any) => ({
+          fileName: r.fileName,
+          status: r.status,
+          message: r.message,
+          error: r.error,
+        }));
+        if (fileResults.length === 0) {
+          aggregated.push({ fileName: p.file.name, status: 'error', error: 'תגובה ריקה מהשרת' });
+        } else {
+          aggregated.push(...fileResults);
+        }
+      } catch (err: any) {
+        aggregated.push({
+          fileName: p.file.name,
+          status: 'error',
+          error: err?.message || 'שגיאת רשת',
+        });
       }
-
-      setResults(data.results || []);
-      setStatus(data.summary?.errors > 0 ? 'error' : 'success');
-      onSuccess?.(data);
-
-      // Clear successful files; keep failed ones so the user can fix them.
-      const failedNames = new Set(
-        (data.results || [])
-          .filter((r: BatchResult) => r.status === 'error')
-          .map((r: BatchResult) => r.fileName),
-      );
-      setPending((prev) => prev.filter((p) => failedNames.has(p.file.name)));
-    } catch (err: any) {
-      const msg = err?.message || 'שגיאה בהעלאה';
-      setErrorMessage(msg);
-      setStatus('error');
-      onError?.(msg);
     }
+
+    setProgressIndex(null);
+    setResults(aggregated);
+    const errorCount = aggregated.filter((r) => r.status === 'error').length;
+    setStatus(errorCount > 0 ? 'error' : 'success');
+    onSuccess?.({
+      success: errorCount === 0,
+      summary: {
+        batchId,
+        total: aggregated.length,
+        processing: aggregated.filter((r) => r.status === 'processing').length,
+        duplicate: aggregated.filter((r) => r.status === 'duplicate').length,
+        errors: errorCount,
+      },
+      results: aggregated,
+    });
+
+    // Clear successful + duplicate files; keep failed so user can fix them.
+    const failedNames = new Set(
+      aggregated.filter((r) => r.status === 'error').map((r) => r.fileName),
+    );
+    setPending((prev) => prev.filter((p) => failedNames.has(p.file.name)));
   };
 
   const handleClear = () => {
@@ -323,7 +371,20 @@ export function DocumentUploader({
         {status === 'uploading' && (
           <div className="py-8 text-center space-y-3">
             <Loader2 className="h-10 w-10 text-phi-dark animate-spin mx-auto" />
-            <p className="text-sm text-gray-600">מעלה {pending.length} קבצים...</p>
+            <p className="text-sm text-gray-700 font-medium">
+              {progressIndex
+                ? `מעלה קובץ ${progressIndex.current} מתוך ${progressIndex.total}…`
+                : 'מתכונן...'}
+            </p>
+            {progressIndex && (
+              <div className="max-w-xs mx-auto h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-phi-gold transition-all duration-300"
+                  style={{ width: `${(progressIndex.current / progressIndex.total) * 100}%` }}
+                />
+              </div>
+            )}
+            <p className="text-xs text-phi-slate">קבצים גדולים נשלחים בנפרד כדי לעקוף את מגבלת השרת</p>
           </div>
         )}
 

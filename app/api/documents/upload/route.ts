@@ -250,7 +250,13 @@ export async function POST(request: NextRequest) {
       ? monthsRaw.map((m) => (typeof m === 'string' && m ? m : null))
       : files.map(() => (formData.get('statementMonth') as string) || null);
 
-    const batchId = crypto.randomUUID();
+    // Client may pass a shared batch_id when looping file-by-file from
+    // the browser (Vercel body size cap forces splitting). Otherwise we
+    // mint one server-side for legacy single-request uploads.
+    const clientBatchId = (formData.get('batchId') as string) || '';
+    const batchId = clientBatchId && /^[0-9a-f-]{36}$/i.test(clientBatchId)
+      ? clientBatchId
+      : crypto.randomUUID();
 
     console.log(`📤 Upload batch ${batchId.substring(0, 8)}: ${files.length} files`);
 
