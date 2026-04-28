@@ -21,6 +21,7 @@ import SmartCategoryPicker from '@/components/transactions/SmartCategoryPicker';
 import { PageWrapper, PageHeader, KpiGrid, StatCard } from '@/components/ui/design-system';
 import { useToast } from '@/components/ui/toaster';
 import { BudgetExplainer } from '@/components/budget/BudgetExplainer';
+import { BudgetStatusHero } from '@/components/budget/BudgetStatusHero';
 
 interface MissingDataItem {
   field: string;
@@ -385,6 +386,17 @@ export default function BudgetPage() {
             onCreateSmart={createSmartBudget}
             onCreateManual={() => setShowManualCreate(true)}
             creating={creating}
+          />
+        )}
+
+        {/* When budget exists — show status hero so user knows where they
+            stand THIS month against the budget (not vs averages) */}
+        {hasBudget && categories && categories.length > 0 && (
+          <BudgetStatusHero
+            categories={categories}
+            totalAllocated={categories.reduce((s: number, c: any) => s + (Number(c.allocated_amount) || 0), 0)}
+            monthLabel={new Date(currentMonth + '-01').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })}
+            onJumpToCategories={() => setActiveTab('categories')}
           />
         )}
 
