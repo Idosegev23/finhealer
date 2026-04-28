@@ -20,6 +20,7 @@ import { Progress } from '@/components/ui/progress';
 import SmartCategoryPicker from '@/components/transactions/SmartCategoryPicker';
 import { PageWrapper, PageHeader, KpiGrid, StatCard } from '@/components/ui/design-system';
 import { useToast } from '@/components/ui/toaster';
+import { BudgetExplainer } from '@/components/budget/BudgetExplainer';
 
 interface MissingDataItem {
   field: string;
@@ -353,6 +354,40 @@ export default function BudgetPage() {
     return (
     <PageWrapper>
 
+        {/* Page Header — always visible at top so the user knows where they are */}
+        <PageHeader
+          title="תקציב חכם"
+          subtitle={hasBudget
+            ? `תקציב פעיל לחודש ${currentMonth} · מבוסס על ${summary?.monthsAnalyzed || 0} חודשים, ${summary?.transactionsCount || 0} תנועות`
+            : 'אין עדיין תקציב פעיל. בנה אחד למטה.'}
+          action={
+            <select
+              value={currentMonth}
+              onChange={(e) => setCurrentMonth(e.target.value)}
+              className="px-4 py-2 border border-phi-frost rounded-lg bg-white text-phi-dark"
+            >
+              {generateMonthOptions().map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          }
+        />
+
+        {/* When no budget yet — show the explainer with money-flow + steps + CTAs */}
+        {!hasBudget && (
+          <BudgetExplainer
+            monthlyIncome={summary?.avgMonthlyIncome || 0}
+            monthlyExpenses={summary?.avgMonthlyExpenses || 0}
+            monthsAnalyzed={summary?.monthsAnalyzed || 0}
+            transactionsCount={summary?.transactionsCount || 0}
+            goalsCount={(goals?.length || summary?.goalsCount) || 0}
+            hasMissingCritical={hasCriticalMissing}
+            onCreateSmart={createSmartBudget}
+            onCreateManual={() => setShowManualCreate(true)}
+            creating={creating}
+          />
+        )}
+
         {/* Missing Data Alert */}
         {hasCriticalMissing && (
           <motion.div
@@ -465,57 +500,6 @@ export default function BudgetPage() {
           </motion.div>
         )}
         
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold text-gray-900 truncate">תקציב חכם</h1>
-              <p className="text-sm text-gray-500 mt-1">
-                מבוסס על {summary?.monthsAnalyzed || 0} חודשים • {summary?.transactionsCount || 0} תנועות
-              </p>
-            </div>
-            
-            <div className="flex gap-3">
-              <select
-                value={currentMonth}
-                onChange={(e) => setCurrentMonth(e.target.value)}
-                className="px-4 py-2 border border-phi-frost rounded-lg bg-white text-phi-dark"
-              >
-                {generateMonthOptions().map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-              
-              {!hasBudget && (
-                <>
-                  <Button
-                    onClick={createSmartBudget}
-                    disabled={creating}
-                    className="bg-phi-gold hover:bg-phi-coral text-white"
-                  >
-                    {creating ? (
-                      <><RefreshCw className="w-4 h-4 ml-2 animate-spin" /> יוצר...</>
-                    ) : (
-                      <><Sparkles className="w-4 h-4 ml-2" /> צור תקציב חכם</>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={() => setShowManualCreate(true)}
-                    variant="outline"
-                    className="border-phi-gold text-phi-gold hover:bg-phi-gold/10"
-                  >
-                    <ListPlus className="w-4 h-4 ml-2" /> צור תקציב ידני
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </motion.div>
-
         {/* Profile Context Cards */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
