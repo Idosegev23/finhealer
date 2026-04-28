@@ -122,6 +122,14 @@ export async function POST(request: Request) {
 
     await (supabase as any).from('budget_frequency_types').insert(frequencyInserts);
 
+    // Budget creation is the gate to monitoring; advance phase now.
+    try {
+      const { tryUpgradePhase } = await import('@/lib/services/PhaseService');
+      await tryUpgradePhase(user.id);
+    } catch (err) {
+      console.warn('[PhaseService] post-smart-budget-create error:', err);
+    }
+
     return NextResponse.json({
       success: true,
       budget,

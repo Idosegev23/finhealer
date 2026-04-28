@@ -367,6 +367,18 @@ export async function POST(request: NextRequest) {
       .then(({ syncBudgetSpending }) => syncBudgetSpending(stmt.user_id))
       .catch(err => console.warn('[BudgetSync] post-document error:', err));
 
+    // 10. Try to advance the lifecycle phase based on the new data —
+    // a freshly uploaded statement that crosses 30/50 tx threshold should
+    // bump the user from data_collection→behavior or behavior→goals
+    // immediately, without waiting for them to refresh the dashboard.
+    try {
+      const { tryUpgradePhase } = await import('@/lib/services/PhaseService');
+      const upgraded = await tryUpgradePhase(stmt.user_id);
+      if (upgraded) console.log(`⏫ [BG] Phase auto-advanced to: ${upgraded}`);
+    } catch (err) {
+      console.warn('[PhaseService] post-document tryUpgradePhase error:', err);
+    }
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`✅ [BG] Completed in ${duration}s`);
 

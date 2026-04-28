@@ -67,6 +67,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
     }
 
+    // Goals creation is the gate from goals → budget; advance phase
+    // right away so the dashboard reflects the new step without a refresh.
+    try {
+      const { tryUpgradePhase } = await import('@/lib/services/PhaseService');
+      await tryUpgradePhase(user.id);
+    } catch (err) {
+      console.warn('[PhaseService] post-goal-create error:', err);
+    }
+
     return NextResponse.json({ success: true, goal });
   } catch (error: any) {
     console.error('Create goal error:', error);

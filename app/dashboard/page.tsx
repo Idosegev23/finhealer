@@ -20,6 +20,7 @@ import { QuickAddFAB } from '@/components/dashboard/QuickAddFAB'
 import { OnboardingWizard } from '@/components/dashboard/OnboardingWizard'
 import { KpiGrid, StatCard, Section, InsightBanner, EmptyState, ProgressBar } from '@/components/ui/design-system'
 import { getActivePeriod } from '@/lib/finance/active-period'
+import { tryUpgradePhase } from '@/lib/services/PhaseService'
 
 export const revalidate = 30
 
@@ -44,6 +45,22 @@ export default async function DashboardPage() {
   // This is the canonical check — handles email login, OAuth, deep links, refreshes.
   if (!u.phone || !u.onboarding_state || u.onboarding_state === 'start') {
     redirect('/onboarding')
+  }
+
+  // Auto-advance the user's lifecycle phase based on actual data. Without
+  // this the phase pinned itself to whatever was set during onboarding —
+  // even after the user uploaded statements, classified, set goals, or
+  // had a budget waiting. Now every dashboard load reconciles phase with
+  // calculatePhase() rules (≥30 tx → behavior, +1 goal → budget, etc.).
+  try {
+    const upgraded = await tryUpgradePhase(user.id)
+    if (upgraded) {
+      // Reflect the freshly calculated phase in the rendered view, instead
+      // of forcing a redirect/refresh.
+      u.phase = upgraded
+    }
+  } catch (err) {
+    console.error('[dashboard] tryUpgradePhase failed:', err)
   }
 
   // Active period — falls back to latest month with data when current month
