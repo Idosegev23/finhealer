@@ -34,6 +34,23 @@ interface PolicyRow {
   premium_amount?: number | string | null;
   premium_type?: string | null; // 'שנתית' | 'חודשית'
   notes?: string | null;
+  // Rich detail captured from the report — saved into insurance.metadata
+  // so the drill-down page can render the full picture.
+  coverage_amount?: number | string | null;
+  coverage?: string[] | null;        // e.g. ["השתלות","ניתוחים בחו\"ל"]
+  covered_conditions?: string[] | null;
+  beneficiaries?: string | null;
+  monthly_benefit?: number | string | null;
+  coverage_percent?: number | null;
+  waiting_period?: string | null;
+  definition?: string | null;
+  vehicle?: any;                      // { make, model, year, license_plate }
+  deductible?: number | string | null;
+  property_address?: string | null;
+  building_coverage?: number | string | null;
+  contents_coverage?: number | string | null;
+  type?: string | null;               // e.g. 'מקיף', 'תכולה', 'משלים'
+  plan_name?: string | null;
 }
 
 export interface HarBitachOcrResult {
@@ -177,6 +194,22 @@ function flattenPolicies(ocr: any): PolicyRow[] {
         end_date: item.end_date || item.valid_until || null,
         premium_amount: amount,
         premium_type: premiumType,
+        // Pass through rich detail so aggregator can store in metadata
+        coverage_amount: item.coverage_amount ?? null,
+        coverage: Array.isArray(item.coverage) ? item.coverage : null,
+        covered_conditions: Array.isArray(item.covered_conditions) ? item.covered_conditions : null,
+        beneficiaries: item.beneficiaries ?? null,
+        monthly_benefit: item.monthly_benefit ?? null,
+        coverage_percent: item.coverage_percent ?? null,
+        waiting_period: item.waiting_period ?? null,
+        definition: item.definition ?? null,
+        vehicle: item.vehicle ?? null,
+        deductible: item.deductible ?? null,
+        property_address: item.property_address ?? null,
+        building_coverage: item.building_coverage ?? null,
+        contents_coverage: item.contents_coverage ?? null,
+        type: item.type ?? null,
+        plan_name: item.plan_name ?? null,
       });
     }
   }
@@ -191,10 +224,27 @@ interface AggregatedPolicy {
   end_date: string | null;
   monthly_premium: number;        // base policy premium, monthly
   rider_total_monthly: number;    // service riders summed, monthly
-  rider_descriptions: string[];   // for the notes field
+  riders: Array<{ name: string; monthly: number; raw?: any }>;
   is_active: boolean;
   raw_period: string | null;
   raw_branches: Set<string>;
+  // Rich detail kept for the metadata column
+  coverage_amount: number | null;
+  coverage_list: Set<string>;
+  covered_conditions: Set<string>;
+  beneficiaries: string | null;
+  monthly_benefit: number | null;
+  coverage_percent: number | null;
+  waiting_period: string | null;
+  definition: string | null;
+  vehicle: any | null;
+  deductible: number | null;
+  property_address: string | null;
+  building_coverage: number | null;
+  contents_coverage: number | null;
+  product_type: string | null;
+  plan_name: string | null;
+  sub_types: Set<string>;          // e.g. 'מקיף + שירותים' / 'משלים'
 }
 
 /**
@@ -236,21 +286,58 @@ function aggregateByPolicyNumber(rows: PolicyRow[]): AggregatedPolicy[] {
         end_date: endDate,
         monthly_premium: 0,
         rider_total_monthly: 0,
-        rider_descriptions: [],
+        riders: [],
         is_active: isActive,
         raw_period: r.policy_period || null,
         raw_branches: new Set(),
+        coverage_amount: null,
+        coverage_list: new Set(),
+        covered_conditions: new Set(),
+        beneficiaries: null,
+        monthly_benefit: null,
+        coverage_percent: null,
+        waiting_period: null,
+        definition: null,
+        vehicle: null,
+        deductible: null,
+        property_address: null,
+        building_coverage: null,
+        contents_coverage: null,
+        product_type: null,
+        plan_name: null,
+        sub_types: new Set(),
       };
       map.set(policyNum, agg);
     }
 
     if (r.main_branch) agg.raw_branches.add(r.main_branch.trim());
     if (r.sub_branch) agg.raw_branches.add(r.sub_branch.trim());
+    if (r.type) agg.sub_types.add(r.type.trim());
+
+    // Rich detail — only set once (first write wins) so the base policy
+    // line takes priority over rider lines.
+    if (r.coverage_amount != null && agg.coverage_amount == null) {
+      agg.coverage_amount = parseAmount(r.coverage_amount);
+    }
+    if (Array.isArray(r.coverage)) r.coverage.forEach((c) => agg!.coverage_list.add(c));
+    if (Array.isArray(r.covered_conditions)) r.covered_conditions.forEach((c) => agg!.covered_conditions.add(c));
+    if (r.beneficiaries && !agg.beneficiaries) agg.beneficiaries = r.beneficiaries;
+    if (r.monthly_benefit != null && agg.monthly_benefit == null) agg.monthly_benefit = parseAmount(r.monthly_benefit);
+    if (r.coverage_percent != null && agg.coverage_percent == null) agg.coverage_percent = Number(r.coverage_percent);
+    if (r.waiting_period && !agg.waiting_period) agg.waiting_period = r.waiting_period;
+    if (r.definition && !agg.definition) agg.definition = r.definition;
+    if (r.vehicle && !agg.vehicle) agg.vehicle = r.vehicle;
+    if (r.deductible != null && agg.deductible == null) agg.deductible = parseAmount(r.deductible);
+    if (r.property_address && !agg.property_address) agg.property_address = r.property_address;
+    if (r.building_coverage != null && agg.building_coverage == null) agg.building_coverage = parseAmount(r.building_coverage);
+    if (r.contents_coverage != null && agg.contents_coverage == null) agg.contents_coverage = parseAmount(r.contents_coverage);
+    if (r.product_type && !agg.product_type) agg.product_type = r.product_type;
+    if (r.plan_name && !agg.plan_name) agg.plan_name = r.plan_name;
 
     if (isRider) {
       agg.rider_total_monthly += monthly;
       const label = (r.product_type || r.sub_branch || 'כתב שירות').trim();
-      if (label) agg.rider_descriptions.push(`${label} (₪${monthly.toFixed(0)})`);
+      agg.riders.push({ name: label, monthly, raw: r });
     } else {
       // Base policy line. Sum if multiple base lines per policy_number
       // (rare — happens when a policy has multiple coverage tiers).
@@ -302,10 +389,40 @@ export async function handleHarBitachReport(
   for (const p of aggregated) {
     const totalMonthly = p.monthly_premium + p.rider_total_monthly;
     const branches = Array.from(p.raw_branches).join(' · ');
-    const ridersBlurb = p.rider_descriptions.length
-      ? ` · נספחים: ${p.rider_descriptions.join(', ')}`
+    const ridersBlurb = p.riders.length
+      ? ` · נספחים: ${p.riders.map((r) => `${r.name} (₪${Math.round(r.monthly)})`).join(', ')}`
       : '';
     const note = `${HARB_MARKER} (סנכרון אוטומטי) — ${branches}${ridersBlurb}. דוח: ${ocrData?.report_info?.report_date || ''}`.trim();
+
+    // Pack the rich detail into a metadata object the drill-down page
+    // renders. Empty arrays/nulls get filtered so the JSON stays clean.
+    const metadata: Record<string, any> = {};
+    if (p.coverage_list.size > 0) metadata.coverage = Array.from(p.coverage_list);
+    if (p.covered_conditions.size > 0) metadata.covered_conditions = Array.from(p.covered_conditions);
+    if (p.beneficiaries) metadata.beneficiaries = p.beneficiaries;
+    if (p.monthly_benefit != null) metadata.monthly_benefit = p.monthly_benefit;
+    if (p.coverage_percent != null) metadata.coverage_percent = p.coverage_percent;
+    if (p.waiting_period) metadata.waiting_period = p.waiting_period;
+    if (p.definition) metadata.definition = p.definition;
+    if (p.vehicle) metadata.vehicle = p.vehicle;
+    if (p.deductible != null) metadata.deductible = p.deductible;
+    if (p.property_address) metadata.property_address = p.property_address;
+    if (p.building_coverage != null) metadata.building_coverage = p.building_coverage;
+    if (p.contents_coverage != null) metadata.contents_coverage = p.contents_coverage;
+    if (p.product_type) metadata.product_type = p.product_type;
+    if (p.plan_name) metadata.plan_name = p.plan_name;
+    if (p.sub_types.size > 0) metadata.sub_types = Array.from(p.sub_types);
+    if (p.raw_period) metadata.policy_period = p.raw_period;
+    if (p.raw_branches.size > 0) metadata.branches = Array.from(p.raw_branches);
+    if (p.riders.length > 0) {
+      metadata.riders = p.riders.map((r) => ({
+        name: r.name,
+        monthly_premium: Math.round(r.monthly * 100) / 100,
+      }));
+    }
+    metadata.source = 'harb';
+    metadata.report_date = ocrData?.report_info?.report_date || null;
+    metadata.synced_at = new Date().toISOString();
 
     // annual_premium is GENERATED — never insert it.
     const row = {
@@ -314,12 +431,13 @@ export async function handleHarBitachReport(
       provider: p.provider,
       policy_number: p.policy_number,
       monthly_premium: Math.round(totalMonthly * 100) / 100,
-      coverage_amount: 0,
+      coverage_amount: p.coverage_amount != null ? p.coverage_amount : 0,
       status: p.is_active ? 'active' : 'inactive',
       active: p.is_active,
       start_date: p.start_date,
       end_date: p.end_date,
       notes: note,
+      metadata,
       updated_at: new Date().toISOString(),
     };
 

@@ -196,10 +196,11 @@ export default function InsurancePage() {
               const typeInfo = INSURANCE_TYPE_LABELS[insurance.insurance_type];
               const TypeIcon = typeInfo?.icon || FileText;
               return (
+                <Link key={insurance.id} href={`/dashboard/insurance/${insurance.id}`} className="block">
                 <DSCard
-                  key={insurance.id}
                   padding="lg"
                   hover
+                  className="cursor-pointer transition-shadow hover:shadow-md"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -239,13 +240,14 @@ export default function InsurancePage() {
                       <p className="text-gray-700">
                         זוהה אוטומטית מחיובי בנק. הסכום ומס׳ הפוליסה הם הערכה.
                       </p>
-                      <Link
+                      <a
                         href="/dashboard/scan-center"
+                        onClick={(e) => { e.stopPropagation(); window.location.href = '/dashboard/scan-center'; e.preventDefault(); }}
                         className="mt-2 inline-flex items-center gap-1 font-medium text-phi-dark hover:underline"
                       >
                         <Upload className="w-3 h-3" />
                         העלאת פירוט פוליסה לדיוק הפרטים
-                      </Link>
+                      </a>
                     </div>
                   )}
 
@@ -273,6 +275,7 @@ export default function InsurancePage() {
                   </div>
 
                 </DSCard>
+                </Link>
               );
             })}
           </div>
