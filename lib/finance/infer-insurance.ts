@@ -42,6 +42,51 @@ const HEBREW_TO_INSURANCE_TYPE: Record<string, string> = {
   'ביטוח בריאות לעובדים': 'health',
 };
 
+// Categories that look like insurance from the name but ARE NOT —
+// social-security/tax/state benefits. Skip these so they don't pollute
+// the insurance dashboard.
+const NOT_REAL_INSURANCE = /^(ביטוח\s*לאומי|ביטוח\s*בריאות\s*ממלכתי|מס\s*בריאות|דמי\s*ביטוח\s*לאומי)/;
+
+// Vendor-name based hints used as a SECOND chance to refine the type
+// when expense_category falls back to 'other'. e.g. category was the
+// generic 'ביטוח עסק' but the vendor "מגדל חיים/בריאות" tells us it's
+// actually health insurance.
+const VENDOR_TYPE_HINTS: Array<[RegExp, string]> = [
+  [/חיים\s*\/?\s*בריאות|בריאות.*חיים/, 'health'],
+  [/חיים|life/i, 'life'],
+  [/בריאות|health/i, 'health'],
+  [/סיעוד/, 'critical_illness'],
+  [/אובדן\s*כושר/, 'disability'],
+  [/תאונ/, 'accident'],
+  [/חובה|רכב|car|leasing/i, 'car'],
+  [/דירה|מבנה|תכולה|home/i, 'home'],
+  [/נסיעות|travel/i, 'travel'],
+  [/חיות\s*מחמד|pet/i, 'pet'],
+];
+
+// Provider name normalization — collapse the many spellings the OCR
+// returns ('ישיר ביטוח', 'ביטוח ישיר', 'ביטוח ישיר ב' …) into one
+// canonical form so the inferrer doesn't create a row per spelling.
+function normalizeProvider(raw: string): string {
+  if (!raw) return '';
+  let v = raw.trim();
+  // Drop trailing single-letter or noise tokens
+  v = v.replace(/\s+(חברה\s*לביטוח(\s*בע"?מ)?|בע"?מ|ביטוח\s*בע"?מ)$/, '');
+  // Common collapses
+  if (/ישיר/.test(v) && /ביטוח/.test(v)) return 'ישיר';
+  if (/^מגדל/.test(v)) return 'מגדל';
+  if (/^הראל/.test(v)) return 'הראל';
+  if (/^הפניקס/.test(v)) return 'הפניקס';
+  if (/^איילון/.test(v)) return 'איילון';
+  if (/^מנורה/.test(v)) return 'מנורה';
+  if (/^כלל/.test(v)) return 'כלל';
+  if (/חקלאי|חקלא/.test(v)) return 'ביטוח חקלאי';
+  if (/^ליברה/.test(v)) return 'ליברה';
+  if (/^שלמה/.test(v) || /ש\.\s*שלמה/.test(v)) return 'שלמה';
+  if (/^שומרה/.test(v)) return 'שומרה';
+  return v;
+}
+
 const INFERRED_MARKER = 'הוסק אוטומטית מתנועה בנקאית';
 
 interface TxRow {
@@ -93,14 +138,40 @@ export async function inferInsuranceFromTransactions(
 
   if (!txs || txs.length === 0) return result;
 
-  // Group by (vendor, mapped_type). Vendor missing → fall back to category
-  // name itself, to avoid lumping every "ביטוח" charge under one row.
+  // Group by (normalized provider, mapped_type). Tax-like categories
+  // (ביטוח לאומי, מס בריאות) are NOT real insurance and are skipped.
+  // When the category-based mapping falls to 'other', we try vendor
+  // hints as a second pass to find a real insurance_type.
   const byKey = new Map<string, AggregateKey>();
+  let skippedNotInsurance = 0;
   for (const tx of txs as TxRow[]) {
     const cat = tx.expense_category?.trim();
     if (!cat) continue;
-    const insType = HEBREW_TO_INSURANCE_TYPE[cat] || 'other';
-    const provider = (tx.vendor && tx.vendor.trim()) || cat;
+    if (NOT_REAL_INSURANCE.test(cat)) {
+      skippedNotInsurance += 1;
+      continue;
+    }
+
+    const rawVendor = (tx.vendor || '').trim();
+    if (rawVendor && NOT_REAL_INSURANCE.test(rawVendor)) {
+      skippedNotInsurance += 1;
+      continue;
+    }
+
+    let insType = HEBREW_TO_INSURANCE_TYPE[cat] || 'other';
+    // Vendor-based refinement when category gave us 'other'
+    if (insType === 'other' && rawVendor) {
+      for (const [pat, t] of VENDOR_TYPE_HINTS) {
+        if (pat.test(rawVendor)) {
+          insType = t;
+          break;
+        }
+      }
+    }
+
+    const provider = normalizeProvider(rawVendor || cat);
+    if (!provider) continue;
+
     const key = `${provider}|${insType}`;
     const month = tx.tx_date ? tx.tx_date.slice(0, 7) : '';
     const existing = byKey.get(key);
@@ -119,6 +190,10 @@ export async function inferInsuranceFromTransactions(
         tx_count: 1,
       });
     }
+  }
+
+  if (skippedNotInsurance > 0) {
+    console.log(`[inferInsurance] skipped ${skippedNotInsurance} non-insurance tx (ביטוח לאומי/מס בריאות)`);
   }
 
   if (byKey.size === 0) return result;
