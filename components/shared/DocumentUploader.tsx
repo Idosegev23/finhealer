@@ -65,7 +65,8 @@ function detectDocTypeFromName(name: string): DocType {
   if (/\b(max|visa|mastercard|isracard|cal|leumicard|amex)\b/.test(f)
       || /(ויזה|מאסטר|מסטר|כא"?ל|כאל|ישראכרט|אמריקן|לאומי\s*קארד)/.test(name)) return 'credit';
   // Check 'הר הביטוח' BEFORE generic insurance — it's a different report.
-  if (/(הר[\s_]?הביטוח|harb|cma\.gov\.il|הר_הביטוח)/.test(name)) return 'insurance_clearing';
+  // Permissive: allow date/anything between 'הר' and 'הביטוח'.
+  if (/הר[\s\S]{0,40}הביטוח/.test(name) || /(harb|cma\.gov\.il|הר_הביטוח)/i.test(name)) return 'insurance_clearing';
   if (/(mislaka|מסלקה|harari)/.test(name) || /\bpension\b/.test(f)) return 'pension_clearing';
   if (/(פנסיה|קופת.?גמל|השתלמות|ביטוח.?מנהלים)/.test(name)) return 'pension';
   if (/(ביטוח|פוליסה|policy|insurance)/.test(name) && !/(ביטוח.?מנהלים|חיסכון)/.test(name)) return 'insurance';

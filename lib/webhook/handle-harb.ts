@@ -346,6 +346,43 @@ export async function handleHarBitachReport(
     }
   }
 
+  // Sweep inferred-from-transactions rows that are now shadowed by real
+  // policies with the same (provider, insurance_type). Without this the
+  // insurance dashboard shows both 'מגדל health 1,074' (inferred) AND
+  // three real Magdal health policies — confusing.
+  const realKeys = new Set<string>(
+    aggregated.map((p) => `${p.provider}|${p.insurance_type}`),
+  );
+  // Also tolerate slight provider name drift ("מגדל" vs "מגדל חברה לביטוח")
+  const realProviderKeysLoose = new Set<string>(
+    aggregated.map((p) => `${p.provider.split(/\s|חברה/)[0]}|${p.insurance_type}`),
+  );
+
+  const { data: inferredRows } = await supabase
+    .from('insurance')
+    .select('id, provider, insurance_type, notes')
+    .eq('user_id', userId)
+    .like('notes', '%הוסק אוטומטית מתנועה בנקאית%');
+
+  if (inferredRows && inferredRows.length > 0) {
+    const idsToRemove: string[] = [];
+    for (const row of inferredRows as any[]) {
+      const key = `${row.provider}|${row.insurance_type}`;
+      const looseKey = `${(row.provider || '').split(/\s|חברה/)[0]}|${row.insurance_type}`;
+      if (realKeys.has(key) || realProviderKeysLoose.has(looseKey)) {
+        idsToRemove.push(row.id);
+      }
+    }
+    if (idsToRemove.length > 0) {
+      const { error } = await supabase.from('insurance').delete().in('id', idsToRemove);
+      if (error) {
+        console.warn('[harb] failed to clean shadowed inferred rows:', error.message);
+      } else {
+        console.log(`[harb] cleaned ${idsToRemove.length} inferred row(s) shadowed by real policies`);
+      }
+    }
+  }
+
   console.log(
     `[harb] processed ${result.total} unique policies — +${result.inserted} new, ~${result.updated} updated, ${result.skipped} skipped`,
   );

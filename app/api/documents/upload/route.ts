@@ -45,8 +45,12 @@ function detectDocumentType(fileName: string): string {
     return 'credit';
   }
   // הר הביטוח — CMA insurance authority full portfolio dump.
-  // Detect BEFORE generic 'insurance' so this lands in the right branch.
-  if (/(הר[\s_]?הביטוח|harb|cma\.gov\.il|הר_הביטוח|insurance[\s_]?mountain)/.test(fileName)) {
+  // Detect BEFORE generic 'insurance'. Permissive: 'הר' + 'הביטוח' may
+  // have a date or any other separator between them in the filename
+  // ('גדי הר 28.04.2026 הביטוח.pdf'), so we accept anything in the
+  // gap as long as both tokens are present.
+  if (/הר[\s\S]{0,40}הביטוח/.test(fileName)
+      || /(harb|cma\.gov\.il|הר_הביטוח|insurance[\s_]?mountain)/i.test(fileName)) {
     return 'insurance_clearing';
   }
   // Mislaka / pension clearing

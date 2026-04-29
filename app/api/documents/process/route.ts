@@ -2288,6 +2288,32 @@ async function saveLoans(supabase: any, result: any, userId: string, documentId:
  */
 async function saveInsurance(supabase: any, result: any, userId: string, documentId: string): Promise<number> {
   try {
+    // OCR sometimes returns policies grouped into categorized arrays
+    // (life_insurance[], health_insurance[], car_insurance[], etc.) —
+    // typical of הר הביטוח reports even when the user picked a generic
+    // 'insurance' type. Delegate to the harb handler which knows how
+    // to flatten that shape AND maps each branch to the right CHECK
+    // value, idempotent by policy_number.
+    const categorizedKeys = [
+      'life_insurance', 'health_insurance', 'disability_insurance',
+      'nursing_insurance', 'critical_illness', 'accident_insurance',
+      'car_insurance', 'home_insurance', 'travel_insurance', 'pet_insurance',
+    ];
+    const hasCategorized = categorizedKeys.some(
+      (k) => Array.isArray(result?.[k]) && result[k].length > 0,
+    );
+    if (hasCategorized) {
+      try {
+        const { handleHarBitachReport } = await import('@/lib/webhook/handle-harb');
+        const h = await handleHarBitachReport(supabase, userId, result, documentId);
+        const total = h.inserted + h.updated;
+        console.log(`🛡️ Insurance via harb handler (categorized format): ${h.inserted} new, ${h.updated} updated, ${h.skipped} skipped (total ${h.total} policies)`);
+        return total;
+      } catch (harbErr) {
+        console.error('harb handler failed, falling back to legacy saveInsurance:', harbErr);
+      }
+    }
+
     if (!result.insurance_policies || result.insurance_policies.length === 0) {
       console.log('No insurance policies to save');
       return 0;
