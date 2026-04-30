@@ -251,7 +251,7 @@ export default function GoalsPage() {
               <ArrowUpDown className="w-5 h-5" />
               שנה סדר
             </Button>
-            <Button onClick={handleNewGoal} size="lg" className="gap-2">
+            <Button onClick={handleNewGoal} size="lg" className="gap-2" data-tour="goals-add">
               <Plus className="w-5 h-5" />
               יעד חדש
             </Button>

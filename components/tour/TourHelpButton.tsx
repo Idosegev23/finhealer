@@ -29,7 +29,7 @@ export function TourHelpButton({
   if (isActive) return null
 
   return (
-    <div className="fixed bottom-6 left-6 z-40 print:hidden" dir="rtl">
+    <div className="fixed bottom-6 right-6 z-40 print:hidden" dir="rtl">
       <motion.button
         onClick={() => {
           resetSeen(tourId)

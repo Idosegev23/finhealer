@@ -11,11 +11,30 @@ import type { TourId } from '@/components/tour/tours';
 
 // Path → tour mapping. The dashboard auto-launches the relevant tour the first
 // time the user lands on each section. After dismiss/complete, it stays gone.
+// Order matters — more specific routes (e.g. data/loans) must come before
+// general ones (e.g. /loans).
 function tourForPath(pathname: string): TourId | null {
+  if (!pathname) return null;
   if (pathname === '/dashboard' || pathname === '/dashboard/') return 'dashboard';
+  if (pathname.startsWith('/dashboard/assistant')) return 'assistant';
+  if (pathname.startsWith('/dashboard/overview')) return 'overview';
+  if (pathname.startsWith('/dashboard/financial-table')) return 'financial-table';
   if (pathname.startsWith('/dashboard/budget')) return 'budget';
+  if (pathname.startsWith('/dashboard/expenses')) return 'expenses';
+  if (pathname.startsWith('/dashboard/income')) return 'income';
+  if (pathname.startsWith('/dashboard/transactions')) return 'transactions';
+  if (pathname.startsWith('/dashboard/recurring')) return 'recurring';
   if (pathname.startsWith('/dashboard/goals')) return 'goals';
   if (pathname.startsWith('/dashboard/loans')) return 'loans';
+  if (pathname.startsWith('/dashboard/savings')) return 'savings';
+  if (pathname.startsWith('/dashboard/investments')) return 'investments';
+  if (pathname.startsWith('/dashboard/insurance')) return 'insurance';
+  if (pathname.startsWith('/dashboard/pensions')) return 'pensions';
+  if (pathname.startsWith('/dashboard/simulator')) return 'simulator';
+  if (pathname.startsWith('/dashboard/scan-center')) return 'scan-center';
+  if (pathname.startsWith('/dashboard/missing-documents')) return 'missing-documents';
+  if (pathname.startsWith('/dashboard/reports')) return 'reports';
+  if (pathname.startsWith('/dashboard/settings')) return 'settings';
   return null;
 }
 
