@@ -90,6 +90,7 @@ export default function InsurancePage() {
             <Button
               onClick={() => setShowAddModal(true)}
               className="bg-phi-dark hover:bg-phi-slate text-white"
+              data-tour="ins-add"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף ביטוח
@@ -101,7 +102,7 @@ export default function InsurancePage() {
 
         {/* Missing Insurances Alert */}
         {missingInsurances.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8" data-tour="ins-gaps">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -191,7 +192,7 @@ export default function InsurancePage() {
             </Button>
           </DSCard>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6" data-tour="ins-list">
             {insurances.map((insurance) => {
               const typeInfo = INSURANCE_TYPE_LABELS[insurance.insurance_type];
               const TypeIcon = typeInfo?.icon || FileText;

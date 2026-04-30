@@ -20,14 +20,14 @@ function SettingsContent() {
 
   return (
     <PageWrapper>
-        <div className="mb-4">
+        <div data-tour="page-header" className="mb-4">
           <h1 className="text-2xl font-bold text-gray-900">הגדרות</h1>
           <p className="text-sm text-phi-slate">ניהול פרופיל, התראות ומנוי</p>
         </div>
 
         <div className="grid lg:grid-cols-4 gap-6">
           {/* Sidebar */}
-          <div className="lg:col-span-1">
+          <div data-tour="settings-tabs" className="lg:col-span-1">
             <DSCard padding="sm" className="space-y-2">
               <TabButton
                 icon={<User className="w-5 h-5" />}
@@ -76,7 +76,7 @@ function SettingsContent() {
           </div>
 
           {/* Content */}
-          <div className="lg:col-span-3">
+          <div data-tour="settings-content" className="lg:col-span-3">
             {activeTab === 'profile' && <ProfileTab />}
             {activeTab === 'whatsapp' && <WhatsAppTab />}
             {activeTab === 'notifications' && <NotificationsTab />}

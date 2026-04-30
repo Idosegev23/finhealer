@@ -376,6 +376,7 @@ export default function BudgetPage() {
 
         {/* When no budget yet — show the explainer with money-flow + steps + CTAs */}
         {!hasBudget && (
+          <div data-tour="budget-categories">
           <BudgetExplainer
             monthlyIncome={summary?.avgMonthlyIncome || 0}
             monthlyExpenses={summary?.avgMonthlyExpenses || 0}
@@ -387,17 +388,20 @@ export default function BudgetPage() {
             onCreateManual={() => setShowManualCreate(true)}
             creating={creating}
           />
+          </div>
         )}
 
         {/* When budget exists — show status hero so user knows where they
             stand THIS month against the budget (not vs averages) */}
         {hasBudget && categories && categories.length > 0 && (
+          <div data-tour="budget-progress">
           <BudgetStatusHero
             categories={categories}
             totalAllocated={categories.reduce((s: number, c: any) => s + (Number(c.allocated_amount) || 0), 0)}
             monthLabel={new Date(currentMonth + '-01').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })}
             onJumpToCategories={() => setActiveTab('categories')}
           />
+          </div>
         )}
 
         {/* Missing Data Alert */}

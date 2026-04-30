@@ -94,6 +94,7 @@ export default function ExpensesPage() {
             <Link
               href="/dashboard/data/expenses"
               className="bg-phi-dark hover:bg-phi-slate text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+              data-tour="exp-add"
             >
               + הוסף הוצאה
             </Link>
@@ -128,7 +129,7 @@ export default function ExpensesPage() {
           )}
         </DSCard>
 
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="exp-list">
           {sortedMonths.length > 0 ? (
             sortedMonths.map((month) => {
               const data = monthlyDetails[month];

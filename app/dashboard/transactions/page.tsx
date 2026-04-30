@@ -84,12 +84,14 @@ export default async function TransactionsPage() {
   return (
     <PageWrapper>
       <PageHeader title="תנועות" subtitle="ניהול הכנסות והוצאות — 30 יום אחרונים" />
-      <TransactionsTable
-        initialTransactions={transactions || []}
-        categories={categories || []}
-        goals={goals || []}
-        userId={user.id}
-      />
+      <div data-tour="tx-list">
+        <TransactionsTable
+          initialTransactions={transactions || []}
+          categories={categories || []}
+          goals={goals || []}
+          userId={user.id}
+        />
+      </div>
     </PageWrapper>
   );
 }

@@ -118,7 +118,7 @@ interface KpiGridProps {
 export function KpiGrid({ children, cols = 4, className = '' }: KpiGridProps) {
   const lgCols = cols === 2 ? 'lg:grid-cols-2' : cols === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4';
   return (
-    <div className={`grid grid-cols-2 ${lgCols} gap-3 ${className}`}>
+    <div data-tour="kpi-grid" className={`grid grid-cols-2 ${lgCols} gap-3 ${className}`}>
       {children}
     </div>
   );
@@ -139,24 +139,29 @@ interface SectionProps {
   /** Card padding */
   padding?: 'sm' | 'md' | 'lg';
   className?: string;
+  /** Optional data-tour anchor id, lets the guided tour spotlight this section. */
+  tourId?: string;
 }
 
-export function Section({ title, titleIcon: Icon, titleIconColor = 'text-phi-gold', action, children, padding = 'md', className = '' }: SectionProps) {
+export function Section({ title, titleIcon: Icon, titleIconColor = 'text-phi-gold', action, children, padding = 'md', className = '', tourId }: SectionProps) {
+  const tourAttrs = tourId ? { 'data-tour': tourId } : {};
   return (
-    <Card padding={padding} className={className}>
-      {(title || action) && (
-        <div className="flex items-center justify-between mb-3">
-          {title && (
-            <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
-              {Icon && <Icon className={`w-4 h-4 ${titleIconColor}`} />}
-              {title}
-            </h3>
-          )}
-          {action}
-        </div>
-      )}
-      {children}
-    </Card>
+    <div {...tourAttrs}>
+      <Card padding={padding} className={className}>
+        {(title || action) && (
+          <div className="flex items-center justify-between mb-3">
+            {title && (
+              <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                {Icon && <Icon className={`w-4 h-4 ${titleIconColor}`} />}
+                {title}
+              </h3>
+            )}
+            {action}
+          </div>
+        )}
+        {children}
+      </Card>
+    </div>
   );
 }
 
@@ -418,14 +423,19 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, action, className = '' }: PageHeaderProps) {
   return (
-    <div className={`flex items-start justify-between gap-4 mb-6 ${className}`}>
+    // data-tour="page-header" is a default anchor — every PageHeader is a
+    // valid spotlight target for the contextual tour's intro step.
+    <div
+      data-tour="page-header"
+      className={`flex items-start justify-between gap-4 mb-6 ${className}`}
+    >
       <div className="min-w-0">
         {/* Canonical h1 size for the entire app — text-2xl (24px). All page
             titles flow through here so headings stay coherent across the dashboard. */}
         <h1 className="text-2xl font-bold text-gray-900 truncate">{title}</h1>
         {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
       </div>
-      {action && <div className="flex-shrink-0">{action}</div>}
+      {action && <div data-tour="page-action" className="flex-shrink-0">{action}</div>}
     </div>
   );
 }

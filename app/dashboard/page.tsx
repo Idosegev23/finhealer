@@ -165,7 +165,7 @@ export default async function DashboardPage() {
         <PendingTransactionsBanner />
 
         {/* Greeting */}
-        <div>
+        <div data-tour="greeting">
           <p className="text-phi-slate text-sm">{greeting},</p>
           <h1 className="text-2xl font-bold text-gray-900">{u.name || 'משתמש'}</h1>
           <p className="text-xs text-gray-400 mt-0.5">
@@ -185,7 +185,9 @@ export default async function DashboardPage() {
           <div data-tour="phi-score">
             <PhiScoreWidget score={score} />
           </div>
-          <PhaseJourney currentPhase={currentPhase} />
+          <div data-tour="phase-journey">
+            <PhaseJourney currentPhase={currentPhase} />
+          </div>
         </div>
 
         {/* Monthly KPIs — semantic colors per metric type */}
@@ -223,11 +225,13 @@ export default async function DashboardPage() {
         </div>
 
         {/* Expenses pie chart + budget recommendations */}
-        <ExpensesPieBudget />
+        <div data-tour="expenses-pie">
+          <ExpensesPieBudget />
+        </div>
 
         {/* Budget tracking */}
         {(!budgetTracking || budgetTracking.length === 0) ? (
-          <Section title="מעקב תקציב" titleIcon={Target}>
+          <Section tourId="budget-tracking" title="מעקב תקציב" titleIcon={Target}>
             <p className="text-xs text-gray-500">עדיין לא הוגדר תקציב.</p>
             <Link href="/dashboard/budget" className="inline-block mt-2 text-xs text-phi-gold font-medium hover:underline">
               צור תקציב חכם
@@ -235,6 +239,7 @@ export default async function DashboardPage() {
           </Section>
         ) : (
           <Section
+            tourId="budget-tracking"
             title="מעקב תקציב"
             titleIcon={Target}
             action={
@@ -268,12 +273,14 @@ export default async function DashboardPage() {
           <div data-tour="goals">
             <GoalsProgress goals={goals || []} />
           </div>
-          <LoansStatusCard />
+          <div data-tour="loans-snapshot">
+            <LoansStatusCard />
+          </div>
         </div>
 
         {/* Smart insights from DB */}
         {insights && insights.length > 0 && (
-          <Section title="תובנות חכמות" titleIcon={Lightbulb}>
+          <Section tourId="insights" title="תובנות חכמות" titleIcon={Lightbulb}>
             <div className="space-y-2">
               {(insights as any[]).map((insight, i) => {
                 const variant: 'danger' | 'warning' | 'info' =
@@ -299,6 +306,7 @@ export default async function DashboardPage() {
           />
         ) : (
           <Section
+            tourId="recent-transactions"
             title="תנועות אחרונות"
             action={
               <Link href="/dashboard/overview" className="text-xs text-phi-gold hover:underline flex items-center gap-0.5">

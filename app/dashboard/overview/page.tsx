@@ -156,12 +156,14 @@ export default async function OverviewPage() {
           tone="expense"
           subtitle={expenseChange !== 0 ? `${expenseChange > 0 ? '+' : ''}${expenseChange}% מחודש קודם` : undefined}
         />
-        <StatCard
-          label="מאזן"
-          value={`${curBalance >= 0 ? '+' : ''}₪${curBalance.toLocaleString('he-IL')}`}
-          icon={Wallet}
-          tone={curBalance >= 0 ? 'balance' : 'expense'}
-        />
+        <div data-tour="overview-networth">
+          <StatCard
+            label="מאזן"
+            value={`${curBalance >= 0 ? '+' : ''}₪${curBalance.toLocaleString('he-IL')}`}
+            icon={Wallet}
+            tone={curBalance >= 0 ? 'balance' : 'expense'}
+          />
+        </div>
         <StatCard
           label="חיסכון"
           value={`₪${totalSavings.toLocaleString('he-IL')}`}
@@ -171,34 +173,38 @@ export default async function OverviewPage() {
       </KpiGrid>
 
       {/* Pie chart + budget recommendations */}
-      <ExpensesPieBudget />
+      <div data-tour="overview-breakdown">
+        <ExpensesPieBudget />
+      </div>
 
       {/* Top spending categories */}
       {topCats.length > 0 && (
-        <Section
-          title={`הוצאות מובילות — ${monthName}`}
-          titleIcon={BarChart3}
-          action={
-            <Link href="/dashboard/expenses" className="text-xs text-phi-gold hover:underline flex items-center gap-0.5">
-              הכל <ChevronLeft className="w-3 h-3" />
-            </Link>
-          }
-        >
-          <div className="space-y-2">
-            {topCats.map(([cat, amount]) => {
-              const pct = curExpenses > 0 ? Math.round((amount / curExpenses) * 100) : 0
-              return (
-                <div key={cat}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-700">{cat}</span>
-                    <span className="text-gray-500 tabular-nums">₪{amount.toLocaleString('he-IL')} ({pct}%)</span>
+        <div data-tour="overview-trend">
+          <Section
+            title={`הוצאות מובילות — ${monthName}`}
+            titleIcon={BarChart3}
+            action={
+              <Link href="/dashboard/expenses" className="text-xs text-phi-gold hover:underline flex items-center gap-0.5">
+                הכל <ChevronLeft className="w-3 h-3" />
+              </Link>
+            }
+          >
+            <div className="space-y-2">
+              {topCats.map(([cat, amount]) => {
+                const pct = curExpenses > 0 ? Math.round((amount / curExpenses) * 100) : 0
+                return (
+                  <div key={cat}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-700">{cat}</span>
+                      <span className="text-gray-500 tabular-nums">₪{amount.toLocaleString('he-IL')} ({pct}%)</span>
+                    </div>
+                    <ProgressBar value={pct} size="md" />
                   </div>
-                  <ProgressBar value={pct} size="md" />
-                </div>
-              )
-            })}
-          </div>
-        </Section>
+                )
+              })}
+            </div>
+          </Section>
+        </div>
       )}
 
       {/* Active goals */}

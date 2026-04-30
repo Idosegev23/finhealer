@@ -16,7 +16,9 @@ export default function FinancialTablePage() {
           </Link>
         }
       />
-      <FinancialSummaryTable />
+      <div data-tour="ftable-table">
+        <FinancialSummaryTable />
+      </div>
     </PageWrapper>
   );
 }

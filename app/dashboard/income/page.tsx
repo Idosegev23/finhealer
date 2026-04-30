@@ -99,7 +99,7 @@ export default function IncomePage() {
   return (
     <PageWrapper maxWidth="wide">
       {/* Month Selector */}
-      <div className="flex flex-col items-center gap-1 mb-4">
+      <div className="flex flex-col items-center gap-1 mb-4" data-tour="inc-filter">
         <div className="flex items-center justify-center gap-3">
           <button
             onClick={() => {
@@ -182,6 +182,7 @@ export default function IncomePage() {
             <Button
               onClick={() => setShowWizard(true)}
               className="bg-phi-mint hover:bg-phi-mint/90 text-white"
+              data-tour="inc-add"
             >
               <Plus className="w-4 h-4 ml-2" />
               הוסף הכנסה
@@ -247,14 +248,16 @@ export default function IncomePage() {
           ) : incomeSources.length > 0 ? (
             <>
               <h3 className="text-xl font-bold text-gray-900 mb-4">💼 מקורות הכנסה קבועים</h3>
-              <IncomeTable
-                incomeSources={incomeSources}
-                onRefresh={loadIncome}
-                onEdit={(income) => {
-                  setEditingIncome(income);
-                  setShowWizard(true);
-                }}
-              />
+              <div data-tour="inc-list">
+                <IncomeTable
+                  incomeSources={incomeSources}
+                  onRefresh={loadIncome}
+                  onEdit={(income) => {
+                    setEditingIncome(income);
+                    setShowWizard(true);
+                  }}
+                />
+              </div>
             </>
           ) : null}
         </>

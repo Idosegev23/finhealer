@@ -261,38 +261,42 @@ function ScanCenterContent() {
 
       {/* Hero uploader — single big drop zone, no type selection required.
           Per-file editing inside the component handles type override + month. */}
-      <Card id="document-uploader" className="border-2 border-phi-gold mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-phi-gold" />
-            העלאת מסמכים
-          </CardTitle>
-          <CardDescription>
-            PDF / JPG / PNG / Excel / CSV · ניתן להעלות מספר קבצים יחד · עד 50MB לקובץ
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DocumentUploader
-            documentType="auto"
-            onSuccess={(data) => {
-              console.log('✅ Documents uploaded:', data);
-              loadScannedHistory();
-            }}
-            onError={(error) => {
-              addToast({ title: error, type: 'error' });
-            }}
-            acceptedFormats=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv"
-            maxSizeMB={50}
-          />
-        </CardContent>
-      </Card>
+      <div data-tour="scan-dropzone">
+        <Card id="document-uploader" className="border-2 border-phi-gold mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-phi-gold" />
+              העלאת מסמכים
+            </CardTitle>
+            <CardDescription>
+              PDF / JPG / PNG / Excel / CSV · ניתן להעלות מספר קבצים יחד · עד 50MB לקובץ
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DocumentUploader
+              documentType="auto"
+              onSuccess={(data) => {
+                console.log('✅ Documents uploaded:', data);
+                loadScannedHistory();
+              }}
+              onError={(error) => {
+                addToast({ title: error, type: 'error' });
+              }}
+              acceptedFormats=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv"
+              maxSizeMB={50}
+            />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Quick guidance — only when there's no bank statement yet */}
       {!checkingBankStatement && !hasBankStatement && (
-        <InsightBanner variant="info" icon={AlertCircle} title="התחל מדוח הבנק">
-          הדרך המהירה לתמונה פיננסית מלאה: העלה דוח תנועות בנק. ה-Phi יזהה אוטומטית אילו דוחות
-          נוספים חסרים (אשראי, מסלקה, ביטוח, תלושי שכר) ויבקש אותם לפי הצורך.
-        </InsightBanner>
+        <div data-tour="scan-hint">
+          <InsightBanner variant="info" icon={AlertCircle} title="התחל מדוח הבנק">
+            הדרך המהירה לתמונה פיננסית מלאה: העלה דוח תנועות בנק. ה-Phi יזהה אוטומטית אילו דוחות
+            נוספים חסרים (אשראי, מסלקה, ביטוח, תלושי שכר) ויבקש אותם לפי הצורך.
+          </InsightBanner>
+        </div>
       )}
 
       {/* Catalog of supported types — collapsed by default, available as
@@ -333,7 +337,7 @@ function ScanCenterContent() {
       </Card>
 
       {/* Scanned Documents History */}
-      <div className="mt-12">
+      <div data-tour="scan-status" className="mt-12">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">

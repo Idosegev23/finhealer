@@ -82,7 +82,7 @@ export default function AssistantPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col" dir="rtl">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
+      <div data-tour="page-header" className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-phi-dark flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-phi-gold" />
@@ -95,7 +95,7 @@ export default function AssistantPage() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
+      <div ref={scrollRef} data-tour="chat-messages" className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-3xl mx-auto space-y-4">
           {loadingHistory && (
             <div className="text-center py-8">
@@ -162,7 +162,7 @@ export default function AssistantPage() {
       </div>
 
       {/* Input */}
-      <div className="bg-white border-t border-gray-200 px-4 py-3">
+      <div data-tour="chat-input" className="bg-white border-t border-gray-200 px-4 py-3">
         <div className="max-w-3xl mx-auto flex items-end gap-2">
           <textarea
             value={input}
@@ -176,6 +176,7 @@ export default function AssistantPage() {
           <button
             onClick={send}
             disabled={sending || !input.trim()}
+            data-tour="chat-send"
             className="w-10 h-10 rounded-full bg-phi-dark text-white flex items-center justify-center disabled:opacity-50 hover:bg-phi-slate"
             aria-label="שלח"
           >

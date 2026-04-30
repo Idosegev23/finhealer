@@ -189,7 +189,7 @@ export default function MissingDocumentsPage() {
 
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
-          <div className="flex items-center gap-4 mb-4">
+          <div data-tour="page-header" className="flex items-center gap-4 mb-4">
             <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
               <AlertCircle className="w-6 h-6 text-phi-gold" />
             </div>
@@ -202,7 +202,7 @@ export default function MissingDocumentsPage() {
           </div>
 
           {/* Progress Bar */}
-          <div>
+          <div data-tour="docs-progress">
             <div className="flex justify-between text-xs text-gray-500 mb-1.5">
               <span>התקדמות: {uploadedCount}/{totalCount}</span>
               <span className="font-medium tabular-nums">{Math.round((uploadedCount / totalCount) * 100)}%</span>
@@ -216,7 +216,7 @@ export default function MissingDocumentsPage() {
           </div>
 
           {/* Filter Bar */}
-          <div className="flex items-center gap-4 flex-wrap">
+          <div data-tour="docs-filter" className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <Filter className="w-6 h-6 text-gray-600" />
               <span className="text-lg font-bold text-gray-700">סינון:</span>

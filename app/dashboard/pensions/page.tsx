@@ -157,7 +157,7 @@ export default function PensionsPage() {
         )}
 
         {/* Request Pension Report from Gadi */}
-        <div className="mb-8">
+        <div className="mb-8" data-tour="pension-report">
           <RequestPensionReport />
         </div>
 
@@ -205,7 +205,7 @@ export default function PensionsPage() {
         )}
 
         {/* Pensions Table */}
-        <DSCard padding="sm" className="overflow-hidden">
+        <DSCard padding="sm" className="overflow-hidden" data-tour="pension-list">
           {pensions.length === 0 ? (
             <div className="text-center py-16 animate-fade-in">
               <div className="mb-6 relative">

@@ -86,6 +86,7 @@ export default function SavingsPage() {
             <Button
               onClick={() => setShowAddModal(true)}
               className="bg-phi-mint hover:bg-phi-mint/90 text-white"
+              data-tour="savings-add"
             >
               <PlusCircle className="w-4 h-4 ml-2" />
               הוסף חשבון חיסכון
@@ -159,7 +160,7 @@ export default function SavingsPage() {
             </Button>
           </DSCard>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-tour="savings-list">
             {savings.map((account) => {
               const typeInfo = ACCOUNT_TYPE_LABELS[account.account_type];
               const Icon = typeInfo?.icon || PiggyBank;

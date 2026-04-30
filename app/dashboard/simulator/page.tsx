@@ -240,7 +240,7 @@ export default function SimulatorPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Input Panel */}
-          <Card className="bg-white border-phi-frost">
+          <Card className="bg-white border-phi-frost" data-tour="sim-form">
             <CardHeader>
               <CardTitle className="text-phi-dark flex items-center gap-2">
                 <Settings2 className="w-5 h-5 text-phi-gold" />
@@ -407,7 +407,7 @@ export default function SimulatorPage() {
 
           {/* Results Panel */}
           <div className="space-y-6">
-            <Card className="bg-white border-phi-frost">
+            <Card className="bg-white border-phi-frost" data-tour="sim-results">
               <CardHeader>
                 <CardTitle className="text-phi-dark flex items-center gap-2">
                   {isLoan ? <TrendingDown className="w-5 h-5 text-red-500" /> : <TrendingUp className="w-5 h-5 text-phi-mint" />}
@@ -493,6 +493,7 @@ export default function SimulatorPage() {
                       onClick={saveAsGoal}
                       disabled={savingGoal}
                       className="w-full bg-phi-gold hover:bg-phi-coral text-white gap-2"
+                      data-tour="sim-save"
                     >
                       {savingGoal ? (
                         <Loader2 className="w-4 h-4 animate-spin" />

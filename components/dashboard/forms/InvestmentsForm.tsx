@@ -163,7 +163,7 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
           className="space-y-6"
         >
           {/* Total Summary */}
-          <div className="bg-gradient-to-l from-phi-mint to-[#6BBF4A] text-white rounded-2xl p-6 shadow-xl">
+          <div className="bg-gradient-to-l from-phi-mint to-[#6BBF4A] text-white rounded-2xl p-6 shadow-xl" data-tour="invest-allocation">
             <div className="text-center">
               <h3 className="text-lg font-semibold mb-2">סך כל ההשקעות</h3>
               <p className="text-5xl font-bold">
@@ -173,7 +173,7 @@ export default function InvestmentsForm({ initialData }: InvestmentsFormProps) {
           </div>
 
           {/* Investment Types */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200">
+          <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200" data-tour="invest-list">
             <h3 className="text-xl font-bold text-[#1E2A3B] mb-6 flex items-center gap-2">
               פרט את ההשקעות שלך
               <InfoTooltip content="הזן סכומים משוערים - לא צריך להיות מדויק לגמרי" type="info" />

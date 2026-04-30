@@ -111,7 +111,7 @@ export default function RecurringPage() {
         </KpiGrid>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-6 items-center">
+        <div className="flex flex-wrap gap-3 mb-6 items-center" data-tour="rec-filter">
           <div className="flex gap-1 bg-white rounded-lg p-1 border border-phi-frost">
             {[
               { id: 'all', label: 'הכל' },
@@ -148,6 +148,7 @@ export default function RecurringPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
+          data-tour="rec-list"
         >
           <Card className="bg-white border-phi-frost">
             <CardHeader>
