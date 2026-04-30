@@ -182,12 +182,14 @@ export default async function DashboardPage() {
 
         {/* Score + Phase */}
         <div className="grid lg:grid-cols-2 gap-4">
-          <PhiScoreWidget score={score} />
+          <div data-tour="phi-score">
+            <PhiScoreWidget score={score} />
+          </div>
           <PhaseJourney currentPhase={currentPhase} />
         </div>
 
         {/* Monthly KPIs — semantic colors per metric type */}
-        <div>
+        <div data-tour="kpis">
           <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" />
             {activePeriod.label}{activePeriod.isFallback ? ' — חודש אחרון עם דאטה' : ' — חודש נוכחי'}
@@ -263,7 +265,9 @@ export default async function DashboardPage() {
 
         {/* Goals + Loans */}
         <div className="grid lg:grid-cols-2 gap-4">
-          <GoalsProgress goals={goals || []} />
+          <div data-tour="goals">
+            <GoalsProgress goals={goals || []} />
+          </div>
           <LoansStatusCard />
         </div>
 

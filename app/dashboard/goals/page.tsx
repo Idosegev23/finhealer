@@ -411,7 +411,7 @@ export default function GoalsPage() {
       )}
       
       {/* רשימת יעדים - עם קומפוננטה חדשה */}
-      <div className="mt-8">
+      <div className="mt-8" data-tour="goals-progress">
         <h2 className="text-2xl font-bold text-phi-dark mb-4">רשימת יעדים</h2>
         <GoalsListCard
           goals={goals}

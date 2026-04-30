@@ -135,15 +135,24 @@ export default function SignupPage() {
               {PHI}
             </span>
           </motion.div>
-          <motion.h2 
-            className="text-3xl font-bold mt-8 text-center"
+          <motion.div
+            className="mt-8 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-medium tracking-wide"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-phi-gold animate-pulse" />
+            Beta פתוחה
+          </motion.div>
+          <motion.h2
+            className="text-3xl font-bold mt-4 text-center"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
             הצטרף ל-Phi
           </motion.h2>
-          <motion.p 
+          <motion.p
             className="text-lg mt-4 opacity-90 text-center max-w-md"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -151,22 +160,25 @@ export default function SignupPage() {
           >
             התחל את המסע לבריאות פיננסית
           </motion.p>
-          
-          {/* Benefits */}
-          <motion.div 
-            className="mt-12 space-y-4"
+
+          {/* Beta value props — honest about what you're getting */}
+          <motion.div
+            className="mt-12 space-y-4 text-right max-w-sm w-full"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
             {[
-              '7 ימי ניסיון חינם',
-              'ללא כרטיס אשראי',
-              'ביטול בכל עת',
+              { label: 'חינם בתקופת הבטא', desc: 'גישה מלאה, ללא כרטיס אשראי' },
+              { label: 'ללא התחייבות', desc: 'אפשר למחוק את החשבון בכל רגע' },
+              { label: 'ליווי אנושי', desc: 'גדי וצוות φ זמינים בוואטסאפ' },
             ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 text-phi-gold" />
-                <span>{item}</span>
+              <div key={i} className="flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-phi-gold flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-medium leading-tight">{item.label}</div>
+                  <div className="text-sm text-white/70 leading-tight mt-0.5">{item.desc}</div>
+                </div>
               </div>
             ))}
           </motion.div>
@@ -194,7 +206,7 @@ export default function SignupPage() {
               יצירת חשבון
             </h1>
             <p className="text-phi-slate mb-8">
-              התחל את המסע ל-{PHI} המושלם שלך
+              שלוש דקות הרשמה — ואחר כך נחבר אותך לבוט {PHI} בוואטסאפ.
             </p>
 
             {error && (

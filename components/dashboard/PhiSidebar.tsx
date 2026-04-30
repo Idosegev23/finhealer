@@ -181,7 +181,10 @@ export function PhiSidebar({ isMobileMenuOpen, closeMobileMenu }: PhiSidebarProp
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-shrink-0 w-56 bg-phi-dark border-l border-phi-slate/20">
+      <aside
+        data-tour="sidebar"
+        className="hidden md:flex flex-shrink-0 w-56 bg-phi-dark border-l border-phi-slate/20"
+      >
         <SidebarContent />
       </aside>
 

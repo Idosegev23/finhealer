@@ -245,8 +245,9 @@ export default function LoansPage() {
               </div>
 
             {/* Loans List */}
-            <DSCard padding="lg">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">רשימת הלוואות</h3>
+            <div data-tour="loans-list">
+              <DSCard padding="lg">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">רשימת הלוואות</h3>
                 <div className="space-y-4">
                   {loans.map((loan) => (
                     <div key={loan.id} className="border border-gray-200 rounded-lg">
@@ -316,7 +317,8 @@ export default function LoansPage() {
                     </div>
                   ))}
               </div>
-            </DSCard>
+              </DSCard>
+            </div>
           </>
         )}
       </PageWrapper>
