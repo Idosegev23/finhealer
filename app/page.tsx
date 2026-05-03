@@ -168,10 +168,10 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              היחס הזהב
+              הבריאות הפיננסית
               <br />
               <span className="bg-gradient-to-l from-phi-coral via-phi-gold to-phi-coral bg-clip-text text-transparent">
-                של הכסף שלך
+                שלך, באיזון.
               </span>
             </motion.h1>
 
@@ -181,7 +181,7 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              מאמן פיננסי דיגיטלי בוואטסאפ. שולח דוחות → מקבל תקציב חכם, יעדים אמיתיים, וציון פיננסי שמתעדכן בזמן אמת.
+              מאמן פיננסי דיגיטלי בוואטסאפ. שולחים דוחות ← מקבלים תקציב חכם, יעדים אמיתיים, וציון פיננסי שמתעדכן בזמן אמת.
             </motion.p>
 
             <motion.p

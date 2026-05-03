@@ -27,7 +27,7 @@ export default function ExpensesDataPage() {
   const [vendor, setVendor] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('credit');
+  const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [categoryId, setCategoryId] = useState('');
   const [categoryName, setCategoryName] = useState('');
   const [expenseType, setExpenseType] = useState('');
@@ -150,10 +150,15 @@ export default function ExpensesDataPage() {
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                     >
-                      <option value="credit">כרטיס אשראי</option>
-                      <option value="debit">חיוב מיידי</option>
+                      <option value="credit_card">כרטיס אשראי</option>
+                      <option value="debit_card">חיוב מיידי</option>
                       <option value="cash">מזומן</option>
                       <option value="bank_transfer">העברה בנקאית</option>
+                      <option value="bit">ביט</option>
+                      <option value="paybox">פייבוקס</option>
+                      <option value="standing_order">הוראת קבע</option>
+                      <option value="direct_debit">חיוב ישיר</option>
+                      <option value="other">אחר</option>
                     </select>
                   </div>
                 </div>

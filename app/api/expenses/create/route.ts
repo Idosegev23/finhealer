@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error creating transaction:', error);
       return NextResponse.json(
-        { error: 'Failed to create transaction' },
+        { error: error.message || 'יצירת ההוצאה נכשלה', code: error.code },
         { status: 500 }
       );
     }
