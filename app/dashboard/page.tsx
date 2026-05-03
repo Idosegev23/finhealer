@@ -18,6 +18,7 @@ import InstallPWA from '@/components/dashboard/InstallPWA'
 import { DedupAlert } from '@/components/dashboard/DedupAlert'
 import { QuickAddFAB } from '@/components/dashboard/QuickAddFAB'
 import { OnboardingWizard } from '@/components/dashboard/OnboardingWizard'
+import { NextStepCard } from '@/components/dashboard/NextStepCard'
 import { KpiGrid, StatCard, Section, InsightBanner, EmptyState, ProgressBar } from '@/components/ui/design-system'
 import { getActivePeriod } from '@/lib/finance/active-period'
 import { tryUpgradePhase } from '@/lib/services/PhaseService'
@@ -79,6 +80,11 @@ export default async function DashboardPage() {
     { data: budgetTracking },
     { data: insights },
     { count: pendingCount },
+    // For NextStepCard — minimal counts so the hero shows the right CTA
+    { count: totalTxCount },
+    { count: incomeSourceCount },
+    { count: activeBudgetCount },
+    { count: missingDocsCount },
   ] = await Promise.all([
     supabase.rpc('calculate_financial_health', { p_user_id: user.id } as any),
     supabase
@@ -115,6 +121,25 @@ export default async function DashboardPage() {
       .limit(3),
     supabase
       .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'pending'),
+    supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'confirmed'),
+    supabase
+      .from('income_sources')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id),
+    supabase
+      .from('budgets')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('status', ['active', 'warning', 'exceeded']),
+    supabase
+      .from('missing_documents')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('status', 'pending'),
@@ -178,6 +203,18 @@ export default async function DashboardPage() {
           userName={u.name || ''}
           hasTransactions={(recentTx?.length || 0) > 0}
           phase={currentPhase}
+        />
+
+        {/* Single source of focus — what to do next based on real state */}
+        <NextStepCard
+          phase={currentPhase}
+          hasTransactions={(totalTxCount || 0) > 0}
+          txCount={totalTxCount || 0}
+          pendingTxCount={pendingCount || 0}
+          hasGoals={(goals?.length || 0) > 0}
+          hasBudget={(activeBudgetCount || 0) > 0}
+          hasIncome={(incomeSourceCount || 0) > 0 || monthlyIncome > 0}
+          hasMissingDocs={(missingDocsCount || 0) > 0}
         />
 
         {/* Score + Phase */}
