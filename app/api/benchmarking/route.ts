@@ -24,16 +24,32 @@ export async function GET() {
       .eq('type', 'expense')
       .gte('tx_date', since);
 
-    // Get all users' averages (anonymized)
+    // Peer cohort — confirmed expenses from OTHER users only. Excluding
+    // self prevents the 'you ARE the average' artifact when very few
+    // accounts have data. Below the cohort threshold we hide the widget
+    // entirely instead of showing fake comparisons.
+    const PEER_THRESHOLD = 5;
+
     const { data: allTx } = await supabase
       .from('transactions')
       .select('amount, category, tx_date, user_id')
       .eq('status', 'confirmed')
       .eq('type', 'expense')
+      .neq('user_id', user.id)
       .gte('tx_date', since);
 
-    if (!myTx || !allTx) {
+    if (!myTx) {
       return NextResponse.json({ comparisons: [], hasData: false });
+    }
+
+    const peerUsers = new Set((allTx || []).map((t) => t.user_id));
+    if (peerUsers.size < PEER_THRESHOLD) {
+      return NextResponse.json({
+        comparisons: [],
+        hasData: false,
+        reason: 'not_enough_peers',
+        peerCount: peerUsers.size,
+      });
     }
 
     const metaCategories = new Set([
@@ -52,11 +68,10 @@ export async function GET() {
       myByCategory[cat] = (myByCategory[cat] || 0) + Math.abs(tx.amount);
     }
 
-    // Calculate all users monthly avg per category
-    const allUsers = new Set(allTx.map(t => t.user_id));
-    const userCount = Math.max(allUsers.size, 1);
+    // Peers' totals per category (current user already excluded)
+    const peerCount = peerUsers.size;
     const allByCategory: Record<string, number> = {};
-    for (const tx of allTx) {
+    for (const tx of (allTx || [])) {
       const cat = tx.category || 'אחר';
       if (metaCategories.has(cat)) continue;
       allByCategory[cat] = (allByCategory[cat] || 0) + Math.abs(tx.amount);
@@ -67,7 +82,7 @@ export async function GET() {
     for (const [cat, total] of Object.entries(myByCategory)) {
       const myMonthlyAvg = Math.round(total / myMonthCount);
       const othersTotal = allByCategory[cat] || 0;
-      const othersMonthlyAvg = Math.round(othersTotal / (userCount * myMonthCount));
+      const othersMonthlyAvg = Math.round(othersTotal / (peerCount * myMonthCount));
 
       if (myMonthlyAvg < 50) continue; // Skip very small categories
 
@@ -90,14 +105,14 @@ export async function GET() {
     comparisons.sort((a, b) => b.diffPercent - a.diffPercent);
 
     const myTotalMonthly = Object.values(myByCategory).reduce((s, v) => s + v, 0) / myMonthCount;
-    const othersTotalMonthly = Object.values(allByCategory).reduce((s, v) => s + v, 0) / (userCount * myMonthCount);
+    const othersTotalMonthly = Object.values(allByCategory).reduce((s, v) => s + v, 0) / (peerCount * myMonthCount);
 
     return NextResponse.json({
       comparisons,
       summary: {
         myTotalMonthly: Math.round(myTotalMonthly),
         othersTotalMonthly: Math.round(othersTotalMonthly),
-        userCount,
+        userCount: peerCount,
         monthsAnalyzed: myMonthCount,
       },
       hasData: comparisons.length > 0,

@@ -13,7 +13,6 @@ import { LoansStatusCard } from '@/components/dashboard/LoansStatusCard'
 import { RealtimeRefresh } from '@/components/dashboard/RealtimeRefresh'
 import { ExpensesPieBudget } from '@/components/dashboard/ExpensesPieBudget'
 import BenchmarkWidget from '@/components/dashboard/BenchmarkWidget'
-import ReferralCard from '@/components/dashboard/ReferralCard'
 import InstallPWA from '@/components/dashboard/InstallPWA'
 import { DedupAlert } from '@/components/dashboard/DedupAlert'
 import { QuickAddFAB } from '@/components/dashboard/QuickAddFAB'
@@ -382,11 +381,10 @@ export default async function DashboardPage() {
           </Section>
         )}
 
-        {/* Benchmark + Referral */}
-        <div className="grid lg:grid-cols-2 gap-4">
-          <BenchmarkWidget />
-          <ReferralCard />
-        </div>
+        {/* Benchmark — only renders when there are enough real peers
+            with comparable data (PEER_THRESHOLD in /api/benchmarking).
+            Referral card removed per product feedback. */}
+        <BenchmarkWidget />
 
         {/* Quick Actions — unified phi palette, no rainbow */}
         <Section title="פעולות מהירות">
